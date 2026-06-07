@@ -340,6 +340,16 @@ const ui = {
   menuDiscordTitle: document.getElementById("menuDiscordTitle"),
   menuDiscordDescription: document.getElementById("menuDiscordDescription"),
   menuDiscordLink: document.getElementById("menuDiscordLink"),
+  menuImprintTitle: document.getElementById("menuImprintTitle"),
+  menuImprintDescription: document.getElementById("menuImprintDescription"),
+  menuImprintProviderTitle: document.getElementById("menuImprintProviderTitle"),
+  menuImprintProviderText: document.getElementById("menuImprintProviderText"),
+  menuImprintContactTitle: document.getElementById("menuImprintContactTitle"),
+  menuImprintContactText: document.getElementById("menuImprintContactText"),
+  menuImprintResponsibleTitle: document.getElementById("menuImprintResponsibleTitle"),
+  menuImprintResponsibleText: document.getElementById("menuImprintResponsibleText"),
+  menuImprintProjectTitle: document.getElementById("menuImprintProjectTitle"),
+  menuImprintProjectText: document.getElementById("menuImprintProjectText"),
   openCalendarScaleDialogButton: document.getElementById("openCalendarScaleDialogButton"),
   calendarScaleModal: document.getElementById("calendarScaleModal"),
   calendarScaleBackdrop: document.getElementById("calendarScaleBackdrop"),
@@ -658,6 +668,16 @@ const I18N = {
     menu_discord_title: "Discord",
     menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
     menu_discord_link: "Discord öffnen",
+    menu_imprint_title: "Impressum",
+    menu_imprint_description: "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeitstrahlen, Quellen, Karten, Charts und projektbezogener Wissensräume.",
+    menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
+    menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
+    menu_imprint_contact_title: "Kontakt",
+    menu_imprint_contact_text: "E-Mail: impressum@ziselin.com",
+    menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
+    menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
+    menu_imprint_project_title: "Projektbeschreibung",
+    menu_imprint_project_text: "TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge und Datencharts.",
     calendar_scale_title: "Zusätzlichen Kalender/Skala hinzufügen",
     calendar_scale_message: "Wähle die Art der zweiten Skala, die künftig zwischen Zeitstrahl und Beschriftung dargestellt werden soll.",
     calendar_scale_group_historical: "Historische Kalender",
@@ -1162,6 +1182,16 @@ const I18N = {
     menu_discord_title: "Discord",
     menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
     menu_discord_link: "Open Discord",
+    menu_imprint_title: "Legal Notice",
+    menu_imprint_description: "TimeMap is an interactive web app for creating, exploring, and presenting historical timelines, sources, maps, charts, and project-based knowledge spaces.",
+    menu_imprint_provider_title: "Provider information according to § 5 DDG",
+    menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
+    menu_imprint_contact_title: "Contact",
+    menu_imprint_contact_text: "Email: impressum@ziselin.com",
+    menu_imprint_responsible_title: "Responsible for content",
+    menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
+    menu_imprint_project_title: "Project description",
+    menu_imprint_project_text: "TimeMap supports digital history communication, historical research, lesson preparation, and curated source work through flexible project folders, visual timelines, image and film sources, map references, and data charts.",
     calendar_scale_title: "Add additional calendar/scale",
     calendar_scale_message: "Choose the kind of second scale that should later appear between the timeline and its labels.",
     calendar_scale_group_historical: "Historical calendars",
@@ -1896,6 +1926,15 @@ Object.assign(I18N.de, {
   menu_help_description: "Haben Sie es schon einmal mit Shift probiert?",
   menu_apps_description: "Vorbereitung f\u00fcr weitere Werkzeuge wie GenMap zur Anzeige genealogischer GEDCOM-Dateien.",
   menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
+  menu_imprint_description: "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeitstrahlen, Quellen, Karten, Charts und projektbezogener Wissensräume.",
+  menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
+  menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
+  menu_imprint_contact_title: "Kontakt",
+  menu_imprint_contact_text: "E-Mail: impressum@ziselin.com",
+  menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
+  menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
+  menu_imprint_project_title: "Projektbeschreibung",
+  menu_imprint_project_text: "TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge und Datencharts.",
   template_directory_choose: "Vorlagenordner wählen",
   template_directory_none: "Noch kein Vorlagenordner gewählt.",
   template_directory_selected: "Vorlagenordner: {name}",
@@ -1924,6 +1963,7 @@ Object.assign(I18N.de, {
   source_dataverse: "Dataverse",
   menu_discord_title: "Discord",
   menu_discord_link: "Discord \u00f6ffnen",
+  menu_imprint_title: "Impressum",
   calendar_scale_title: "Zus\u00e4tzlichen Kalender/Skala hinzuf\u00fcgen",
   calendar_scale_message: "W\u00e4hle die Art der zweiten Skala, die k\u00fcnftig zwischen Zeitstrahl und Beschriftung dargestellt werden soll.",
   calendar_scale_group_historical: "Historische Kalender",
@@ -2001,6 +2041,16 @@ Object.assign(I18N.en, {
   menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
   menu_discord_title: "Discord",
   menu_discord_link: "Open Discord",
+  menu_imprint_title: "Legal Notice",
+  menu_imprint_description: "TimeMap is an interactive web app for creating, exploring, and presenting historical timelines, sources, maps, charts, and project-based knowledge spaces.",
+  menu_imprint_provider_title: "Provider information according to § 5 DDG",
+  menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
+  menu_imprint_contact_title: "Contact",
+  menu_imprint_contact_text: "Email: impressum@ziselin.com",
+  menu_imprint_responsible_title: "Responsible for content",
+  menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
+  menu_imprint_project_title: "Project description",
+  menu_imprint_project_text: "TimeMap supports digital history communication, historical research, lesson preparation, and curated source work through flexible project folders, visual timelines, image and film sources, map references, and data charts.",
   calendar_scale_title: "Add additional calendar/scale",
   calendar_scale_message: "Choose the kind of second scale that should later appear between the timeline and its labels.",
   calendar_scale_group_historical: "Historical calendars",
@@ -4129,6 +4179,16 @@ function applyStaticTranslations() {
   if (ui.menuDiscordTitle) ui.menuDiscordTitle.textContent = t("menu_discord_title");
   if (ui.menuDiscordDescription) ui.menuDiscordDescription.textContent = t("menu_discord_description");
   if (ui.menuDiscordLink) ui.menuDiscordLink.textContent = t("menu_discord_link");
+  if (ui.menuImprintTitle) ui.menuImprintTitle.textContent = t("menu_imprint_title");
+  if (ui.menuImprintDescription) ui.menuImprintDescription.textContent = t("menu_imprint_description");
+  if (ui.menuImprintProviderTitle) ui.menuImprintProviderTitle.textContent = t("menu_imprint_provider_title");
+  if (ui.menuImprintProviderText) ui.menuImprintProviderText.innerHTML = t("menu_imprint_provider_text");
+  if (ui.menuImprintContactTitle) ui.menuImprintContactTitle.textContent = t("menu_imprint_contact_title");
+  if (ui.menuImprintContactText) ui.menuImprintContactText.textContent = t("menu_imprint_contact_text");
+  if (ui.menuImprintResponsibleTitle) ui.menuImprintResponsibleTitle.textContent = t("menu_imprint_responsible_title");
+  if (ui.menuImprintResponsibleText) ui.menuImprintResponsibleText.innerHTML = t("menu_imprint_responsible_text");
+  if (ui.menuImprintProjectTitle) ui.menuImprintProjectTitle.textContent = t("menu_imprint_project_title");
+  if (ui.menuImprintProjectText) ui.menuImprintProjectText.textContent = t("menu_imprint_project_text");
   if (ui.calendarScaleTitle) ui.calendarScaleTitle.textContent = t("calendar_scale_title");
   if (ui.calendarScaleMessage) ui.calendarScaleMessage.textContent = t("calendar_scale_message");
   if (ui.calendarScaleGroupHistorical) ui.calendarScaleGroupHistorical.textContent = t("calendar_scale_group_historical");

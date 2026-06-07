@@ -392,8 +392,8 @@ button:focus-visible {
   left: 0;
   width: min(33vw, 420px);
   max-width: min(calc(100% - 24px), 420px);
-  height: calc(100vh - 24px);
-  height: calc(100dvh - 24px);
+  height: 100vh;
+  height: 100dvh;
   border: 1px solid rgba(28, 38, 48, 0.1);
   background: #f3f5f7;
   color: #1f2930;
@@ -459,6 +459,8 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
   padding-top: 6px;
 }
 
@@ -602,6 +604,41 @@ button:focus-visible {
   margin-top: 2px;
   color: #182128;
   text-decoration: none;
+}
+
+.menu-imprint-popup {
+  max-height: min(54vh, 460px);
+  overflow: auto;
+}
+
+.timeline-menu-section-imprint {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.timeline-menu-section-imprint .timeline-menu-item {
+  min-height: 34px;
+  padding: 7px 9px;
+  color: rgba(31, 41, 48, 0.52);
+  font-size: 0.82rem;
+}
+
+.timeline-menu-section-imprint .timeline-menu-icon {
+  width: 17px;
+  height: 17px;
+  opacity: 0.68;
+}
+
+.menu-imprint-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.menu-imprint-block strong {
+  color: rgba(24, 33, 40, 0.84);
+  font-size: 0.84rem;
 }
 
 .chart-api-panel {
