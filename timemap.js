@@ -14,10 +14,13 @@ const LOCAL_DB_VERSION = 1;
 const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
 const LOCAL_PROJECT_DIRECTORY_KEY = "projectDirectoryHandle";
+const LOCAL_PROJECT_HOME_DIRECTORY_KEY = "projectHomeDirectoryHandle";
 const LOCAL_TEMPLATE_DIRECTORY_KEY = "templateDirectoryHandle";
 const LOCAL_STATE_VERSION = 1;
 const AUTOSAVE_DELAY_MS = 900;
 const PROJECT_FILE_NAME = "timemap-project.json";
+const PROJECT_ASSET_DIRECTORY_NAME = "Medien";
+const LEGACY_PROJECT_ASSET_DIRECTORY_NAME = "assets";
 const TEMPLATE_FOLDER_NAME = "Projektvorlagen";
 const SEARCH_RESULTS_PAGE_SIZE = 8;
 const CHART_SEARCH_RESULTS_PAGE_SIZE = 6;
@@ -228,6 +231,7 @@ const pendingEventImageLookupBySourceId = new Map();
 const eventImageMemoryCache = new Map();
 const flagImageAspectCache = new Map();
 const projectAssetObjectUrlCache = new Map();
+const editorOpenSectionByScope = new Map();
 const EVENT_IMAGE_MEMORY_CACHE_LIMIT = 256;
 const thumbCropModalState = {
   eventId: null,
@@ -288,7 +292,9 @@ const ui = {
   addChartButton: document.getElementById("addChartButton"),
   addEpochGroupButton: document.getElementById("addEpochGroupButton"),
   importFolderButton: document.getElementById("importFolderButton"),
+  saveProjectButton: document.getElementById("saveProjectButton"),
   renderLibraryButton: document.getElementById("renderLibraryButton"),
+  projectDirectoryStatus: document.getElementById("projectDirectoryStatus"),
   importFolderInput: document.getElementById("importFolderInput"),
   importChartButton: document.getElementById("importChartButton"),
   importChartInput: document.getElementById("importChartInput"),
@@ -602,6 +608,7 @@ const EDITOR_SECTION_ICON_URLS = {
   information: "https://api.iconify.design/ic/sharp-info.svg",
   assignment: "https://api.iconify.design/mdi/folder-text.svg",
   visibility: "https://api.iconify.design/ic/sharp-visibility.svg",
+  categories: "https://api.iconify.design/material-symbols/category-rounded.svg",
 };
 const LANGUAGE_STORAGE_KEY = "timemap-language";
 const LANGUAGE_OPTIONS = [
@@ -1870,7 +1877,9 @@ const state = {
   localPersistenceReady: false,
   localRestoreInProgress: false,
   autosaveTimer: null,
+  projectHomeDirectoryHandle: null,
   projectDirectoryHandle: null,
+  projectHasUnsavedChanges: false,
   templateDirectoryHandle: null,
   templateProjectEntries: [],
   templateProjectEntriesLoaded: false,
@@ -1923,6 +1932,10 @@ Object.assign(I18N.de, {
   calendar_scale_close: "Schlie\u00dfen",
   project_storage_title: "5. Projektordner",
   project_storage_description: "Lege optional einen lokalen Projektordner fest, um den aktuellen Stand als Datei zu speichern oder wieder zu laden.",
+  project_new: "Neues Projekt",
+  project_open: "Öffnen",
+  project_open_button: "Projekt öffnen",
+  project_save: "Speichern",
   project_directory_choose: "Projektordner wählen",
   project_directory_save: "Projekt speichern",
   project_directory_load: "Projekt laden",
@@ -1930,10 +1943,24 @@ Object.assign(I18N.de, {
   project_directory_selected: "Projektordner: {name}",
   project_directory_saved: "Projekt gespeichert: {name}",
   project_directory_loaded: "Projekt geladen: {name}",
+  project_home_choose: "TimeMap-Heimatordner wählen",
+  project_home_selected: "Heimatordner: {name}",
+  project_home_saved: "Projekt gespeichert: {project} · Heimatordner: {home}",
   project_directory_unavailable: "Projektordner werden in diesem Browser nicht unterstützt.",
   project_directory_permission_denied: "Zugriff auf den Projektordner wurde nicht erlaubt.",
   project_directory_missing_file: "Im gewählten Ordner wurde keine Projektdatei gefunden.",
   project_directory_error: "Projektordner konnte nicht verarbeitet werden.",
+  project_open_title: "Projekt öffnen",
+  project_open_message: "Wähle einen Projektordner oder einen Ordner, der mehrere TimeMap-Projekte enthält.",
+  project_open_empty: "Im gewählten Ordner wurde kein TimeMap-Projekt gefunden.",
+  project_open_current_folder: "Diesen Ordner öffnen",
+  project_open_choose: "Projekt auswählen",
+  project_menu_actions: "Projektaktionen",
+  project_menu_save: "Projekt speichern",
+  project_menu_properties: "Eigenschaften",
+  project_menu_render: "Projekt rendern",
+  project_menu_add_subfolder: "Unterordner erstellen",
+  project_menu_delete: "Projekt löschen",
   presentation_render_title: "Präsentation rendern",
   presentation_render_message: "Lege den darstellbaren Zeitbereich und den erlaubten Zoombereich der Präsentationsdatei fest.",
   presentation_render_start: "Zeitraum von",
@@ -2007,6 +2034,10 @@ Object.assign(I18N.en, {
   source_dataverse: "Dataverse",
   project_storage_title: "5. Project folder",
   project_storage_description: "Optionally choose a local project folder to save or reload the current state as a file.",
+  project_new: "New project",
+  project_open: "Open",
+  project_open_button: "Open project",
+  project_save: "Save",
   project_directory_choose: "Choose project folder",
     chart_comment_add: "Add comment",
     event_hide: "Hide event",
@@ -2032,10 +2063,24 @@ Object.assign(I18N.en, {
   project_directory_selected: "Project folder: {name}",
   project_directory_saved: "Project saved: {name}",
   project_directory_loaded: "Project loaded: {name}",
+  project_home_choose: "Choose TimeMap home folder",
+  project_home_selected: "Home folder: {name}",
+  project_home_saved: "Project saved: {project} · Home folder: {home}",
   project_directory_unavailable: "Project folders are not supported in this browser.",
   project_directory_permission_denied: "Access to the project folder was not granted.",
   project_directory_missing_file: "No project file was found in the selected folder.",
   project_directory_error: "The project folder could not be processed.",
+  project_open_title: "Open project",
+  project_open_message: "Choose a project folder or a folder containing several TimeMap projects.",
+  project_open_empty: "No TimeMap project was found in the selected folder.",
+  project_open_current_folder: "Open this folder",
+  project_open_choose: "Choose project",
+  project_menu_actions: "Project actions",
+  project_menu_save: "Save project",
+  project_menu_properties: "Properties",
+  project_menu_render: "Render project",
+  project_menu_add_subfolder: "Create subfolder",
+  project_menu_delete: "Delete project",
   presentation_render_title: "Render presentation",
   presentation_render_message: "Define the time span and allowed zoom range of the presentation file.",
   presentation_render_start: "Time span from",
@@ -2055,18 +2100,12 @@ if (ui.addCustomEventButton) {
 
 if (ui.addFolderButton) {
   ui.addFolderButton.classList.add("add-action-button");
-  ui.addFolderButton.innerHTML = '<span class="add-action-plus">+</span><span>Ordner</span>';
+  ui.addFolderButton.innerHTML = '<span class="add-action-plus">+</span><span>Neues Projekt</span>';
 }
 
 if (ui.addChartButton) {
   ui.addChartButton.classList.add("add-action-button");
   ui.addChartButton.innerHTML = '<span class="add-action-plus">+</span><span>Chart</span>';
-}
-
-if (ui.addEpochGroupButton) {
-  ui.addEpochGroupButton.classList.add("add-action-button");
-  ui.addEpochGroupButton.innerHTML = '<span class="add-action-plus">+</span><span>Hinzufügen</span>';
-  ui.addEpochGroupButton.disabled = false;
 }
 
 function clamp(value, min, max) {
@@ -2374,8 +2413,21 @@ async function saveLocalStateSnapshot() {
   await withLocalStateStore("readwrite", (store) => store.put(snapshot, LOCAL_DB_KEY));
 }
 
+function updateProjectSaveDirtyIndicators() {
+  document.querySelectorAll(".group-row-icon-action.is-save-project").forEach((button) => {
+    button.classList.toggle("has-unsaved-changes", state.projectHasUnsavedChanges === true);
+  });
+}
+
+function markProjectDirty() {
+  if (state.localRestoreInProgress) return;
+  state.projectHasUnsavedChanges = true;
+  updateProjectSaveDirtyIndicators();
+}
+
 function scheduleLocalAutosave() {
   if (!state.localPersistenceReady || state.localRestoreInProgress) return;
+  markProjectDirty();
   if (state.autosaveTimer) {
     window.clearTimeout(state.autosaveTimer);
   }
@@ -2537,9 +2589,18 @@ function getProjectDirectoryDisplayName(handle = state.projectDirectoryHandle) {
   return String(handle?.name || PROJECT_FILE_NAME);
 }
 
+function getProjectHomeDirectoryDisplayName(handle = state.projectHomeDirectoryHandle) {
+  return String(handle?.name || t("project_home_choose"));
+}
+
 async function saveProjectDirectoryHandle(handle) {
   state.projectDirectoryHandle = handle ?? null;
   await withLocalStateStore("readwrite", (store) => store.put(handle ?? null, LOCAL_PROJECT_DIRECTORY_KEY));
+}
+
+async function saveProjectHomeDirectoryHandle(handle) {
+  state.projectHomeDirectoryHandle = handle ?? null;
+  await withLocalStateStore("readwrite", (store) => store.put(handle ?? null, LOCAL_PROJECT_HOME_DIRECTORY_KEY));
 }
 
 async function loadStoredProjectDirectoryHandle() {
@@ -2549,6 +2610,17 @@ async function loadStoredProjectDirectoryHandle() {
     return state.projectDirectoryHandle;
   } catch {
     state.projectDirectoryHandle = null;
+    return null;
+  }
+}
+
+async function loadStoredProjectHomeDirectoryHandle() {
+  try {
+    const handle = await withLocalStateStore("readonly", (store) => store.get(LOCAL_PROJECT_HOME_DIRECTORY_KEY));
+    state.projectHomeDirectoryHandle = handle ?? null;
+    return state.projectHomeDirectoryHandle;
+  } catch {
+    state.projectHomeDirectoryHandle = null;
     return null;
   }
 }
@@ -2605,6 +2677,44 @@ async function chooseTemplateDirectory() {
 
 function getTemplateEntrySortKey(entry) {
   return `${String(entry.title || "").toLocaleLowerCase(getUiSortLocale())}\u0000${String(entry.fileName || "").toLocaleLowerCase(getUiSortLocale())}`;
+}
+
+function getCurrentProjectDirectoryName() {
+  const activeProject = getActiveProjectRootGroup?.() ?? null;
+  const fallbackProject = getProjectRootGroupOptions?.()[0] ?? null;
+  const rawTitle = String(activeProject?.title || fallbackProject?.title || "TimeMap-Projekt").trim();
+  const safeTitle = sanitizeFilenamePart(rawTitle)
+    .replace(/\.+$/g, "")
+    .trim();
+  return safeTitle || "TimeMap-Projekt";
+}
+
+async function chooseProjectHomeDirectory() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    updateProjectStorageUi(t("project_directory_unavailable"));
+    return null;
+  }
+  const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+  await saveProjectHomeDirectoryHandle(handle);
+  updateProjectStorageUi(tf("project_home_selected", { name: getProjectHomeDirectoryDisplayName(handle) }));
+  return handle;
+}
+
+async function getOrCreateProjectDirectoryInHome() {
+  let homeHandle = state.projectHomeDirectoryHandle;
+  if (!homeHandle) {
+    homeHandle = await chooseProjectHomeDirectory();
+  }
+  if (!homeHandle) return null;
+  const granted = await ensureProjectDirectoryPermission(homeHandle, "readwrite");
+  if (!granted) {
+    updateProjectStorageUi(t("project_directory_permission_denied"));
+    return null;
+  }
+  const projectFolderName = getCurrentProjectDirectoryName();
+  const projectHandle = await homeHandle.getDirectoryHandle(projectFolderName, { create: true });
+  await saveProjectDirectoryHandle(projectHandle);
+  return projectHandle;
 }
 
 async function listTemplateProjectsInDirectory(handle) {
@@ -2674,14 +2784,17 @@ function updateProjectStorageUi(statusText = null) {
     ui.projectDirectoryStatus.textContent = statusText
       || (supported
         ? (state.projectDirectoryHandle
-          ? tf("project_directory_selected", { name: getProjectDirectoryDisplayName() })
+          ? (state.projectHomeDirectoryHandle
+            ? `${tf("project_directory_selected", { name: getProjectDirectoryDisplayName() })} · ${tf("project_home_selected", { name: getProjectHomeDirectoryDisplayName() })}`
+            : tf("project_directory_selected", { name: getProjectDirectoryDisplayName() }))
           : t("project_directory_none"))
         : t("project_directory_unavailable"));
   }
-  [ui.chooseProjectDirectoryButton, ui.saveProjectDirectoryButton, ui.loadProjectDirectoryButton].forEach((button) => {
+  [ui.chooseProjectDirectoryButton, ui.saveProjectDirectoryButton, ui.loadProjectDirectoryButton, ui.saveProjectButton].forEach((button) => {
     if (!button) return;
     button.disabled = !supported;
   });
+  if (ui.importFolderButton) ui.importFolderButton.disabled = false;
 }
 
 async function chooseProjectDirectory() {
@@ -2695,10 +2808,127 @@ async function chooseProjectDirectory() {
   return handle;
 }
 
+async function directoryContainsProjectFile(handle) {
+  if (!handle) return false;
+  try {
+    await handle.getFileHandle(PROJECT_FILE_NAME, { create: false });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function listProjectDirectoriesInDirectory(handle) {
+  const entries = [];
+  if (!handle || typeof handle.entries !== "function") return entries;
+  for await (const [, childHandle] of handle.entries()) {
+    if (!childHandle || childHandle.kind !== "directory") continue;
+    if (!(await directoryContainsProjectFile(childHandle))) continue;
+    entries.push({
+      title: getProjectDirectoryDisplayName(childHandle),
+      handle: childHandle,
+    });
+  }
+  entries.sort((left, right) => String(left.title || "").localeCompare(String(right.title || ""), getUiSortLocale()));
+  return entries;
+}
+
+function showProjectOpenSelectionDialog(entries, { includeCurrent = false, currentHandle = null } = {}) {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.className = "confirm-modal project-open-modal";
+    const backdrop = document.createElement("div");
+    backdrop.className = "confirm-modal-backdrop";
+    const dialog = document.createElement("div");
+    dialog.className = "confirm-modal-dialog project-open-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    const title = document.createElement("strong");
+    title.textContent = t("project_open_title");
+    const message = document.createElement("p");
+    message.textContent = t("project_open_message");
+    const list = document.createElement("div");
+    list.className = "project-open-list";
+    const close = (handle = null) => {
+      modal.remove();
+      resolve(handle);
+    };
+    if (includeCurrent && currentHandle) {
+      const currentButton = document.createElement("button");
+      currentButton.type = "button";
+      currentButton.className = "secondary-button project-open-list-button";
+      currentButton.textContent = t("project_open_current_folder");
+      currentButton.addEventListener("click", () => close(currentHandle));
+      list.appendChild(currentButton);
+    }
+    entries.forEach((entry) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "secondary-button project-open-list-button";
+      button.textContent = entry.title || t("project_open_choose");
+      button.addEventListener("click", () => close(entry.handle));
+      list.appendChild(button);
+    });
+    const actions = document.createElement("div");
+    actions.className = "confirm-modal-actions";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = t("cancel");
+    cancelButton.addEventListener("click", () => close(null));
+    backdrop.addEventListener("click", () => close(null));
+    actions.appendChild(cancelButton);
+    dialog.append(title, message, list, actions);
+    modal.append(backdrop, dialog);
+    document.body.appendChild(modal);
+  });
+}
+
+async function openProjectModule() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    updateProjectStorageUi(t("project_directory_unavailable"));
+    ui.importFolderInput?.click();
+    return false;
+  }
+  try {
+    const rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+    const granted = await ensureProjectDirectoryPermission(rootHandle, "readwrite");
+    if (!granted) {
+      updateProjectStorageUi(t("project_directory_permission_denied"));
+      return false;
+    }
+    const includeCurrent = await directoryContainsProjectFile(rootHandle);
+    const projectEntries = await listProjectDirectoriesInDirectory(rootHandle);
+    let projectHandle = rootHandle;
+    if (!includeCurrent && projectEntries.length === 0) {
+      updateProjectStorageUi(t("project_open_empty"));
+      return false;
+    }
+    if (projectEntries.length > 0) {
+      projectHandle = await showProjectOpenSelectionDialog(projectEntries, {
+        includeCurrent,
+        currentHandle: rootHandle,
+      });
+      if (projectHandle) {
+        await saveProjectHomeDirectoryHandle(rootHandle);
+      }
+    } else if (!includeCurrent) {
+      await saveProjectHomeDirectoryHandle(rootHandle);
+    }
+    if (!projectHandle) return false;
+    await saveProjectDirectoryHandle(projectHandle);
+    return loadProjectFromDirectory(projectHandle);
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      updateProjectStorageUi(t("project_directory_error"));
+    }
+    return false;
+  }
+}
+
 async function saveProjectToDirectory() {
   let handle = state.projectDirectoryHandle;
   if (!handle) {
-    handle = await chooseProjectDirectory();
+    handle = await getOrCreateProjectDirectoryInHome();
   }
   if (!handle) return false;
   const granted = await ensureProjectDirectoryPermission(handle, "readwrite");
@@ -2710,14 +2940,21 @@ async function saveProjectToDirectory() {
   const writable = await fileHandle.createWritable();
   await writable.write(JSON.stringify(buildLocalStateSnapshot(), null, 2));
   await writable.close();
-  updateProjectStorageUi(tf("project_directory_saved", { name: getProjectDirectoryDisplayName(handle) }));
+  state.projectHasUnsavedChanges = false;
+  updateProjectSaveDirtyIndicators();
+  updateProjectStorageUi(state.projectHomeDirectoryHandle
+    ? tf("project_home_saved", {
+      project: getProjectDirectoryDisplayName(handle),
+      home: getProjectHomeDirectoryDisplayName(),
+    })
+    : tf("project_directory_saved", { name: getProjectDirectoryDisplayName(handle) }));
   return true;
 }
 
 async function ensureProjectAssetDirectoryHandle(kind = "images") {
   let handle = state.projectDirectoryHandle;
   if (!handle) {
-    handle = await chooseProjectDirectory();
+    handle = await getOrCreateProjectDirectoryInHome();
   }
   if (!handle) return null;
   const granted = await ensureProjectDirectoryPermission(handle, "readwrite");
@@ -2725,7 +2962,7 @@ async function ensureProjectAssetDirectoryHandle(kind = "images") {
     updateProjectStorageUi(t("project_directory_permission_denied"));
     return null;
   }
-  const assetsHandle = await handle.getDirectoryHandle("assets", { create: true });
+  const assetsHandle = await handle.getDirectoryHandle(PROJECT_ASSET_DIRECTORY_NAME, { create: true });
   return assetsHandle.getDirectoryHandle(kind, { create: true });
 }
 
@@ -2738,7 +2975,7 @@ async function writeProjectAssetFile(kind, file) {
   const writable = await fileHandle.createWritable();
   await writable.write(await file.arrayBuffer());
   await writable.close();
-  return normalizeLocalAssetPath(`assets/${kind}/${nextFileName}`);
+  return normalizeLocalAssetPath(`${PROJECT_ASSET_DIRECTORY_NAME}/${kind}/${nextFileName}`);
 }
 
 async function resolveProjectAssetUrl(assetPath) {
@@ -2753,11 +2990,21 @@ async function resolveProjectAssetUrl(assetPath) {
   try {
     const pathParts = normalizedPath.split("/").filter(Boolean);
     if (!pathParts.length) return "";
-    let currentHandle = handle;
-    for (let index = 0; index < pathParts.length - 1; index += 1) {
-      currentHandle = await currentHandle.getDirectoryHandle(pathParts[index], { create: false });
+    const resolveFromParts = async (parts) => {
+      let currentHandle = handle;
+      for (let index = 0; index < parts.length - 1; index += 1) {
+        currentHandle = await currentHandle.getDirectoryHandle(parts[index], { create: false });
+      }
+      return currentHandle.getFileHandle(parts[parts.length - 1], { create: false });
+    };
+    let fileHandle;
+    try {
+      fileHandle = await resolveFromParts(pathParts);
+    } catch (error) {
+      const usesCurrentAssetRoot = pathParts[0] === PROJECT_ASSET_DIRECTORY_NAME;
+      if (!usesCurrentAssetRoot) throw error;
+      fileHandle = await resolveFromParts([LEGACY_PROJECT_ASSET_DIRECTORY_NAME, ...pathParts.slice(1)]);
     }
-    const fileHandle = await currentHandle.getFileHandle(pathParts[pathParts.length - 1], { create: false });
     const file = await fileHandle.getFile();
     const objectUrl = URL.createObjectURL(file);
     projectAssetObjectUrlCache.set(normalizedPath, objectUrl);
@@ -2821,12 +3068,15 @@ async function hydrateAllLocalMediaAssetUrls() {
   syncHydratedFlagMarkerUrlsFromOwners();
 }
 
-async function loadProjectFromDirectory() {
-  let handle = state.projectDirectoryHandle;
+async function loadProjectFromDirectory(handleOverride = null) {
+  let handle = handleOverride || state.projectDirectoryHandle;
   if (!handle) {
     handle = await chooseProjectDirectory();
   }
   if (!handle) return false;
+  if (handleOverride) {
+    await saveProjectDirectoryHandle(handleOverride);
+  }
   const granted = await ensureProjectDirectoryPermission(handle, "read");
   if (!granted) {
     updateProjectStorageUi(t("project_directory_permission_denied"));
@@ -2854,6 +3104,8 @@ async function loadProjectFromDirectory() {
     renderChartResults();
     renderSearchResults();
     drawTimeline();
+    state.projectHasUnsavedChanges = false;
+    updateProjectSaveDirtyIndicators();
     updateProjectStorageUi(tf("project_directory_loaded", { name: getProjectDirectoryDisplayName(handle) }));
     return true;
   } catch (error) {
@@ -3926,11 +4178,11 @@ function applyStaticTranslations() {
   if (ui.editorEmptyState) ui.editorEmptyState.textContent = t("editor_empty");
   if (ui.eventLibraryLabel) ui.eventLibraryLabel.textContent = t("event_library_label");
   if (ui.addCustomEventButton) ui.addCustomEventButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("add_event")}</span>`;
-  if (ui.addFolderButton) ui.addFolderButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("add_folder")}</span>`;
+  if (ui.addFolderButton) ui.addFolderButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("project_new")}</span>`;
   if (ui.addChartButton) ui.addChartButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("add_chart")}</span>`;
-  if (ui.addEpochGroupButton) ui.addEpochGroupButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("add_more")}</span>`;
-  if (ui.addEpochGroupButton) ui.addEpochGroupButton.disabled = false;
-  if (ui.importFolderButton) ui.importFolderButton.textContent = t("import");
+  if (ui.addEpochGroupButton) ui.addEpochGroupButton.hidden = true;
+  if (ui.importFolderButton) ui.importFolderButton.textContent = t("project_open_button");
+  if (ui.saveProjectButton) ui.saveProjectButton.hidden = true;
   if (ui.renderLibraryButton) ui.renderLibraryButton.textContent = t("render");
   if (ui.chartPointCommentAddButton) ui.chartPointCommentAddButton.textContent = t("chart_comment_add");
   if (ui.chartPointEventHideButton) ui.chartPointEventHideButton.textContent = t("event_hide");
@@ -23058,8 +23310,12 @@ function createInlineEditor(eventItem) {
     subfolderField,
   );
 
+  const editorSectionScopeId = `event:${eventItem.id}`;
+  const openEditorSectionId = editorOpenSectionByScope.get(editorSectionScopeId) || "general";
   let activeEditorSection = null;
-  const createEditorSection = (text, children = [], { expanded = false, iconKey = "" } = {}) => {
+  const createEditorSection = (text, children = [], { id = "", iconKey = "" } = {}) => {
+    const sectionId = id || normalizeCategory(text) || "section";
+    const expanded = openEditorSectionId === sectionId;
     const section = document.createElement("section");
     section.className = "editor-section";
     const button = document.createElement("button");
@@ -23101,6 +23357,8 @@ function createInlineEditor(eventItem) {
       button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
       icon.textContent = nextExpanded ? "▾" : "▸";
       activeEditorSection = nextExpanded ? sectionState : null;
+      if (nextExpanded) editorOpenSectionByScope.set(editorSectionScopeId, sectionId);
+      else editorOpenSectionByScope.delete(editorSectionScopeId);
     });
     section.append(button, body);
     return section;
@@ -23244,37 +23502,37 @@ function createInlineEditor(eventItem) {
     createEditorSection("Allgemein", [
       createField(t("title"), titleInput),
       categoryMetaRow,
-    ], { expanded: true, iconKey: "general" }),
+    ], { id: "general", iconKey: "general" }),
     createEditorSection(t("archives_heading"), [
       archiveRow,
       archiveRowSecondary,
-    ], { iconKey: "archives" }),
+    ], { id: "archives", iconKey: "archives" }),
     createEditorSection("Zeit", [
       yearRow,
       checkboxLabel,
-    ], { iconKey: "time" }),
+    ], { id: "time", iconKey: "time" }),
     createEditorSection("Darstellung", [
       displayRow,
       ...(eventItem.displayMode === "area" ? [areaManualPositionLockField] : []),
       colorField,
-    ], { iconKey: "display" }),
+    ], { id: "display", iconKey: "display" }),
     createEditorSection("Illustration", [
       imageField,
       ...(eventItem.kind === "source" ? [] : [flagField]),
-    ], { iconKey: "illustration" }),
+    ], { id: "illustration", iconKey: "illustration" }),
     createEditorSection("Ereignis-Informationen", [
       wikidataCategoryField,
       descriptionField,
       workInformationField,
-    ], { iconKey: "information" }),
+    ], { id: "information", iconKey: "information" }),
     createEditorSection("Zuordnung", [
       folderRelationRow,
       relationField,
-    ], { iconKey: "assignment" }),
+    ], { id: "assignment", iconKey: "assignment" }),
     createEditorSection(state.language === "en" ? "Visibility" : "Sichtbarkeit", [
       zoomRow,
       ...(eventItem.kind === "source" ? [] : [relationRow]),
-    ], { iconKey: "visibility" }),
+    ], { id: "visibility", iconKey: "visibility" }),
   );
   editor.append(eventMetaSection);
   updateRelationEditorState();
@@ -25181,8 +25439,12 @@ function createGroupInlineEditor(groupItem) {
   forceSettingsText.textContent = t("folder_force_settings");
   forceSettingsField.append(forceSettingsCheckbox, forceSettingsText);
 
+  const editorSectionScopeId = `group:${groupItem.id}`;
+  const openEditorSectionId = editorOpenSectionByScope.get(editorSectionScopeId) || "general";
   let activeEditorSection = null;
-  const createEditorSection = (text, children = [], { expanded = false, iconKey = "" } = {}) => {
+  const createEditorSection = (text, children = [], { id = "", iconKey = "" } = {}) => {
+    const sectionId = id || normalizeCategory(text) || "section";
+    const expanded = openEditorSectionId === sectionId;
     const section = document.createElement("section");
     section.className = "editor-section";
     const button = document.createElement("button");
@@ -25224,6 +25486,8 @@ function createGroupInlineEditor(groupItem) {
       button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
       icon.textContent = nextExpanded ? "▾" : "▸";
       activeEditorSection = nextExpanded ? sectionState : null;
+      if (nextExpanded) editorOpenSectionByScope.set(editorSectionScopeId, sectionId);
+      else editorOpenSectionByScope.delete(editorSectionScopeId);
     });
     section.append(button, body);
     return section;
@@ -25253,19 +25517,19 @@ function createGroupInlineEditor(groupItem) {
         createEditorSection("Allgemein", [
           createField(t("folder_name"), titleInput),
           createField(t("add_icon"), iconFieldBody),
-        ], { expanded: true, iconKey: "general" }),
+        ], { id: "general", iconKey: "general" }),
         createEditorSection("Sichtbarkeit", [
           visibilityHint,
           zoomRow,
           timeLimitRow,
-        ], { iconKey: "visibility" }),
+        ], { id: "visibility", iconKey: "visibility" }),
         createEditorSection("Timeline", [
           timelinePositionField,
           createField(t("additional_calendar"), additionalCalendarSelect),
-        ], { iconKey: "time" }),
+        ], { id: "timeline", iconKey: "time" }),
         createEditorSection(t("categories"), [
           categoryFieldBody,
-        ]),
+        ], { id: "categories", iconKey: "categories" }),
       ]
       : [
         createField(t("folder_name"), titleInput),
@@ -25627,6 +25891,26 @@ function createGroupBrowserItem(groupItem, options = {}) {
 
   const main = document.createElement("div");
   main.className = "group-row-main";
+  if (isProjectRootGroup(groupItem) && !isSideMirror) {
+    main.setAttribute("role", "button");
+    main.tabIndex = 0;
+    main.title = t("folder_properties");
+    main.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (state.openGroupEditorId !== groupItem.id) {
+        handleRenameGroup();
+      }
+    });
+    main.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (state.openGroupEditorId !== groupItem.id) {
+        handleRenameGroup();
+      }
+    });
+  }
 
   const title = document.createElement("strong");
   const normalizedGroupIconName = normalizeGroupIconName(groupItem.iconName);
@@ -25722,9 +26006,17 @@ function createGroupBrowserItem(groupItem, options = {}) {
     renderEventList();
   };
 
-  const handleExportGroup = () => {
+  const handleExportGroup = async () => {
     state.openSubgroupBrowserMenuId = null;
     state.openSideSubgroupBrowserMenuId = null;
+    if (isProjectRootGroup(groupItem)) {
+      try {
+        await saveProjectToDirectory();
+      } catch {
+        updateProjectStorageUi(t("project_directory_error"));
+      }
+      return;
+    }
     downloadFolderExport(groupItem.id);
   };
 
@@ -25747,7 +26039,15 @@ function createGroupBrowserItem(groupItem, options = {}) {
   addSubgroupButton.type = "button";
   addSubgroupButton.className = "group-row-export group-row-subgroup";
   addSubgroupButton.disabled = !contextOpen;
-  addSubgroupButton.textContent = t("add_subfolder");
+  if (isProjectRootGroup(groupItem)) {
+    addSubgroupButton.classList.add("group-row-icon-action", "is-add-folder");
+    addSubgroupButton.disabled = false;
+    addSubgroupButton.innerHTML = '<span class="group-row-icon-action-glyph" aria-hidden="true"></span>';
+    addSubgroupButton.setAttribute("aria-label", t("project_menu_add_subfolder"));
+    addSubgroupButton.setAttribute("title", t("project_menu_add_subfolder"));
+  } else {
+    addSubgroupButton.textContent = t("add_subfolder");
+  }
   addSubgroupButton.addEventListener("click", handleAddSubgroup);
 
   const propertiesButton = document.createElement("button");
@@ -25764,7 +26064,15 @@ function createGroupBrowserItem(groupItem, options = {}) {
   const exportButton = document.createElement("button");
   exportButton.type = "button";
   exportButton.className = "group-row-export";
-  exportButton.textContent = t("export_label");
+  if (isProjectRootGroup(groupItem)) {
+    exportButton.classList.add("group-row-icon-action", "is-save-project");
+    exportButton.classList.toggle("has-unsaved-changes", state.projectHasUnsavedChanges === true);
+    exportButton.innerHTML = '<span class="group-row-icon-action-glyph" aria-hidden="true"></span>';
+    exportButton.setAttribute("aria-label", t("project_menu_save"));
+    exportButton.setAttribute("title", t("project_menu_save"));
+  } else {
+    exportButton.textContent = t("export_label");
+  }
   exportButton.addEventListener("click", handleExportGroup);
 
   const renderButton = document.createElement("button");
@@ -25798,6 +26106,60 @@ function createGroupBrowserItem(groupItem, options = {}) {
     event.stopPropagation();
     toggleSideFolderBrowser(groupItem.id);
   });
+
+  const createProjectMenuShell = () => {
+    const menuShell = document.createElement("div");
+    menuShell.className = "group-row-menu-shell project-row-menu-shell";
+    const menuTrigger = document.createElement("button");
+    menuTrigger.type = "button";
+    menuTrigger.className = "group-row-menu-trigger";
+    menuTrigger.setAttribute("aria-label", t("project_menu_actions"));
+    menuTrigger.setAttribute("aria-expanded", state.openSubgroupBrowserMenuId === groupItem.id ? "true" : "false");
+    menuTrigger.innerHTML = "<span class=\"group-row-menu-dots\" aria-hidden=\"true\"></span>";
+    menuTrigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetGroupBrowserMenuDeleteHold();
+      state.openSubgroupBrowserMenuId = state.openSubgroupBrowserMenuId === groupItem.id ? null : groupItem.id;
+      state.openSideSubgroupBrowserMenuId = null;
+      state.openSourceCollectionBrowserMenuId = null;
+      renderEventList();
+    });
+    const menu = document.createElement("div");
+    menu.className = "group-row-menu";
+    menu.hidden = state.openSubgroupBrowserMenuId !== groupItem.id;
+    const createMenuButton = (label, handler, className = "") => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `group-row-menu-action${className ? ` ${className}` : ""}`;
+      button.textContent = label;
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.openSubgroupBrowserMenuId = null;
+        handler();
+      });
+      return button;
+    };
+    const deleteMenuButton = document.createElement("button");
+    deleteMenuButton.type = "button";
+    deleteMenuButton.className = "group-row-menu-action group-row-menu-action-delete";
+    deleteMenuButton.textContent = t("project_menu_delete");
+    deleteMenuButton.dataset.groupId = groupItem.id;
+    deleteMenuButton.addEventListener("pointerdown", beginGroupBrowserMenuDeleteHold);
+    deleteMenuButton.addEventListener("pointerup", finishGroupBrowserMenuDeleteHold);
+    deleteMenuButton.addEventListener("pointercancel", cancelGroupBrowserMenuDeleteHold);
+    deleteMenuButton.addEventListener("lostpointercapture", cancelGroupBrowserMenuDeleteHold);
+    menu.append(
+      createMenuButton(t("project_menu_save"), handleExportGroup),
+      createMenuButton(t("project_menu_properties"), handleRenameGroup),
+      createMenuButton(t("project_menu_render"), () => handleRenderProject(groupItem.id)),
+      createMenuButton(t("project_menu_add_subfolder"), handleAddSubgroup),
+      deleteMenuButton,
+    );
+    menuShell.append(menuTrigger, menu);
+    return menuShell;
+  };
 
   if (isSubgroupBrowserRow) {
     const menuShell = document.createElement("div");
@@ -25894,7 +26256,11 @@ function createGroupBrowserItem(groupItem, options = {}) {
     menuShell.append(menuTrigger, menu);
     row.append(checkWrap, toggleButton, main, source, menuShell, sideFolderButton);
   } else {
-    row.append(checkWrap, toggleButton, main, source, addSubgroupButton, propertiesButton, renderButton, exportButton, deleteButton);
+    if (isProjectRootGroup(groupItem)) {
+      row.append(checkWrap, toggleButton, main, source, addSubgroupButton, exportButton, createProjectMenuShell());
+    } else {
+      row.append(checkWrap, toggleButton, main, source, addSubgroupButton, propertiesButton, renderButton, exportButton, deleteButton);
+    }
   }
   container.appendChild(row);
 
@@ -33284,19 +33650,27 @@ function bindEvents() {
     state.openChartCommentEditorId = null;
     state.openGroupEditorId = newGroup.id;
     renderEventList();
+    scheduleLocalAutosave();
     scrollToDetails("auto");
     focusEditorNameField("group", { reveal: true, behavior: "auto" });
   });
   ui.addChartButton?.addEventListener("click", createNewChartFromBrowser);
-  ui.addEpochGroupButton.addEventListener("click", () => {
+  ui.addEpochGroupButton?.addEventListener("click", () => {
     state.showEpochMenu = !state.showEpochMenu;
     renderEpochMenu();
     if (state.showEpochMenu) {
       refreshTemplateProjectEntries({ force: true });
     }
   });
-  ui.importFolderButton.addEventListener("click", () => {
-    ui.importFolderInput.click();
+  ui.importFolderButton?.addEventListener("click", () => {
+    openProjectModule();
+  });
+  ui.saveProjectButton?.addEventListener("click", async () => {
+    try {
+      await saveProjectToDirectory();
+    } catch {
+      updateProjectStorageUi(t("project_directory_error"));
+    }
   });
   ui.renderLibraryButton?.addEventListener("click", () => {
     handleRenderLibrary();
@@ -33736,6 +34110,8 @@ async function init() {
   } else {
     window.__TIMEMAP_BOOT_STAGE__ = "restoreLocalStateIfAvailable";
     await restoreLocalStateIfAvailable();
+    window.__TIMEMAP_BOOT_STAGE__ = "loadStoredProjectHomeDirectoryHandle";
+    await loadStoredProjectHomeDirectoryHandle();
     window.__TIMEMAP_BOOT_STAGE__ = "loadStoredProjectDirectoryHandle";
     await loadStoredProjectDirectoryHandle();
     if (state.projectDirectoryHandle) {

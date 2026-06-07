@@ -2303,6 +2303,29 @@ button:focus-visible {
   pointer-events: none;
 }
 
+.project-storage-status {
+  margin: -2px 0 0;
+  color: rgba(255, 179, 71, 0.86);
+}
+
+.project-open-dialog {
+  width: min(520px, calc(100vw - 36px));
+}
+
+.project-open-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(48vh, 360px);
+  overflow: auto;
+  padding: 2px 2px 0;
+}
+
+.project-open-list-button {
+  justify-content: flex-start;
+  text-align: left;
+}
+
 .event-list {
   display: flex;
   flex-direction: column;
@@ -3599,6 +3622,10 @@ button:focus-visible {
   border-radius: 10px;
 }
 
+.group-browser-item:not(.is-child-group) > .group-row:has(.project-row-menu-shell) {
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(18px, auto) auto auto auto;
+}
+
 .bookmark-folder-row,
 .chart-folder-row,
 .timeline-folder-row,
@@ -3642,6 +3669,16 @@ button:focus-visible {
   gap: 2px;
   text-align: left;
   cursor: default;
+}
+
+.group-row-main[role="button"] {
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.group-row-main[role="button"]:hover strong,
+.group-row-main[role="button"]:focus-visible strong {
+  color: #ffb347;
 }
 
 .group-row-main strong {
@@ -3749,6 +3786,46 @@ button:focus-visible {
   width: 28px;
   padding: 0;
   font-size: 0.8rem;
+}
+
+.group-row-icon-action {
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.group-row-icon-action.is-save-project {
+  color: rgba(214, 222, 231, 0.42);
+}
+
+.group-row-icon-action.is-save-project.has-unsaved-changes {
+  color: #ffb347;
+  border-color: rgba(255, 179, 71, 0.42);
+  background: rgba(255, 179, 71, 0.08);
+}
+
+.group-row-icon-action-glyph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 17px 17px;
+  mask-size: 17px 17px;
+}
+
+.group-row-icon-action.is-add-folder .group-row-icon-action-glyph {
+  -webkit-mask-image: url("https://api.iconify.design/mdi/folder-add-outline.svg");
+  mask-image: url("https://api.iconify.design/mdi/folder-add-outline.svg");
+}
+
+.group-row-icon-action.is-save-project .group-row-icon-action-glyph {
+  -webkit-mask-image: url("https://api.iconify.design/boxicons/save-filled.svg");
+  mask-image: url("https://api.iconify.design/boxicons/save-filled.svg");
 }
 
 .group-row-menu-shell {
