@@ -23,6 +23,16 @@ const PROJECT_HOME_DIRECTORY_NAME = "TimeMap-Projekte";
 const PROJECT_ASSET_DIRECTORY_NAME = "Medien";
 const LEGACY_PROJECT_ASSET_DIRECTORY_NAME = "assets";
 const TEMPLATE_FOLDER_NAME = "Projektvorlagen";
+const MENU_IMPRINT_DESCRIPTION_TEXT = "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Ereignisse, Quellen, Karten, Charts, Kalendersysteme und projektbezogener Wissensräume.";
+const MENU_IMPRINT_PROJECT_TEXT = [
+  "Die Anwendung richtet sich bewusst an unterschiedliche Zielgruppen: an Lehrkräfte, Lernende, Forschende, historisch Interessierte und alle, die komplexe historische Zusammenhänge strukturieren, untersuchen oder anschaulich präsentieren möchten. TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge, Datencharts und kommentierbare Ereignissammlungen.",
+  "Eine besondere Stärke von TimeMap liegt in der flexiblen Darstellung historischer Zeiträume über unterschiedliche Skalen hinweg. Projekte können kurze Ereignisabfolgen ebenso abbilden wie langfristige Entwicklungen bis hin zu geologischen oder kosmischen Dimensionen. Durch flüssige Zoombarkeit, unterschiedliche Darstellungsformen und einen strukturierten Ereignisbrowser lassen sich Informationen intuitiv ordnen, vergleichen und präsentieren.",
+  "Zu einem TimeMap-Projekt gehören alle Informationen, die gemeinsam auf einem Zeitstrahl dargestellt und inhaltlich miteinander verknüpft werden sollen. Ereignisse, Quellen, Medien, Kartenbezüge, Charts, Kommentare und weitere Objekte können innerhalb eines Projekts organisiert und aufeinander bezogen werden. Unterstützt wird auch die Anzeige zusätzlicher Kalendersysteme und historischer Zeitordnungen. Bisher sind unter anderem der julianische und gregorianische Kalender, der französische Revolutionskalender, der römische Kalender, der hebräische Kalender sowie geologische Epochen integriert.",
+  "TimeMap legt besonderen Wert auf nachvollziehbare Quellenbezüge. Ereignisse können mit Wikidata und weiteren offenen Archiven verknüpft werden. Bei datenbasierten Darstellungen, etwa Charts, steht die kleinteilige Nachweisbarkeit einzelner Datenpunkte im Vordergrund, idealerweise durch konkrete Quellenangaben oder Links zu belastbaren Fachinformationen.",
+  "Projekte werden als JSON-Dateien gespeichert. Ziel ist es, dass Projektdaten auf dem Rechner der Nutzerinnen und Nutzer verbleiben; online bereitgestellt werden lediglich die Programmdateien der Web-App. Dadurch lassen sich Projekte lokal sichern, weitergeben und später erneut bearbeiten.",
+  "TimeMap kann außerdem KI-gestützte Arbeitsprozesse unterstützen, ohne selbst eine KI zu integrieren. Die App kann vorbereitete Prompts bereitstellen, die Nutzerinnen und Nutzer in einem eigenen KI-Werkzeug verwenden können. Die daraus erzeugten strukturierten CSV-Daten lassen sich anschließend importieren und in Zeitachsen, Charts, Ereignissammlungen oder anderen Darstellungsformen abbilden.",
+  "TimeMap versteht sich nicht als Ersatz für historische Forschung oder Quellenkritik. Die App nimmt Nutzerinnen und Nutzern die eigentliche Deutung, Prüfung und Bewertung historischer Informationen nicht ab. Sie ist ein Werkzeug zum Entdecken, Strukturieren, Präsentieren und Lernen — mit dem Ziel, historische Zusammenhänge sichtbar und neue Fragestellungen möglich zu machen.",
+].join("\n\n");
 const SEARCH_RESULTS_PAGE_SIZE = 8;
 const CHART_SEARCH_RESULTS_PAGE_SIZE = 6;
 const EVENT_IMAGE_THUMB_WIDTH = 96;
@@ -293,6 +303,7 @@ const ui = {
   addChartButton: document.getElementById("addChartButton"),
   addEpochGroupButton: document.getElementById("addEpochGroupButton"),
   importFolderButton: document.getElementById("importFolderButton"),
+  projectImportButton: document.getElementById("projectImportButton"),
   saveProjectButton: document.getElementById("saveProjectButton"),
   renderLibraryButton: document.getElementById("renderLibraryButton"),
   projectDirectoryStatus: document.getElementById("projectDirectoryStatus"),
@@ -336,6 +347,9 @@ const ui = {
   menuLanguageDescription: document.getElementById("menuLanguageDescription"),
   menuHelpTitle: document.getElementById("menuHelpTitle"),
   menuHelpDescription: document.getElementById("menuHelpDescription"),
+  menuDevelopmentTitle: document.getElementById("menuDevelopmentTitle"),
+  menuDevelopmentDescription: document.getElementById("menuDevelopmentDescription"),
+  menuDevelopmentStorage: document.getElementById("menuDevelopmentStorage"),
   menuAppsTitle: document.getElementById("menuAppsTitle"),
   menuAppsDescription: document.getElementById("menuAppsDescription"),
   menuDiscordTitle: document.getElementById("menuDiscordTitle"),
@@ -660,6 +674,9 @@ const I18N = {
     menu_language_description: "Deutsch und Englisch sind bereits funktional. Weitere EU-Sprachen plus Ukrainisch sind vorbereitet.",
     menu_help_title: "Funktionsweise",
     menu_help_description: "Haben Sie es schon einmal mit Shift probiert?",
+    menu_development_title: "Entwicklungsstand",
+    menu_development_description: "TimeMap befindet sich aktuell in Version 0.4. Einzelne Funktionen, Schnittstellen und Darstellungsformen werden noch entwickelt, erprobt und getestet.",
+    menu_development_storage: "Das Speichersystem befindet sich ausdrücklich noch in Entwicklung und Testung und kann Fehler enthalten. Projekte werden temporär vom Browser gespeichert; das bewusste lokale Speichern wird weiter ausgebaut und soll künftig transparenter funktionieren.",
     menu_prompts_title: "Prompts",
     menu_prompts_description: "Lade eine Vorlage herunter, mit der sich chartfähige CSV-Dateien für TimeMap in einem KI-System erzeugen lassen.",
     chart_prompt_download: "Chart-Prompt herunterladen",
@@ -670,7 +687,7 @@ const I18N = {
     menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
     menu_discord_link: "Discord öffnen",
     menu_imprint_title: "Impressum",
-    menu_imprint_description: "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeitstrahlen, Quellen, Karten, Charts und projektbezogener Wissensräume.",
+    menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
     menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
     menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
     menu_imprint_contact_title: "Kontakt",
@@ -678,7 +695,7 @@ const I18N = {
     menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
     menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
     menu_imprint_project_title: "Projektbeschreibung",
-    menu_imprint_project_text: "TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge und Datencharts.",
+    menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
     calendar_scale_title: "Zusätzlichen Kalender/Skala hinzufügen",
     calendar_scale_message: "Wähle die Art der zweiten Skala, die künftig zwischen Zeitstrahl und Beschriftung dargestellt werden soll.",
     calendar_scale_group_historical: "Historische Kalender",
@@ -1104,13 +1121,20 @@ const I18N = {
     source_collection_dialog_all_types: "Alle Quellarten",
     source_collection_dialog_add: "Auswahl hinzufügen",
     source_collection_dialog_empty: "Keine passenden Quellen vorhanden.",
-    source_collection_csv_hint: "CSV-Code mit collectionTitle und den Spalten title, creator, yearFrom, yearTo, publishedYear, sourceType und note einfügen. IDs werden in der App aufgelöst.",
+    source_collection_csv_hint: "CSV-Code mit collectionTitle und den Spalten title, creator, yearFrom, yearTo, publishedYear, sourceType, note sowie optionalen Archivquellen einfügen.",
     source_collection_csv_apply: "Quellen aus CSV anlegen",
     source_collection_csv_created: "{count} Quellen wurden angelegt.",
     source_collection_lock_movement: "Sammlung koppeln",
     source_collection_unlock_movement: "Sammlung entkoppeln",
     source_archive_slot: "Quelle {index}",
+    source_archive_wikidata: "Wikidata",
     source_archive_none: "Keine Quelle",
+    source_archive_manual: "Manuell",
+    source_archive_manual_dialog_title: "Manuelle Quelle bearbeiten",
+    source_archive_manual_label: "Quellfeld",
+    source_archive_manual_url: "URL",
+    source_archive_manual_title: "Titel/Kurzbeschreibung",
+    source_archive_manual_save: "Quelle übernehmen",
     tmdb_api_token_label: "TMDb API-Token",
     tmdb_api_token_placeholder: "Bearer Token eingeben",
     tmdb_api_token_description: "Für Filme und Serien nutzt TimeMap die TMDb API. Der Token wird nur lokal gespeichert.",
@@ -1175,6 +1199,9 @@ const I18N = {
     menu_language_description: "German and English already work. Additional EU languages plus Ukrainian are prepared.",
     menu_help_title: "How it works",
     menu_help_description: "Have you tried Shift?",
+    menu_development_title: "Development status",
+    menu_development_description: "TimeMap is currently version 0.4. Individual features, interfaces, and display modes are still being developed, tested, and refined.",
+    menu_development_storage: "The storage system is explicitly still under development and testing and may contain errors. Projects are temporarily stored by the browser; deliberate local saving is being expanded and should become more transparent.",
     menu_prompts_title: "Prompts",
     menu_prompts_description: "Download a template that helps an AI system generate chart-ready CSV files for TimeMap.",
     chart_prompt_download: "Download chart prompt",
@@ -1184,7 +1211,7 @@ const I18N = {
     menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
     menu_discord_link: "Open Discord",
     menu_imprint_title: "Legal Notice",
-    menu_imprint_description: "TimeMap is an interactive web app for creating, exploring, and presenting historical timelines, sources, maps, charts, and project-based knowledge spaces.",
+    menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
     menu_imprint_provider_title: "Provider information according to § 5 DDG",
     menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
     menu_imprint_contact_title: "Contact",
@@ -1192,7 +1219,7 @@ const I18N = {
     menu_imprint_responsible_title: "Responsible for content",
     menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
     menu_imprint_project_title: "Project description",
-    menu_imprint_project_text: "TimeMap supports digital history communication, historical research, lesson preparation, and curated source work through flexible project folders, visual timelines, image and film sources, map references, and data charts.",
+    menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
     calendar_scale_title: "Add additional calendar/scale",
     calendar_scale_message: "Choose the kind of second scale that should later appear between the timeline and its labels.",
     calendar_scale_group_historical: "Historical calendars",
@@ -1620,13 +1647,20 @@ const I18N = {
     source_collection_dialog_all_types: "All source types",
     source_collection_dialog_add: "Add selection",
     source_collection_dialog_empty: "No matching sources available.",
-    source_collection_csv_hint: "Paste CSV code with collectionTitle and the columns Title, Creator, Year from, Year to, Publication year, Source type, and note. IDs are resolved in the app.",
+    source_collection_csv_hint: "Paste CSV code with collectionTitle and the columns title, creator, yearFrom, yearTo, publishedYear, sourceType, note, and optional archive sources.",
     source_collection_csv_apply: "Create sources from CSV",
     source_collection_csv_created: "{count} sources were created.",
     source_collection_lock_movement: "Couple collection",
     source_collection_unlock_movement: "Uncouple collection",
     source_archive_slot: "Source {index}",
+    source_archive_wikidata: "Wikidata",
     source_archive_none: "No source",
+    source_archive_manual: "Manual",
+    source_archive_manual_dialog_title: "Edit manual source",
+    source_archive_manual_label: "Source field",
+    source_archive_manual_url: "URL",
+    source_archive_manual_title: "Title/short description",
+    source_archive_manual_save: "Apply source",
     tmdb_api_token_label: "TMDb API token",
     tmdb_api_token_placeholder: "Enter bearer token",
     tmdb_api_token_description: "TimeMap uses the TMDb API for films and series. The token is stored locally only.",
@@ -1925,9 +1959,12 @@ Object.assign(I18N.de, {
   timeline_menu_title: "Zeitstrahl-Men\u00fc",
   menu_language_description: "Deutsch und Englisch sind bereits funktional. Weitere EU-Sprachen plus Ukrainisch sind vorbereitet.",
   menu_help_description: "Haben Sie es schon einmal mit Shift probiert?",
+  menu_development_title: "Entwicklungsstand",
+  menu_development_description: "TimeMap befindet sich aktuell in Version 0.4. Einzelne Funktionen, Schnittstellen und Darstellungsformen werden noch entwickelt, erprobt und getestet.",
+  menu_development_storage: "Das Speichersystem befindet sich ausdrücklich noch in Entwicklung und Testung und kann Fehler enthalten. Projekte werden temporär vom Browser gespeichert; das bewusste lokale Speichern wird weiter ausgebaut und soll künftig transparenter funktionieren.",
   menu_apps_description: "Vorbereitung f\u00fcr weitere Werkzeuge wie GenMap zur Anzeige genealogischer GEDCOM-Dateien.",
   menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
-  menu_imprint_description: "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeitstrahlen, Quellen, Karten, Charts und projektbezogener Wissensräume.",
+  menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
   menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
   menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
   menu_imprint_contact_title: "Kontakt",
@@ -1935,7 +1972,7 @@ Object.assign(I18N.de, {
   menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
   menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
   menu_imprint_project_title: "Projektbeschreibung",
-  menu_imprint_project_text: "TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge und Datencharts.",
+  menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
   template_directory_choose: "Vorlagenordner wählen",
   template_directory_none: "Noch kein Vorlagenordner gewählt.",
   template_directory_selected: "Vorlagenordner: {name}",
@@ -1976,6 +2013,14 @@ Object.assign(I18N.de, {
   project_new: "Neues Projekt",
   project_open: "Öffnen",
   project_open_button: "Projekt öffnen",
+  project_import_button: "Importieren",
+  project_import_dialog_title: "Projekt importieren",
+  project_import_dialog_message: "Möchtest du eine heruntergeladene Datei vom Desktop auswählen oder eine direkt abrufbare Projektdatei über URL laden?",
+  project_import_from_desktop: "Desktop",
+  project_import_from_url: "URL",
+  project_import_url_prompt_title: "Projekt über URL importieren",
+  project_import_url_prompt_message: "Füge die direkte URL zu einer TimeMap-JSON-Datei ein. Cloud-Freigaben müssen direkt abrufbar sein.",
+  project_import_url_placeholder: "https://…/timemap-project.json",
   project_save: "Speichern",
   project_directory_choose: "Projektordner wählen",
   project_directory_save: "Projekt speichern",
@@ -1992,12 +2037,17 @@ Object.assign(I18N.de, {
   project_directory_missing_file: "Im gewählten Ordner wurde keine Projektdatei gefunden.",
   project_directory_error: "Projektordner konnte nicht verarbeitet werden.",
   project_open_title: "Projekt öffnen",
-  project_open_message: "Wähle einen Projektordner oder einen Ordner, der mehrere TimeMap-Projekte enthält.",
+  project_open_message: "Wähle ein gespeichertes TimeMap-Projekt aus.",
   project_open_empty: "Im gewählten Ordner wurde kein TimeMap-Projekt gefunden.",
   project_open_current_folder: "Diesen Ordner öffnen",
   project_open_choose: "Projekt auswählen",
+  project_open_item_action: "Öffnen",
+  project_open_item_summary: "{events} Ereignisse · {sources} Quellen · {charts} Charts · {folders} Ordner",
+  project_open_item_updated: "Zuletzt geändert: {date}",
+  project_open_item_unknown_date: "Änderungsdatum unbekannt",
   project_menu_actions: "Projektaktionen",
   project_menu_save: "Projekt speichern",
+  project_menu_export: "Exportieren",
   project_menu_properties: "Eigenschaften",
   project_menu_render: "Projekt rendern",
   project_menu_add_subfolder: "Unterordner erstellen",
@@ -2038,12 +2088,15 @@ Object.assign(I18N.en, {
   timeline_menu: "Menu",
   timeline_menu_title: "Timeline menu",
   menu_help_description: "Have you tried Shift?",
+  menu_development_title: "Development status",
+  menu_development_description: "TimeMap is currently version 0.4. Individual features, interfaces, and display modes are still being developed, tested, and refined.",
+  menu_development_storage: "The storage system is explicitly still under development and testing and may contain errors. Projects are temporarily stored by the browser; deliberate local saving is being expanded and should become more transparent.",
   menu_apps_description: "Preparation for additional tools such as GenMap for genealogical GEDCOM files.",
   menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
   menu_discord_title: "Discord",
   menu_discord_link: "Open Discord",
   menu_imprint_title: "Legal Notice",
-  menu_imprint_description: "TimeMap is an interactive web app for creating, exploring, and presenting historical timelines, sources, maps, charts, and project-based knowledge spaces.",
+  menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
   menu_imprint_provider_title: "Provider information according to § 5 DDG",
   menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
   menu_imprint_contact_title: "Contact",
@@ -2051,7 +2104,7 @@ Object.assign(I18N.en, {
   menu_imprint_responsible_title: "Responsible for content",
   menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
   menu_imprint_project_title: "Project description",
-  menu_imprint_project_text: "TimeMap supports digital history communication, historical research, lesson preparation, and curated source work through flexible project folders, visual timelines, image and film sources, map references, and data charts.",
+  menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
   calendar_scale_title: "Add additional calendar/scale",
   calendar_scale_message: "Choose the kind of second scale that should later appear between the timeline and its labels.",
   calendar_scale_group_historical: "Historical calendars",
@@ -2088,6 +2141,14 @@ Object.assign(I18N.en, {
   project_new: "New project",
   project_open: "Open",
   project_open_button: "Open project",
+  project_import_button: "Import",
+  project_import_dialog_title: "Import project",
+  project_import_dialog_message: "Do you want to choose a downloaded file from your desktop or load a directly accessible project file via URL?",
+  project_import_from_desktop: "Desktop",
+  project_import_from_url: "URL",
+  project_import_url_prompt_title: "Import project via URL",
+  project_import_url_prompt_message: "Paste the direct URL to a TimeMap JSON file. Cloud shares must be directly accessible.",
+  project_import_url_placeholder: "https://…/timemap-project.json",
   project_save: "Save",
   project_directory_choose: "Choose project folder",
     chart_comment_add: "Add comment",
@@ -2122,12 +2183,17 @@ Object.assign(I18N.en, {
   project_directory_missing_file: "No project file was found in the selected folder.",
   project_directory_error: "The project folder could not be processed.",
   project_open_title: "Open project",
-  project_open_message: "Choose a project folder or a folder containing several TimeMap projects.",
+  project_open_message: "Choose a saved TimeMap project.",
   project_open_empty: "No TimeMap project was found in the selected folder.",
   project_open_current_folder: "Open this folder",
   project_open_choose: "Choose project",
+  project_open_item_action: "Open",
+  project_open_item_summary: "{events} events · {sources} sources · {charts} charts · {folders} folders",
+  project_open_item_updated: "Last modified: {date}",
+  project_open_item_unknown_date: "Modified date unknown",
   project_menu_actions: "Project actions",
   project_menu_save: "Save project",
+  project_menu_export: "Export",
   project_menu_properties: "Properties",
   project_menu_render: "Render project",
   project_menu_add_subfolder: "Create subfolder",
@@ -2457,6 +2523,93 @@ function buildLocalStateSnapshot() {
     sourceCollections: sourceCollections.map((collection) => structuredClone(collection)),
     timelineComments: timelineComments.map((comment) => structuredClone(comment)),
   };
+}
+
+function resetProjectWorkspaceForOpen() {
+  timelineEvents.length = 0;
+  eventGroups.length = 0;
+  chartItems.length = 0;
+  sourceItems.length = 0;
+  sourceCollections.length = 0;
+  timelineComments.length = 0;
+  state.tickBookmarks = [];
+  state.activeContextGroupId = null;
+  state.openEditorId = null;
+  state.openGroupEditorId = null;
+  state.openSourceEditorId = null;
+  state.openBookmarkEditorId = null;
+  state.openEventCommentEditorId = null;
+  state.openChartCommentEditorId = null;
+  state.openTimelineCommentEditorId = null;
+  state.openSourceCollectionEditorId = null;
+  state.openChartEditorId = null;
+  state.selectedEventId = null;
+  state.activeChartId = null;
+  state.selectedChartAxisIds = [];
+  state.showYAxis = false;
+  state.openSubgroupBrowserMenuId = null;
+  state.openSideSubgroupBrowserMenuId = null;
+  state.openSourceCollectionBrowserMenuId = null;
+  state.openSideFolderBrowserGroupId = null;
+  state.mirroredFolderExpansionByContext = {};
+  projectAssetObjectUrlCache.forEach((url) => URL.revokeObjectURL(url));
+  projectAssetObjectUrlCache.clear();
+}
+
+function keepOnlyProjectRootByDirectoryName(directoryName) {
+  const normalizedName = String(directoryName || "").trim();
+  const rootGroups = eventGroups.filter((groupItem) => isProjectRootGroup(groupItem));
+  if (rootGroups.length === 0) return;
+  const matchedRoot = rootGroups.find((groupItem) => getProjectDirectoryNameForGroupId(groupItem.id) === normalizedName)
+    ?? rootGroups.find((groupItem) => String(groupItem.title || "").trim() === normalizedName)
+    ?? (rootGroups.length === 1 ? rootGroups[0] : null);
+  if (!matchedRoot) return;
+  const keepGroupIds = new Set(getDescendantGroupIds(matchedRoot.id));
+  const keepEventIds = new Set(timelineEvents.filter((eventItem) => keepGroupIds.has(eventItem.groupId)).map((eventItem) => eventItem.id));
+  const keepChartIds = new Set(chartItems.filter((chartItem) => keepGroupIds.has(chartItem.groupId)).map((chartItem) => chartItem.id));
+  const keepSourceIds = new Set(sourceItems.filter((sourceItem) => keepGroupIds.has(sourceItem.groupId)).map((sourceItem) => sourceItem.id));
+
+  for (let index = eventGroups.length - 1; index >= 0; index -= 1) {
+    if (!keepGroupIds.has(eventGroups[index].id)) eventGroups.splice(index, 1);
+  }
+  for (let index = timelineEvents.length - 1; index >= 0; index -= 1) {
+    if (!keepEventIds.has(timelineEvents[index].id)) timelineEvents.splice(index, 1);
+  }
+  for (let index = chartItems.length - 1; index >= 0; index -= 1) {
+    if (!keepChartIds.has(chartItems[index].id)) chartItems.splice(index, 1);
+  }
+  for (let index = sourceItems.length - 1; index >= 0; index -= 1) {
+    if (!keepSourceIds.has(sourceItems[index].id)) sourceItems.splice(index, 1);
+  }
+  for (let index = sourceCollections.length - 1; index >= 0; index -= 1) {
+    const collection = sourceCollections[index];
+    if (!keepGroupIds.has(collection.groupId)) {
+      sourceCollections.splice(index, 1);
+      continue;
+    }
+    collection.sourceIds = (collection.sourceIds || []).filter((sourceId) => keepSourceIds.has(sourceId));
+    collection.placedSourceIds = (collection.placedSourceIds || []).filter((sourceId) => keepSourceIds.has(sourceId));
+  }
+  for (let index = timelineComments.length - 1; index >= 0; index -= 1) {
+    if (!keepGroupIds.has(timelineComments[index].groupId)) timelineComments.splice(index, 1);
+  }
+  state.tickBookmarks = (state.tickBookmarks || []).filter((bookmark) => keepGroupIds.has(bookmark.groupId));
+  setExclusiveProjectGroupEnabled(matchedRoot.id, true);
+  state.activeContextGroupId = matchedRoot.id;
+  return matchedRoot;
+}
+
+async function importProjectFromLocalStateSnapshot(snapshot, directoryName) {
+  const previousSnapshot = buildLocalStateSnapshot();
+  try {
+    const applied = applyLocalStateSnapshot(snapshot);
+    if (!applied) return null;
+    const matchedRoot = keepOnlyProjectRootByDirectoryName(directoryName);
+    if (!matchedRoot) return null;
+    return buildFolderExportPayload(matchedRoot.id, { includeBookmarks: true });
+  } finally {
+    applyLocalStateSnapshot(previousSnapshot);
+  }
 }
 
 async function saveLocalStateSnapshot() {
@@ -2881,14 +3034,67 @@ async function directoryContainsProjectFile(handle) {
   }
 }
 
+async function readProjectDirectoryEntryMetadata(handle) {
+  const fallback = {
+    title: getProjectDirectoryDisplayName(handle),
+    events: 0,
+    sources: 0,
+    charts: 0,
+    folders: 0,
+    updatedAt: null,
+  };
+  if (!handle) return fallback;
+  try {
+    const fileHandle = await handle.getFileHandle(PROJECT_FILE_NAME, { create: false });
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    const rootGroup = payload?.type === "timemap-folder-export"
+      ? (payload.groups ?? []).find((groupItem) => groupItem.parentGroupId == null)
+      : (payload.eventGroups ?? []).find((groupItem) => isProjectRootGroup(groupItem))
+        ?? (payload.eventGroups ?? [])[0];
+    return {
+      title: String(payload?.title || payload?.rootTitle || rootGroup?.title || fallback.title).trim() || fallback.title,
+      events: Array.isArray(payload?.events)
+        ? payload.events.length
+        : (Array.isArray(payload?.timelineEvents) ? payload.timelineEvents.length : 0),
+      sources: Array.isArray(payload?.sources)
+        ? payload.sources.length
+        : (Array.isArray(payload?.sourceItems) ? payload.sourceItems.length : 0),
+      charts: Array.isArray(payload?.charts)
+        ? payload.charts.length
+        : (Array.isArray(payload?.chartItems) ? payload.chartItems.length : 0),
+      folders: Array.isArray(payload?.groups)
+        ? payload.groups.length
+        : (Array.isArray(payload?.eventGroups) ? payload.eventGroups.length : 0),
+      updatedAt: file.lastModified || payload?.exportedAt || null,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function formatProjectExplorerDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return t("project_open_item_unknown_date");
+  return tf("project_open_item_updated", {
+    date: date.toLocaleDateString(getUiSortLocale(), {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }),
+  });
+}
+
 async function listProjectDirectoriesInDirectory(handle) {
   const entries = [];
   if (!handle || typeof handle.entries !== "function") return entries;
   for await (const [, childHandle] of handle.entries()) {
     if (!childHandle || childHandle.kind !== "directory") continue;
     if (!(await directoryContainsProjectFile(childHandle))) continue;
+    const metadata = await readProjectDirectoryEntryMetadata(childHandle);
     entries.push({
-      title: getProjectDirectoryDisplayName(childHandle),
+      ...metadata,
       handle: childHandle,
     });
   }
@@ -2906,31 +3112,64 @@ function showProjectOpenSelectionDialog(entries, { includeCurrent = false, curre
     dialog.className = "confirm-modal-dialog project-open-dialog";
     dialog.setAttribute("role", "dialog");
     dialog.setAttribute("aria-modal", "true");
+    const header = document.createElement("div");
+    header.className = "project-open-header";
+    const headerIcon = document.createElement("span");
+    headerIcon.className = "project-open-header-icon";
+    headerIcon.setAttribute("aria-hidden", "true");
+    const headerCopy = document.createElement("div");
+    headerCopy.className = "project-open-header-copy";
     const title = document.createElement("strong");
     title.textContent = t("project_open_title");
     const message = document.createElement("p");
     message.textContent = t("project_open_message");
+    headerCopy.append(title, message);
+    header.append(headerIcon, headerCopy);
     const list = document.createElement("div");
     list.className = "project-open-list";
     const close = (handle = null) => {
       modal.remove();
       resolve(handle);
     };
-    if (includeCurrent && currentHandle) {
-      const currentButton = document.createElement("button");
-      currentButton.type = "button";
-      currentButton.className = "secondary-button project-open-list-button";
-      currentButton.textContent = t("project_open_current_folder");
-      currentButton.addEventListener("click", () => close(currentHandle));
-      list.appendChild(currentButton);
-    }
-    entries.forEach((entry) => {
+    const createEntryButton = (entry, { current = false } = {}) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "secondary-button project-open-list-button";
-      button.textContent = entry.title || t("project_open_choose");
+      button.className = "project-open-card";
+      if (current) button.classList.add("is-current-folder");
+      const icon = document.createElement("span");
+      icon.className = "project-open-card-icon";
+      icon.setAttribute("aria-hidden", "true");
+      const main = document.createElement("span");
+      main.className = "project-open-card-main";
+      const name = document.createElement("strong");
+      name.textContent = entry.title || (current ? t("project_open_current_folder") : t("project_open_choose"));
+      const summary = document.createElement("span");
+      summary.className = "project-open-card-summary";
+      summary.textContent = tf("project_open_item_summary", {
+        events: Number(entry.events) || 0,
+        sources: Number(entry.sources) || 0,
+        charts: Number(entry.charts) || 0,
+        folders: Math.max(0, Number(entry.folders) || 0),
+      });
+      const date = document.createElement("span");
+      date.className = "project-open-card-date";
+      date.textContent = formatProjectExplorerDate(entry.updatedAt);
+      main.append(name, summary, date);
+      const action = document.createElement("span");
+      action.className = "project-open-card-action";
+      action.textContent = t("project_open_item_action");
+      button.append(icon, main, action);
       button.addEventListener("click", () => close(entry.handle));
-      list.appendChild(button);
+      return button;
+    };
+    if (includeCurrent && currentHandle) {
+      list.appendChild(createEntryButton({
+        title: t("project_open_current_folder"),
+        handle: currentHandle,
+      }, { current: true }));
+    }
+    entries.forEach((entry) => {
+      list.appendChild(createEntryButton(entry));
     });
     const actions = document.createElement("div");
     actions.className = "confirm-modal-actions";
@@ -2940,7 +3179,7 @@ function showProjectOpenSelectionDialog(entries, { includeCurrent = false, curre
     cancelButton.addEventListener("click", () => close(null));
     backdrop.addEventListener("click", () => close(null));
     actions.appendChild(cancelButton);
-    dialog.append(title, message, list, actions);
+    dialog.append(header, list, actions);
     modal.append(backdrop, dialog);
     document.body.appendChild(modal);
   });
@@ -2953,6 +3192,26 @@ async function openProjectModule() {
     return false;
   }
   try {
+    if (state.projectHomeDirectoryHandle) {
+      const granted = await ensureProjectDirectoryPermission(state.projectHomeDirectoryHandle, "readwrite");
+      if (!granted) {
+        updateProjectStorageUi(t("project_directory_permission_denied"));
+        return false;
+      }
+      const projectEntries = await listProjectDirectoriesInDirectory(state.projectHomeDirectoryHandle);
+      if (projectEntries.length === 0) {
+        updateProjectStorageUi(t("project_open_empty"));
+        return false;
+      }
+      const projectHandle = await showProjectOpenSelectionDialog(projectEntries, {
+        includeCurrent: false,
+        currentHandle: null,
+      });
+      if (!projectHandle) return false;
+      await saveProjectDirectoryHandle(projectHandle);
+      return loadProjectFromDirectory(projectHandle);
+    }
+
     const rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
     const granted = await ensureProjectDirectoryPermission(rootHandle, "readwrite");
     if (!granted) {
@@ -3185,14 +3444,20 @@ async function loadProjectFromDirectory(handleOverride = null) {
     const file = await fileHandle.getFile();
     const text = await file.text();
     const payload = JSON.parse(text);
+    let importedRootGroup = null;
     if (payload?.type === "timemap-folder-export") {
-      await importFolderPayload(payload);
+      importedRootGroup = await importFolderPayload(payload);
     } else {
-      const applied = applyLocalStateSnapshot(payload);
-      if (!applied) {
+      const folderPayload = await importProjectFromLocalStateSnapshot(payload, getProjectDirectoryDisplayName(handle));
+      if (!folderPayload) {
         updateProjectStorageUi(t("project_directory_error"));
         return false;
       }
+      importedRootGroup = await importFolderPayload(folderPayload);
+    }
+    if (importedRootGroup) {
+      setExclusiveProjectGroupEnabled(importedRootGroup.id, true);
+      state.activeContextGroupId = importedRootGroup.id;
     }
     await hydrateAllLocalMediaAssetUrls();
     populateLanguageSelect();
@@ -4209,6 +4474,21 @@ function adjustPresentationZoom(delta) {
   applyPresentationZoom();
 }
 
+function renderParagraphList(container, text) {
+  if (!container) return;
+  container.replaceChildren();
+  String(text || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .forEach((paragraph) => {
+      const item = document.createElement("p");
+      item.className = "event-description";
+      item.textContent = paragraph;
+      container.appendChild(item);
+    });
+}
+
 function applyStaticTranslations() {
   document.title = "TimeMap";
   document.documentElement.lang = state.language;
@@ -4226,6 +4506,9 @@ function applyStaticTranslations() {
   if (ui.menuLanguageDescription) ui.menuLanguageDescription.textContent = t("menu_language_description");
   if (ui.menuHelpTitle) ui.menuHelpTitle.textContent = t("menu_help_title");
   if (ui.menuHelpDescription) ui.menuHelpDescription.textContent = t("menu_help_description");
+  if (ui.menuDevelopmentTitle) ui.menuDevelopmentTitle.textContent = t("menu_development_title");
+  if (ui.menuDevelopmentDescription) ui.menuDevelopmentDescription.textContent = t("menu_development_description");
+  if (ui.menuDevelopmentStorage) ui.menuDevelopmentStorage.textContent = t("menu_development_storage");
   if (ui.menuAppsTitle) ui.menuAppsTitle.textContent = t("menu_apps_title");
   if (ui.menuAppsDescription) ui.menuAppsDescription.textContent = t("menu_apps_description");
   if (ui.menuDiscordTitle) ui.menuDiscordTitle.textContent = t("menu_discord_title");
@@ -4240,7 +4523,7 @@ function applyStaticTranslations() {
   if (ui.menuImprintResponsibleTitle) ui.menuImprintResponsibleTitle.textContent = t("menu_imprint_responsible_title");
   if (ui.menuImprintResponsibleText) ui.menuImprintResponsibleText.innerHTML = t("menu_imprint_responsible_text");
   if (ui.menuImprintProjectTitle) ui.menuImprintProjectTitle.textContent = t("menu_imprint_project_title");
-  if (ui.menuImprintProjectText) ui.menuImprintProjectText.textContent = t("menu_imprint_project_text");
+  renderParagraphList(ui.menuImprintProjectText, t("menu_imprint_project_text"));
   if (ui.calendarScaleTitle) ui.calendarScaleTitle.textContent = t("calendar_scale_title");
   if (ui.calendarScaleMessage) ui.calendarScaleMessage.textContent = t("calendar_scale_message");
   if (ui.calendarScaleGroupHistorical) ui.calendarScaleGroupHistorical.textContent = t("calendar_scale_group_historical");
@@ -4294,6 +4577,7 @@ function applyStaticTranslations() {
   if (ui.addChartButton) ui.addChartButton.innerHTML = `<span class="add-action-plus">+</span><span>${t("add_chart")}</span>`;
   if (ui.addEpochGroupButton) ui.addEpochGroupButton.hidden = true;
   if (ui.importFolderButton) ui.importFolderButton.textContent = t("project_open_button");
+  if (ui.projectImportButton) ui.projectImportButton.textContent = t("project_import_button");
   if (ui.saveProjectButton) ui.saveProjectButton.hidden = true;
   if (ui.renderLibraryButton) ui.renderLibraryButton.textContent = t("render");
   if (ui.chartPointCommentAddButton) ui.chartPointCommentAddButton.textContent = t("chart_comment_add");
@@ -4461,6 +4745,7 @@ function showTextPromptModal({
   title = t("chart_comment_label_prompt"),
   message = t("chart_comment_label_message"),
   defaultValue = "",
+  placeholder = "",
   extraInput = null,
   confirmLabel = t("chart_csv_paste_save"),
   cancelLabel = t("cancel"),
@@ -4478,6 +4763,7 @@ function showTextPromptModal({
     const previousTitle = ui.textPromptTitle?.textContent ?? "";
     const previousMessage = ui.textPromptMessage?.textContent ?? "";
     const previousValue = ui.textPromptInput.value ?? "";
+    const previousPlaceholder = ui.textPromptInput.placeholder ?? "";
     const previousExtraHidden = ui.textPromptExtraField?.hidden ?? true;
     const previousExtraLabel = ui.textPromptExtraLabel?.textContent ?? "";
     const previousExtraHintHidden = ui.textPromptExtraHint?.hidden ?? true;
@@ -4490,6 +4776,7 @@ function showTextPromptModal({
     if (ui.textPromptTitle) ui.textPromptTitle.textContent = title;
     if (ui.textPromptMessage) ui.textPromptMessage.textContent = message;
     ui.textPromptInput.value = String(defaultValue ?? "");
+    ui.textPromptInput.placeholder = String(placeholder || "");
     if (ui.textPromptExtraField && ui.textPromptExtraLabel && ui.textPromptExtraInput) {
       const hasExtraInput = !!extraInput;
       ui.textPromptExtraField.hidden = !hasExtraInput;
@@ -4515,6 +4802,7 @@ function showTextPromptModal({
       if (ui.textPromptTitle) ui.textPromptTitle.textContent = previousTitle;
       if (ui.textPromptMessage) ui.textPromptMessage.textContent = previousMessage;
       if (ui.textPromptInput) ui.textPromptInput.value = previousValue;
+      if (ui.textPromptInput) ui.textPromptInput.placeholder = previousPlaceholder;
       if (ui.textPromptExtraField) ui.textPromptExtraField.hidden = previousExtraHidden;
       if (ui.textPromptExtraLabel) ui.textPromptExtraLabel.textContent = previousExtraLabel;
       if (ui.textPromptExtraHint) {
@@ -5122,6 +5410,85 @@ function showTmdbApiTokenDialog() {
     window.requestAnimationFrame(() => {
       input.focus();
       input.select?.();
+    });
+  });
+}
+
+function showManualArchiveSourceModal(initialEntry = {}) {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.className = "confirm-modal prompt-modal manual-archive-modal";
+    const backdrop = document.createElement("div");
+    backdrop.className = "confirm-modal-backdrop";
+    const dialog = document.createElement("div");
+    dialog.className = "confirm-modal-dialog prompt-modal-dialog source-link-modal-dialog manual-archive-modal-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+
+    const title = document.createElement("strong");
+    title.textContent = t("source_archive_manual_dialog_title");
+    const labelInput = document.createElement("input");
+    labelInput.className = "prompt-modal-input";
+    labelInput.type = "text";
+    labelInput.value = String(initialEntry?.label || "").trim() || t("source_archive_manual");
+    const urlInput = document.createElement("input");
+    urlInput.className = "prompt-modal-input";
+    urlInput.type = "url";
+    urlInput.value = String(initialEntry?.url || "").trim();
+    const titleInput = document.createElement("input");
+    titleInput.className = "prompt-modal-input";
+    titleInput.type = "text";
+    titleInput.value = String(initialEntry?.title || "").trim();
+
+    const actions = document.createElement("div");
+    actions.className = "confirm-modal-actions";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = t("cancel");
+    const saveButton = document.createElement("button");
+    saveButton.type = "button";
+    saveButton.textContent = t("source_archive_manual_save");
+
+    const cleanup = (value = null) => {
+      modal.remove();
+      resolve(value);
+    };
+    const save = () => {
+      cleanup(normalizeManualArchiveSourceEntry({
+        label: labelInput.value,
+        url: urlInput.value,
+        title: titleInput.value,
+      }));
+    };
+    backdrop.addEventListener("click", () => cleanup(null));
+    cancelButton.addEventListener("click", () => cleanup(null));
+    saveButton.addEventListener("click", save);
+    [labelInput, urlInput, titleInput].forEach((input) => {
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cleanup(null);
+          return;
+        }
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        save();
+      });
+    });
+
+    actions.append(cancelButton, saveButton);
+    dialog.append(
+      title,
+      createField(t("source_archive_manual_label"), labelInput),
+      createField(t("source_archive_manual_url"), urlInput),
+      createField(t("source_archive_manual_title"), titleInput),
+      actions,
+    );
+    modal.append(backdrop, dialog);
+    document.body.appendChild(modal);
+    window.requestAnimationFrame(() => {
+      labelInput.focus();
+      labelInput.select?.();
     });
   });
 }
@@ -7121,7 +7488,8 @@ function getDefaultArchiveSourceTypesForSourceType(sourceType) {
 
 function normalizeArchiveSourceType(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  return normalized === "tmdb" ? "tmdb" : "";
+  if (normalized === "tmdb" || normalized === "manual") return normalized;
+  return "";
 }
 
 function normalizeSourceArchiveTypes(sourceItem) {
@@ -7130,6 +7498,20 @@ function normalizeSourceArchiveTypes(sourceItem) {
     : null;
   const defaults = getDefaultArchiveSourceTypesForSourceType(sourceItem?.sourceType);
   return [0, 1, 2].map((index) => normalizeArchiveSourceType(current?.[index] ?? defaults[index]));
+}
+
+function normalizeManualArchiveSourceEntry(entry = {}) {
+  const label = String(entry?.label || "").trim() || t("source_archive_manual");
+  const url = String(entry?.url || "").trim();
+  const title = String(entry?.title || "").trim();
+  return { label, url, title };
+}
+
+function normalizeManualArchiveSources(sourceItem) {
+  const current = Array.isArray(sourceItem?.manualArchiveSources)
+    ? sourceItem.manualArchiveSources
+    : [];
+  return [0, 1, 2].map((index) => normalizeManualArchiveSourceEntry(current[index]));
 }
 
 function getSourceImageAspectMode(sourceType) {
@@ -12894,6 +13276,7 @@ function normalizeSourceItem(sourceItem) {
   normalized.sourceId = String(normalized.sourceId || "").trim();
   normalized.wikidataId = normalizeWikidataEntityId(normalized.wikidataId || (normalized.source === "wikidata" ? normalized.sourceId : ""));
   normalized.archiveSourceTypes = normalizeSourceArchiveTypes(normalized);
+  normalized.manualArchiveSources = normalizeManualArchiveSources(normalized);
   normalized.externalId = String(normalized.externalId || "").trim();
   normalized.title = String(normalized.title || "").trim() || normalized.sourceId || t("source_film");
   normalized.description = String(normalized.description || "").trim();
@@ -15527,10 +15910,10 @@ function buildDefaultSourceCollectionCsvTemplate(title = "") {
   const collectionTitle = String(title || "").trim() || t("source_collection_default_title");
   return [
     `collectionTitle,${escapeCsvCell(collectionTitle)}`,
-    "title,creator,yearFrom,yearTo,publishedYear,sourceType,note",
-    "Quellenbeispiel,Urheber,100,200,1959,film,Kurze Notiz",
-    "Bildbeispiel,Maler,1888,,1888,image,Kurze Notiz",
-    "Textbeispiel,Autor,-44,-27,-27,text,Kurze Notiz",
+    "title,creator,yearFrom,yearTo,publishedYear,sourceType,note,wikidataId,source2Type,source2Id,source2MediaType,source2Label,source2Url,source2Title,source3Type,source3Id,source3MediaType,source3Label,source3Url,source3Title,source4Type,source4Id,source4MediaType,source4Label,source4Url,source4Title",
+    "Quellenbeispiel,Regisseur,100,200,1959,film,Kurze Notiz,Q12345,tmdb,123,movie,TMDb,,,manual,,,Rezension,https://example.org,Konkreter Nachweis,,,,,,",
+    "Bildbeispiel,Maler,1888,,1888,image,Kurze Notiz,Q5582,manual,,,Museum,https://example.org/bild,Sammlungseintrag,,,,,,,,,,,,",
+    "Textbeispiel,Autor,-44,-27,-27,text,Kurze Notiz,,manual,,,Edition,https://example.org/text,Digitale Edition,,,,,,,,,,,,",
   ].join("\n");
 }
 
@@ -15562,15 +15945,7 @@ function renderHighlightedSourceCollectionCsvHtml(csvText) {
       && (normalizedCells.includes("yearfrom") || normalizedCells.includes("year"));
     if (isHeader) {
       headerSeen = true;
-      return `<span class="csv-code-line">${joinColoredCells(cells, [
-        "csv-token-header",
-        "csv-token-header",
-        "csv-token-header",
-        "csv-token-header",
-        "csv-token-header",
-        "csv-token-header",
-        "csv-token-header",
-      ])}</span>`;
+      return `<span class="csv-code-line">${joinColoredCells(cells, cells.map(() => "csv-token-header"))}</span>`;
     }
     if (!headerSeen) {
       return `<span class="csv-code-line"><span class="csv-token-error">${escapeHtml(line)}</span></span>`;
@@ -15585,6 +15960,13 @@ function renderHighlightedSourceCollectionCsvHtml(csvText) {
       "csv-token-y",
       "csv-token-y",
       "csv-token-header",
+      "csv-token-source",
+      "csv-token-meta-key",
+      "csv-token-header",
+      "csv-token-meta-key",
+      "csv-token-meta-key",
+      "csv-token-source",
+      "csv-token-source",
       "csv-token-source",
     ])}</span>`;
   }).join("");
@@ -15837,9 +16219,9 @@ function buildSourceCollectionGenerationPrompt(requestText) {
   const options = state.sourceGenerateOptions || {};
   const extraRules = [];
   if (options.wikidataOnly) {
-    extraRules.push("- Verwende nur konkrete Quellen, die voraussichtlich in Wikidata beschrieben sind. Gib dennoch keine Wikidata-IDs aus; TimeMap löst IDs später selbst auf.");
+    extraRules.push("- Verwende nur konkrete Quellen, die voraussichtlich in Wikidata beschrieben sind. Gib die Wikidata-ID in wikidataId an, wenn du sie belastbar bestimmen kannst.");
   } else {
-    extraRules.push("- Gib keine Wikidata-IDs oder TMDb-IDs aus. TimeMap löst IDs später selbst über die App auf.");
+    extraRules.push("- Gib Wikidata-IDs und bei Filmen/Serien TMDb-IDs nur an, wenn du sie belastbar bestimmen kannst. Erfinde keine IDs. TimeMap kann fehlende IDs später in der App nachlösen.");
   }
   extraRules.push("- Verwende nur einzeln nachweisbare Quellen, keine Sammelbegriffe.");
   if (options.primaryOnly) {
@@ -15867,8 +16249,8 @@ Erstelle eine validierte CSV mit konkreten Einzelquellen. Gib keine Datei aus, k
 Die CSV muss exakt nach diesem Schema aufgebaut sein:
 
 collectionTitle,<Titel der Sammlung>
-title,creator,yearFrom,yearTo,publishedYear,sourceType,note
-<Titel>,<Urheber>,<Beginn der erzählten oder abgedeckten Zeit>,<Ende der erzählten oder abgedeckten Zeit>,<Jahr herausgegeben>,<film|image|text>,<knappe Notiz>
+title,creator,yearFrom,yearTo,publishedYear,sourceType,note,wikidataId,source2Type,source2Id,source2MediaType,source2Label,source2Url,source2Title,source3Type,source3Id,source3MediaType,source3Label,source3Url,source3Title,source4Type,source4Id,source4MediaType,source4Label,source4Url,source4Title
+<Titel>,<Urheber>,<Beginn der erzählten oder abgedeckten Zeit>,<Ende der erzählten oder abgedeckten Zeit>,<Jahr herausgegeben>,<film|image|text>,<knappe Notiz>,<Wikidata-ID oder leer>,<tmdb|manual|leer>,<ID oder leer>,<movie|tv|leer>,<Label oder leer>,<URL oder leer>,<Titel/Kurzbeschreibung oder leer>,<tmdb|manual|leer>,<ID oder leer>,<movie|tv|leer>,<Label oder leer>,<URL oder leer>,<Titel/Kurzbeschreibung oder leer>,<tmdb|manual|leer>,<ID oder leer>,<movie|tv|leer>,<Label oder leer>,<URL oder leer>,<Titel/Kurzbeschreibung oder leer>
 
 Regeln:
 - collectionTitle benennt die Sammlung knapp und fachlich passend. Wenn in der Anfrage bereits ein eindeutiger Sammlungstitel genannt wird, übernimm ihn. Wenn kein Titel genannt wird, bilde automatisch einen präzisen Titel aus Thema, Zeitraum oder Quellenauswahl.
@@ -15879,12 +16261,19 @@ Regeln:
 - publishedYear ist das Erscheinungs-, Veröffentlichungs- oder Herstellungsjahr, sofern abweichend oder fachlich relevant.
 - sourceType ist einer der Werte film, image oder text.
 - note enthält Unsicherheit, Auswahlbegründung oder knappe Hinweise. Wenn keine Notiz nötig ist, lasse die Zelle leer.
-- Gib keine Spalten für Wikidata-ID, TMDb-ID, IMDb-ID oder sonstige externe IDs aus.
-- Erfinde keine IDs und notiere keine ID-Vermutungen in note. Die App übernimmt die technische Zuordnung.
+- wikidataId enthält die Wikidata-ID der Einzelquelle, zum Beispiel Q220. Wenn keine belastbare Wikidata-ID bekannt ist, bleibt die Zelle leer.
+- source2Type, source3Type und source4Type beschreiben weitere Archiv-/Quellenfelder. Zulässige Werte sind tmdb, manual oder leer.
+- Für Filme und Serien soll, wenn möglich, ein TMDb-Feld ergänzt werden: sourceXType=tmdb, sourceXId=<TMDb-ID>, sourceXMediaType=movie oder tv. sourceXLabel, sourceXUrl und sourceXTitle bleiben bei TMDb leer.
+- Für manuelle Quellen/Nachweise nutze sourceXType=manual. sourceXLabel enthält die Bezeichnung des Feldes, etwa Museum, Edition, Rezension, Verlag, Archiv, Katalog, Website oder Zeitschrift. sourceXUrl enthält den direkten Link. sourceXTitle enthält eine kurze anklickbare Beschreibung.
+- Wenn keine Wikidata-ID sicher ausgewiesen werden kann, muss mindestens ein manuelles Quellenfeld mit sourceXType=manual, sourceXUrl und sourceXTitle ausgefüllt werden.
+- Je nach Anfrage darf auch zusätzlich zu Wikidata ein manuelles Quellenfeld nötig sein, etwa für eine konkrete Edition, einen Sammlungsnachweis, eine Rezension, eine Streaming-/Katalogseite oder eine fachlich belastbare Belegseite.
+- Erfinde keine IDs und keine URLs. Wenn du eine ID oder URL nicht belastbar bestimmen kannst, lasse das jeweilige Feld leer und nutze eine allgemeine, aber konkrete manuelle Nachweismöglichkeit nur dann, wenn sie tatsächlich plausibel und auffindbar ist.
 - Verwende keine Sammelzeilen. Jede Zeile beschreibt genau eine Einzelquelle.
 - Sortiere die Quellen chronologisch nach yearFrom.
-- Die Spaltenpositionen müssen exakt eingehalten werden: title in Spalte 1, creator in Spalte 2, yearFrom in Spalte 3, yearTo in Spalte 4, publishedYear in Spalte 5, sourceType in Spalte 6, note in Spalte 7.
+- Die Spaltenpositionen müssen exakt eingehalten werden. Nutze die Header-Zeile exakt wie oben angegeben.
 - Wenn yearFrom und yearTo beide vorhanden sind, wird die Quelle als Strecke dargestellt. Wenn nur yearFrom vorhanden ist, wird sie als Punkt dargestellt.
+- Für Quelle 1 ist Wikidata vorgesehen. Die drei weiteren Quellenfelder entsprechen in TimeMap Quelle 2 bis Quelle 4.
+- Gib den vollständigen CSV-Inhalt in einem Markdown-Codeblock mit Sprachkennung csv aus.
 
 Zusätzliche Vorgaben für diesen Auftrag:
 ${extraRules.join("\n")}`;
@@ -16799,6 +17188,9 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
       sourceType: sourceItem.sourceType || "film",
       source: sourceItem.source || "wikidata",
       sourceId: sourceItem.sourceId || "",
+      wikidataId: normalizeWikidataEntityId(sourceItem.wikidataId || (sourceItem.source === "wikidata" ? sourceItem.sourceId : "")),
+      archiveSourceTypes: normalizeSourceArchiveTypes(sourceItem),
+      manualArchiveSources: normalizeManualArchiveSources(sourceItem),
       externalId: sourceItem.externalId || "",
       imdbId: String(sourceItem.imdbId || sourceItem.externalId || "").trim(),
       startYear: sourceItem.startYear,
@@ -17070,10 +17462,43 @@ async function importFolderPayload(payload, onProgress = null) {
     });
   }
 
-  const orderedGroups = [...payload.groups].sort((left, right) => {
-    if (left.parentGroupId == null && right.parentGroupId != null) return -1;
-    if (left.parentGroupId != null && right.parentGroupId == null) return 1;
-  return String(left.title ?? "").localeCompare(String(right.title ?? ""), "de");
+  const groupsByParentId = new Map();
+  const seenGroupIds = new Set();
+  payload.groups.forEach((groupItem, index) => {
+    const groupId = String(groupItem?.id || "");
+    if (!groupId || seenGroupIds.has(groupId)) return;
+    seenGroupIds.add(groupId);
+    const parentId = groupItem.parentGroupId ? String(groupItem.parentGroupId) : "";
+    const siblings = groupsByParentId.get(parentId) ?? [];
+    siblings.push({ groupItem, index });
+    groupsByParentId.set(parentId, siblings);
+  });
+  const compareImportedGroups = (left, right) => {
+    const titleComparison = String(left.groupItem?.title ?? "").localeCompare(
+      String(right.groupItem?.title ?? ""),
+      "de",
+    );
+    return titleComparison || left.index - right.index;
+  };
+  groupsByParentId.forEach((siblings) => siblings.sort(compareImportedGroups));
+  const orderedGroups = [];
+  const visitedGroupIds = new Set();
+  const appendGroupTree = (parentId = "") => {
+    (groupsByParentId.get(parentId) ?? []).forEach(({ groupItem }) => {
+      const groupId = String(groupItem?.id || "");
+      if (!groupId || visitedGroupIds.has(groupId)) return;
+      visitedGroupIds.add(groupId);
+      orderedGroups.push(groupItem);
+      appendGroupTree(groupId);
+    });
+  };
+  appendGroupTree("");
+  payload.groups.forEach((groupItem) => {
+    const groupId = String(groupItem?.id || "");
+    if (!groupId || visitedGroupIds.has(groupId)) return;
+    visitedGroupIds.add(groupId);
+    orderedGroups.push(groupItem);
+    appendGroupTree(groupId);
   });
 
   orderedGroups.forEach((sourceGroup) => {
@@ -17288,6 +17713,7 @@ async function importFolderPayload(payload, onProgress = null) {
     });
     await waitForNextPaint();
   }
+  return importedRootGroup ?? null;
 }
 
 function hideTooltip() {
@@ -23567,21 +23993,80 @@ function createInlineEditor(eventItem) {
       openTmdbAssign();
     });
   }
+  const openManualArchiveSourceEditor = async (slotIndex) => {
+    if (eventItem.kind !== "source" || slotIndex < 2) return;
+    eventItem.manualArchiveSources = normalizeManualArchiveSources(eventItem);
+    const manualIndex = slotIndex - 2;
+    const nextEntry = await showManualArchiveSourceModal(eventItem.manualArchiveSources[manualIndex]);
+    if (!nextEntry) return;
+    eventItem.manualArchiveSources[manualIndex] = nextEntry;
+    eventItem.archiveSourceTypes = normalizeSourceArchiveTypes(eventItem);
+    eventItem.archiveSourceTypes[manualIndex] = "manual";
+    scheduleLocalAutosave();
+    rerenderEditor({ updateSelection: false, redrawTimeline: false });
+  };
+  const createManualArchiveReadout = (slotIndex) => {
+    const manualIndex = slotIndex - 2;
+    const manualSources = eventItem.kind === "source" ? normalizeManualArchiveSources(eventItem) : [];
+    const entry = manualSources[manualIndex] ?? normalizeManualArchiveSourceEntry();
+    const readout = document.createElement("div");
+    readout.className = "wikidata-assign-readout archive-manual-readout";
+    readout.tabIndex = 0;
+    readout.setAttribute("role", "button");
+    readout.setAttribute("aria-label", t("source_archive_manual_dialog_title"));
+    const summaryText = entry.title || entry.url || t("source_archive_manual");
+    if (entry.url) {
+      const link = document.createElement("a");
+      link.className = "archive-manual-link";
+      link.href = entry.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = summaryText;
+      link.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      link.addEventListener("keydown", (event) => {
+        event.stopPropagation();
+      });
+      readout.appendChild(link);
+    } else {
+      const summary = document.createElement("span");
+      summary.className = "archive-manual-summary";
+      summary.textContent = summaryText;
+      readout.appendChild(summary);
+    }
+    readout.addEventListener("click", () => openManualArchiveSourceEditor(slotIndex));
+    readout.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openManualArchiveSourceEditor(slotIndex);
+    });
+    return readout;
+  };
   const createArchiveSourceSlotField = (slotIndex, controlElement = null) => {
     const field = document.createElement("div");
     field.className = "field archive-source-field";
+    if (slotIndex === 1) field.classList.add("is-wikidata-slot");
     const header = document.createElement("div");
     header.className = "archive-source-field-header";
     const label = document.createElement("span");
-    label.textContent = tf("source_archive_slot", { index: slotIndex });
+    const sourceArchiveTypes = eventItem.kind === "source" ? normalizeSourceArchiveTypes(eventItem) : ["", "", ""];
+    const manualSources = eventItem.kind === "source" ? normalizeManualArchiveSources(eventItem) : [];
+    if (slotIndex === 1) {
+      label.textContent = t("source_archive_wikidata");
+    } else if (sourceArchiveTypes[slotIndex - 2] === "manual") {
+      label.textContent = manualSources[slotIndex - 2]?.label || t("source_archive_manual");
+    } else {
+      label.textContent = tf("source_archive_slot", { index: slotIndex });
+    }
     header.appendChild(label);
     if (slotIndex > 1) {
       const select = document.createElement("select");
       select.className = "archive-source-select";
-      const sourceArchiveTypes = eventItem.kind === "source" ? normalizeSourceArchiveTypes(eventItem) : ["", "", ""];
       select.appendChild(createSelectOption("", t("source_archive_none"), sourceArchiveTypes[slotIndex - 2] === ""));
       select.appendChild(createSelectOption("tmdb", "TMDb", sourceArchiveTypes[slotIndex - 2] === "tmdb"));
-      select.addEventListener("change", () => {
+      select.appendChild(createSelectOption("manual", t("source_archive_manual"), sourceArchiveTypes[slotIndex - 2] === "manual"));
+      select.addEventListener("change", async () => {
         if (eventItem.kind === "source") {
           eventItem.archiveSourceTypes = normalizeSourceArchiveTypes(eventItem);
           eventItem.archiveSourceTypes[slotIndex - 2] = normalizeArchiveSourceType(select.value);
@@ -23589,12 +24074,19 @@ function createInlineEditor(eventItem) {
             eventItem.archiveSourceTypes = eventItem.archiveSourceTypes.map((value, index) => (
               index === slotIndex - 2 ? value : (value === "tmdb" ? "" : value)
             ));
+          } else if (eventItem.archiveSourceTypes[slotIndex - 2] === "manual") {
+            eventItem.manualArchiveSources = normalizeManualArchiveSources(eventItem);
           }
           scheduleLocalAutosave();
           rerenderEditor({ updateSelection: false, redrawTimeline: false });
         }
       });
       header.appendChild(select);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "archive-source-select-spacer";
+      spacer.setAttribute("aria-hidden", "true");
+      header.appendChild(spacer);
     }
     const body = document.createElement("div");
     body.className = "archive-source-field-body";
@@ -23614,13 +24106,13 @@ function createInlineEditor(eventItem) {
   archiveRow.className = "field-row year-fields archive-source-row";
   archiveRow.append(
     createArchiveSourceSlotField(1, wikidataControl),
-    createArchiveSourceSlotField(2, archiveSourceTypes[0] === "tmdb" ? tmdbReadout : null),
+    createArchiveSourceSlotField(2, archiveSourceTypes[0] === "tmdb" ? tmdbReadout : (archiveSourceTypes[0] === "manual" ? createManualArchiveReadout(2) : null)),
   );
   const archiveRowSecondary = document.createElement("div");
   archiveRowSecondary.className = "field-row year-fields archive-source-row";
   archiveRowSecondary.append(
-    createArchiveSourceSlotField(3, archiveSourceTypes[1] === "tmdb" ? tmdbReadout : null),
-    createArchiveSourceSlotField(4, archiveSourceTypes[2] === "tmdb" ? tmdbReadout : null),
+    createArchiveSourceSlotField(3, archiveSourceTypes[1] === "tmdb" ? tmdbReadout : (archiveSourceTypes[1] === "manual" ? createManualArchiveReadout(3) : null)),
+    createArchiveSourceSlotField(4, archiveSourceTypes[2] === "tmdb" ? tmdbReadout : (archiveSourceTypes[2] === "manual" ? createManualArchiveReadout(4) : null)),
   );
   const imageField = shouldShowImageDisplayField
     ? createField(t("image_display"), imageDisplayPanel)
@@ -26286,7 +26778,9 @@ function createGroupBrowserItem(groupItem, options = {}) {
     deleteMenuButton.addEventListener("pointercancel", cancelGroupBrowserMenuDeleteHold);
     deleteMenuButton.addEventListener("lostpointercapture", cancelGroupBrowserMenuDeleteHold);
     menu.append(
-      createMenuButton(t("project_menu_save"), handleExportGroup),
+      createMenuButton(t("project_menu_export"), () => {
+        downloadFolderExport(groupItem.id);
+      }),
       createMenuButton(t("project_menu_properties"), handleRenameGroup),
       createMenuButton(t("project_menu_render"), () => handleRenderProject(groupItem.id)),
       createMenuButton(t("project_menu_add_subfolder"), handleAddSubgroup),
@@ -27181,30 +27675,81 @@ function createSourcesFromCollectionCsv(collection, csvText) {
     const header = row.join(" ").toLowerCase();
     return !(header.includes("titel") || header.includes("title"));
   });
+  const headerMap = new Map();
+  if (headerRow) {
+    headerRow.forEach((cell, index) => {
+      const key = normalizeDelimitedHeaderName(cell);
+      if (key && !headerMap.has(key)) headerMap.set(key, index);
+    });
+  }
+  const getCellByHeader = (row, names, fallbackIndex = null) => {
+    const nameList = Array.isArray(names) ? names : [names];
+    for (const name of nameList) {
+      const index = headerMap.get(normalizeDelimitedHeaderName(name));
+      if (Number.isInteger(index)) return String(row[index] || "").trim();
+    }
+    return Number.isInteger(fallbackIndex) ? String(row[fallbackIndex] || "").trim() : "";
+  };
+  const getArchiveSlotFromCsv = (row, slotNumber) => {
+    const prefix = `source${slotNumber}`;
+    const id = getCellByHeader(row, [`${prefix}Id`, `${prefix}ID`, `quelle${slotNumber}Id`]);
+    const mediaType = String(getCellByHeader(row, [`${prefix}MediaType`, `quelle${slotNumber}Medientyp`]) || "").trim().toLowerCase();
+    const label = getCellByHeader(row, [`${prefix}Label`, `quelle${slotNumber}Label`, `quelle${slotNumber}Bezeichnung`]);
+    const url = getCellByHeader(row, [`${prefix}Url`, `${prefix}URL`, `quelle${slotNumber}Url`, `quelle${slotNumber}URL`]);
+    const title = getCellByHeader(row, [`${prefix}Title`, `quelle${slotNumber}Titel`, `quelle${slotNumber}Beschreibung`]);
+    const explicitType = normalizeArchiveSourceType(getCellByHeader(row, [`${prefix}Type`, `quelle${slotNumber}Typ`, `quelle${slotNumber}Type`]));
+    const type = explicitType || ((label || url || title) ? "manual" : "");
+    return { type, id, mediaType, label, url, title };
+  };
   const createdSources = [];
   dataRows.forEach((row) => {
-    const title = String(row[0] || "").trim();
+    const title = headerRow ? getCellByHeader(row, ["title", "titel"], 0) : String(row[0] || "").trim();
     if (!title) return;
-    const creator = String(row[1] || "").trim();
+    const creator = headerRow ? getCellByHeader(row, ["creator", "urheber"], 1) : String(row[1] || "").trim();
     const rowUsesRangeSchema = usesRangeSchema || row.length >= 7;
-    const yearFromLabel = String(row[2] || "").trim();
-    const yearToLabel = rowUsesRangeSchema ? String(row[3] || "").trim() : "";
-    const publishedYearLabel = String(row[rowUsesRangeSchema ? 4 : 3] || "").trim();
-    const sourceType = inferSourceTypeFromCsvValue(row[rowUsesRangeSchema ? 5 : 4] || "");
-    const note = String(row[rowUsesRangeSchema ? 6 : 5] || "").trim();
+    const yearFromLabel = headerRow
+      ? getCellByHeader(row, ["yearFrom", "year", "von"], 2)
+      : String(row[2] || "").trim();
+    const yearToLabel = headerRow
+      ? getCellByHeader(row, ["yearTo", "bis"], 3)
+      : (rowUsesRangeSchema ? String(row[3] || "").trim() : "");
+    const publishedYearLabel = headerRow
+      ? getCellByHeader(row, ["publishedYear", "publicationYear", "erscheinungsjahr"], 4)
+      : String(row[rowUsesRangeSchema ? 4 : 3] || "").trim();
+    const sourceType = inferSourceTypeFromCsvValue(headerRow
+      ? getCellByHeader(row, ["sourceType", "quellart"], 5)
+      : (row[rowUsesRangeSchema ? 5 : 4] || ""));
+    const note = headerRow
+      ? getCellByHeader(row, ["note", "notiz", "hinweis"], 6)
+      : String(row[rowUsesRangeSchema ? 6 : 5] || "").trim();
+    const wikidataId = normalizeWikidataEntityId(headerRow ? getCellByHeader(row, ["wikidataId", "wikidata", "qid"], 7) : "");
+    const archiveSlots = [2, 3, 4].map((slotNumber) => getArchiveSlotFromCsv(row, slotNumber));
+    const tmdbSlot = archiveSlots.find((slot) => slot.type === "tmdb" && slot.id);
+    const manualArchiveSources = archiveSlots.map((slot) => normalizeManualArchiveSourceEntry({
+      label: slot.label || t("source_archive_manual"),
+      url: slot.url,
+      title: slot.title,
+    }));
+    const archiveSourceTypes = archiveSlots.map((slot) => slot.type);
     const targetGroup = getDefaultGroupForNewSource(sourceType);
     const temporalStartValue = parseEditorTemporalValue(yearFromLabel);
     const temporalEndValue = parseEditorTemporalValue(yearToLabel);
+    const tmdbMediaType = tmdbSlot
+      ? (tmdbSlot.mediaType === "tv" ? "tv" : "movie")
+      : "";
+    const tmdbId = tmdbSlot ? String(tmdbSlot.id || "").trim() : "";
     const sourceDraft = {
       id: createUniqueId(`source-${sourceType}`),
       kind: "source",
       sourceType,
-      source: "manual",
-      sourceId: "",
+      source: tmdbId ? "tmdb" : (wikidataId ? "wikidata" : "manual"),
+      sourceId: tmdbId ? `${tmdbMediaType}:${tmdbId}` : (wikidataId || ""),
       externalId: "",
-      tmdbId: "",
-      tmdbMediaType: "",
-      wikidataId: "",
+      tmdbId,
+      tmdbMediaType,
+      wikidataId,
+      archiveSourceTypes,
+      manualArchiveSources,
       title,
       description: [creator ? `${t("source_collection_creator_label")}: ${creator}` : "", note].filter(Boolean).join("\n"),
       creator,
@@ -29575,6 +30120,105 @@ async function importLibraryPayloadFromFile(file) {
         setFolderImportLoading({ visible: false });
       }, 180);
     }
+  }
+}
+
+function getImportFilenameFromUrl(urlValue) {
+  try {
+    const url = new URL(urlValue);
+    const pathname = decodeURIComponent(url.pathname || "");
+    const name = pathname.split("/").filter(Boolean).pop();
+    return name && /\.[a-z0-9]+$/i.test(name) ? name : "timemap-import.json";
+  } catch {
+    return "timemap-import.json";
+  }
+}
+
+async function importLibraryPayloadFromUrl(urlValue) {
+  const url = String(urlValue || "").trim();
+  if (!url) return;
+  try {
+    hideSearchLoading();
+    setFolderImportLoading({
+      visible: true,
+      title: url,
+      text: tf("loading_read_file", { title: url }),
+      progress: 12,
+    });
+    await waitForNextPaint();
+    const response = await fetchWithTimeout(url, { cache: "no-store" }, 18000);
+    if (!response.ok) throw new Error(`import-url-failed-${response.status}`);
+    const text = await response.text();
+    const fileLike = {
+      name: getImportFilenameFromUrl(url),
+      text: async () => text,
+    };
+    await importLibraryPayloadFromFile(fileLike);
+  } catch {
+    ui.eventBrowserInfo.textContent = t("import_failed");
+    window.setTimeout(() => {
+      setFolderImportLoading({ visible: false });
+    }, 180);
+  }
+}
+
+function showProjectImportChoiceModal() {
+  return new Promise((resolve) => {
+    const modal = document.createElement("div");
+    modal.className = "confirm-modal project-import-modal";
+    const backdrop = document.createElement("div");
+    backdrop.className = "confirm-modal-backdrop";
+    const dialog = document.createElement("div");
+    dialog.className = "confirm-modal-dialog project-open-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    const title = document.createElement("strong");
+    title.textContent = t("project_import_dialog_title");
+    const message = document.createElement("p");
+    message.textContent = t("project_import_dialog_message");
+    const actions = document.createElement("div");
+    actions.className = "confirm-modal-actions project-import-actions";
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = t("cancel");
+    const desktopButton = document.createElement("button");
+    desktopButton.type = "button";
+    desktopButton.textContent = t("project_import_from_desktop");
+    const urlButton = document.createElement("button");
+    urlButton.type = "button";
+    urlButton.textContent = t("project_import_from_url");
+    const cleanup = (choice = null) => {
+      modal.remove();
+      resolve(choice);
+    };
+    backdrop.addEventListener("click", () => cleanup(null));
+    cancelButton.addEventListener("click", () => cleanup(null));
+    desktopButton.addEventListener("click", () => cleanup("desktop"));
+    urlButton.addEventListener("click", () => cleanup("url"));
+    actions.append(cancelButton, desktopButton, urlButton);
+    dialog.append(title, message, actions);
+    modal.append(backdrop, dialog);
+    document.body.appendChild(modal);
+  });
+}
+
+async function handleProjectImportClick() {
+  const choice = await showProjectImportChoiceModal();
+  if (choice === "desktop") {
+    ui.importFolderInput?.click();
+    return;
+  }
+  if (choice === "url") {
+    const url = await showTextPromptModal({
+      title: t("project_import_url_prompt_title"),
+      message: t("project_import_url_prompt_message"),
+      defaultValue: "",
+      placeholder: t("project_import_url_placeholder"),
+      confirmLabel: t("project_import_button"),
+      cancelLabel: t("cancel"),
+    });
+    if (!String(url || "").trim()) return;
+    await importLibraryPayloadFromUrl(url);
   }
 }
 
@@ -33779,11 +34423,13 @@ function bindEvents() {
     newGroup.iconName = "mdi:folder";
     newGroup.iconColor = PROJECT_ICON_DEFAULT_COLOR;
     eventGroups.push(newGroup);
+    setExclusiveProjectGroupEnabled(newGroup.id, true);
     state.openEditorId = null;
     state.openChartEditorId = null;
     state.openBookmarkEditorId = null;
     state.openChartCommentEditorId = null;
     state.openGroupEditorId = newGroup.id;
+    state.activeContextGroupId = newGroup.id;
     renderEventList();
     scheduleLocalAutosave();
     scrollToDetails("auto");
@@ -33799,6 +34445,9 @@ function bindEvents() {
   });
   ui.importFolderButton?.addEventListener("click", () => {
     openProjectModule();
+  });
+  ui.projectImportButton?.addEventListener("click", () => {
+    handleProjectImportClick();
   });
   ui.saveProjectButton?.addEventListener("click", async () => {
     try {

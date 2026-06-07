@@ -83,6 +83,48 @@
                 <a id="menuDiscordLink" class="secondary-button menu-discord-link" href="https://discord.com/channels/709433399596679261/709434180857233491" target="_blank" rel="noopener noreferrer">Discord öffnen</a>
               </div>
             </div>
+            <div class="timeline-menu-section timeline-menu-section-development">
+              <button type="button" class="timeline-menu-item" data-menu-panel="development" aria-expanded="false">
+                <img class="timeline-menu-icon" src="https://api.iconify.design/lucide/construction.svg" alt="" aria-hidden="true">
+                <span id="menuDevelopmentTitle">Entwicklungsstand</span>
+              </button>
+              <div class="timeline-menu-popup" data-menu-popup="development" hidden>
+                <p id="menuDevelopmentDescription" class="event-description">TimeMap befindet sich aktuell in Version 0.4. Einzelne Funktionen, Schnittstellen und Darstellungsformen werden noch entwickelt, erprobt und getestet.</p>
+                <p id="menuDevelopmentStorage" class="event-description">Das Speichersystem befindet sich ausdrücklich noch in Entwicklung und Testung und kann Fehler enthalten. Projekte werden temporär vom Browser gespeichert; das bewusste lokale Speichern wird weiter ausgebaut und soll künftig transparenter funktionieren.</p>
+                <div class="menu-development-metrics" aria-label="Geschätzter Entwicklungsstand">
+                  <div class="menu-development-meter" style="--progress: 85%">
+                    <span>Timeline</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>85%</strong>
+                  </div>
+                  <div class="menu-development-meter" style="--progress: 75%">
+                    <span>Objektbrowser</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>75%</strong>
+                  </div>
+                  <div class="menu-development-meter" style="--progress: 40%">
+                    <span>Speichersystem</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>40%</strong>
+                  </div>
+                  <div class="menu-development-meter" style="--progress: 5%">
+                    <span>Styles</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>5%</strong>
+                  </div>
+                  <div class="menu-development-meter" style="--progress: 10%">
+                    <span>Quellapparat</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>10%</strong>
+                  </div>
+                  <div class="menu-development-meter" style="--progress: 25%">
+                    <span>Kalendersystem</span>
+                    <div class="menu-development-track"><i></i></div>
+                    <strong>25%</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="timeline-menu-section timeline-menu-section-imprint">
               <button type="button" class="timeline-menu-item" data-menu-panel="imprint" aria-expanded="false">
                 <img class="timeline-menu-icon" src="https://api.iconify.design/mdi/legal.svg" alt="" aria-hidden="true">
@@ -91,8 +133,8 @@
               <div class="timeline-menu-popup menu-imprint-popup" data-menu-popup="imprint" hidden>
                 <div class="menu-imprint-block">
                   <strong id="menuImprintProjectTitle">Projektbeschreibung</strong>
-                  <p id="menuImprintDescription" class="event-description">TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeitstrahlen, Quellen, Karten, Charts und projektbezogener Wissensräume.</p>
-                  <p id="menuImprintProjectText" class="event-description">TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge und Datencharts.</p>
+                  <p id="menuImprintDescription" class="event-description">TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Ereignisse, Quellen, Karten, Charts, Kalendersysteme und projektbezogener Wissensräume.</p>
+                  <div id="menuImprintProjectText" class="menu-imprint-project-copy"></div>
                 </div>
                 <div class="menu-imprint-block">
                   <strong id="menuImprintProviderTitle">Angaben gemäß § 5 DDG</strong>
@@ -187,6 +229,7 @@
           <div class="library-actions">
             <button type="button" id="addFolderButton" class="secondary-button">Neues Projekt</button>
             <button type="button" id="importFolderButton" class="secondary-button">Projekt öffnen</button>
+            <button type="button" id="projectImportButton" class="secondary-button">Importieren</button>
             <button type="button" id="renderLibraryButton" class="secondary-button" disabled>Rendern</button>
           </div>
           <p id="projectDirectoryStatus" class="event-description project-storage-status"></p>

@@ -522,6 +522,21 @@ button:focus-visible {
   filter: brightness(0) saturate(100%) invert(56%) sepia(85%) saturate(607%) hue-rotate(351deg) brightness(99%) contrast(96%);
 }
 
+.timeline-menu-section-development .timeline-menu-item {
+  color: rgba(137, 200, 255, 0.96);
+  font-weight: 700;
+}
+
+.timeline-menu-section-development .timeline-menu-icon {
+  opacity: 1;
+  filter: brightness(0) saturate(100%) invert(74%) sepia(48%) saturate(720%) hue-rotate(180deg) brightness(104%) contrast(101%);
+}
+
+.timeline-menu-section-development .timeline-menu-item:hover,
+.timeline-menu-section-development .timeline-menu-item.is-active {
+  color: rgba(112, 184, 246, 1);
+}
+
 .timeline-menu-popup {
   margin: -1px 0 2px 34px;
   padding: 10px 12px 12px;
@@ -548,6 +563,50 @@ button:focus-visible {
 .timeline-side-menu .event-description {
   font-size: 0.86rem;
   line-height: 1.45;
+}
+
+.menu-development-metrics {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.menu-development-meter {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) minmax(96px, 1.35fr) 38px;
+  align-items: center;
+  gap: 8px;
+  color: rgba(31, 41, 48, 0.68);
+  font-size: 0.78rem;
+}
+
+.menu-development-meter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-development-meter > strong {
+  color: rgba(31, 41, 48, 0.58);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.menu-development-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(31, 41, 48, 0.11);
+  box-shadow: inset 0 1px 1px rgba(31, 41, 48, 0.08);
+}
+
+.menu-development-track i {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 179, 71, 0.78), rgba(255, 179, 71, 0.96));
 }
 
 .menu-action-row {
@@ -634,6 +693,15 @@ button:focus-visible {
   flex-direction: column;
   gap: 4px;
   margin-top: 12px;
+}
+
+.menu-imprint-project-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-imprint-project-copy .event-description {
+  margin: 0;
 }
 
 .menu-imprint-block strong {
@@ -2345,22 +2413,203 @@ button:focus-visible {
   color: rgba(255, 179, 71, 0.86);
 }
 
-.project-open-dialog {
-  width: min(520px, calc(100vw - 36px));
+.confirm-modal-dialog.project-open-dialog {
+  width: min(780px, calc(100vw - 36px));
+  min-height: min(620px, calc(100vh - 56px));
+  max-height: min(88vh, 860px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 20px;
+  border-color: rgba(255, 179, 71, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    #2a3035;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.project-open-list {
+.project-open-header {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.project-open-header-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(137, 200, 255, 0.16), rgba(137, 200, 255, 0.05)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 0 0 1px rgba(137, 200, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  position: relative;
+}
+
+.project-open-header-icon::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  background: rgba(137, 200, 255, 0.95);
+  -webkit-mask: url("https://api.iconify.design/mdi/folder-open.svg") center / contain no-repeat;
+  mask: url("https://api.iconify.design/mdi/folder-open.svg") center / contain no-repeat;
+}
+
+.project-open-header-copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.project-open-header-copy strong {
+  color: rgba(238, 243, 246, 0.96);
+  font-size: 1.08rem;
+  line-height: 1.2;
+}
+
+.project-open-header-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.42;
+}
+
+.confirm-modal-dialog.project-open-dialog .project-open-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: min(48vh, 360px);
+  gap: 7px;
+  max-height: none;
+  min-height: 0;
   overflow: auto;
-  padding: 2px 2px 0;
+  padding: 2px 4px 2px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 179, 71, 0.28) transparent;
 }
 
-.project-open-list-button {
-  justify-content: flex-start;
+.project-open-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.02);
+  color: var(--text);
   text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 8px 22px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.project-open-card:hover,
+.project-open-card:focus-visible {
+  border-color: rgba(255, 179, 71, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 179, 71, 0.075), rgba(255, 179, 71, 0.028)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 13px 28px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.project-open-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(137, 200, 255, 0.08);
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(137, 200, 255, 0.16);
+}
+
+.project-open-card-icon::before {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  background: rgba(137, 200, 255, 0.96);
+  -webkit-mask: url("https://api.iconify.design/mdi/folder.svg") center / contain no-repeat;
+  mask: url("https://api.iconify.design/mdi/folder.svg") center / contain no-repeat;
+}
+
+.project-open-card-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.project-open-card-main strong {
+  overflow: hidden;
+  color: rgba(238, 243, 246, 0.98);
+  font-size: 0.98rem;
+  line-height: 1.22;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-open-card-summary,
+.project-open-card-date {
+  overflow: hidden;
+  color: rgba(169, 181, 190, 0.92);
+  font-size: 0.82rem;
+  line-height: 1.22;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-open-card-date {
+  color: rgba(169, 181, 190, 0.68);
+}
+
+.project-open-card-action {
+  align-self: center;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 179, 71, 0.22);
+  border-radius: 10px;
+  color: rgba(255, 179, 71, 0.92);
+  font-weight: 700;
+  font-size: 0.88rem;
+  line-height: 1;
+  background: rgba(255, 179, 71, 0.055);
+}
+
+.project-open-card:hover .project-open-card-action,
+.project-open-card:focus-visible .project-open-card-action {
+  border-color: rgba(255, 179, 71, 0.42);
+  background: rgba(255, 179, 71, 0.11);
+  color: #ffc468;
+}
+
+.project-open-dialog .confirm-modal-actions {
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 620px) {
+  .project-open-card {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .project-open-card-action {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 
 .event-list {
@@ -6424,10 +6673,23 @@ body.event-tooltip-viewer-open {
 }
 
 .archive-source-select {
-  max-width: 170px;
-  min-height: 32px;
+  width: 170px;
+  max-width: 42%;
+  height: 40px;
+  flex: 0 1 170px;
+  box-sizing: border-box;
   padding: 5px 30px 5px 10px;
   font-size: 0.92rem;
+}
+
+.archive-source-select-spacer {
+  display: block;
+  width: 170px;
+  max-width: 42%;
+  height: 40px;
+  flex: 0 1 170px;
+  box-sizing: border-box;
+  visibility: hidden;
 }
 
 .archive-source-field-body {
@@ -6438,6 +6700,31 @@ body.event-tooltip-viewer-open {
   min-height: 44px;
   cursor: default;
   opacity: 0.74;
+  font: 14px/1.25 Consolas, "Courier New", monospace;
+  color: rgba(238, 243, 246, 0.58);
+  letter-spacing: 0.01em;
+}
+
+.archive-manual-readout {
+  min-height: 44px;
+}
+
+.archive-manual-link,
+.archive-manual-summary {
+  min-width: 0;
+  color: inherit;
+  font: 14px/1.25 Consolas, "Courier New", monospace;
+  letter-spacing: 0.01em;
+}
+
+.archive-manual-link {
+  text-decoration: none;
+}
+
+.archive-manual-link:hover,
+.archive-manual-link:focus-visible {
+  color: #d7edf2;
+  text-decoration: underline;
 }
 
 .editor-tmdb-link {
