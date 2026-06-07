@@ -19,6 +19,7 @@ const LOCAL_TEMPLATE_DIRECTORY_KEY = "templateDirectoryHandle";
 const LOCAL_STATE_VERSION = 1;
 const AUTOSAVE_DELAY_MS = 900;
 const PROJECT_FILE_NAME = "timemap-project.json";
+const PROJECT_HOME_DIRECTORY_NAME = "TimeMap-Projekte";
 const PROJECT_ASSET_DIRECTORY_NAME = "Medien";
 const LEGACY_PROJECT_ASSET_DIRECTORY_NAME = "assets";
 const TEMPLATE_FOLDER_NAME = "Projektvorlagen";
@@ -2729,8 +2730,11 @@ function getTemplateEntrySortKey(entry) {
   return `${String(entry.title || "").toLocaleLowerCase(getUiSortLocale())}\u0000${String(entry.fileName || "").toLocaleLowerCase(getUiSortLocale())}`;
 }
 
-function getCurrentProjectDirectoryName() {
-  const activeProject = getActiveProjectRootGroup?.() ?? null;
+function getProjectDirectoryNameForGroupId(projectGroupId = null) {
+  const explicitProject = projectGroupId ? getGroupById(projectGroupId) : null;
+  const activeProject = explicitProject && isProjectRootGroup(explicitProject)
+    ? explicitProject
+    : (getActiveProjectRootGroup?.() ?? null);
   const fallbackProject = getProjectRootGroupOptions?.()[0] ?? null;
   const rawTitle = String(activeProject?.title || fallbackProject?.title || "TimeMap-Projekt").trim();
   const safeTitle = sanitizeFilenamePart(rawTitle)
@@ -2739,18 +2743,34 @@ function getCurrentProjectDirectoryName() {
   return safeTitle || "TimeMap-Projekt";
 }
 
+function getExistingProjectDirectoryHandleForGroupId(projectGroupId = null) {
+  if (!state.projectDirectoryHandle) return null;
+  const expectedName = getProjectDirectoryNameForGroupId(projectGroupId);
+  return getProjectDirectoryDisplayName(state.projectDirectoryHandle) === expectedName
+    ? state.projectDirectoryHandle
+    : null;
+}
+
 async function chooseProjectHomeDirectory() {
   if (typeof window.showDirectoryPicker !== "function") {
     updateProjectStorageUi(t("project_directory_unavailable"));
     return null;
   }
-  const handle = await window.showDirectoryPicker({ mode: "readwrite" });
-  await saveProjectHomeDirectoryHandle(handle);
-  updateProjectStorageUi(tf("project_home_selected", { name: getProjectHomeDirectoryDisplayName(handle) }));
-  return handle;
+  const selectedHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+  const granted = await ensureProjectDirectoryPermission(selectedHandle, "readwrite");
+  if (!granted) {
+    updateProjectStorageUi(t("project_directory_permission_denied"));
+    return null;
+  }
+  const homeHandle = selectedHandle.name === PROJECT_HOME_DIRECTORY_NAME
+    ? selectedHandle
+    : await selectedHandle.getDirectoryHandle(PROJECT_HOME_DIRECTORY_NAME, { create: true });
+  await saveProjectHomeDirectoryHandle(homeHandle);
+  updateProjectStorageUi(tf("project_home_selected", { name: getProjectHomeDirectoryDisplayName(homeHandle) }));
+  return homeHandle;
 }
 
-async function getOrCreateProjectDirectoryInHome() {
+async function getOrCreateProjectDirectoryInHome(projectGroupId = null) {
   let homeHandle = state.projectHomeDirectoryHandle;
   if (!homeHandle) {
     homeHandle = await chooseProjectHomeDirectory();
@@ -2761,7 +2781,7 @@ async function getOrCreateProjectDirectoryInHome() {
     updateProjectStorageUi(t("project_directory_permission_denied"));
     return null;
   }
-  const projectFolderName = getCurrentProjectDirectoryName();
+  const projectFolderName = getProjectDirectoryNameForGroupId(projectGroupId);
   const projectHandle = await homeHandle.getDirectoryHandle(projectFolderName, { create: true });
   await saveProjectDirectoryHandle(projectHandle);
   return projectHandle;
@@ -2848,14 +2868,7 @@ function updateProjectStorageUi(statusText = null) {
 }
 
 async function chooseProjectDirectory() {
-  if (typeof window.showDirectoryPicker !== "function") {
-    updateProjectStorageUi(t("project_directory_unavailable"));
-    return null;
-  }
-  const handle = await window.showDirectoryPicker({ mode: "readwrite" });
-  await saveProjectDirectoryHandle(handle);
-  updateProjectStorageUi(tf("project_directory_selected", { name: getProjectDirectoryDisplayName(handle) }));
-  return handle;
+  return chooseProjectHomeDirectory();
 }
 
 async function directoryContainsProjectFile(handle) {
@@ -2946,9 +2959,20 @@ async function openProjectModule() {
       updateProjectStorageUi(t("project_directory_permission_denied"));
       return false;
     }
-    const includeCurrent = await directoryContainsProjectFile(rootHandle);
-    const projectEntries = await listProjectDirectoriesInDirectory(rootHandle);
-    let projectHandle = rootHandle;
+    let homeHandle = rootHandle;
+    let includeCurrent = await directoryContainsProjectFile(rootHandle);
+    let projectEntries = await listProjectDirectoriesInDirectory(rootHandle);
+    if (!includeCurrent && projectEntries.length === 0 && rootHandle.name !== PROJECT_HOME_DIRECTORY_NAME) {
+      try {
+        const nestedHomeHandle = await rootHandle.getDirectoryHandle(PROJECT_HOME_DIRECTORY_NAME, { create: false });
+        homeHandle = nestedHomeHandle;
+        includeCurrent = await directoryContainsProjectFile(nestedHomeHandle);
+        projectEntries = await listProjectDirectoriesInDirectory(nestedHomeHandle);
+      } catch {
+        // The selected folder is not a TimeMap parent folder.
+      }
+    }
+    let projectHandle = includeCurrent ? homeHandle : rootHandle;
     if (!includeCurrent && projectEntries.length === 0) {
       updateProjectStorageUi(t("project_open_empty"));
       return false;
@@ -2956,13 +2980,13 @@ async function openProjectModule() {
     if (projectEntries.length > 0) {
       projectHandle = await showProjectOpenSelectionDialog(projectEntries, {
         includeCurrent,
-        currentHandle: rootHandle,
+        currentHandle: homeHandle,
       });
       if (projectHandle) {
-        await saveProjectHomeDirectoryHandle(rootHandle);
+        await saveProjectHomeDirectoryHandle(homeHandle);
       }
     } else if (!includeCurrent) {
-      await saveProjectHomeDirectoryHandle(rootHandle);
+      await saveProjectHomeDirectoryHandle(homeHandle);
     }
     if (!projectHandle) return false;
     await saveProjectDirectoryHandle(projectHandle);
@@ -2975,10 +2999,20 @@ async function openProjectModule() {
   }
 }
 
-async function saveProjectToDirectory() {
-  let handle = state.projectDirectoryHandle;
+async function saveProjectToDirectory(projectGroupId = null) {
+  const explicitProject = projectGroupId ? getGroupById(projectGroupId) : null;
+  const projectRoot = explicitProject && isProjectRootGroup(explicitProject)
+    ? explicitProject
+    : (getActiveProjectRootGroup?.() ?? getProjectRootGroupOptions?.()[0] ?? null);
+  let handle = projectRoot
+    ? (
+      state.projectHomeDirectoryHandle
+        ? await getOrCreateProjectDirectoryInHome(projectRoot.id)
+        : getExistingProjectDirectoryHandleForGroupId(projectRoot.id)
+    )
+    : state.projectDirectoryHandle;
   if (!handle) {
-    handle = await getOrCreateProjectDirectoryInHome();
+    handle = await getOrCreateProjectDirectoryInHome(projectRoot?.id ?? null);
   }
   if (!handle) return false;
   const granted = await ensureProjectDirectoryPermission(handle, "readwrite");
@@ -2986,9 +3020,16 @@ async function saveProjectToDirectory() {
     updateProjectStorageUi(t("project_directory_permission_denied"));
     return false;
   }
+  const payload = projectRoot
+    ? buildFolderExportPayload(projectRoot.id, { includeBookmarks: true })
+    : buildLocalStateSnapshot();
+  if (!payload) {
+    updateProjectStorageUi(t("project_directory_error"));
+    return false;
+  }
   const fileHandle = await handle.getFileHandle(PROJECT_FILE_NAME, { create: true });
   const writable = await fileHandle.createWritable();
-  await writable.write(JSON.stringify(buildLocalStateSnapshot(), null, 2));
+  await writable.write(JSON.stringify(payload, null, 2));
   await writable.close();
   state.projectHasUnsavedChanges = false;
   updateProjectSaveDirtyIndicators();
@@ -3002,9 +3043,16 @@ async function saveProjectToDirectory() {
 }
 
 async function ensureProjectAssetDirectoryHandle(kind = "images") {
-  let handle = state.projectDirectoryHandle;
+  const projectRoot = getActiveProjectRootGroup?.() ?? getProjectRootGroupOptions?.()[0] ?? null;
+  let handle = projectRoot
+    ? (
+      state.projectHomeDirectoryHandle
+        ? await getOrCreateProjectDirectoryInHome(projectRoot.id)
+        : getExistingProjectDirectoryHandleForGroupId(projectRoot.id)
+    )
+    : state.projectDirectoryHandle;
   if (!handle) {
-    handle = await getOrCreateProjectDirectoryInHome();
+    handle = await getOrCreateProjectDirectoryInHome(projectRoot?.id ?? null);
   }
   if (!handle) return null;
   const granted = await ensureProjectDirectoryPermission(handle, "readwrite");
@@ -3121,7 +3169,7 @@ async function hydrateAllLocalMediaAssetUrls() {
 async function loadProjectFromDirectory(handleOverride = null) {
   let handle = handleOverride || state.projectDirectoryHandle;
   if (!handle) {
-    handle = await chooseProjectDirectory();
+    return openProjectModule();
   }
   if (!handle) return false;
   if (handleOverride) {
@@ -3136,11 +3184,15 @@ async function loadProjectFromDirectory(handleOverride = null) {
     const fileHandle = await handle.getFileHandle(PROJECT_FILE_NAME, { create: false });
     const file = await fileHandle.getFile();
     const text = await file.text();
-    const snapshot = JSON.parse(text);
-    const applied = applyLocalStateSnapshot(snapshot);
-    if (!applied) {
-      updateProjectStorageUi(t("project_directory_error"));
-      return false;
+    const payload = JSON.parse(text);
+    if (payload?.type === "timemap-folder-export") {
+      await importFolderPayload(payload);
+    } else {
+      const applied = applyLocalStateSnapshot(payload);
+      if (!applied) {
+        updateProjectStorageUi(t("project_directory_error"));
+        return false;
+      }
     }
     await hydrateAllLocalMediaAssetUrls();
     populateLanguageSelect();
@@ -16806,6 +16858,10 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
       enabled: sourceItem.enabled !== false,
     }));
 
+  const sourceCollectionsForExport = sourceCollections
+    .filter((collection) => groupIdSet.has(collection.groupId))
+    .map((collection) => structuredClone(collection));
+
   return {
     type: "timemap-folder-export",
     version: TIMEMAP_FOLDER_EXPORT_VERSION,
@@ -16827,6 +16883,7 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
     events,
     charts,
     sources,
+    sourceCollections: sourceCollectionsForExport,
     bookmarks: includeBookmarks
       ? (
         getSpecialTreeKindForGroup(rootGroupId) === "bookmarks"
@@ -17003,6 +17060,7 @@ async function importFolderPayload(payload, onProgress = null) {
   const groupIdMap = new Map();
   const eventIdMap = new Map();
   const chartIdMap = new Map();
+  const sourceIdMap = new Map();
   const folderTitle = payload.title ?? payload.groups.find((group) => group.parentGroupId == null)?.title ?? "TimeMap";
 
   if (typeof onProgress === "function") {
@@ -17127,7 +17185,7 @@ async function importFolderPayload(payload, onProgress = null) {
     };
     normalizeChartItem(chartItem);
     const targetGroup = getDefaultGroupForNewItem("charts");
-    if (pushToState && targetGroup && !chartItem.groupId) {
+    if (targetGroup && !chartItem.groupId) {
       chartItem.groupId = targetGroup.id;
       expandGroupAncestors(targetGroup.id);
     }
@@ -17147,14 +17205,31 @@ async function importFolderPayload(payload, onProgress = null) {
   });
 
   (payload.sources ?? []).forEach((sourceItem) => {
+    const importedSourceId = createUniqueId("source-import");
+    if (sourceItem.id) sourceIdMap.set(sourceItem.id, importedSourceId);
     const normalizedSource = normalizeSourceItem({
       ...sourceItem,
-      id: createUniqueId("source-import"),
+      id: importedSourceId,
       groupId: sourceItem.groupId ? (groupIdMap.get(sourceItem.groupId) ?? null) : null,
       coupledEventId: sourceItem.coupledEventId ? (eventIdMap.get(sourceItem.coupledEventId) ?? null) : null,
       enabled: sourceItem.enabled !== false,
     });
     if (normalizedSource) sourceItems.push(normalizedSource);
+  });
+
+  (payload.sourceCollections ?? []).forEach((collection) => {
+    const normalizedCollection = normalizeSourceCollection({
+      ...collection,
+      id: createUniqueId("source-collection-import"),
+      groupId: collection.groupId ? (groupIdMap.get(collection.groupId) ?? null) : null,
+      sourceIds: Array.isArray(collection.sourceIds)
+        ? collection.sourceIds.map((sourceId) => sourceIdMap.get(sourceId)).filter(Boolean)
+        : [],
+      placedSourceIds: Array.isArray(collection.placedSourceIds)
+        ? collection.placedSourceIds.map((sourceId) => sourceIdMap.get(sourceId)).filter(Boolean)
+        : [],
+    });
+    if (normalizedCollection) sourceCollections.push(normalizedCollection);
   });
 
   if (payload.chartViewState && typeof payload.chartViewState === "object") {
@@ -26071,7 +26146,7 @@ function createGroupBrowserItem(groupItem, options = {}) {
     state.openSideSubgroupBrowserMenuId = null;
     if (isProjectRootGroup(groupItem)) {
       try {
-        await saveProjectToDirectory();
+        await saveProjectToDirectory(groupItem.id);
       } catch {
         updateProjectStorageUi(t("project_directory_error"));
       }
@@ -34095,7 +34170,7 @@ function bindEvents() {
   ui.focusNowButton?.addEventListener("click", toggleTodayFocus);
   ui.chooseProjectDirectoryButton?.addEventListener("click", async () => {
     try {
-      await chooseProjectDirectory();
+      await chooseProjectHomeDirectory();
     } catch {
       updateProjectStorageUi(t("project_directory_error"));
     }
@@ -34109,7 +34184,7 @@ function bindEvents() {
   });
   ui.loadProjectDirectoryButton?.addEventListener("click", async () => {
     try {
-      await loadProjectFromDirectory();
+      await openProjectModule();
     } catch {
       updateProjectStorageUi(t("project_directory_error"));
     }
