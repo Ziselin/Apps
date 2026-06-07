@@ -1,9 +1,9 @@
 $ErrorActionPreference = "Stop"
 
-$scriptTarget = Join-Path $PSScriptRoot "timemap-v2.js"
+$scriptTarget = Join-Path $PSScriptRoot "timemap.js"
 $encodingTargets = @(
   $scriptTarget,
-  (Join-Path $PSScriptRoot "timemap-v2.html")
+  (Join-Path $PSScriptRoot "timemap.html")
 )
 
 Write-Host "Checking syntax..." -ForegroundColor Cyan
