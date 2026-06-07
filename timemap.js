@@ -33639,7 +33639,7 @@ function bindEvents() {
     adjustPresentationZoom(-0.1);
   });
   ui.addCustomEventButton?.addEventListener("click", createNewEventFromBrowser);
-  ui.addFolderButton.addEventListener("click", () => {
+  ui.addFolderButton?.addEventListener("click", () => {
     const newGroup = createEmptyGroup();
     newGroup.iconName = "mdi:folder";
     newGroup.iconColor = PROJECT_ICON_DEFAULT_COLOR;
@@ -33675,7 +33675,7 @@ function bindEvents() {
   ui.renderLibraryButton?.addEventListener("click", () => {
     handleRenderLibrary();
   });
-  ui.importFolderInput.addEventListener("change", handleImportFolderFile);
+  ui.importFolderInput?.addEventListener("change", handleImportFolderFile);
   ui.importChartButton?.addEventListener("click", () => {
     ui.importChartInput?.click();
   });
