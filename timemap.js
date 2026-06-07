@@ -23,15 +23,28 @@ const PROJECT_HOME_DIRECTORY_NAME = "TimeMap-Projekte";
 const PROJECT_ASSET_DIRECTORY_NAME = "Medien";
 const LEGACY_PROJECT_ASSET_DIRECTORY_NAME = "assets";
 const TEMPLATE_FOLDER_NAME = "Projektvorlagen";
-const MENU_IMPRINT_DESCRIPTION_TEXT = "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Ereignisse, Quellen, Karten, Charts, Kalendersysteme und projektbezogener Wissensräume.";
+const MODE_DECISION_BUTTON_ICONS = {
+  eventsSearch: "https://api.iconify.design/mdi/event-search.svg",
+  eventsCreate: "https://api.iconify.design/mdi/event-add.svg",
+  chartsSearch: "https://api.iconify.design/fe/line-chart.svg",
+  chartsCreate: "https://api.iconify.design/fe/line-chart.svg",
+  chartsGenerate: "https://api.iconify.design/mingcute/ai-fill.svg",
+  sourcesSearch: "https://api.iconify.design/mdi/source-branch-sync.svg",
+  sourcesCreate: "https://api.iconify.design/mdi/source-branch-plus.svg",
+  sourceCollectionCreate: "https://api.iconify.design/fluent/collections-16-filled.svg",
+  sourceCollectionGenerate: "https://api.iconify.design/mingcute/ai-fill.svg",
+};
+const MENU_IMPRINT_DESCRIPTION_TEXT = "TimeMap ist eine interaktive Web-App zur Erstellung, Erforschung und Präsentation historischer Zeiträume, Ereignisse, Quellen, Medien, Kartenbezüge, Charts und Kalendersysteme.";
 const MENU_IMPRINT_PROJECT_TEXT = [
-  "Die Anwendung richtet sich bewusst an unterschiedliche Zielgruppen: an Lehrkräfte, Lernende, Forschende, historisch Interessierte und alle, die komplexe historische Zusammenhänge strukturieren, untersuchen oder anschaulich präsentieren möchten. TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge, Datencharts und kommentierbare Ereignissammlungen.",
+  "Die Anwendung richtet sich bewusst an unterschiedliche Zielgruppen: an Lehrkräfte, Lernende, Forschende, historisch Interessierte und alle, die komplexe historische Zusammenhänge strukturieren, untersuchen oder anschaulich präsentieren möchten. TimeMap unterstützt digitale Geschichtsvermittlung, historische Forschung, Unterrichtsvorbereitung und kuratierte Quellenarbeit durch frei strukturierbare Projektordner, visuelle Zeitachsen, Bild- und Filmquellen, Kartenbezüge, Datencharts, Kommentare und Ereignissammlungen.",
+  "Als Web-App ist TimeMap ohne Installation direkt im Browser nutzbar. Dadurch eignet sich die Anwendung besonders für Unterricht, Präsentationen, Workshops, kollaborative Erprobungssituationen und den schnellen Zugang auf unterschiedlichen Geräten.",
   "Eine besondere Stärke von TimeMap liegt in der flexiblen Darstellung historischer Zeiträume über unterschiedliche Skalen hinweg. Projekte können kurze Ereignisabfolgen ebenso abbilden wie langfristige Entwicklungen bis hin zu geologischen oder kosmischen Dimensionen. Durch flüssige Zoombarkeit, unterschiedliche Darstellungsformen und einen strukturierten Ereignisbrowser lassen sich Informationen intuitiv ordnen, vergleichen und präsentieren.",
+  "TimeMap eignet sich nicht nur zur Darstellung historischer Ereignisse, sondern auch zur zeitlichen Analyse von Quellen, Medien und Datensammlungen. Quellen und Medienobjekte können nach Entstehungszeit, Bezugszeitraum und Verweisstruktur eingeordnet werden. Dadurch lassen sich Häufungen, Leerstellen, Überlieferungslücken, spätere Deutungsschichten, mediale Repräsentationsmuster und Referenzen zwischen Quellen sichtbar machen.",
   "Zu einem TimeMap-Projekt gehören alle Informationen, die gemeinsam auf einem Zeitstrahl dargestellt und inhaltlich miteinander verknüpft werden sollen. Ereignisse, Quellen, Medien, Kartenbezüge, Charts, Kommentare und weitere Objekte können innerhalb eines Projekts organisiert und aufeinander bezogen werden. Unterstützt wird auch die Anzeige zusätzlicher Kalendersysteme und historischer Zeitordnungen. Bisher sind unter anderem der julianische und gregorianische Kalender, der französische Revolutionskalender, der römische Kalender, der hebräische Kalender sowie geologische Epochen integriert.",
-  "TimeMap legt besonderen Wert auf nachvollziehbare Quellenbezüge. Ereignisse können mit Wikidata und weiteren offenen Archiven verknüpft werden. Bei datenbasierten Darstellungen, etwa Charts, steht die kleinteilige Nachweisbarkeit einzelner Datenpunkte im Vordergrund, idealerweise durch konkrete Quellenangaben oder Links zu belastbaren Fachinformationen.",
-  "Projekte werden als JSON-Dateien gespeichert. Ziel ist es, dass Projektdaten auf dem Rechner der Nutzerinnen und Nutzer verbleiben; online bereitgestellt werden lediglich die Programmdateien der Web-App. Dadurch lassen sich Projekte lokal sichern, weitergeben und später erneut bearbeiten.",
-  "TimeMap kann außerdem KI-gestützte Arbeitsprozesse unterstützen, ohne selbst eine KI zu integrieren. Die App kann vorbereitete Prompts bereitstellen, die Nutzerinnen und Nutzer in einem eigenen KI-Werkzeug verwenden können. Die daraus erzeugten strukturierten CSV-Daten lassen sich anschließend importieren und in Zeitachsen, Charts, Ereignissammlungen oder anderen Darstellungsformen abbilden.",
-  "TimeMap versteht sich nicht als Ersatz für historische Forschung oder Quellenkritik. Die App nimmt Nutzerinnen und Nutzern die eigentliche Deutung, Prüfung und Bewertung historischer Informationen nicht ab. Sie ist ein Werkzeug zum Entdecken, Strukturieren, Präsentieren und Lernen — mit dem Ziel, historische Zusammenhänge sichtbar und neue Fragestellungen möglich zu machen.",
+  "TimeMap legt besonderen Wert auf nachvollziehbare Quellenbezüge. Ereignisse und Datenpunkte können mit Wikidata und weiteren offenen Archiven oder Fachinformationen verknüpft werden. Bei datenbasierten Darstellungen, etwa Charts, steht die kleinteilige Nachweisbarkeit einzelner Datenpunkte im Vordergrund, idealerweise durch konkrete Quellenangaben oder Links zu belastbaren Informationen.",
+  "Projekte werden als JSON-Dateien gespeichert. Ziel ist es, dass Projektdaten auf dem Rechner der Nutzerinnen und Nutzer verbleiben; online bereitgestellt werden lediglich die Programmdateien der Web-App. Dadurch verbindet TimeMap die leichte Zugänglichkeit einer Online-Anwendung mit lokaler Kontrolle über die eigenen Projektdaten. Projekte lassen sich lokal sichern, weitergeben und später erneut bearbeiten.",
+  "TimeMap kann KI-gestützte Arbeitsprozesse gezielt vorbereiten, ohne selbst eine KI zu integrieren. Die App stellt strukturierte Prompts bereit, mit denen externe KI-Werkzeuge Daten in einem festgelegten Schema erzeugen können. Diese Daten lassen sich anschließend als CSV importieren und in Zeitachsen, Charts oder Ereignissammlungen visualisieren. So können auch umfangreiche Recherchefelder schneller erschlossen, Muster sichtbar gemacht und anschließend quellenkritisch geprüft werden.",
+  "TimeMap versteht sich nicht als Ersatz für historische Forschung oder Quellenkritik. Die App nimmt Nutzerinnen und Nutzern die eigentliche Deutung, Prüfung und Bewertung historischer Informationen nicht ab. Sie ist ein Werkzeug zum Entdecken, Strukturieren, Analysieren, Präsentieren und Lernen — mit dem Ziel, historische Zusammenhänge, Quellenbezüge und Repräsentationsmuster sichtbar zu machen.",
 ].join("\n\n");
 const SEARCH_RESULTS_PAGE_SIZE = 8;
 const CHART_SEARCH_RESULTS_PAGE_SIZE = 6;
@@ -3024,6 +3037,22 @@ async function chooseProjectDirectory() {
   return chooseProjectHomeDirectory();
 }
 
+function setButtonIconLabel(button, label, iconUrl) {
+  if (!button) return;
+  button.replaceChildren();
+  if (iconUrl) {
+    const icon = document.createElement("span");
+    icon.className = "button-label-icon";
+    icon.style.setProperty("--button-icon-url", `url("${iconUrl}")`);
+    icon.setAttribute("aria-hidden", "true");
+    button.appendChild(icon);
+  }
+  const text = document.createElement("span");
+  text.className = "button-label-text";
+  text.textContent = label;
+  button.appendChild(text);
+}
+
 async function directoryContainsProjectFile(handle) {
   if (!handle) return false;
   try {
@@ -4587,15 +4616,15 @@ function applyStaticTranslations() {
   if (ui.modeEventsButton) ui.modeEventsButton.textContent = t("data_mode_events");
   if (ui.modeChartsButton) ui.modeChartsButton.textContent = t("data_mode_charts");
   if (ui.modeSourcesButton) ui.modeSourcesButton.textContent = t("data_mode_sources");
-  if (ui.eventsModeSearchButton) ui.eventsModeSearchButton.textContent = t("events_mode_search");
-  if (ui.eventsModeCreateButton) ui.eventsModeCreateButton.textContent = t("events_mode_create");
-  if (ui.chartsModeSearchButton) ui.chartsModeSearchButton.textContent = t("charts_mode_search");
-  if (ui.chartsModeCreateButton) ui.chartsModeCreateButton.textContent = t("charts_mode_create");
-  if (ui.chartsModeGenerateButton) ui.chartsModeGenerateButton.textContent = t("charts_mode_generate");
-  if (ui.sourcesModeSearchButton) ui.sourcesModeSearchButton.textContent = t("sources_mode_search");
-  if (ui.sourcesModeCreateButton) ui.sourcesModeCreateButton.textContent = t("sources_mode_create");
-  if (ui.sourcesCollectionCreateButton) ui.sourcesCollectionCreateButton.textContent = t("sources_collection_create");
-  if (ui.sourcesCollectionGenerateButton) ui.sourcesCollectionGenerateButton.textContent = t("sources_collection_generate");
+  setButtonIconLabel(ui.eventsModeSearchButton, t("events_mode_search"), MODE_DECISION_BUTTON_ICONS.eventsSearch);
+  setButtonIconLabel(ui.eventsModeCreateButton, t("events_mode_create"), MODE_DECISION_BUTTON_ICONS.eventsCreate);
+  setButtonIconLabel(ui.chartsModeSearchButton, t("charts_mode_search"), MODE_DECISION_BUTTON_ICONS.chartsSearch);
+  setButtonIconLabel(ui.chartsModeCreateButton, t("charts_mode_create"), MODE_DECISION_BUTTON_ICONS.chartsCreate);
+  setButtonIconLabel(ui.chartsModeGenerateButton, t("charts_mode_generate"), MODE_DECISION_BUTTON_ICONS.chartsGenerate);
+  setButtonIconLabel(ui.sourcesModeSearchButton, t("sources_mode_search"), MODE_DECISION_BUTTON_ICONS.sourcesSearch);
+  setButtonIconLabel(ui.sourcesModeCreateButton, t("sources_mode_create"), MODE_DECISION_BUTTON_ICONS.sourcesCreate);
+  setButtonIconLabel(ui.sourcesCollectionCreateButton, t("sources_collection_create"), MODE_DECISION_BUTTON_ICONS.sourceCollectionCreate);
+  setButtonIconLabel(ui.sourcesCollectionGenerateButton, t("sources_collection_generate"), MODE_DECISION_BUTTON_ICONS.sourceCollectionGenerate);
   if (ui.eventSourceLabel) ui.eventSourceLabel.textContent = t("chart_source");
   if (ui.chartSourceLabel) ui.chartSourceLabel.textContent = t("chart_source");
   if (ui.alphaVantageApiKeyLabel) ui.alphaVantageApiKeyLabel.textContent = t("alphavantage_api_key_label");
