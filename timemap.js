@@ -297,6 +297,8 @@ const ui = {
   timelineBookmarkHud: document.getElementById("timelineBookmarkHud"),
   chartPointContextMenu: document.getElementById("chartPointContextMenu"),
   chartPointCommentAddButton: document.getElementById("chartPointCommentAddButton"),
+  connectionParentButton: document.getElementById("connectionParentButton"),
+  connectionCreateButton: document.getElementById("connectionCreateButton"),
   sourceCoupleButton: document.getElementById("sourceCoupleButton"),
   sourceUncoupleButton: document.getElementById("sourceUncoupleButton"),
   chartPointEventHideButton: document.getElementById("chartPointEventHideButton"),
@@ -607,6 +609,7 @@ const eventGroups = [];
 const chartItems = [];
 const sourceItems = [];
 const sourceCollections = [];
+const connectionItems = [];
 const timelineComments = [];
 const trashStore = {
   events: [],
@@ -1044,6 +1047,14 @@ const I18N = {
     timeline_count_summary: "{count} Kommentare",
     flags_folder: "Flaggen",
     comments_folder: "Kommentare",
+    connections_folder: "Verbindungen",
+    connection_default_title: "Verbindung",
+    connection_parent: "Parent",
+    connection_child: "Child",
+    connection_route: "Linienführung",
+    connection_route_direct: "direkt",
+    connection_route_orthogonal: "um die Ecke",
+    connection_delete: "Verbindung löschen",
     browser_virtual_folder_count_one: "1 Eintrag",
     browser_virtual_folder_count: "{count} Einträge",
     events_folder: "Ereignisse",
@@ -1569,6 +1580,14 @@ const I18N = {
     timeline_count_summary: "{count} comments",
     flags_folder: "Flags",
     comments_folder: "Comments",
+    connections_folder: "Connections",
+    connection_default_title: "Connection",
+    connection_parent: "Parent",
+    connection_child: "Child",
+    connection_route: "Route",
+    connection_route_direct: "direct",
+    connection_route_orthogonal: "around corner",
+    connection_delete: "Delete connection",
     browser_virtual_folder_count_one: "1 entry",
     browser_virtual_folder_count: "{count} entries",
     events_folder: "Events",
@@ -1827,6 +1846,7 @@ const state = {
   openEditorId: null,
   openGroupEditorId: null,
   openSourceEditorId: null,
+  openConnectionEditorId: null,
   openSubgroupBrowserMenuId: null,
   openSideSubgroupBrowserMenuId: null,
   openSourceCollectionBrowserMenuId: null,
@@ -1900,6 +1920,7 @@ const state = {
   browserDragTimelineFolder: false,
   chartPointContextMenuState: null,
   pendingChartCommentPlacement: null,
+  pendingConnectionParentId: null,
   suppressClickUntil: 0,
   timelineMenuOpen: false,
   language: "de",
@@ -2490,6 +2511,7 @@ function buildLocalStateSnapshot() {
       openEditorId: state.openEditorId,
       openGroupEditorId: state.openGroupEditorId,
       openSourceEditorId: state.openSourceEditorId,
+      openConnectionEditorId: state.openConnectionEditorId,
       openBookmarkEditorId: state.openBookmarkEditorId,
       openEventCommentEditorId: state.openEventCommentEditorId,
       openChartCommentEditorId: state.openChartCommentEditorId,
@@ -2534,6 +2556,7 @@ function buildLocalStateSnapshot() {
     chartItems: chartItems.map((chartItem) => structuredClone(chartItem)),
     sourceItems: sourceItems.map((sourceItem) => structuredClone(sourceItem)),
     sourceCollections: sourceCollections.map((collection) => structuredClone(collection)),
+    connectionItems: connectionItems.map((connection) => structuredClone(connection)),
     timelineComments: timelineComments.map((comment) => structuredClone(comment)),
   };
 }
@@ -2544,12 +2567,14 @@ function resetProjectWorkspaceForOpen() {
   chartItems.length = 0;
   sourceItems.length = 0;
   sourceCollections.length = 0;
+  connectionItems.length = 0;
   timelineComments.length = 0;
   state.tickBookmarks = [];
   state.activeContextGroupId = null;
   state.openEditorId = null;
   state.openGroupEditorId = null;
   state.openSourceEditorId = null;
+  state.openConnectionEditorId = null;
   state.openBookmarkEditorId = null;
   state.openEventCommentEditorId = null;
   state.openChartCommentEditorId = null;
@@ -2581,6 +2606,7 @@ function keepOnlyProjectRootByDirectoryName(directoryName) {
   const keepEventIds = new Set(timelineEvents.filter((eventItem) => keepGroupIds.has(eventItem.groupId)).map((eventItem) => eventItem.id));
   const keepChartIds = new Set(chartItems.filter((chartItem) => keepGroupIds.has(chartItem.groupId)).map((chartItem) => chartItem.id));
   const keepSourceIds = new Set(sourceItems.filter((sourceItem) => keepGroupIds.has(sourceItem.groupId)).map((sourceItem) => sourceItem.id));
+  const keepConnectableIds = new Set([...keepEventIds, ...keepSourceIds]);
 
   for (let index = eventGroups.length - 1; index >= 0; index -= 1) {
     if (!keepGroupIds.has(eventGroups[index].id)) eventGroups.splice(index, 1);
@@ -2593,6 +2619,12 @@ function keepOnlyProjectRootByDirectoryName(directoryName) {
   }
   for (let index = sourceItems.length - 1; index >= 0; index -= 1) {
     if (!keepSourceIds.has(sourceItems[index].id)) sourceItems.splice(index, 1);
+  }
+  for (let index = connectionItems.length - 1; index >= 0; index -= 1) {
+    const connection = connectionItems[index];
+    if (!keepConnectableIds.has(connection.parentId) || !keepConnectableIds.has(connection.childId)) {
+      connectionItems.splice(index, 1);
+    }
   }
   for (let index = sourceCollections.length - 1; index >= 0; index -= 1) {
     const collection = sourceCollections[index];
@@ -2676,6 +2708,7 @@ function applyLocalStateSnapshot(snapshot) {
     chartItems.length = 0;
     sourceItems.length = 0;
     sourceCollections.length = 0;
+    connectionItems.length = 0;
     timelineComments.length = 0;
 
     (snapshot.eventGroups ?? []).forEach((groupItem) => {
@@ -2726,6 +2759,11 @@ function applyLocalStateSnapshot(snapshot) {
       if (nextCollection) sourceCollections.push(nextCollection);
     });
 
+    (snapshot.connectionItems ?? []).forEach((connection) => {
+      const nextConnection = normalizeConnectionItem(structuredClone(connection));
+      if (nextConnection) connectionItems.push(nextConnection);
+    });
+
     (snapshot.timelineComments ?? []).forEach((comment) => {
       const nextComment = normalizeTimelineComment(structuredClone(comment));
       if (nextComment) timelineComments.push(nextComment);
@@ -2740,6 +2778,7 @@ function applyLocalStateSnapshot(snapshot) {
     state.openEditorId = savedState.openEditorId ?? null;
     state.openGroupEditorId = savedState.openGroupEditorId ?? null;
     state.openSourceEditorId = savedState.openSourceEditorId ?? null;
+    state.openConnectionEditorId = savedState.openConnectionEditorId ?? null;
     state.openBookmarkEditorId = savedState.openBookmarkEditorId ?? null;
     state.openEventCommentEditorId = savedState.openEventCommentEditorId ?? null;
     state.openChartCommentEditorId = savedState.openChartCommentEditorId ?? null;
@@ -3705,7 +3744,7 @@ function populateSourcesCreateTypeSelect() {
 
 function updateDataModeUi() {
   const hasActiveMode = Boolean(state.activeDataMode);
-  const hasOpenEditor = Boolean(getOpenEditorEvent() || getOpenEditorGroup() || getOpenEditorChart() || getOpenEditorSource() || getOpenEditorSourceCollection() || getOpenEditorChartComment());
+  const hasOpenEditor = Boolean(getOpenEditorEvent() || getOpenEditorGroup() || getOpenEditorChart() || getOpenEditorSource() || getOpenEditorSourceCollection() || getOpenEditorConnection() || getOpenEditorChartComment());
   ui.eventsModePanel.hidden = state.activeDataMode !== "events";
   ui.chartsModePanel.hidden = state.activeDataMode !== "charts";
   ui.sourcesModePanel.hidden = state.activeDataMode !== "sources";
@@ -7277,6 +7316,12 @@ function deleteSourceItemById(sourceId) {
   if (index < 0) return false;
   sourceItems.splice(index, 1);
   removeSourceFromCollections(sourceId);
+  for (let connectionIndex = connectionItems.length - 1; connectionIndex >= 0; connectionIndex -= 1) {
+    if (connectionItems[connectionIndex].parentId === sourceId || connectionItems[connectionIndex].childId === sourceId) {
+      if (state.openConnectionEditorId === connectionItems[connectionIndex].id) state.openConnectionEditorId = null;
+      connectionItems.splice(connectionIndex, 1);
+    }
+  }
   if (state.openSourceEditorId === sourceId) state.openSourceEditorId = null;
   if (state.selectedEventId === sourceId) state.selectedEventId = null;
   return true;
@@ -13002,6 +13047,12 @@ function removeEventReferencesToDeletedIds(deletedEventIds) {
       sourceItem.coupledEventId = null;
     }
   });
+  for (let index = connectionItems.length - 1; index >= 0; index -= 1) {
+    if (deletedEventIds.has(connectionItems[index].parentId) || deletedEventIds.has(connectionItems[index].childId)) {
+      if (state.openConnectionEditorId === connectionItems[index].id) state.openConnectionEditorId = null;
+      connectionItems.splice(index, 1);
+    }
+  }
 }
 
 function trashEventTree(eventId) {
@@ -13110,6 +13161,11 @@ function trashGroupTree(groupId) {
       groupId: null,
       enabled: sourceItem.enabled !== false,
     }));
+  const deletedSourceIds = new Set(
+    sourceItems
+      .filter((sourceItem) => descendantIds.has(sourceItem.groupId))
+      .map((sourceItem) => sourceItem.id),
+  );
   const removedBookmarks = state.tickBookmarks
     .filter((bookmark) => descendantIds.has(bookmark.groupId))
     .map((bookmark) => cloneTrashPayload({
@@ -13126,6 +13182,18 @@ function trashGroupTree(groupId) {
     }));
 
   removeEventReferencesToDeletedIds(deletedEventIds);
+  for (let index = connectionItems.length - 1; index >= 0; index -= 1) {
+    const connection = connectionItems[index];
+    if (
+      deletedSourceIds.has(connection.parentId)
+      || deletedSourceIds.has(connection.childId)
+      || deletedEventIds.has(connection.parentId)
+      || deletedEventIds.has(connection.childId)
+    ) {
+      if (state.openConnectionEditorId === connection.id) state.openConnectionEditorId = null;
+      connectionItems.splice(index, 1);
+    }
+  }
 
   if (state.openGroupEditorId && descendantIds.has(state.openGroupEditorId)) {
     state.openGroupEditorId = null;
@@ -13291,6 +13359,107 @@ function createEmptySourceItem() {
     coupledEventId: null,
     enabled: true,
   };
+}
+
+function createEmptyConnection(parentId = "", childId = "") {
+  return {
+    id: createUniqueId("connection"),
+    kind: "connection",
+    parentId: String(parentId || "").trim(),
+    childId: String(childId || "").trim(),
+    title: t("connection_default_title"),
+    color: "#cfd7dc",
+    lineStyle: "solid",
+    arrowDirection: "parent-to-child",
+    routeMode: "direct",
+    bendPoints: [],
+    enabled: true,
+  };
+}
+
+function getConnectableTimelineItemById(itemId) {
+  const normalizedId = String(itemId || "").trim();
+  if (!normalizedId) return null;
+  return getEventById(normalizedId) ?? getSourceById(normalizedId) ?? null;
+}
+
+function isConnectableTimelineItem(item) {
+  return Boolean(item && (timelineEvents.includes(item) || sourceItems.includes(item)));
+}
+
+function normalizeConnectionItem(connection) {
+  if (!connection || typeof connection !== "object") return null;
+  const normalized = {
+    ...createEmptyConnection(),
+    ...connection,
+  };
+  normalized.id = String(normalized.id || createUniqueId("connection"));
+  normalized.kind = "connection";
+  normalized.parentId = String(normalized.parentId || "").trim();
+  normalized.childId = String(normalized.childId || "").trim();
+  normalized.title = String(normalized.title || "").trim() || t("connection_default_title");
+  normalized.color = /^#[0-9a-f]{6}$/i.test(String(normalized.color || "").trim())
+    ? String(normalized.color).trim()
+    : "#cfd7dc";
+  normalized.lineStyle = normalizeLineStyle(normalized.lineStyle, "solid");
+  normalized.arrowDirection = ["parent-to-child", "child-to-parent", "both", "none"].includes(normalized.arrowDirection)
+    ? normalized.arrowDirection
+    : "parent-to-child";
+  normalized.routeMode = String(normalized.routeMode || "") === "orthogonal" ? "orthogonal" : "direct";
+  normalized.bendPoints = Array.isArray(normalized.bendPoints)
+    ? normalized.bendPoints.map((point) => ({
+      x: Number.isFinite(Number(point?.x)) ? Number(point.x) : null,
+      y: Number.isFinite(Number(point?.y)) ? Number(point.y) : null,
+    }))
+    : [];
+  normalized.enabled = normalized.enabled !== false;
+  if (!getConnectableTimelineItemById(normalized.parentId) || !getConnectableTimelineItemById(normalized.childId)) return null;
+  if (normalized.parentId === normalized.childId) return null;
+  return normalized;
+}
+
+function getConnectionsForItem(itemId) {
+  const normalizedId = String(itemId || "").trim();
+  if (!normalizedId) return [];
+  return connectionItems
+    .map((connection) => normalizeConnectionItem(connection))
+    .filter(Boolean)
+    .filter((connection) => connection.parentId === normalizedId);
+}
+
+function deleteConnectionItemById(connectionId) {
+  const index = connectionItems.findIndex((connection) => connection.id === connectionId);
+  if (index === -1) return false;
+  connectionItems.splice(index, 1);
+  if (state.openConnectionEditorId === connectionId) state.openConnectionEditorId = null;
+  return true;
+}
+
+function openConnectionInLibrary(connection) {
+  const normalized = normalizeConnectionItem(connection);
+  if (!normalized) return;
+  Object.assign(connection, normalized);
+  hideTooltip();
+  state.openEditorId = null;
+  state.openGroupEditorId = null;
+  state.openChartEditorId = null;
+  state.openSourceEditorId = null;
+  state.openSourceCollectionEditorId = null;
+  state.openBookmarkEditorId = null;
+  state.openEventCommentEditorId = null;
+  state.openChartCommentEditorId = null;
+  state.openTimelineCommentEditorId = null;
+  state.openConnectionEditorId = connection.id;
+  state.selectedEventId = null;
+  const parentItem = getConnectableTimelineItemById(connection.parentId);
+  if (parentItem?.groupId) {
+    expandGroupAncestors(parentItem.groupId);
+    state.activeContextGroupId = parentItem.groupId;
+  }
+  renderEventList();
+  renderDetailsSidePanel();
+  drawTimeline();
+  scrollToDetails("auto");
 }
 
 function normalizeSourceItem(sourceItem) {
@@ -17282,6 +17451,15 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
   const sourceCollectionsForExport = sourceCollections
     .filter((collection) => groupIdSet.has(collection.groupId))
     .map((collection) => structuredClone(collection));
+  const connectableExportIds = new Set([
+    ...events.map((eventItem) => eventItem.id),
+    ...sources.map((sourceItem) => sourceItem.id),
+  ]);
+  const connections = connectionItems
+    .map((connection) => normalizeConnectionItem(connection))
+    .filter(Boolean)
+    .filter((connection) => connectableExportIds.has(connection.parentId) && connectableExportIds.has(connection.childId))
+    .map((connection) => structuredClone(connection));
 
   return {
     type: "timemap-folder-export",
@@ -17305,6 +17483,7 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
     charts,
     sources,
     sourceCollections: sourceCollectionsForExport,
+    connections,
     bookmarks: includeBookmarks
       ? (
         getSpecialTreeKindForGroup(rootGroupId) === "bookmarks"
@@ -17684,6 +17863,19 @@ async function importFolderPayload(payload, onProgress = null) {
         : [],
     });
     if (normalizedCollection) sourceCollections.push(normalizedCollection);
+  });
+
+  (payload.connections ?? payload.connectionItems ?? []).forEach((connection) => {
+    const parentId = eventIdMap.get(connection.parentId) ?? sourceIdMap.get(connection.parentId) ?? null;
+    const childId = eventIdMap.get(connection.childId) ?? sourceIdMap.get(connection.childId) ?? null;
+    if (!parentId || !childId || parentId === childId) return;
+    const normalizedConnection = normalizeConnectionItem({
+      ...connection,
+      id: createUniqueId("connection-import"),
+      parentId,
+      childId,
+    });
+    if (normalizedConnection) connectionItems.push(normalizedConnection);
   });
 
   if (payload.chartViewState && typeof payload.chartViewState === "object") {
@@ -20089,11 +20281,20 @@ function showChartPointContextMenu(event, payload) {
   const canHideOrDeleteEvent = isEventPoint || isEventRange;
   const showCommentAdd = !isComment && !isEventRange;
   const sourceItem = payload?.sourceId ? getSourceById(payload.sourceId) : null;
+  const connectableItemId = payload?.sourceId || payload?.eventId || "";
+  const connectableItem = getConnectableTimelineItemById(connectableItemId);
+  const pendingConnectionParent = state.pendingConnectionParentId
+    ? getConnectableTimelineItemById(state.pendingConnectionParentId)
+    : null;
+  const showConnectionParent = Boolean(connectableItem);
+  const showConnectionCreate = Boolean(connectableItem && pendingConnectionParent && pendingConnectionParent.id !== connectableItem.id);
   const showCouple = Boolean(sourceItem && payload?.couplingCandidateEventId && sourceItem.coupledEventId !== payload.couplingCandidateEventId);
   const showUncouple = Boolean(sourceItem?.coupledEventId);
   const menuWidth = 180;
   const visibleActionCount = (isComment ? 1 : 0)
     + (showCommentAdd ? 1 : 0)
+    + (showConnectionParent ? 1 : 0)
+    + (showConnectionCreate ? 1 : 0)
     + (showCouple ? 1 : 0)
     + (showUncouple ? 1 : 0)
     + (canHideOrDeleteEvent ? 2 : 0);
@@ -20106,6 +20307,14 @@ function showChartPointContextMenu(event, payload) {
     y,
   };
   if (ui.chartPointCommentAddButton) ui.chartPointCommentAddButton.hidden = !showCommentAdd;
+  if (ui.connectionParentButton) {
+    ui.connectionParentButton.textContent = state.language === "en" ? "Choose as parent" : "Als Parent wählen";
+    ui.connectionParentButton.hidden = !showConnectionParent;
+  }
+  if (ui.connectionCreateButton) {
+    ui.connectionCreateButton.textContent = state.language === "en" ? "Create connection" : "Verbindung erstellen";
+    ui.connectionCreateButton.hidden = !showConnectionCreate;
+  }
   if (ui.sourceCoupleButton) {
     ui.sourceCoupleButton.textContent = state.language === "en" ? "Couple" : "Koppeln";
     ui.sourceCoupleButton.hidden = !showCouple;
@@ -20120,6 +20329,40 @@ function showChartPointContextMenu(event, payload) {
   ui.chartPointContextMenu.style.left = `${x}px`;
   ui.chartPointContextMenu.style.top = `${y}px`;
   ui.chartPointContextMenu.hidden = false;
+}
+
+function getContextMenuConnectableItem(payload = state.chartPointContextMenuState) {
+  return getConnectableTimelineItemById(payload?.sourceId || payload?.eventId || "");
+}
+
+function chooseConnectionParentFromContextMenu() {
+  const payload = state.chartPointContextMenuState;
+  const item = getContextMenuConnectableItem(payload);
+  hideChartPointContextMenu();
+  if (!item) return;
+  state.pendingConnectionParentId = item.id;
+  state.selectedEventId = item.id;
+  updateSelectionPanel();
+  drawTimeline();
+}
+
+function createConnectionFromContextMenu() {
+  const payload = state.chartPointContextMenuState;
+  const childItem = getContextMenuConnectableItem(payload);
+  const parentItem = state.pendingConnectionParentId ? getConnectableTimelineItemById(state.pendingConnectionParentId) : null;
+  hideChartPointContextMenu();
+  if (!parentItem || !childItem || parentItem.id === childItem.id) return;
+  const connection = normalizeConnectionItem({
+    ...createEmptyConnection(parentItem.id, childItem.id),
+    title: `${t("connection_default_title")}: ${parentItem.title || "—"} -> ${childItem.title || "—"}`,
+    color: getEffectiveColor(parentItem) || "#cfd7dc",
+  });
+  if (!connection) return;
+  connectionItems.push(connection);
+  parentItem.expanded = true;
+  state.pendingConnectionParentId = null;
+  openConnectionInLibrary(connection);
+  scheduleLocalAutosave();
 }
 
 function coupleSourceFromContextMenu() {
@@ -22599,6 +22842,75 @@ function drawTimeline() {
     });
   });
 
+  connectionItems
+    .map((connection) => normalizeConnectionItem(connection))
+    .filter(Boolean)
+    .filter((connection) => connection.enabled !== false)
+    .forEach((connection) => {
+      const parentItem = getConnectableTimelineItemById(connection.parentId);
+      const childItem = getConnectableTimelineItemById(connection.childId);
+      const parentGeometry = parentItem ? eventGeometries.get(parentItem.id) : null;
+      const childGeometry = childItem ? eventGeometries.get(childItem.id) : null;
+      if (!parentItem || !childItem || !parentGeometry || !childGeometry) return;
+      if (parentItem.enabled === false || childItem.enabled === false) return;
+      const selected = state.openConnectionEditorId === connection.id;
+      const baseGeometry = {
+        x1: parentGeometry.anchorX,
+        y1: parentGeometry.markerY,
+        x2: childGeometry.anchorX,
+        y2: childGeometry.markerY,
+      };
+      const trimmed = getTrimmedRelationLine(baseGeometry, connection.arrowDirection);
+      const strokeColor = selected ? "#ff8f5a" : (connection.color || "#cfd7dc");
+      let lineElement;
+      if (connection.routeMode === "orthogonal") {
+        const bendX = Number.isFinite(Number(connection.bendPoints?.[0]?.x))
+          ? Number(connection.bendPoints[0].x)
+          : ((trimmed.x1 + trimmed.x2) / 2);
+        lineElement = createSvgElement("path", {
+          d: `M ${trimmed.x1} ${trimmed.y1} L ${bendX} ${trimmed.y1} L ${bendX} ${trimmed.y2} L ${trimmed.x2} ${trimmed.y2}`,
+          fill: "none",
+        });
+        relationSegments.push(
+          { x1: trimmed.x1, y1: trimmed.y1, x2: bendX, y2: trimmed.y1 },
+          { x1: bendX, y1: trimmed.y1, x2: bendX, y2: trimmed.y2 },
+          { x1: bendX, y1: trimmed.y2, x2: trimmed.x2, y2: trimmed.y2 },
+        );
+      } else {
+        lineElement = createSvgElement("line", {
+          x1: trimmed.x1,
+          y1: trimmed.y1,
+          x2: trimmed.x2,
+          y2: trimmed.y2,
+        });
+        relationSegments.push({
+          x1: trimmed.x1,
+          y1: trimmed.y1,
+          x2: trimmed.x2,
+          y2: trimmed.y2,
+        });
+      }
+      lineElement.setAttribute("stroke", strokeColor);
+      lineElement.setAttribute("stroke-width", selected ? "2.4" : "1.9");
+      lineElement.setAttribute("stroke-linecap", "round");
+      lineElement.setAttribute("stroke-linejoin", "round");
+      lineElement.setAttribute("pointer-events", "stroke");
+      lineElement.setAttribute("cursor", "pointer");
+      const dasharray = getLineStyleDasharray(connection.lineStyle);
+      if (dasharray) lineElement.setAttribute("stroke-dasharray", dasharray);
+      if (connection.arrowDirection === "parent-to-child" || connection.arrowDirection === "both") {
+        lineElement.setAttribute("marker-end", "url(#relation-arrow-end)");
+      }
+      if (connection.arrowDirection === "child-to-parent" || connection.arrowDirection === "both") {
+        lineElement.setAttribute("marker-start", "url(#relation-arrow-start)");
+      }
+      lineElement.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openConnectionInLibrary(connection);
+      });
+      svg.appendChild(lineElement);
+    });
+
   const visibleLabelBounds = [];
   const visibleLabelBoundsByEventId = new Map();
   const deferredBarLabelGroups = new Set();
@@ -24391,6 +24703,11 @@ function getOpenEditorSourceCollection() {
   return state.openSourceCollectionEditorId ? getSourceCollectionById(state.openSourceCollectionEditorId) : null;
 }
 
+function getOpenEditorConnection() {
+  if (!state.openConnectionEditorId) return null;
+  return connectionItems.find((connection) => connection.id === state.openConnectionEditorId) ?? null;
+}
+
 function getOpenEditorChartComment() {
   return state.openChartCommentEditorId ? findChartCommentById(state.openChartCommentEditorId) : null;
 }
@@ -24419,6 +24736,7 @@ function clearSidePanelEditorsForFolderBrowser() {
   state.openChartEditorId = null;
   state.openSourceEditorId = null;
   state.openSourceCollectionEditorId = null;
+  state.openConnectionEditorId = null;
   state.openBookmarkEditorId = null;
   state.openEventCommentEditorId = null;
   state.openChartCommentEditorId = null;
@@ -24749,6 +25067,113 @@ function createTimelineCommentInlineEditor(comment) {
   );
 
   editor.append(commentMetaSection);
+  return editor;
+}
+
+function createConnectionInlineEditor(connection) {
+  const normalized = normalizeConnectionItem(connection);
+  if (!normalized) return document.createDocumentFragment();
+  Object.assign(connection, normalized);
+  const editor = document.createElement("div");
+  editor.className = "event-inline-editor connection-inline-editor";
+  editor.dataset.connectionId = connection.id;
+  const parentItem = getConnectableTimelineItemById(connection.parentId);
+  const childItem = getConnectableTimelineItemById(connection.childId);
+  const rerenderEditor = () => {
+    renderEventList();
+    renderDetailsSidePanel();
+    drawTimeline();
+    scheduleLocalAutosave();
+  };
+
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.value = connection.title;
+  titleInput.placeholder = t("connection_default_title");
+  titleInput.addEventListener("change", () => {
+    connection.title = titleInput.value.trim() || t("connection_default_title");
+    rerenderEditor();
+  });
+
+  const parentReadout = document.createElement("div");
+  parentReadout.className = "editor-static-value";
+  parentReadout.textContent = parentItem?.title || "—";
+  const childReadout = document.createElement("div");
+  childReadout.className = "editor-static-value";
+  childReadout.textContent = childItem?.title || "—";
+
+  const colorInput = document.createElement("input");
+  colorInput.type = "text";
+  colorInput.value = connection.color || "#cfd7dc";
+  colorInput.placeholder = "#cfd7dc";
+  const applyColorChange = (value = colorInput.value) => {
+    const nextColor = String(value || "").trim();
+    connection.color = /^#[0-9a-f]{6}$/i.test(nextColor) ? nextColor : "#cfd7dc";
+    colorInput.value = connection.color;
+    lineStyleField.refreshPreview?.();
+    rerenderEditor();
+  };
+  colorInput.addEventListener("change", () => applyColorChange(colorInput.value));
+
+  const lineStyleField = createGraphicLineStyleField(t("line"), {
+    getPreviewColor: () => connection.color || "#cfd7dc",
+    getLineStyle: () => connection.lineStyle || "solid",
+    setLineStyle: (nextStyle) => {
+      connection.lineStyle = normalizeLineStyle(nextStyle, "solid");
+      rerenderEditor();
+    },
+  });
+
+  const directionSelect = document.createElement("select");
+  directionSelect.append(
+    createSelectOption("parent-to-child", t("arrow_down_right"), connection.arrowDirection === "parent-to-child"),
+    createSelectOption("child-to-parent", t("arrow_up_left"), connection.arrowDirection === "child-to-parent"),
+    createSelectOption("both", t("arrow_both"), connection.arrowDirection === "both"),
+    createSelectOption("none", t("arrow_none"), connection.arrowDirection === "none"),
+  );
+  directionSelect.addEventListener("change", () => {
+    connection.arrowDirection = directionSelect.value;
+    rerenderEditor();
+  });
+
+  const routeSelect = document.createElement("select");
+  routeSelect.append(
+    createSelectOption("direct", t("connection_route_direct"), connection.routeMode !== "orthogonal"),
+    createSelectOption("orthogonal", t("connection_route_orthogonal"), connection.routeMode === "orthogonal"),
+  );
+  routeSelect.addEventListener("change", () => {
+    connection.routeMode = routeSelect.value === "orthogonal" ? "orthogonal" : "direct";
+    rerenderEditor();
+  });
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "secondary-button";
+  deleteButton.textContent = t("connection_delete");
+  deleteButton.addEventListener("click", () => {
+    deleteConnectionItemById(connection.id);
+    renderEventList();
+    renderDetailsSidePanel();
+    drawTimeline();
+    scheduleLocalAutosave();
+  });
+
+  const styleRow = document.createElement("div");
+  styleRow.className = "chart-table-style-row";
+  styleRow.append(lineStyleField, createColorField(t("color_value"), colorInput, applyColorChange));
+
+  const metaSection = document.createElement("div");
+  metaSection.className = "event-editor-meta";
+  metaSection.append(
+    createField(t("title"), titleInput),
+    createField(t("connection_parent"), parentReadout),
+    createField(t("connection_child"), childReadout),
+    styleRow,
+    createField(t("arrows"), directionSelect),
+    createField(t("connection_route"), routeSelect),
+    deleteButton,
+  );
+  editor.append(metaSection);
   return editor;
 }
 
@@ -25160,6 +25585,7 @@ function minimizeDetailsEditor() {
   state.openChartEditorId = null;
   state.openSourceEditorId = null;
   state.openSourceCollectionEditorId = null;
+  state.openConnectionEditorId = null;
   state.openBookmarkEditorId = null;
   state.openEventCommentEditorId = null;
   state.openChartCommentEditorId = null;
@@ -25215,6 +25641,7 @@ function renderDetailsSidePanel() {
   const openChart = getOpenEditorChart();
   const openSource = getOpenEditorSource();
   const openSourceCollection = getOpenEditorSourceCollection();
+  const openConnection = getOpenEditorConnection();
   const openBookmark = getOpenEditorBookmark();
   const openEventComment = getOpenEditorEventComment();
   const openChartComment = getOpenEditorChartComment();
@@ -25230,6 +25657,8 @@ function renderDetailsSidePanel() {
           ? { type: "source", item: openSource }
           : openSourceCollection
             ? { type: "source-collection", item: openSourceCollection }
+            : openConnection
+              ? { type: "connection", item: openConnection }
         : openEventComment
           ? { type: "event-comment", item: openEventComment.comment, eventItem: openEventComment.eventItem }
         : openChartComment
@@ -25348,6 +25777,8 @@ function renderDetailsSidePanel() {
       editor = createSourceInlineEditor(activeEditor.item);
     } else if (activeEditor.type === "source-collection") {
       editor = createSourceCollectionInlineEditor(activeEditor.item);
+    } else if (activeEditor.type === "connection") {
+      editor = createConnectionInlineEditor(activeEditor.item);
     } else if (activeEditor.type === "event-comment") {
       editor = createEventCommentInlineEditor(activeEditor.eventItem, activeEditor.item);
     } else if (activeEditor.type === "chart-comment") {
@@ -25426,7 +25857,7 @@ function createBrowserVirtualFolderItem({ parentId, kind, title, count, depth = 
   item.dataset.browserScope = browserScope;
 
   const row = document.createElement("div");
-  row.className = `event-row browser-virtual-folder-row ${kind === "comments" ? "chart-comment-row" : "flag-folder-row"}`;
+  row.className = `event-row browser-virtual-folder-row ${kind === "comments" || kind === "connections" ? "chart-comment-row" : "flag-folder-row"}`;
 
   const spacer = document.createElement("span");
   spacer.className = "event-row-check browser-virtual-folder-spacer";
@@ -25449,7 +25880,7 @@ function createBrowserVirtualFolderItem({ parentId, kind, title, count, depth = 
   });
 
   const legend = document.createElement("span");
-  legend.className = kind === "comments"
+  legend.className = kind === "comments" || kind === "connections"
     ? "comment-row-icon title-suffix-comment"
     : "browser-virtual-folder-flag-icon";
   legend.setAttribute("aria-hidden", "true");
@@ -25477,6 +25908,63 @@ function createBrowserVirtualFolderItem({ parentId, kind, title, count, depth = 
   return item;
 }
 
+function createConnectionBrowserItem(connection, depth = 0) {
+  const normalized = normalizeConnectionItem(connection);
+  if (!normalized) return document.createDocumentFragment();
+  Object.assign(connection, normalized);
+  const childItem = getConnectableTimelineItemById(connection.childId);
+  const item = document.createElement("div");
+  item.className = "event-browser-item chart-comment-browser-item connection-browser-item is-child";
+  if (state.openConnectionEditorId === connection.id) item.classList.add("is-open");
+  item.style.setProperty("--tree-depth", String(depth));
+
+  const row = document.createElement("div");
+  row.className = "event-row chart-comment-row";
+
+  const checkWrap = document.createElement("label");
+  checkWrap.className = "event-row-check";
+  const enabledCheckbox = document.createElement("input");
+  enabledCheckbox.type = "checkbox";
+  enabledCheckbox.checked = connection.enabled !== false;
+  enabledCheckbox.addEventListener("change", () => {
+    connection.enabled = enabledCheckbox.checked;
+    renderEventList();
+    drawTimeline();
+    scheduleLocalAutosave();
+  });
+  checkWrap.appendChild(enabledCheckbox);
+
+  const legend = document.createElement("span");
+  legend.className = "comment-row-icon title-suffix-comment";
+  legend.setAttribute("aria-hidden", "true");
+
+  const main = document.createElement("div");
+  main.className = "event-row-main chart-row-main";
+  main.addEventListener("click", () => openConnectionInLibrary(connection));
+  const title = document.createElement("strong");
+  title.textContent = getMarkdownPlainText(connection.title || t("connection_default_title"));
+  const meta = document.createElement("span");
+  meta.textContent = childItem?.title ? `${t("connection_child")}: ${getMarkdownPlainText(childItem.title)}` : t("connection_child");
+  main.append(title, meta);
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "event-row-delete";
+  deleteButton.textContent = "X";
+  deleteButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    deleteConnectionItemById(connection.id);
+    renderEventList();
+    renderDetailsSidePanel();
+    drawTimeline();
+    scheduleLocalAutosave();
+  });
+
+  row.append(checkWrap, legend, main, deleteButton);
+  item.appendChild(row);
+  return item;
+}
+
 function createEventBrowserItem(eventItem, options = {}) {
   const {
     child = false,
@@ -25495,8 +25983,10 @@ function createEventBrowserItem(eventItem, options = {}) {
   item.dataset.browserScope = browserScope;
   if (child) item.classList.add("is-child");
   const eventComments = getEventComments(eventItem);
+  const eventConnections = getConnectionsForItem(eventItem.id);
   const hasOpenComment = eventComments.some((comment) => comment.id === state.openEventCommentEditorId);
-  if (state.openEditorId === eventItem.id || hasOpenComment) item.classList.add("is-open");
+  const hasOpenConnection = eventConnections.some((connection) => connection.id === state.openConnectionEditorId);
+  if (state.openEditorId === eventItem.id || hasOpenComment || hasOpenConnection) item.classList.add("is-open");
   item.style.setProperty("--tree-depth", String(depth));
 
   const row = document.createElement("div");
@@ -25570,11 +26060,12 @@ function createEventBrowserItem(eventItem, options = {}) {
   const childEvents = getEventsForGroup(eventItem.groupId).filter((candidate) => candidate.parentEventId === eventItem.id);
   const hasChildEvents = childEvents.length > 0;
   const hasComments = eventComments.length > 0;
+  const hasConnections = eventConnections.length > 0;
   const hasChildCharts = false;
   const displayExpanded = isSideMirror
     ? isSideFolderBrowserEventExpanded(eventItem.id)
     : eventItem.expanded;
-  const contextOpen = displayExpanded && (hasChildEvents || hasComments);
+  const contextOpen = displayExpanded && (hasChildEvents || hasComments || hasConnections);
   if (contextOpen) item.classList.add("is-context-open");
 
   const checkWrap = document.createElement("label");
@@ -25600,13 +26091,12 @@ function createEventBrowserItem(eventItem, options = {}) {
   const toggleButton = document.createElement("button");
   toggleButton.type = "button";
   toggleButton.className = "tree-row-toggle";
-  toggleButton.textContent = (hasChildEvents || hasComments) ? (displayExpanded ? "▾" : "▸") : "";
-  toggleButton.disabled = !(hasChildEvents || hasComments);
-  toggleButton.setAttribute("aria-label", (hasChildEvents || hasComments) ? t("show_child_events") : "");
-  toggleButton.textContent = (hasChildEvents || hasChildCharts || hasComments) ? (displayExpanded ? "▾" : "▸") : "";
+  toggleButton.textContent = (hasChildEvents || hasChildCharts || hasComments || hasConnections) ? (displayExpanded ? "▾" : "▸") : "";
+  toggleButton.disabled = !(hasChildEvents || hasComments || hasConnections);
+  toggleButton.setAttribute("aria-label", (hasChildEvents || hasComments || hasConnections) ? t("show_child_events") : "");
   toggleButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (!(hasChildEvents || hasComments)) return;
+    if (!(hasChildEvents || hasComments || hasConnections)) return;
     const isSideMirrorAction = isSideMirror || Boolean(toggleButton.closest(".side-folder-browser-list"));
     if (isSideMirrorAction) {
       setSideFolderBrowserEventExpanded(eventItem.id, !displayExpanded);
@@ -25632,6 +26122,7 @@ function createEventBrowserItem(eventItem, options = {}) {
     state.openChartCommentEditorId = null;
     state.openEventCommentEditorId = null;
     state.openTimelineCommentEditorId = null;
+    state.openConnectionEditorId = null;
     state.openEditorId = state.openEditorId === eventItem.id ? null : eventItem.id;
     state.activeContextGroupId = eventItem.groupId ?? null;
     if (eventItem.groupId) {
@@ -25714,6 +26205,17 @@ function createEventBrowserItem(eventItem, options = {}) {
         children: eventComments.map((comment) => (
           createEventCommentBrowserItem(eventItem, comment, depth + 2)
         )),
+      }));
+    }
+    if (eventConnections.length > 0) {
+      childList.appendChild(createBrowserVirtualFolderItem({
+        parentId: eventItem.id,
+        kind: "connections",
+        title: t("connections_folder"),
+        count: eventConnections.length,
+        depth: depth + 1,
+        browserScope,
+        children: eventConnections.map((connection) => createConnectionBrowserItem(connection, depth + 2)),
       }));
     }
     if (childList.childElementCount > 0) {
@@ -26992,14 +27494,17 @@ function createSourceBrowserItem(sourceItem, options = {}) {
   if (!normalized) return document.createDocumentFragment();
   Object.assign(sourceItem, normalized);
   const sourceComments = getEventComments(sourceItem);
+  const sourceConnections = getConnectionsForItem(sourceItem.id);
   const hasComments = sourceComments.length > 0;
+  const hasConnections = sourceConnections.length > 0;
   const hasOpenComment = sourceComments.some((comment) => comment.id === state.openEventCommentEditorId);
-  const contextOpen = sourceItem.expanded && hasComments;
+  const hasOpenConnection = sourceConnections.some((connection) => connection.id === state.openConnectionEditorId);
+  const contextOpen = sourceItem.expanded && (hasComments || hasConnections);
 
   const item = document.createElement("div");
   item.className = "event-browser-item source-browser-item";
   if (child) item.classList.add("is-child");
-  if (hasOpenComment) item.classList.add("is-open");
+  if (hasOpenComment || hasOpenConnection) item.classList.add("is-open");
   if (contextOpen) item.classList.add("is-context-open");
   item.style.setProperty("--tree-depth", String(Math.max(0, depth)));
 
@@ -27041,12 +27546,12 @@ function createSourceBrowserItem(sourceItem, options = {}) {
   const toggleButton = document.createElement("button");
   toggleButton.type = "button";
   toggleButton.className = "tree-row-toggle";
-  toggleButton.textContent = hasComments ? (sourceItem.expanded ? "▾" : "▸") : "";
-  toggleButton.disabled = !hasComments;
-  toggleButton.setAttribute("aria-label", hasComments ? t("show_child_events") : "");
+  toggleButton.textContent = (hasComments || hasConnections) ? (sourceItem.expanded ? "▾" : "▸") : "";
+  toggleButton.disabled = !(hasComments || hasConnections);
+  toggleButton.setAttribute("aria-label", (hasComments || hasConnections) ? t("show_child_events") : "");
   toggleButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (!hasComments) return;
+    if (!(hasComments || hasConnections)) return;
     sourceItem.expanded = !sourceItem.expanded;
     renderEventList();
   });
@@ -27098,17 +27603,30 @@ function createSourceBrowserItem(sourceItem, options = {}) {
   if (contextOpen) {
     const childList = document.createElement("div");
     childList.className = "group-children";
-    childList.appendChild(createBrowserVirtualFolderItem({
-      parentId: sourceItem.id,
-      kind: "comments",
-      title: t("comments_folder"),
-      count: sourceComments.length,
-      depth: depth + 1,
-      browserScope,
-      children: sourceComments.map((comment) => (
-        createEventCommentBrowserItem(sourceItem, comment, depth + 2)
-      )),
-    }));
+    if (sourceComments.length > 0) {
+      childList.appendChild(createBrowserVirtualFolderItem({
+        parentId: sourceItem.id,
+        kind: "comments",
+        title: t("comments_folder"),
+        count: sourceComments.length,
+        depth: depth + 1,
+        browserScope,
+        children: sourceComments.map((comment) => (
+          createEventCommentBrowserItem(sourceItem, comment, depth + 2)
+        )),
+      }));
+    }
+    if (sourceConnections.length > 0) {
+      childList.appendChild(createBrowserVirtualFolderItem({
+        parentId: sourceItem.id,
+        kind: "connections",
+        title: t("connections_folder"),
+        count: sourceConnections.length,
+        depth: depth + 1,
+        browserScope,
+        children: sourceConnections.map((connection) => createConnectionBrowserItem(connection, depth + 2)),
+      }));
+    }
     if (childList.childElementCount > 0) {
       item.appendChild(childList);
     }
@@ -27227,6 +27745,7 @@ function openSourceInLibrary(sourceItem) {
   state.openEventCommentEditorId = null;
   state.openChartCommentEditorId = null;
   state.openTimelineCommentEditorId = null;
+  state.openConnectionEditorId = null;
   state.openSourceEditorId = sourceItem.id;
   state.selectedEventId = sourceItem.id;
   if (sourceItem.groupId) {
@@ -27276,6 +27795,7 @@ function openSourceCollectionInLibrary(collection) {
   state.openEventCommentEditorId = null;
   state.openChartCommentEditorId = null;
   state.openTimelineCommentEditorId = null;
+  state.openConnectionEditorId = null;
   state.openSourceCollectionEditorId = collection.id;
   state.selectedEventId = null;
   if (collection.groupId) {
@@ -34273,6 +34793,16 @@ function bindEvents() {
     event.preventDefault();
     event.stopPropagation();
     beginChartCommentPlacementFromContextMenu();
+  });
+  ui.connectionParentButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    chooseConnectionParentFromContextMenu();
+  });
+  ui.connectionCreateButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    createConnectionFromContextMenu();
   });
   ui.sourceCoupleButton?.addEventListener("click", (event) => {
     event.preventDefault();
