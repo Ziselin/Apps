@@ -2,17 +2,474 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TimeMap</title>
-  <script>
-window.location.replace("./timemap-app.html?v=20260503b");
-  </script>
+  <title>Ziselin</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5efe4;
+      --paper-warm: #fbf5e9;
+      --panel: rgba(255, 250, 241, 0.68);
+      --panel-clear: rgba(255, 252, 246, 0.9);
+      --ink: #2e2b27;
+      --muted: #756f66;
+      --quiet: rgba(46, 43, 39, 0.48);
+      --line: rgba(112, 82, 45, 0.16);
+      --line-strong: rgba(188, 125, 21, 0.42);
+      --gold: #d28a05;
+      --gold-deep: #a86400;
+      --shadow: rgba(82, 59, 26, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--paper);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        linear-gradient(135deg, #fcf7ee 0%, var(--paper) 52%, #eadfce 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        repeating-linear-gradient(0deg, rgba(82, 59, 26, 0.026) 0 1px, transparent 1px 7px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 11px);
+      opacity: 0.52;
+      pointer-events: none;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: minmax(190px, 280px) minmax(260px, 1fr) minmax(120px, 280px);
+      align-items: center;
+      min-height: 74px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 252, 246, 0.86), rgba(248, 239, 224, 0.76));
+      backdrop-filter: blur(14px);
+    }
+
+    .brand-plate {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      padding: 14px clamp(18px, 3vw, 40px);
+    }
+
+    .brand-bird {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      filter: saturate(0.28) contrast(1.08);
+    }
+
+    .brand-name {
+      width: min(105px, 26vw);
+      height: auto;
+      display: block;
+      opacity: 0.62;
+      filter: contrast(0.78);
+    }
+
+    .topbar-search {
+      display: flex;
+      justify-content: center;
+      padding: 0 20px;
+    }
+
+    .search-wrap {
+      position: relative;
+      width: min(470px, 100%);
+    }
+
+    .search-wrap::before {
+      content: "";
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      background: #615b52;
+      mask: url("https://api.iconify.design/material-symbols/search-rounded.svg") center / contain no-repeat;
+      transform: translateY(-50%);
+      opacity: 0.82;
+      pointer-events: none;
+    }
+
+    .app-search {
+      width: 100%;
+      height: 44px;
+      padding: 0 16px 0 44px;
+      border: 1px solid rgba(112, 82, 45, 0.2);
+      border-radius: 12px;
+      color: var(--ink);
+      background: rgba(255, 252, 246, 0.88);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 10px 24px rgba(82, 59, 26, 0.07);
+      font: inherit;
+    }
+
+    .app-search:focus {
+      border-color: var(--line-strong);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(210, 138, 5, 0.14), 0 12px 28px rgba(82, 59, 26, 0.08);
+    }
+
+    .topbar-meta {
+      justify-self: end;
+      padding-right: clamp(18px, 3vw, 40px);
+      color: var(--quiet);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .page-shell {
+      width: min(1180px, calc(100vw - 42px));
+      margin: 0 auto;
+      padding: clamp(34px, 5.8vw, 72px) 0 36px;
+    }
+
+    .hero {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      margin-bottom: clamp(34px, 5.4vw, 62px);
+      text-align: center;
+    }
+
+    .hero-bird {
+      width: min(430px, 66vw);
+      max-height: 310px;
+      object-fit: contain;
+      filter: saturate(0.16) contrast(1.06);
+      opacity: 0.94;
+    }
+
+    .claim-image {
+      width: min(560px, 78vw);
+      height: auto;
+      display: block;
+      opacity: 0.82;
+    }
+
+    .collection-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .collection-card {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
+      min-height: 258px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 248, 235, 0.38)),
+        var(--panel);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 18px 38px rgba(82, 59, 26, 0.09);
+    }
+
+    .collection-card.is-empty {
+      min-height: 188px;
+    }
+
+    .collection-head {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .collection-kicker {
+      color: var(--gold-deep);
+      font-size: 0.72rem;
+      font-weight: 850;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .collection-head strong {
+      font-size: 1.26rem;
+      line-height: 1.18;
+    }
+
+    .collection-head span:last-child {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .app-list {
+      display: grid;
+      align-content: end;
+      gap: 10px;
+    }
+
+    .app-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      min-height: 76px;
+      padding: 14px;
+      border: 1px solid rgba(112, 82, 45, 0.14);
+      border-radius: 10px;
+      color: inherit;
+      background: var(--panel-clear);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 8px 20px rgba(82, 59, 26, 0.06);
+      text-decoration: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .app-card[href]:hover,
+    .app-card[href]:focus-visible {
+      border-color: var(--line-strong);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 14px 28px rgba(82, 59, 26, 0.1);
+      outline: none;
+      transform: translateY(-2px);
+    }
+
+    .app-card.is-muted {
+      opacity: 0.7;
+    }
+
+    .app-symbol {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid rgba(210, 138, 5, 0.42);
+      border-radius: 10px;
+      color: var(--gold-deep);
+      background: rgba(210, 138, 5, 0.08);
+      font-weight: 850;
+    }
+
+    .app-copy {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .app-copy strong {
+      overflow: hidden;
+      font-size: 1rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-copy span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.34;
+    }
+
+    .app-action {
+      color: var(--gold-deep);
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .soon {
+      color: var(--quiet);
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 20px;
+      border: 1px dashed rgba(112, 82, 45, 0.24);
+      border-radius: 12px;
+      color: var(--muted);
+      background: rgba(255, 250, 241, 0.5);
+      text-align: center;
+    }
+
+    .collection-grid.has-no-results .empty-state {
+      display: block;
+    }
+
+    .collection-card[hidden] {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar-search {
+        justify-content: stretch;
+        padding: 0 18px 14px;
+      }
+
+      .topbar-meta {
+        display: none;
+      }
+
+      .collection-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page-shell {
+        width: min(100% - 24px, 1180px);
+        padding-top: 28px;
+      }
+
+      .brand-plate {
+        padding: 12px 18px;
+      }
+
+      .brand-bird {
+        width: 42px;
+        height: 42px;
+      }
+
+      .hero-bird {
+        width: min(360px, 78vw);
+      }
+
+      .app-card {
+        grid-template-columns: auto 1fr;
+      }
+
+      .app-action,
+      .soon {
+        grid-column: 2;
+      }
+    }
+  </style>
 </head>
 <body>
-  <p>Weiterleitung zu TimeMap ...</p>
-  <p><a href="./timemap-app.html?v=20260503b">Falls die Weiterleitung nicht greift, hier klicken.</a></p>
+  <header class="topbar">
+    <div class="brand-plate" aria-label="Ziselin">
+      <img class="brand-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
+      <img class="brand-name" src="./assets/ziselin-name.svg" alt="Ziselin">
+    </div>
+    <div class="topbar-search">
+      <div class="search-wrap">
+        <input class="app-search" type="search" list="appSearchOptions" placeholder="Apps durchsuchen" aria-label="Apps durchsuchen" autocomplete="off">
+      </div>
+      <datalist id="appSearchOptions">
+        <option value="TimeMap"></option>
+      </datalist>
+    </div>
+    <div class="topbar-meta">Apps</div>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero">
+      <img class="hero-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
+      <img class="claim-image" src="./assets/digital-tools.svg" alt="Digital Tools for Analogue People">
+    </section>
+
+    <section class="collection-grid" aria-label="App-Sammlungen">
+      <article class="collection-card" data-search-card data-search-text="data visualisation visualization timemap zeitachsen daten charts kalender quellen maps">
+        <div class="collection-head">
+          <span class="collection-kicker">Sammlung</span>
+          <strong>Data Visualisation</strong>
+          <span>Zeitachsen, Datenreihen, Kartenbezüge und visuelle Ordnungen.</span>
+        </div>
+        <div class="app-list">
+          <a class="app-card" href="./timemap/index.html" data-app-link data-search-text="timemap zeitstrahl timeline quellen charts kalender maps">
+            <span class="app-symbol">TM</span>
+            <span class="app-copy">
+              <strong>TimeMap</strong>
+              <span>Historische Zeiträume, Quellen, Charts und Kalendersysteme.</span>
+            </span>
+            <span class="app-action">Öffnen</span>
+          </a>
+        </div>
+      </article>
+
+      <article class="collection-card is-empty" data-search-card data-search-text="text workflows textbausteine schreiben unterricht bausteine">
+        <div class="collection-head">
+          <span class="collection-kicker">Sammlung</span>
+          <strong>Text Workflows</strong>
+          <span>Bausteine, Formulierungen und Arbeitsflächen für wiederkehrende Schreibprozesse.</span>
+        </div>
+      </article>
+
+      <article class="collection-card is-empty" data-search-card data-search-text="sources quellen archiv nachweise sammlungen referenzen">
+        <div class="collection-head">
+          <span class="collection-kicker">Sammlung</span>
+          <strong>Sources</strong>
+          <span>Räume für Quellenarbeit, Nachweise, Sammlungen und überprüfbare Referenzen.</span>
+        </div>
+      </article>
+
+      <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
+    </section>
+
+  </main>
+
+  <script>
+    const appSearch = document.querySelector(".app-search");
+    const collectionGrid = document.querySelector(".collection-grid");
+    const collectionCards = [...document.querySelectorAll("[data-search-card]")];
+
+    function normalizeSearch(value) {
+      return value.trim().toLowerCase();
+    }
+
+    function runSearch() {
+      const query = normalizeSearch(appSearch?.value ?? "");
+      let visibleCount = 0;
+
+      collectionCards.forEach((card) => {
+        const text = normalizeSearch(card.dataset.searchText ?? card.textContent ?? "");
+        const isVisible = !query || text.includes(query);
+        card.hidden = !isVisible;
+        if (isVisible) {
+          visibleCount += 1;
+        }
+      });
+
+      collectionGrid?.classList.toggle("has-no-results", visibleCount === 0);
+    }
+
+    appSearch?.addEventListener("input", runSearch);
+
+    appSearch?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      event.preventDefault();
+      const query = normalizeSearch(appSearch.value);
+      if (query === "timemap") {
+        window.location.href = "./timemap/index.html";
+      }
+    });
+  </script>
 </body>
 </html>
