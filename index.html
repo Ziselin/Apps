@@ -5,28 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ziselin</title>
   <style>
-    @font-face {
-      font-family: "Candlescript Neue";
-      src: url("./assets/candlescript-neue-basic-demo.ttf") format("truetype");
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-
     :root {
       color-scheme: light;
-      --paper: #f5efe4;
-      --paper-warm: #fbf5e9;
-      --panel: rgba(255, 250, 241, 0.68);
-      --panel-clear: rgba(255, 252, 246, 0.9);
-      --ink: #2e2b27;
-      --muted: #756f66;
-      --quiet: rgba(46, 43, 39, 0.48);
-      --line: rgba(112, 82, 45, 0.16);
-      --line-strong: rgba(188, 125, 21, 0.42);
-      --gold: #d28a05;
-      --gold-deep: #a86400;
-      --shadow: rgba(82, 59, 26, 0.12);
+      --paper: #f2eee6;
+      --paper-warm: #faf7f0;
+      --panel: rgba(255, 252, 245, 0.68);
+      --panel-clear: rgba(255, 253, 248, 0.92);
+      --ink: #1f2928;
+      --ink-soft: #334340;
+      --muted: #68736d;
+      --quiet: rgba(31, 41, 40, 0.48);
+      --line: rgba(31, 41, 40, 0.16);
+      --line-strong: rgba(31, 55, 51, 0.42);
+      --iron: #213633;
+      --iron-soft: #3f5b56;
+      --shadow: rgba(31, 41, 40, 0.12);
     }
 
     * {
@@ -44,7 +37,7 @@
       color: var(--ink);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
-        linear-gradient(135deg, #fcf7ee 0%, var(--paper) 52%, #eadfce 100%);
+        linear-gradient(135deg, #fbf8f1 0%, var(--paper) 56%, #e8e2d8 100%);
     }
 
     body::before {
@@ -53,9 +46,9 @@
       inset: 0;
       z-index: -1;
       background:
-        repeating-linear-gradient(0deg, rgba(82, 59, 26, 0.026) 0 1px, transparent 1px 7px),
-        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 11px);
-      opacity: 0.52;
+        repeating-linear-gradient(0deg, rgba(31, 41, 40, 0.022) 0 1px, transparent 1px 7px),
+        repeating-linear-gradient(90deg, rgba(31, 41, 40, 0.018) 0 1px, transparent 1px 11px);
+      opacity: 0.46;
       pointer-events: none;
     }
 
@@ -73,7 +66,7 @@
       min-height: 74px;
       border-bottom: 1px solid var(--line);
       background:
-        linear-gradient(180deg, rgba(255, 252, 246, 0.86), rgba(248, 239, 224, 0.76));
+        linear-gradient(180deg, rgba(255, 253, 248, 0.92), rgba(245, 240, 230, 0.8));
       backdrop-filter: blur(14px);
     }
 
@@ -110,12 +103,12 @@
       width: 48px;
       height: 48px;
       object-fit: contain;
-      filter: brightness(0) saturate(100%) invert(56%) sepia(96%) saturate(1055%) hue-rotate(7deg) brightness(93%) contrast(96%);
+      filter: brightness(0) saturate(100%) invert(20%) sepia(18%) saturate(673%) hue-rotate(122deg) brightness(92%) contrast(90%);
       opacity: 0.9;
     }
 
     .brand-name {
-      color: var(--gold-deep);
+      color: var(--iron);
       font-family: Arial, Helvetica, sans-serif;
       font-size: clamp(1.34rem, 2.4vw, 1.76rem);
       font-weight: 700;
@@ -142,7 +135,7 @@
       top: 50%;
       width: 18px;
       height: 18px;
-      background: #615b52;
+      background: var(--iron-soft);
       mask: url("https://api.iconify.design/material-symbols/search-rounded.svg") center / contain no-repeat;
       transform: translateY(-50%);
       opacity: 0.82;
@@ -153,18 +146,18 @@
       width: 100%;
       height: 44px;
       padding: 0 16px 0 44px;
-      border: 1px solid rgba(112, 82, 45, 0.2);
+      border: 1px solid rgba(31, 55, 51, 0.2);
       border-radius: 12px;
       color: var(--ink);
-      background: rgba(255, 252, 246, 0.88);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 10px 24px rgba(82, 59, 26, 0.07);
+      background: rgba(255, 253, 248, 0.9);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 10px 24px rgba(31, 41, 40, 0.07);
       font: inherit;
     }
 
     .app-search:focus {
       border-color: var(--line-strong);
       outline: none;
-      box-shadow: 0 0 0 3px rgba(210, 138, 5, 0.14), 0 12px 28px rgba(82, 59, 26, 0.08);
+      box-shadow: 0 0 0 3px rgba(31, 55, 51, 0.14), 0 12px 28px rgba(31, 41, 40, 0.08);
     }
 
     .topbar-meta {
@@ -195,18 +188,19 @@
       width: min(430px, 66vw);
       max-height: 310px;
       object-fit: contain;
-      filter: saturate(0.16) contrast(1.06);
-      opacity: 0.94;
+      filter: brightness(0) saturate(100%) invert(20%) sepia(18%) saturate(673%) hue-rotate(122deg) brightness(92%) contrast(90%);
+      opacity: 0.88;
     }
 
     .claim-text {
       margin: 0;
-      color: var(--gold);
-      font-family: "Candlescript Neue", "Edwardian Script ITC", cursive;
-      font-size: clamp(2.4rem, 6.4vw, 5.2rem);
-      font-weight: 400;
-      line-height: 0.92;
-      letter-spacing: 0;
+      color: var(--iron-soft);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: clamp(0.78rem, 1.32vw, 1.02rem);
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
     }
 
     .collection-grid {
@@ -225,9 +219,9 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 248, 235, 0.38)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(247, 242, 233, 0.42)),
         var(--panel);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 18px 38px rgba(82, 59, 26, 0.09);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 18px 38px rgba(31, 41, 40, 0.08);
     }
 
     .collection-card.is-empty {
@@ -241,7 +235,7 @@
     }
 
     .collection-kicker {
-      color: var(--gold-deep);
+      color: var(--iron-soft);
       font-size: 0.72rem;
       font-weight: 850;
       letter-spacing: 0.16em;
@@ -271,11 +265,11 @@
       gap: 14px;
       min-height: 76px;
       padding: 14px;
-      border: 1px solid rgba(112, 82, 45, 0.14);
+      border: 1px solid rgba(31, 55, 51, 0.14);
       border-radius: 10px;
       color: inherit;
       background: var(--panel-clear);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 8px 20px rgba(82, 59, 26, 0.06);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64), 0 8px 20px rgba(31, 41, 40, 0.06);
       text-decoration: none;
       transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
     }
@@ -283,7 +277,7 @@
     .app-card[href]:hover,
     .app-card[href]:focus-visible {
       border-color: var(--line-strong);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 14px 28px rgba(82, 59, 26, 0.1);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 14px 28px rgba(31, 41, 40, 0.1);
       outline: none;
       transform: translateY(-2px);
     }
@@ -297,10 +291,10 @@
       place-items: center;
       width: 44px;
       height: 44px;
-      border: 1px solid rgba(210, 138, 5, 0.42);
+      border: 1px solid rgba(31, 55, 51, 0.34);
       border-radius: 10px;
-      color: var(--gold-deep);
-      background: rgba(210, 138, 5, 0.08);
+      color: var(--iron);
+      background: rgba(31, 55, 51, 0.07);
       font-weight: 850;
     }
 
@@ -324,7 +318,7 @@
     }
 
     .app-action {
-      color: var(--gold-deep);
+      color: var(--iron);
       font-weight: 850;
       white-space: nowrap;
     }
@@ -339,10 +333,10 @@
       display: none;
       grid-column: 1 / -1;
       padding: 20px;
-      border: 1px dashed rgba(112, 82, 45, 0.24);
+      border: 1px dashed rgba(31, 55, 51, 0.24);
       border-radius: 12px;
       color: var(--muted);
-      background: rgba(255, 250, 241, 0.5);
+      background: rgba(255, 253, 248, 0.54);
       text-align: center;
     }
 
@@ -417,9 +411,9 @@
   <header class="topbar">
     <div class="brand-plate" aria-label="Ziselin">
       <span class="home-menu-button" aria-hidden="true">
-        <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23d28a05" alt="">
+        <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23213633" alt="">
       </span>
-      <img class="brand-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
+      <img class="brand-bird" src="./assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
       <span class="brand-name">ziselin</span>
     </div>
     <div class="topbar-search">
@@ -435,7 +429,7 @@
 
   <main class="page-shell">
     <section class="hero">
-      <img class="hero-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
+      <img class="hero-bird" src="./assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
       <p class="claim-text">Digital Tools for Analogue People</p>
     </section>
 
