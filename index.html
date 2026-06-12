@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ziselin</title>
   <style>
+    @font-face {
+      font-family: "Candlescript Neue";
+      src: url("./assets/candlescript-neue-basic-demo.ttf") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
     :root {
       color-scheme: light;
       --paper: #f5efe4;
@@ -72,9 +80,29 @@
     .brand-plate {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       min-width: 0;
       padding: 14px clamp(18px, 3vw, 40px);
+    }
+
+    .home-menu-button {
+      width: 36px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    .home-menu-button img {
+      width: 28px;
+      height: 28px;
+      display: block;
     }
 
     .brand-bird {
@@ -82,15 +110,18 @@
       width: 48px;
       height: 48px;
       object-fit: contain;
-      filter: saturate(0.28) contrast(1.08);
+      filter: brightness(0) saturate(100%) invert(56%) sepia(96%) saturate(1055%) hue-rotate(7deg) brightness(93%) contrast(96%);
+      opacity: 0.9;
     }
 
     .brand-name {
-      width: min(105px, 26vw);
-      height: auto;
-      display: block;
-      opacity: 0.62;
-      filter: contrast(0.78);
+      color: var(--gold-deep);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: clamp(1.34rem, 2.4vw, 1.76rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0;
+      text-transform: lowercase;
     }
 
     .topbar-search {
@@ -168,11 +199,14 @@
       opacity: 0.94;
     }
 
-    .claim-image {
-      width: min(560px, 78vw);
-      height: auto;
-      display: block;
-      opacity: 0.82;
+    .claim-text {
+      margin: 0;
+      color: var(--gold);
+      font-family: "Candlescript Neue", "Edwardian Script ITC", cursive;
+      font-size: clamp(2.4rem, 6.4vw, 5.2rem);
+      font-weight: 400;
+      line-height: 0.92;
+      letter-spacing: 0;
     }
 
     .collection-grid {
@@ -345,8 +379,18 @@
         padding-top: 28px;
       }
 
-      .brand-plate {
-        padding: 12px 18px;
+    .brand-plate {
+      padding: 12px 18px;
+    }
+
+      .home-menu-button {
+        width: 32px;
+        height: 32px;
+      }
+
+      .home-menu-button img {
+        width: 25px;
+        height: 25px;
       }
 
       .brand-bird {
@@ -372,8 +416,11 @@
 <body>
   <header class="topbar">
     <div class="brand-plate" aria-label="Ziselin">
+      <span class="home-menu-button" aria-hidden="true">
+        <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23d28a05" alt="">
+      </span>
       <img class="brand-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
-      <img class="brand-name" src="./assets/ziselin-name.svg" alt="Ziselin">
+      <span class="brand-name">ziselin</span>
     </div>
     <div class="topbar-search">
       <div class="search-wrap">
@@ -389,7 +436,7 @@
   <main class="page-shell">
     <section class="hero">
       <img class="hero-bird" src="./assets/ziselin-bild.svg" alt="" aria-hidden="true">
-      <img class="claim-image" src="./assets/digital-tools.svg" alt="Digital Tools for Analogue People">
+      <p class="claim-text">Digital Tools for Analogue People</p>
     </section>
 
     <section class="collection-grid" aria-label="App-Sammlungen">

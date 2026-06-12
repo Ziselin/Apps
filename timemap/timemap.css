@@ -141,7 +141,7 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   min-width: 0;
   align-self: stretch;
   height: 100%;
@@ -151,31 +151,46 @@ body {
 }
 
 .brand-row::before {
-  content: "";
-  position: absolute;
-  left: -20px;
-  top: -18px;
-  bottom: -10px;
-  width: clamp(210px, 31vw, 560px);
-  background: var(--highlight);
-  clip-path: polygon(0 0, 92% 0, 84% 100%, 0 100%);
-  z-index: -1;
+  content: none;
 }
 
 .brand-mark {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 12px;
   min-width: 0;
-  color: #272c32;
+  color: var(--highlight);
   z-index: 2;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .brand-mark img {
   display: block;
   object-fit: contain;
-  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.12));
+}
+
+.brand-home-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.brand-home-link:focus-visible {
+  outline: 2px solid rgba(255, 179, 71, 0.72);
+  outline-offset: 4px;
+}
+
+.brand-bird {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  filter: brightness(0) saturate(100%) invert(72%) sepia(53%) saturate(1219%) hue-rotate(335deg) brightness(100%) contrast(102%);
+  opacity: 0.94;
 }
 
 .brand-icon {
@@ -184,28 +199,18 @@ body {
   flex: 0 0 auto;
 }
 
-.brand-header-composite {
-  display: block;
-  height: 42px;
-  width: auto;
-  max-width: min(62vw, 680px);
-  object-position: left center;
-  flex: 0 1 auto;
-  position: relative;
-  z-index: 2;
-  transform: translateX(-28px);
-}
-
 .brand-wordmark-text {
   display: inline-flex;
   align-items: center;
   min-width: 0;
   color: currentColor;
-  font-size: clamp(1.15rem, 1.85vw, 1.5rem);
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(1.32rem, 2.05vw, 1.82rem);
+  font-weight: 700;
+  letter-spacing: 0;
   line-height: 1;
-  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+  text-transform: lowercase;
+  text-shadow: none;
 }
 
 .timeline-menu-button {
@@ -216,7 +221,7 @@ body {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: #272c32;
+  color: var(--highlight);
   border: 1px solid transparent;
   background: transparent;
   position: relative;
@@ -231,13 +236,12 @@ body {
   width: 28px;
   height: 28px;
   display: block;
-  filter: brightness(0) saturate(100%) invert(16%) sepia(10%) saturate(1112%) hue-rotate(169deg) brightness(89%) contrast(88%);
 }
 
 .timeline-menu-button:hover,
 .timeline-menu-button[aria-expanded="true"] {
-  border-color: rgba(39, 44, 50, 0.22);
-  background: rgba(39, 44, 50, 0.12);
+  border-color: rgba(255, 179, 71, 0.34);
+  background: rgba(255, 179, 71, 0.12);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -7055,17 +7059,16 @@ body.presentation-render-mode .timeline-stage {
   }
 
   .brand-row::before {
-    width: min(calc(100vw - 36px), 520px);
-    max-width: 100%;
+    content: none;
   }
 
   .brand-icon {
     height: clamp(32px, 8.8vw, 50px);
   }
 
-  .brand-header-composite {
-    height: clamp(30px, 8.4vw, 44px);
-    max-width: min(78vw, 560px);
+  .brand-bird {
+    width: clamp(38px, 8vw, 48px);
+    height: clamp(38px, 8vw, 48px);
   }
 
   .brand-wordmark-text {
