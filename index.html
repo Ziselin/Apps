@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ziselin</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/ziselin-app-icon.svg?v=20260613a">
   <style>
     :root {
       color-scheme: light;
@@ -588,6 +589,7 @@
       </div>
       <datalist id="appSearchOptions">
         <option value="TimeMap"></option>
+        <option value="TypeMap"></option>
       </datalist>
     </div>
   </header>
@@ -641,6 +643,13 @@
           <span class="app-copy">
             <span class="app-title">TimeMap</span>
             <span class="app-description">Interaktive Zeitstrahlen und Quellenräume</span>
+          </span>
+        </a>
+        <a class="app-tile" href="./typemap/index.html" data-search-card data-app-link data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
+          <img class="app-icon" src="./assets/typemap-app-icon.svg" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">TypeMap</span>
+            <span class="app-description">Textsetzung</span>
           </span>
         </a>
         <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
@@ -724,8 +733,11 @@
 
     appSearch?.addEventListener("input", runSearch);
 
-    function openTimeMap() {
-      window.location.href = "./timemap/index.html";
+    function openApp(link) {
+      const href = link?.getAttribute("href");
+      if (href) {
+        window.location.href = href;
+      }
     }
 
     document.querySelectorAll("[data-app-link]").forEach((link) => {
@@ -734,7 +746,7 @@
           return;
         }
         event.preventDefault();
-        openTimeMap();
+        openApp(link);
       });
     });
 
@@ -745,8 +757,12 @@
 
       event.preventDefault();
       const query = normalizeSearch(appSearch.value);
-      if (query === "timemap") {
-        openTimeMap();
+      const exactMatch = collectionCards.find((card) => {
+        const title = normalizeSearch(card.querySelector(".app-title")?.textContent || "");
+        return title === query && !card.hidden;
+      });
+      if (exactMatch) {
+        openApp(exactMatch);
       }
     });
   </script>

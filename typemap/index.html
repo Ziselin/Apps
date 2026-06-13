@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeMap</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/typemap-app-icon.svg?v=20260613a">
+  <link rel="stylesheet" href="typemap.css?v=20260613a">
+</head>
+<body>
+  <main class="app-frame workspace-mode-preview">
+    <section class="preview-view" id="previewView">
+      <header class="topbar">
+        <div class="brand-row">
+          <button type="button" id="typeMenuButton" class="type-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="typeSideMenu">
+            <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23d28a05" alt="" aria-hidden="true">
+          </button>
+          <div class="brand-mark">
+            <a class="brand-home-link" href="../index.html" aria-label="Zur Ziselin-Startseite">
+              <img class="brand-bird" src="../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+            </a>
+            <span class="brand-wordmark-text">type map</span>
+          </div>
+        </div>
+        <div class="control-grid">
+          <button type="button" id="newProjectButton">Neu</button>
+          <button type="button" id="exportProjectButton">Export</button>
+          <button type="button" id="importProjectButton">Import</button>
+        </div>
+      </header>
+
+      <div id="typeMenuOverlay" class="type-menu-overlay" hidden></div>
+      <aside id="typeSideMenu" class="type-side-menu" aria-hidden="true" inert>
+        <div class="type-side-menu-inner">
+          <div class="type-menu-head">
+            <div>
+              <span class="label">Menü</span>
+              <strong>TypeMap</strong>
+            </div>
+            <button type="button" id="typeMenuCloseButton" class="type-menu-close-button" aria-label="Menü schließen">X</button>
+          </div>
+          <div class="type-menu-list">
+            <div class="type-menu-section">
+              <button type="button" class="type-menu-item" data-menu-panel="help" aria-expanded="false">
+                <img class="type-menu-icon" src="https://api.iconify.design/mdi/teacher.svg" alt="" aria-hidden="true">
+                <span>Funktionsweise</span>
+              </button>
+              <div class="type-menu-popup" data-menu-popup="help" hidden>
+                <p class="event-description">TypeMap trennt Textarbeit und Ausgabe: unten schreiben und einstellen, oben das gesetzte Ergebnis prüfen.</p>
+              </div>
+            </div>
+            <div class="type-menu-section">
+              <button type="button" class="type-menu-item" data-menu-panel="development" aria-expanded="false">
+                <img class="type-menu-icon" src="https://api.iconify.design/lucide/construction.svg" alt="" aria-hidden="true">
+                <span>Entwicklungsstand</span>
+              </button>
+              <div class="type-menu-popup" data-menu-popup="development" hidden>
+                <p class="event-description">TypeMap ist ein erster struktureller Prototyp. Text, Satzoptionen und Projektlogik sind angelegt; Exportformate und feinere typografische Werkzeuge folgen später.</p>
+              </div>
+            </div>
+            <div class="type-menu-section type-menu-section-project">
+              <button type="button" class="type-menu-item" data-menu-panel="project" aria-expanded="false">
+                <img class="type-menu-icon" src="https://api.iconify.design/material-symbols/source-notes-sharp.svg" alt="" aria-hidden="true">
+                <span>Projektbeschreibung</span>
+              </button>
+              <div class="type-menu-popup" data-menu-popup="project" hidden>
+                <p class="event-description">TypeMap ist eine App zur hochwertigen Textsetzung in interaktiven, strukturierten Textmaps.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="type-stage" aria-label="TypeMap Vorschau">
+        <article id="previewCanvas" class="preview-canvas">
+          <div class="preview-page" style="--preview-font-size: 34px; --preview-line-height: 1.38; --preview-measure: 64ch;">
+            <div id="previewText" class="preview-text"></div>
+          </div>
+        </article>
+      </section>
+
+      <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Projekteditor">
+        <span class="workspace-strip-label">Projekteditor</span>
+      </div>
+    </section>
+
+    <section class="details-view" id="detailsView">
+      <div id="returnPreviewStrip" class="workspace-strip workspace-strip-top" role="button" tabindex="0" aria-label="TypeMap Vorschau">
+        <span class="workspace-strip-label">TypeMap</span>
+      </div>
+      <article class="details-inline browser-panel">
+        <div class="panel-header">
+          <span class="label">Projekteditor</span>
+          <strong>TypeMap-Projekte</strong>
+        </div>
+
+        <div class="project-tabs" role="tablist" aria-label="Projekteditor">
+          <button type="button" class="project-tab is-active" data-type-tab="browser" role="tab" aria-selected="true">Browser</button>
+          <button type="button" class="project-tab" data-type-tab="preview" role="tab" aria-selected="false">Vorschau</button>
+        </div>
+
+        <div class="project-tab-panel" data-type-tab-panel="browser">
+          <p id="projectInfo" class="event-description"></p>
+          <div class="library-actions">
+            <button type="button" id="createProjectButton" class="secondary-button">Neues Projekt</button>
+            <button type="button" id="openImportButton" class="secondary-button">Importieren</button>
+          </div>
+          <input id="projectFileInput" type="file" accept=".json,application/json" hidden>
+          <div id="projectList" class="project-list"></div>
+        </div>
+
+        <div class="project-tab-panel" data-type-tab-panel="preview" hidden>
+          <div class="side-preview-page" style="--preview-font-size: 22px; --preview-line-height: 1.38; --preview-measure: 44ch;">
+            <div id="sidePreviewText" class="preview-text side-preview-text"></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="details-inline editor-panel">
+        <div class="panel-header panel-header-with-action">
+          <div>
+            <span class="label">Editor</span>
+            <strong id="editorTitle">Text setzen</strong>
+          </div>
+        </div>
+
+        <div class="editor-controls">
+        <div class="editor-toolbar" role="toolbar" aria-label="Texteditor-Menü">
+          <label class="field editor-text-type-field">
+            <span>Textart</span>
+            <select id="textTypeSelect">
+              <option value="prose">Fließtext</option>
+              <option value="lyric">Lyrik</option>
+              <option value="drama">Drama</option>
+              <option value="note">Notiz</option>
+            </select>
+          </label>
+          <details class="editor-menu">
+            <summary>Format</summary>
+            <div class="editor-menu-panel">
+              <label class="field">
+                <span>Titel</span>
+                <input id="projectTitleInput" type="text" autocomplete="off">
+              </label>
+              <label class="field">
+                <span>Schrift</span>
+                <select id="fontFamilySelect">
+                  <option value="Arial, Helvetica, sans-serif">Arial</option>
+                  <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                  <option value="'Courier New', Courier, monospace">Courier New</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Ausrichtung</span>
+                <select id="textAlignSelect">
+                  <option value="left">Links</option>
+                  <option value="center">Zentriert</option>
+                  <option value="justify">Blocksatz</option>
+                </select>
+              </label>
+            </div>
+          </details>
+          <details class="editor-menu">
+            <summary>Satz</summary>
+            <div class="editor-menu-panel">
+              <label class="field">
+                <span>Schriftgröße</span>
+                <input id="fontSizeInput" type="range" min="18" max="72" step="1">
+              </label>
+              <label class="field">
+                <span>Zeilenhöhe</span>
+                <input id="lineHeightInput" type="range" min="1.05" max="1.8" step="0.01">
+              </label>
+              <label class="field">
+                <span>Satzbreite</span>
+                <input id="measureInput" type="range" min="36" max="86" step="1">
+              </label>
+              <label class="field">
+                <span>Zeilentrennung</span>
+                <select id="hyphenationSelect">
+                  <option value="manual">Manuell</option>
+                  <option value="auto">Automatisch</option>
+                  <option value="none">Keine</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Sprache</span>
+                <select id="languageSelect">
+                  <option value="de">Deutsch</option>
+                  <option value="en">Englisch</option>
+                  <option value="fr">Französisch</option>
+                  <option value="la">Latein</option>
+                </select>
+              </label>
+            </div>
+          </details>
+          <details class="editor-menu">
+            <summary>Ansicht</summary>
+            <div class="editor-menu-panel">
+              <label class="field checkbox-field">
+                <input id="lineNumbersInput" type="checkbox">
+                <span>Zeilennummerierung</span>
+              </label>
+            </div>
+          </details>
+        </div>
+        </div>
+
+        <section class="editor-section editor-text-section">
+          <label class="field text-editor-field">
+            <span>Text</span>
+            <textarea id="textInput" rows="10" spellcheck="true"></textarea>
+          </label>
+        </section>
+      </article>
+    </section>
+  </main>
+  <script src="typemap.js?v=20260613a"></script>
+</body>
+</html>
