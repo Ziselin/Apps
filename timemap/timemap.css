@@ -1055,11 +1055,17 @@ button:focus-visible {
   z-index: 3;
 }
 
-.timeline-bookmark-row {
+.timeline-bookmark-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-bookmark-row,
+.timeline-bookmark-lock {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(27, 32, 36, 0.88);
   color: #c4ced4;
-  padding: 4px 8px;
   font: inherit;
   font-size: calc(0.8rem * 1.08);
   line-height: 1.2;
@@ -1067,15 +1073,81 @@ button:focus-visible {
   transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
 }
 
-.timeline-bookmark-row:hover {
+.timeline-bookmark-row {
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+  padding: 4px 8px;
+}
+
+.timeline-bookmark-title {
+  min-width: 0;
+}
+
+.timeline-bookmark-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  flex: 0 0 29px;
+  color: rgba(196, 206, 212, 0.72);
+  opacity: 0.86;
+  cursor: pointer;
+}
+
+.timeline-bookmark-lock::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-image: url("https://api.iconify.design/mdi/lock-open.svg");
+  mask-image: url("https://api.iconify.design/mdi/lock-open.svg");
+}
+
+.timeline-bookmark-lock.is-locked::before {
+  -webkit-mask-image: url("https://api.iconify.design/mdi/lock.svg");
+  mask-image: url("https://api.iconify.design/mdi/lock.svg");
+}
+
+.timeline-bookmark-lock.is-locked {
+  color: #ffb347;
+  opacity: 1;
+}
+
+.timeline-bookmark-lock:hover,
+.timeline-bookmark-lock:focus-visible {
+  border-color: rgba(255, 179, 71, 0.45);
+  background: rgba(255, 179, 71, 0.08);
+  color: #ffb347;
+  opacity: 1;
+  outline: none;
+}
+
+.timeline-bookmark-row:hover,
+.timeline-bookmark-lock:hover {
   border-color: rgba(255, 179, 71, 0.45);
   color: #eef3f6;
 }
 
-.timeline-bookmark-row.is-active {
+.timeline-bookmark-row.is-active,
+.timeline-bookmark-row.is-active + .timeline-bookmark-lock.is-locked {
   border-color: rgba(255, 179, 71, 0.5);
   color: #ffb347;
   background: rgba(255, 179, 71, 0.08);
+}
+
+.timeline-bookmark-row.is-active + .timeline-bookmark-lock:not(.is-locked) {
+  border-color: rgba(255, 179, 71, 0.34);
+  color: rgba(196, 206, 212, 0.78);
+  background: rgba(255, 179, 71, 0.045);
 }
 
 .timeline-easter-hud {
@@ -4508,6 +4580,67 @@ button:focus-visible {
 
 .bookmark-row {
   background: rgba(255, 179, 71, 0.03);
+}
+
+.bookmark-title-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.bookmark-title-line > strong {
+  min-width: 0;
+}
+
+.bookmark-lock-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 179, 71, 0.8);
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.bookmark-lock-button::before {
+  content: "";
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-image: url("https://api.iconify.design/mdi/lock-open.svg");
+  mask-image: url("https://api.iconify.design/mdi/lock-open.svg");
+}
+
+.bookmark-lock-button.is-locked {
+  color: rgba(255, 179, 71, 0.96);
+}
+
+.bookmark-lock-button.is-locked::before {
+  -webkit-mask-image: url("https://api.iconify.design/mdi/lock.svg");
+  mask-image: url("https://api.iconify.design/mdi/lock.svg");
+}
+
+.bookmark-lock-button:hover,
+.bookmark-lock-button:focus-visible {
+  border-color: rgba(255, 179, 71, 0.32);
+  background: rgba(255, 179, 71, 0.1);
+  color: #ffb347;
+  outline: none;
 }
 
 .bookmark-row-icon {

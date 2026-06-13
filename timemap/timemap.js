@@ -365,19 +365,11 @@ const ui = {
   menuDevelopmentTitle: document.getElementById("menuDevelopmentTitle"),
   menuDevelopmentDescription: document.getElementById("menuDevelopmentDescription"),
   menuDevelopmentStorage: document.getElementById("menuDevelopmentStorage"),
-  menuAppsTitle: document.getElementById("menuAppsTitle"),
-  menuAppsDescription: document.getElementById("menuAppsDescription"),
   menuDiscordTitle: document.getElementById("menuDiscordTitle"),
   menuDiscordDescription: document.getElementById("menuDiscordDescription"),
   menuDiscordLink: document.getElementById("menuDiscordLink"),
   menuImprintTitle: document.getElementById("menuImprintTitle"),
   menuImprintDescription: document.getElementById("menuImprintDescription"),
-  menuImprintProviderTitle: document.getElementById("menuImprintProviderTitle"),
-  menuImprintProviderText: document.getElementById("menuImprintProviderText"),
-  menuImprintContactTitle: document.getElementById("menuImprintContactTitle"),
-  menuImprintContactText: document.getElementById("menuImprintContactText"),
-  menuImprintResponsibleTitle: document.getElementById("menuImprintResponsibleTitle"),
-  menuImprintResponsibleText: document.getElementById("menuImprintResponsibleText"),
   menuImprintProjectTitle: document.getElementById("menuImprintProjectTitle"),
   menuImprintProjectText: document.getElementById("menuImprintProjectText"),
   openCalendarScaleDialogButton: document.getElementById("openCalendarScaleDialogButton"),
@@ -697,19 +689,11 @@ const I18N = {
     menu_prompts_description: "Lade eine Vorlage herunter, mit der sich chartfähige CSV-Dateien für TimeMap in einem KI-System erzeugen lassen.",
     chart_prompt_download: "Chart-Prompt herunterladen",
     chart_probe_source_toggle: "Quelle",
-    menu_apps_title: "Andere Applikationen",
-    menu_apps_description: "Vorbereitung für weitere Werkzeuge wie GenMap zur Anzeige genealogischer GEDCOM-Dateien.",
     menu_discord_title: "Discord",
     menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
     menu_discord_link: "Discord öffnen",
-    menu_imprint_title: "Impressum",
+    menu_imprint_title: "Projektbeschreibung",
     menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
-    menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
-    menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
-    menu_imprint_contact_title: "Kontakt",
-    menu_imprint_contact_text: "E-Mail: impressum@ziselin.com",
-    menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
-    menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
     menu_imprint_project_title: "Projektbeschreibung",
     menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
     calendar_scale_title: "Zusätzlichen Kalender/Skala hinzufügen",
@@ -1067,6 +1051,8 @@ const I18N = {
     bookmark_position: "Position",
     bookmark_zoom: "Zoom",
     bookmark_title_placeholder: "Lesezeichentitel",
+    bookmark_lock: "Lesezeichen sperren",
+    bookmark_unlock: "Lesezeichen entsperren",
     show_more_results: "Weitere Ergebnisse anzeigen",
     chart_import: "Chart importieren",
     chart_status_default: "Importiere lokale JSON- oder CSV-Charts, um Zeitreihen auf dem Zeitstrahl darzustellen.",
@@ -1229,19 +1215,11 @@ const I18N = {
     menu_prompts_title: "Prompts",
     menu_prompts_description: "Download a template that helps an AI system generate chart-ready CSV files for TimeMap.",
     chart_prompt_download: "Download chart prompt",
-    menu_apps_title: "Other applications",
-    menu_apps_description: "Preparation for additional tools such as GenMap for displaying genealogical GEDCOM files.",
     menu_discord_title: "Discord",
     menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
     menu_discord_link: "Open Discord",
-    menu_imprint_title: "Legal Notice",
+    menu_imprint_title: "Project description",
     menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
-    menu_imprint_provider_title: "Provider information according to § 5 DDG",
-    menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
-    menu_imprint_contact_title: "Contact",
-    menu_imprint_contact_text: "Email: impressum@ziselin.com",
-    menu_imprint_responsible_title: "Responsible for content",
-    menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
     menu_imprint_project_title: "Project description",
     menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
     calendar_scale_title: "Add additional calendar/scale",
@@ -1600,6 +1578,8 @@ const I18N = {
     bookmark_position: "Position",
     bookmark_zoom: "Zoom",
     bookmark_title_placeholder: "Bookmark title",
+    bookmark_lock: "Lock bookmark",
+    bookmark_unlock: "Unlock bookmark",
     show_more_results: "Show more results",
     chart_import: "Import chart",
     chart_status_default: "Import local JSON or CSV charts to render time series on the timeline.",
@@ -2000,15 +1980,8 @@ Object.assign(I18N.de, {
   menu_development_title: "Entwicklungsstand",
   menu_development_description: "TimeMap befindet sich aktuell in Version 0.4. Einzelne Funktionen, Schnittstellen und Darstellungsformen werden noch entwickelt, erprobt und getestet.",
   menu_development_storage: "Das Speichersystem befindet sich ausdrücklich noch in Entwicklung und Testung und kann Fehler enthalten. Projekte werden temporär vom Browser gespeichert; das bewusste lokale Speichern wird weiter ausgebaut und soll künftig transparenter funktionieren.",
-  menu_apps_description: "Vorbereitung f\u00fcr weitere Werkzeuge wie GenMap zur Anzeige genealogischer GEDCOM-Dateien.",
   menu_discord_description: "Zur Discordseite des Projekts wechseln, um Austausch, Hinweise und laufende Entwicklung zu verfolgen.",
   menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
-  menu_imprint_provider_title: "Angaben gemäß § 5 DDG",
-  menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
-  menu_imprint_contact_title: "Kontakt",
-  menu_imprint_contact_text: "E-Mail: impressum@ziselin.com",
-  menu_imprint_responsible_title: "Verantwortlich für den Inhalt",
-  menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland",
   menu_imprint_project_title: "Projektbeschreibung",
   menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
   template_directory_choose: "Vorlagenordner wählen",
@@ -2039,7 +2012,7 @@ Object.assign(I18N.de, {
   source_dataverse: "Dataverse",
   menu_discord_title: "Discord",
   menu_discord_link: "Discord \u00f6ffnen",
-  menu_imprint_title: "Impressum",
+  menu_imprint_title: "Projektbeschreibung",
   calendar_scale_title: "Zus\u00e4tzlichen Kalender/Skala hinzuf\u00fcgen",
   calendar_scale_message: "W\u00e4hle die Art der zweiten Skala, die k\u00fcnftig zwischen Zeitstrahl und Beschriftung dargestellt werden soll.",
   calendar_scale_group_historical: "Historische Kalender",
@@ -2129,18 +2102,11 @@ Object.assign(I18N.en, {
   menu_development_title: "Development status",
   menu_development_description: "TimeMap is currently version 0.4. Individual features, interfaces, and display modes are still being developed, tested, and refined.",
   menu_development_storage: "The storage system is explicitly still under development and testing and may contain errors. Projects are temporarily stored by the browser; deliberate local saving is being expanded and should become more transparent.",
-  menu_apps_description: "Preparation for additional tools such as GenMap for genealogical GEDCOM files.",
   menu_discord_description: "Open the project Discord page for discussion, notes, and ongoing development.",
   menu_discord_title: "Discord",
   menu_discord_link: "Open Discord",
-  menu_imprint_title: "Legal Notice",
+  menu_imprint_title: "Project description",
   menu_imprint_description: MENU_IMPRINT_DESCRIPTION_TEXT,
-  menu_imprint_provider_title: "Provider information according to § 5 DDG",
-  menu_imprint_provider_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
-  menu_imprint_contact_title: "Contact",
-  menu_imprint_contact_text: "Email: impressum@ziselin.com",
-  menu_imprint_responsible_title: "Responsible for content",
-  menu_imprint_responsible_text: "Martin Graupner<br>Ribnitz-Damgarten<br>Germany",
   menu_imprint_project_title: "Project description",
   menu_imprint_project_text: MENU_IMPRINT_PROJECT_TEXT,
   calendar_scale_title: "Add additional calendar/scale",
@@ -2828,6 +2794,7 @@ function applyLocalStateSnapshot(snapshot) {
     }
     state.tickBookmarks = sanitizeTickBookmarksCollection(
       Array.isArray(savedState.tickBookmarks) ? savedState.tickBookmarks.map((bookmark) => ({ ...bookmark })) : [],
+      { enforceSingleLocked: true },
     );
     return true;
   } finally {
@@ -4581,19 +4548,11 @@ function applyStaticTranslations() {
   if (ui.menuDevelopmentTitle) ui.menuDevelopmentTitle.textContent = t("menu_development_title");
   if (ui.menuDevelopmentDescription) ui.menuDevelopmentDescription.textContent = t("menu_development_description");
   if (ui.menuDevelopmentStorage) ui.menuDevelopmentStorage.textContent = t("menu_development_storage");
-  if (ui.menuAppsTitle) ui.menuAppsTitle.textContent = t("menu_apps_title");
-  if (ui.menuAppsDescription) ui.menuAppsDescription.textContent = t("menu_apps_description");
   if (ui.menuDiscordTitle) ui.menuDiscordTitle.textContent = t("menu_discord_title");
   if (ui.menuDiscordDescription) ui.menuDiscordDescription.textContent = t("menu_discord_description");
   if (ui.menuDiscordLink) ui.menuDiscordLink.textContent = t("menu_discord_link");
   if (ui.menuImprintTitle) ui.menuImprintTitle.textContent = t("menu_imprint_title");
   if (ui.menuImprintDescription) ui.menuImprintDescription.textContent = t("menu_imprint_description");
-  if (ui.menuImprintProviderTitle) ui.menuImprintProviderTitle.textContent = t("menu_imprint_provider_title");
-  if (ui.menuImprintProviderText) ui.menuImprintProviderText.innerHTML = t("menu_imprint_provider_text");
-  if (ui.menuImprintContactTitle) ui.menuImprintContactTitle.textContent = t("menu_imprint_contact_title");
-  if (ui.menuImprintContactText) ui.menuImprintContactText.textContent = t("menu_imprint_contact_text");
-  if (ui.menuImprintResponsibleTitle) ui.menuImprintResponsibleTitle.textContent = t("menu_imprint_responsible_title");
-  if (ui.menuImprintResponsibleText) ui.menuImprintResponsibleText.innerHTML = t("menu_imprint_responsible_text");
   if (ui.menuImprintProjectTitle) ui.menuImprintProjectTitle.textContent = t("menu_imprint_project_title");
   renderParagraphList(ui.menuImprintProjectText, t("menu_imprint_project_text"));
   if (ui.calendarScaleTitle) ui.calendarScaleTitle.textContent = t("calendar_scale_title");
@@ -7896,6 +7855,7 @@ function getBookmarksForGroupTree(rootGroupId) {
       ownerGroupId: bookmark.ownerGroupId ?? null,
       groupId: bookmark.groupId ?? null,
       enabled: bookmark.enabled !== false,
+      locked: bookmark.locked === true,
     }));
 }
 
@@ -13296,6 +13256,10 @@ function restoreBookmarkFromTrash(bookmarkId) {
   restored.ownerGroupId = null;
   state.tickBookmarks.push(restored);
   state.tickBookmarks = sanitizeTickBookmarksCollection(state.tickBookmarks);
+  const restoredBookmark = state.tickBookmarks.find((bookmark) => bookmark.id === restored.id);
+  if (restoredBookmark?.locked === true) {
+    setBookmarkLocked(restoredBookmark, true);
+  }
   trashStore.bookmarks.splice(index, 1);
 }
 
@@ -17342,6 +17306,8 @@ function getBookmarksForTimelineRange(range, ownerGroupId = null) {
       title: bookmark.title ?? "",
       ownerGroupId: ownerGroupId ?? bookmark.ownerGroupId ?? null,
       groupId: bookmark.groupId ?? null,
+      enabled: bookmark.enabled !== false,
+      locked: bookmark.locked === true,
     }));
 }
 
@@ -17644,7 +17610,7 @@ function buildFolderExportPayload(rootGroupId, options = {}) {
 }
 
 function mergeImportedBookmarks(bookmarks, importedRootGroupId = null, groupIdMap = new Map()) {
-  const validBookmarks = sanitizeTickBookmarksCollection(bookmarks);
+  const validBookmarks = sanitizeTickBookmarksCollection(bookmarks, { enforceSingleLocked: true });
   if (!validBookmarks.length) return;
   const existingKeys = new Set(
     state.tickBookmarks.map((bookmark) => `${bookmark.stepIndex}|${bookmark.tickValue}`),
@@ -17670,10 +17636,11 @@ function mergeImportedBookmarks(bookmarks, importedRootGroupId = null, groupIdMa
       }
       if (existingBookmark) {
         existingBookmark.enabled = bookmark.enabled !== false;
+        setBookmarkLocked(existingBookmark, bookmark.locked === true);
       }
       return;
     }
-    state.tickBookmarks.push({
+    const importedBookmark = {
       id: createUniqueId("bookmark-import"),
       tickValue: bookmark.tickValue,
       centerYear: bookmark.centerYear,
@@ -17682,7 +17649,12 @@ function mergeImportedBookmarks(bookmarks, importedRootGroupId = null, groupIdMa
       ownerGroupId: importedRootGroupId ?? bookmark.ownerGroupId ?? null,
       groupId: bookmark.groupId ? (groupIdMap.get(bookmark.groupId) ?? null) : null,
       enabled: bookmark.enabled !== false,
-    });
+      locked: bookmark.locked === true,
+    };
+    state.tickBookmarks.push(importedBookmark);
+    if (importedBookmark.locked === true) {
+      setBookmarkLocked(importedBookmark, true);
+    }
     existingKeys.add(key);
   });
 }
@@ -18808,9 +18780,11 @@ function isBookmarkRenderable(bookmark) {
   return isSameTimelineStepValue(alignedValue, bookmark.tickValue, step);
 }
 
-function sanitizeTickBookmarksCollection(bookmarks) {
+function sanitizeTickBookmarksCollection(bookmarks, options = {}) {
   if (!Array.isArray(bookmarks)) return [];
+  const { enforceSingleLocked = false } = options;
   const seenKeys = new Set();
+  let hasLockedBookmark = false;
   const sanitized = [];
   bookmarks.forEach((bookmark) => {
     if (!isBookmarkRenderable(bookmark)) return;
@@ -18824,7 +18798,15 @@ function sanitizeTickBookmarksCollection(bookmarks) {
       ownerGroupId: bookmark.ownerGroupId ?? null,
       groupId: bookmark.groupId && getGroupById(bookmark.groupId) ? bookmark.groupId : null,
       enabled: bookmark.enabled !== false,
+      locked: bookmark.locked === true,
     };
+    if (enforceSingleLocked && normalizedBookmark.locked) {
+      if (hasLockedBookmark) {
+        normalizedBookmark.locked = false;
+      } else {
+        hasLockedBookmark = true;
+      }
+    }
     const key = `${normalizedBookmark.stepIndex}|${normalizedBookmark.tickValue}`;
     if (seenKeys.has(key)) return;
     seenKeys.add(key);
@@ -18838,6 +18820,59 @@ function isCurrentBookmark(bookmark) {
   return bookmark.stepIndex === state.stepIndex && isSameTimelineStepValue(bookmark.centerYear, state.centerYear, step);
 }
 
+function setBookmarkLocked(bookmark, locked) {
+  if (!bookmark) return;
+  const target = bookmark.id
+    ? state.tickBookmarks.find((candidate) => candidate.id === bookmark.id) ?? bookmark
+    : bookmark;
+  const shouldLock = locked === true;
+  if (shouldLock) {
+    state.tickBookmarks.forEach((candidate) => {
+      if (candidate.id !== target.id) {
+        candidate.locked = false;
+      }
+    });
+  }
+  target.locked = shouldLock;
+  if (target !== bookmark) {
+    bookmark.locked = shouldLock;
+  }
+}
+
+function getLockedBookmarkAnchor() {
+  if (!Array.isArray(state.tickBookmarks)) return null;
+  return state.tickBookmarks
+    .filter((bookmark) => bookmark.locked === true && Number.isInteger(Number(bookmark.stepIndex)))
+    .map((bookmark) => ({
+      stepIndex: Number(bookmark.stepIndex),
+      centerYear: Number(bookmark.tickValue),
+    }))
+    .find((anchor) => Number.isFinite(anchor.centerYear)) ?? null;
+}
+
+function getZoomLockedCenterYear(currentIndex, nextIndex, fallbackCenterYear) {
+  const nextStep = scaleSteps[nextIndex] || null;
+  if (!nextStep || nextStep.unit !== "year") return fallbackCenterYear;
+  const lockedAnchor = getLockedBookmarkAnchor();
+  if (!lockedAnchor) return fallbackCenterYear;
+  if (nextIndex === lockedAnchor.stepIndex) return lockedAnchor.centerYear;
+  const direction = Math.sign(nextIndex - currentIndex);
+  if (!direction) return fallbackCenterYear;
+  if (Math.sign(lockedAnchor.stepIndex - currentIndex) !== direction) return fallbackCenterYear;
+  if (!Number.isFinite(state.centerYear)) return fallbackCenterYear;
+  return state.centerYear + ((lockedAnchor.centerYear - state.centerYear) / 2);
+}
+
+function normalizeZoomCenterYear(centerYear, step) {
+  if (!Number.isFinite(centerYear) || !step) return state.centerYear;
+  let normalizedCenterYear = centerYear;
+  if (isPresentationRenderMode()) {
+    normalizedCenterYear = clampCenterYearToPresentation(normalizedCenterYear, step);
+  }
+  normalizedCenterYear = clampCenterYearToProjectBounds(normalizedCenterYear, step);
+  return alignTimelineValueToStepStart(normalizedCenterYear, step);
+}
+
 function toggleTickBookmark(tickValue) {
   const step = getStep();
   const existingIndex = state.tickBookmarks.findIndex((bookmark) => (
@@ -18845,6 +18880,9 @@ function toggleTickBookmark(tickValue) {
     && isSameTimelineStepValue(bookmark.tickValue, tickValue, step)
   ));
   if (existingIndex >= 0) {
+    if (state.tickBookmarks[existingIndex]?.locked === true) {
+      return;
+    }
     const [removedBookmark] = state.tickBookmarks.splice(existingIndex, 1);
     if (removedBookmark?.id && state.openBookmarkEditorId === removedBookmark.id) {
       state.openBookmarkEditorId = null;
@@ -18864,6 +18902,7 @@ function toggleTickBookmark(tickValue) {
     ownerGroupId: null,
     groupId: null,
     enabled: true,
+    locked: false,
   };
   const targetGroup = getDefaultGroupForNewItem("bookmarks");
   if (targetGroup) {
@@ -18949,18 +18988,45 @@ function renderTimelineBookmarkHud() {
     return;
   }
   [...renderableBookmarks].forEach((bookmark) => {
+    const item = document.createElement("span");
+    item.className = "timeline-bookmark-item";
     const row = document.createElement("button");
     row.type = "button";
     row.className = "timeline-bookmark-row";
     if (isCurrentBookmark(bookmark)) row.classList.add("is-active");
-    row.textContent = getTickBookmarkTitle(bookmark);
+    const title = document.createElement("span");
+    title.className = "timeline-bookmark-title";
+    title.textContent = getTickBookmarkTitle(bookmark);
+    row.append(title);
+    const lockButton = document.createElement("button");
+    lockButton.type = "button";
+    lockButton.className = `timeline-bookmark-lock${bookmark.locked === true ? " is-locked" : ""}`;
+    lockButton.setAttribute("aria-label", bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock"));
+    lockButton.title = bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock");
+    const toggleBookmarkLock = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setBookmarkLocked(bookmark, bookmark.locked !== true);
+      renderTimelineBookmarkHud();
+      renderEventList();
+      scheduleLocalAutosave();
+    };
+    lockButton.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+    lockButton.addEventListener("click", toggleBookmarkLock);
+    lockButton.addEventListener("dblclick", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
     row.addEventListener("click", () => jumpToTickBookmark(bookmark));
     row.addEventListener("dblclick", (event) => {
       event.preventDefault();
       event.stopPropagation();
       openBookmarkInLibrary(bookmark, { forceOpen: true, jump: false });
     });
-    ui.timelineBookmarkHud.appendChild(row);
+    item.append(row, lockButton);
+    ui.timelineBookmarkHud.appendChild(item);
   });
   ui.timelineBookmarkHud.hidden = false;
 }
@@ -29579,19 +29645,42 @@ function createBookmarkBrowserItem(bookmark, options = {}) {
   toggleSpacer.disabled = true;
   toggleSpacer.setAttribute("aria-hidden", "true");
 
-  const main = document.createElement("button");
-  main.type = "button";
+  const main = document.createElement("div");
+  main.role = "button";
+  main.tabIndex = 0;
   main.className = "event-row-main";
-  main.addEventListener("click", () => {
+  const toggleBookmarkEditor = () => {
     const isClosing = state.openBookmarkEditorId === bookmark.id;
     openBookmarkInLibrary(bookmark, { forceOpen: !isClosing, jump: !isClosing });
+  };
+  main.addEventListener("click", toggleBookmarkEditor);
+  main.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggleBookmarkEditor();
   });
 
   const title = document.createElement("strong");
   title.textContent = getMarkdownPlainText(getTickBookmarkTitle(bookmark));
+  const titleLine = document.createElement("span");
+  titleLine.className = "bookmark-title-line";
+  const lockButton = document.createElement("button");
+  lockButton.type = "button";
+  lockButton.className = `bookmark-lock-button${bookmark.locked === true ? " is-locked" : ""}`;
+  lockButton.setAttribute("aria-label", bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock"));
+  lockButton.title = bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock");
+  lockButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setBookmarkLocked(bookmark, bookmark.locked !== true);
+    renderEventList();
+    drawTimeline();
+    scheduleLocalAutosave();
+  });
+  titleLine.append(title, lockButton);
   const meta = document.createElement("span");
   meta.textContent = getTickBookmarkLabel(bookmark);
-  main.append(title, meta);
+  main.append(titleLine, meta);
 
   const date = document.createElement("span");
   date.className = "event-row-date";
@@ -30383,9 +30472,25 @@ function createTrashBookmarkBrowserItem(bookmark) {
   main.className = "event-row-main";
   const title = document.createElement("strong");
   title.textContent = getMarkdownPlainText(getTickBookmarkTitle(bookmark));
+  const titleLine = document.createElement("span");
+  titleLine.className = "bookmark-title-line";
+  const lockButton = document.createElement("button");
+  lockButton.type = "button";
+  lockButton.className = `bookmark-lock-button${bookmark.locked === true ? " is-locked" : ""}`;
+  lockButton.setAttribute("aria-label", bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock"));
+  lockButton.title = bookmark.locked === true ? t("bookmark_unlock") : t("bookmark_lock");
+  lockButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    bookmark.locked = bookmark.locked !== true;
+    renderEventList();
+    drawTimeline();
+    scheduleLocalAutosave();
+  });
+  titleLine.append(title, lockButton);
   const meta = document.createElement("span");
   meta.textContent = getTickBookmarkLabel(bookmark);
-  main.append(title, meta);
+  main.append(titleLine, meta);
 
   const date = document.createElement("span");
   date.className = "event-row-date";
@@ -30612,6 +30717,7 @@ function pan(direction) {
 
 function zoom(direction) {
   const currentStep = getStep();
+  const currentIndex = state.stepIndex;
   const nextIndex = clamp(state.stepIndex + direction, 0, scaleSteps.length - 1);
   if (nextIndex === state.stepIndex) return;
   const nextStep = scaleSteps[nextIndex];
@@ -30623,12 +30729,17 @@ function zoom(direction) {
     : null;
   state.stepIndex = nextIndex;
   const newHalfRange = Math.floor(state.tickCount / 2) * getStepYears();
-  state.centerYear = anchoredValue - ((ratio * 2) - 1) * newHalfRange;
+  const nextCenterYear = anchoredValue - ((ratio * 2) - 1) * newHalfRange;
+  state.centerYear = normalizeZoomCenterYear(
+    getZoomLockedCenterYear(currentIndex, nextIndex, nextCenterYear),
+    nextStep,
+  );
   drawTimeline();
 }
 
 function zoomAtClientX(direction, clientX) {
   const currentStep = getStep();
+  const currentIndex = state.stepIndex;
   const nextIndex = clamp(state.stepIndex + direction, 0, scaleSteps.length - 1);
   if (nextIndex === state.stepIndex) return;
 
@@ -30641,7 +30752,11 @@ function zoomAtClientX(direction, clientX) {
     : null;
   state.stepIndex = nextIndex;
   const newHalfRange = Math.floor(state.tickCount / 2) * getStepYears();
-  state.centerYear = anchoredValue - ((ratio * 2) - 1) * newHalfRange;
+  const nextCenterYear = anchoredValue - ((ratio * 2) - 1) * newHalfRange;
+  state.centerYear = normalizeZoomCenterYear(
+    getZoomLockedCenterYear(currentIndex, nextIndex, nextCenterYear),
+    nextStep,
+  );
   drawTimeline();
 }
 
@@ -35710,7 +35825,7 @@ async function init() {
   timelineEvents.forEach((eventItem) => migrateLocalizedDescriptionState(eventItem));
   eventGroups.forEach((groupItem) => migrateLocalizedDescriptionState(groupItem));
   window.__TIMEMAP_BOOT_STAGE__ = "sanitizeTickBookmarks";
-  state.tickBookmarks = sanitizeTickBookmarksCollection(state.tickBookmarks);
+  state.tickBookmarks = sanitizeTickBookmarksCollection(state.tickBookmarks, { enforceSingleLocked: true });
   window.__TIMEMAP_BOOT_STAGE__ = "populateLanguageSelect";
   populateLanguageSelect();
   window.__TIMEMAP_BOOT_STAGE__ = "applyWorkspaceViewportScale";

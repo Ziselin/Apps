@@ -107,7 +107,14 @@
       border: 1px solid transparent;
       border-radius: 9px;
       background: transparent;
-      pointer-events: none;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .home-menu-button:hover,
+    .home-menu-button[aria-expanded="true"] {
+      border-color: rgba(33, 54, 51, 0.14);
+      background: rgba(33, 54, 51, 0.055);
     }
 
     .home-menu-button img {
@@ -174,6 +181,153 @@
       font-size: 0.94rem;
     }
 
+    .home-menu-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(33, 54, 51, 0.16);
+      backdrop-filter: blur(2px);
+    }
+
+    .home-menu-overlay[hidden] {
+      display: none;
+    }
+
+    .home-side-menu {
+      position: fixed;
+      z-index: 21;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: min(420px, calc(100vw - 32px));
+      padding: 18px;
+      background: rgba(250, 247, 239, 0.96);
+      border-right: 1px solid var(--line);
+      box-shadow: 24px 0 70px rgba(33, 54, 51, 0.18);
+      transform: translateX(-100%);
+      transition: transform 180ms ease;
+    }
+
+    .home-side-menu.is-open {
+      transform: translateX(0);
+    }
+
+    .home-side-menu-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .home-menu-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-menu-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--quiet);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .home-menu-title {
+      color: var(--ink);
+      font-size: 1.14rem;
+      font-weight: 700;
+    }
+
+    .home-menu-close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 254, 250, 0.68);
+      color: var(--ink-soft);
+      font: inherit;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .home-menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .home-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 10px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .home-menu-item:hover,
+    .home-menu-item.is-active {
+      border-color: var(--line);
+      background: rgba(255, 254, 250, 0.64);
+    }
+
+    .home-menu-icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+      opacity: 0.84;
+    }
+
+    .home-menu-panel {
+      display: grid;
+      gap: 14px;
+      margin-top: 2px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 254, 250, 0.62);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+    }
+
+    .home-menu-panel[hidden] {
+      display: none;
+    }
+
+    .home-menu-block {
+      display: grid;
+      gap: 5px;
+    }
+
+    .home-menu-block strong {
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    .home-menu-block p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      line-height: 1.48;
+    }
+
     .app-search:focus {
       border-color: var(--line-strong);
       outline: none;
@@ -181,12 +335,29 @@
     }
 
     .page-shell {
+      position: relative;
+      isolation: isolate;
       width: min(1180px, calc(100vw - 56px));
       margin: 0 auto;
       padding: clamp(68px, 9vw, 116px) 0 48px;
     }
 
+    .page-shell::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: clamp(8px, 4vw, 46px);
+      left: clamp(-220px, -17vw, -96px);
+      width: min(820px, 72vw);
+      aspect-ratio: 1;
+      background: url("./assets/ziselin-bild.svg") left top / contain no-repeat;
+      opacity: 0.145;
+      filter: brightness(0) saturate(100%) invert(67%) sepia(13%) saturate(430%) hue-rotate(9deg) brightness(96%) contrast(90%);
+      pointer-events: none;
+    }
+
     .hero {
+      position: relative;
       display: grid;
       justify-items: start;
       margin: 0 auto clamp(92px, 13vw, 150px);
@@ -211,33 +382,49 @@
 
     .collection-grid {
       display: grid;
-      grid-template-columns: max-content;
-      gap: 46px;
+      grid-template-columns: minmax(280px, 420px);
+      gap: 8px;
       justify-content: start;
       align-items: start;
     }
 
     .app-tile {
+      position: relative;
       display: grid;
-      justify-items: center;
-      align-content: start;
-      gap: 10px;
-      width: max-content;
-      max-width: 120px;
-      min-height: 0;
-      padding: 0;
+      grid-template-columns: 54px minmax(0, 1fr) 18px;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      min-height: 78px;
+      padding: 12px 14px 12px 12px;
       border: 0;
-      border-radius: 0;
+      border-radius: 14px;
       background: transparent;
       box-shadow: none;
       text-decoration: none;
-      transition: transform 160ms ease;
+      transition: background 160ms ease, transform 160ms ease;
+    }
+
+    .app-tile::after {
+      content: "";
+      width: 15px;
+      height: 15px;
+      justify-self: end;
+      background: var(--quiet);
+      mask: url("https://api.iconify.design/material-symbols/chevron-right-rounded.svg") center / contain no-repeat;
+      opacity: 0;
+      transition: opacity 160ms ease, transform 160ms ease;
     }
 
     .app-tile:hover,
     .app-tile:focus-visible {
       outline: none;
-      transform: translateY(-2px);
+      background: rgba(255, 254, 250, 0.58);
+    }
+
+    .app-tile:hover::after,
+    .app-tile:focus-visible::after {
+      opacity: 1;
     }
 
     .app-tile:focus-visible .app-icon {
@@ -255,15 +442,32 @@
 
     .app-tile:hover .app-icon {
       box-shadow: 0 14px 30px rgba(33, 54, 51, 0.2);
-      transform: scale(1.03);
+    }
+
+    .app-copy {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
     }
 
     .app-title {
       color: var(--ink);
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 1rem;
+      font-weight: 400;
       letter-spacing: 0;
-      text-align: center;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-description {
+      color: var(--muted);
+      font-size: 0.91rem;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .app-placeholder {
@@ -305,6 +509,12 @@
         padding-top: 52px;
       }
 
+      .page-shell::before {
+        left: clamp(-170px, -22vw, -64px);
+        width: min(700px, 86vw);
+        opacity: 0.12;
+      }
+
       .hero {
         margin-bottom: 70px;
       }
@@ -314,7 +524,7 @@
       }
 
       .collection-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(260px, 420px);
       }
     }
 
@@ -322,6 +532,13 @@
       .page-shell {
         width: min(100% - 28px, 1180px);
         padding-top: 42px;
+      }
+
+      .page-shell::before {
+        top: 18px;
+        left: -150px;
+        width: 620px;
+        opacity: 0.105;
       }
 
       .brand-plate {
@@ -341,9 +558,15 @@
         font-size: clamp(2.65rem, 14vw, 4.25rem);
       }
 
-      .app-tile,
-      .app-placeholder {
-        min-height: 0;
+      .app-tile {
+        grid-template-columns: 48px minmax(0, 1fr) 18px;
+        min-height: 72px;
+        gap: 14px;
+      }
+
+      .app-icon {
+        width: 48px;
+        height: 48px;
       }
     }
   </style>
@@ -351,9 +574,9 @@
 <body>
   <header class="topbar">
     <div class="brand-plate" aria-label="Ziselin">
-      <span class="home-menu-button" aria-hidden="true">
+      <button type="button" id="homeMenuButton" class="home-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="homeSideMenu">
         <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23213633" alt="">
-      </span>
+      </button>
       <div class="brand-mark">
         <img class="brand-bird" src="./assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
         <span class="brand-name">ziselin</span>
@@ -369,6 +592,43 @@
     </div>
   </header>
 
+  <div id="homeMenuOverlay" class="home-menu-overlay" hidden></div>
+  <aside id="homeSideMenu" class="home-side-menu" aria-hidden="true" inert>
+    <div class="home-side-menu-inner">
+      <div class="home-menu-head">
+        <div>
+          <span class="home-menu-label">Menü</span>
+          <strong class="home-menu-title">Ziselin</strong>
+        </div>
+        <button type="button" id="homeMenuCloseButton" class="home-menu-close" aria-label="Menü schließen">×</button>
+      </div>
+      <div class="home-menu-list">
+        <button type="button" class="home-menu-item" data-home-menu-panel="imprint" aria-expanded="false">
+          <img class="home-menu-icon" src="https://api.iconify.design/mdi/legal.svg?color=%23213633" alt="" aria-hidden="true">
+          <span>Impressum</span>
+        </button>
+        <div class="home-menu-panel" data-home-menu-popup="imprint" hidden>
+          <div class="home-menu-block">
+            <strong>Projektbeschreibung</strong>
+            <p>Ziselin ist eine Plattform für digitale Werkzeuge zur Erstellung und Erprobung interaktiver Wissens- und Präsentationsräume.</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Angaben gemäß § 5 DDG</strong>
+            <p>Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Kontakt</strong>
+            <p>E-Mail: impressum@ziselin.com</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Verantwortlich für den Inhalt</strong>
+            <p>Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
   <main class="page-shell">
     <section class="hero">
       <h1 class="claim-text">Digital Tools for Analogue People</h1>
@@ -378,7 +638,10 @@
       <div class="collection-grid">
         <a class="app-tile" href="./timemap/index.html" data-search-card data-app-link data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
           <img class="app-icon" src="./assets/timemap-app-icon.jpg" alt="" aria-hidden="true">
-          <span class="app-title">TimeMap</span>
+          <span class="app-copy">
+            <span class="app-title">TimeMap</span>
+            <span class="app-description">Interaktive Zeitstrahlen und Quellenräume</span>
+          </span>
         </a>
         <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
       </div>
@@ -386,9 +649,58 @@
   </main>
 
   <script>
+    const homeMenuButton = document.getElementById("homeMenuButton");
+    const homeMenuCloseButton = document.getElementById("homeMenuCloseButton");
+    const homeMenuOverlay = document.getElementById("homeMenuOverlay");
+    const homeSideMenu = document.getElementById("homeSideMenu");
     const appSearch = document.querySelector(".app-search");
     const collectionGrid = document.querySelector(".collection-grid");
     const collectionCards = [...document.querySelectorAll("[data-search-card]")];
+
+    function setHomeMenuOpen(isOpen) {
+      homeSideMenu?.classList.toggle("is-open", isOpen);
+      if (homeMenuOverlay) {
+        homeMenuOverlay.hidden = !isOpen;
+      }
+      homeSideMenu?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      if (homeSideMenu) {
+        homeSideMenu.inert = !isOpen;
+      }
+      homeMenuButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    homeMenuButton?.addEventListener("click", () => {
+      setHomeMenuOpen(homeMenuButton.getAttribute("aria-expanded") !== "true");
+    });
+
+    homeMenuCloseButton?.addEventListener("click", () => {
+      setHomeMenuOpen(false);
+      homeMenuButton?.focus();
+    });
+
+    homeMenuOverlay?.addEventListener("click", () => {
+      setHomeMenuOpen(false);
+    });
+
+    document.querySelectorAll("[data-home-menu-panel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const panelId = button.dataset.homeMenuPanel;
+        const panel = document.querySelector(`[data-home-menu-popup="${panelId}"]`);
+        const isExpanded = button.getAttribute("aria-expanded") === "true";
+        button.classList.toggle("is-active", !isExpanded);
+        button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+        if (panel) {
+          panel.hidden = isExpanded;
+        }
+      });
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && homeMenuButton?.getAttribute("aria-expanded") === "true") {
+        setHomeMenuOpen(false);
+        homeMenuButton.focus();
+      }
+    });
 
     function normalizeSearch(value) {
       return value.trim().toLowerCase();
