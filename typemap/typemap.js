@@ -14,6 +14,7 @@ const ui = {
   returnPreviewStrip: document.getElementById("returnPreviewStrip"),
   newProjectButton: document.getElementById("newProjectButton"),
   exportProjectButton: document.getElementById("exportProjectButton"),
+  exportMenu: document.getElementById("exportMenu"),
   importProjectButton: document.getElementById("importProjectButton"),
   createProjectButton: document.getElementById("createProjectButton"),
   openImportButton: document.getElementById("openImportButton"),
@@ -21,7 +22,42 @@ const ui = {
   projectList: document.getElementById("projectList"),
   projectInfo: document.getElementById("projectInfo"),
   editorTitle: document.getElementById("editorTitle"),
-  projectTitleInput: document.getElementById("projectTitleInput"),
+  documentPropertiesButton: document.getElementById("documentPropertiesButton"),
+  documentPropertiesOverlay: document.getElementById("documentPropertiesOverlay"),
+  documentPropertiesDialog: document.getElementById("documentPropertiesDialog"),
+  documentPropertiesCloseButton: document.getElementById("documentPropertiesCloseButton"),
+  documentPropertiesCancelButton: document.getElementById("documentPropertiesCancelButton"),
+  documentPropertiesSaveButton: document.getElementById("documentPropertiesSaveButton"),
+  docTextKindInput: document.getElementById("docTextKindInput"),
+  docTitleInput: document.getElementById("docTitleInput"),
+  docSubtitleInput: document.getElementById("docSubtitleInput"),
+  docAuthorsList: document.getElementById("docAuthorsList"),
+  addDocAuthorButton: document.getElementById("addDocAuthorButton"),
+  docContributorsList: document.getElementById("docContributorsList"),
+  addDocContributorButton: document.getElementById("addDocContributorButton"),
+  docCreatedDateInput: document.getElementById("docCreatedDateInput"),
+  docModifiedDateInput: document.getElementById("docModifiedDateInput"),
+  docRightsHolderInput: document.getElementById("docRightsHolderInput"),
+  docCopyrightYearInput: document.getElementById("docCopyrightYearInput"),
+  docLicenseInput: document.getElementById("docLicenseInput"),
+  docAllowUseInput: document.getElementById("docAllowUseInput"),
+  docAllowEditInput: document.getElementById("docAllowEditInput"),
+  docAllowShareInput: document.getElementById("docAllowShareInput"),
+  docAttributionInput: document.getElementById("docAttributionInput"),
+  docStatusInput: document.getElementById("docStatusInput"),
+  docVersionInput: document.getElementById("docVersionInput"),
+  docPublishedDateInput: document.getElementById("docPublishedDateInput"),
+  docLanguageMetaInput: document.getElementById("docLanguageMetaInput"),
+  docTagsInput: document.getElementById("docTagsInput"),
+  docDescriptionInput: document.getElementById("docDescriptionInput"),
+  addFontButton: document.getElementById("addFontButton"),
+  fontDialogOverlay: document.getElementById("fontDialogOverlay"),
+  fontDialog: document.getElementById("fontDialog"),
+  fontDialogCloseButton: document.getElementById("fontDialogCloseButton"),
+  fontDialogCancelButton: document.getElementById("fontDialogCancelButton"),
+  fontDialogAddButton: document.getElementById("fontDialogAddButton"),
+  fontFamilySearchInput: document.getElementById("fontFamilySearchInput"),
+  fontPreviewSample: document.getElementById("fontPreviewSample"),
   textTypeSelect: document.getElementById("textTypeSelect"),
   textInput: document.getElementById("textInput"),
   fontFamilySelect: document.getElementById("fontFamilySelect"),
@@ -29,9 +65,30 @@ const ui = {
   lineHeightInput: document.getElementById("lineHeightInput"),
   measureInput: document.getElementById("measureInput"),
   textAlignSelect: document.getElementById("textAlignSelect"),
-  hyphenationSelect: document.getElementById("hyphenationSelect"),
+  hyphenationSettingsButton: document.getElementById("hyphenationSettingsButton"),
+  hyphenationDialogOverlay: document.getElementById("hyphenationDialogOverlay"),
+  hyphenationDialog: document.getElementById("hyphenationDialog"),
+  hyphenationDialogCloseButton: document.getElementById("hyphenationDialogCloseButton"),
+  hyphenationDialogCancelButton: document.getElementById("hyphenationDialogCancelButton"),
+  hyphenationDialogSaveButton: document.getElementById("hyphenationDialogSaveButton"),
+  hyphenationModeInput: document.getElementById("hyphenationModeInput"),
+  hyphenationLanguageInput: document.getElementById("hyphenationLanguageInput"),
+  hyphenationConsecutiveInput: document.getElementById("hyphenationConsecutiveInput"),
+  hyphenationMinWordLengthInput: document.getElementById("hyphenationMinWordLengthInput"),
+  hyphenationBeforeInput: document.getElementById("hyphenationBeforeInput"),
+  hyphenationAfterInput: document.getElementById("hyphenationAfterInput"),
   languageSelect: document.getElementById("languageSelect"),
-  lineNumbersInput: document.getElementById("lineNumbersInput"),
+  lineNumberSettingsButton: document.getElementById("lineNumberSettingsButton"),
+  lineNumberDialogOverlay: document.getElementById("lineNumberDialogOverlay"),
+  lineNumberDialog: document.getElementById("lineNumberDialog"),
+  lineNumberDialogCloseButton: document.getElementById("lineNumberDialogCloseButton"),
+  lineNumberDialogCancelButton: document.getElementById("lineNumberDialogCancelButton"),
+  lineNumberDialogSaveButton: document.getElementById("lineNumberDialogSaveButton"),
+  lineNumberEnabledInput: document.getElementById("lineNumberEnabledInput"),
+  lineNumberModeInput: document.getElementById("lineNumberModeInput"),
+  lineNumberIncludeBlankInput: document.getElementById("lineNumberIncludeBlankInput"),
+  lineNumberIntervalInput: document.getElementById("lineNumberIntervalInput"),
+  lineNumberStartInput: document.getElementById("lineNumberStartInput"),
   previewPage: document.querySelector(".preview-page"),
   previewText: document.getElementById("previewText"),
   sidePreviewPage: document.querySelector(".side-preview-page"),
@@ -43,6 +100,19 @@ const defaultProjectText = [
   "",
   "Der Text bleibt als strukturierte Quelle erhalten. Die Vorschau oben zeigt das gerenderte Ergebnis, ohne den Inhalt in ein Bild zu verwandeln.",
 ].join("\n");
+
+const APP_FONTS = [
+  { label: "Arial", family: "Arial", css: "Arial, Helvetica, sans-serif", source: "system" },
+  { label: "Roboto", family: "Roboto", css: "'Roboto', Arial, Helvetica, sans-serif", source: "app" },
+  { label: "EB Garamond", family: "EB Garamond", css: "'EB Garamond', Georgia, serif", source: "app" },
+  { label: "Literata", family: "Literata", css: "'Literata', Georgia, serif", source: "app" },
+  { label: "Source Serif 4", family: "Source Serif 4", css: "'Source Serif 4', Georgia, serif", source: "app" },
+  { label: "Source Sans 3", family: "Source Sans 3", css: "'Source Sans 3', Arial, sans-serif", source: "app" },
+  { label: "Source Code Pro", family: "Source Code Pro", css: "'Source Code Pro', 'Courier New', monospace", source: "app" },
+  { label: "Georgia", family: "Georgia", css: "Georgia, 'Times New Roman', serif", source: "system" },
+  { label: "Times New Roman", family: "Times New Roman", css: "'Times New Roman', Times, serif", source: "system" },
+  { label: "Courier New", family: "Courier New", css: "'Courier New', Courier, monospace", source: "system" },
+];
 
 const state = {
   projects: [],
@@ -56,6 +126,136 @@ const state = {
 
 function createId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+}
+
+function createDefaultMetadata() {
+  return {
+    textKind: "essay",
+    subtitle: "",
+    authors: [""],
+    contributors: [""],
+    createdDate: "",
+    modifiedDate: "",
+    rightsHolder: "",
+    copyrightYear: "",
+    license: "",
+    allowUse: false,
+    allowEdit: false,
+    allowShare: false,
+    attribution: "",
+    status: "draft",
+    version: "0.1",
+    publishedDate: "",
+    language: "de",
+    tags: "",
+    description: "",
+  };
+}
+
+function createDefaultTypography() {
+  return {
+    projectFonts: [],
+  };
+}
+
+function createDefaultLineNumbering() {
+  return {
+    enabled: false,
+    mode: "source-lines",
+    includeBlankLines: false,
+    interval: 1,
+    start: 1,
+  };
+}
+
+function createDefaultHyphenationSettings() {
+  return {
+    mode: "manual",
+    language: "de",
+    consecutiveLines: 2,
+    minWordLength: 6,
+    before: 3,
+    after: 3,
+  };
+}
+
+function clampInteger(value, fallback, min, max) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+function normalizeLineNumbering(value, legacyEnabled = false) {
+  const fallback = createDefaultLineNumbering();
+  const source = typeof value === "object" && value ? value : {};
+  return {
+    enabled: source.enabled === true || legacyEnabled === true,
+    mode: ["paragraphs", "source-lines"].includes(source.mode) ? source.mode : fallback.mode,
+    includeBlankLines: source.includeBlankLines === true,
+    interval: clampInteger(source.interval, fallback.interval, 1, 100),
+    start: clampInteger(source.start, fallback.start, 0, 99999),
+  };
+}
+
+function normalizeHyphenationSettings(value, legacyMode = "manual", legacyLanguage = "de") {
+  const fallback = createDefaultHyphenationSettings();
+  const source = typeof value === "object" && value ? value : {};
+  const mode = ["manual", "auto", "none"].includes(source.mode)
+    ? source.mode
+    : ["manual", "auto", "none"].includes(legacyMode)
+      ? legacyMode
+      : fallback.mode;
+  const language = ["de", "en", "fr", "la"].includes(source.language)
+    ? source.language
+    : ["de", "en", "fr", "la"].includes(legacyLanguage)
+      ? legacyLanguage
+      : fallback.language;
+  return {
+    mode,
+    language,
+    consecutiveLines: clampInteger(source.consecutiveLines, fallback.consecutiveLines, 0, 12),
+    minWordLength: clampInteger(source.minWordLength, fallback.minWordLength, 4, 24),
+    before: clampInteger(source.before, fallback.before, 2, 12),
+    after: clampInteger(source.after, fallback.after, 2, 12),
+  };
+}
+
+function normalizePersonList(value) {
+  const list = Array.isArray(value) ? value : typeof value === "string" ? [value] : [""];
+  const normalized = list.map((entry) => String(entry || "").trim()).filter(Boolean);
+  return normalized.length ? normalized : [""];
+}
+
+function normalizeFontFamilyName(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function createGoogleFontCssValue(family) {
+  const normalizedFamily = normalizeFontFamilyName(family);
+  return normalizedFamily ? `'${normalizedFamily.replace(/'/g, "\\'")}', Arial, sans-serif` : APP_FONTS[0].css;
+}
+
+function normalizeProjectFonts(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map((font) => {
+      const family = normalizeFontFamilyName(font?.family || font?.label || font);
+      if (!family) return null;
+      const key = family.toLowerCase();
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return {
+        family,
+        label: String(font?.label || family),
+        css: String(font?.css || createGoogleFontCssValue(family)),
+        source: font?.source === "local" ? "local" : "google",
+        variants: Array.isArray(font?.variants) && font.variants.length ? font.variants.map(String) : ["400", "700"],
+      };
+    })
+    .filter(Boolean);
 }
 
 function createDefaultProject(title = "Neue TypeMap") {
@@ -77,7 +277,11 @@ function createDefaultProject(title = "Neue TypeMap") {
       hyphenation: "manual",
       language: "de",
       lineNumbers: false,
+      lineNumbering: createDefaultLineNumbering(),
+      hyphenationSettings: createDefaultHyphenationSettings(),
     },
+    metadata: createDefaultMetadata(),
+    typography: createDefaultTypography(),
   };
 }
 
@@ -98,6 +302,14 @@ function normalizeProject(project) {
       ...fallback.style,
       ...(project?.style || {}),
     },
+    metadata: {
+      ...fallback.metadata,
+      ...(project?.metadata || {}),
+    },
+    typography: {
+      ...fallback.typography,
+      ...(project?.typography || {}),
+    },
   };
   normalized.id = String(normalized.id || createId("typemap-project"));
   normalized.title = String(normalized.title || "Unbenannte TypeMap");
@@ -115,6 +327,41 @@ function normalizeProject(project) {
     ? normalized.style.language
     : fallback.style.language;
   normalized.style.lineNumbers = normalized.style.lineNumbers === true;
+  normalized.style.lineNumbering = normalizeLineNumbering(normalized.style.lineNumbering, normalized.style.lineNumbers);
+  normalized.style.hyphenationSettings = normalizeHyphenationSettings(
+    normalized.style.hyphenationSettings,
+    normalized.style.hyphenation,
+    normalized.style.language,
+  );
+  normalized.style.hyphenation = normalized.style.hyphenationSettings.mode;
+  normalized.style.language = normalized.style.hyphenationSettings.language;
+  normalized.metadata.textKind = [
+    "artikel",
+    "essay",
+    "buchkapitel",
+    "gedicht",
+    "brief",
+    "wissenschaftlicher-text",
+    "vertrag",
+    "notiz",
+  ].includes(normalized.metadata.textKind)
+    ? normalized.metadata.textKind
+    : fallback.metadata.textKind;
+  normalized.metadata.authors = normalizePersonList(normalized.metadata.authors);
+  normalized.metadata.contributors = normalizePersonList(normalized.metadata.contributors);
+  normalized.metadata.allowUse = normalized.metadata.allowUse === true;
+  normalized.metadata.allowEdit = normalized.metadata.allowEdit === true;
+  normalized.metadata.allowShare = normalized.metadata.allowShare === true;
+  normalized.metadata.status = ["draft", "working", "final", "published"].includes(normalized.metadata.status)
+    ? normalized.metadata.status
+    : fallback.metadata.status;
+  normalized.metadata.language = String(normalized.metadata.language || fallback.metadata.language);
+  normalized.typography.projectFonts = normalizeProjectFonts(normalized.typography.projectFonts);
+  const knownFontValues = new Set([...APP_FONTS.map((font) => font.css), ...normalized.typography.projectFonts.map((font) => font.css)]);
+  if (!knownFontValues.has(normalized.style.fontFamily)) {
+    const matchingProjectFont = normalized.typography.projectFonts.find((font) => font.family === normalized.style.fontFamily);
+    normalized.style.fontFamily = matchingProjectFont?.css || fallback.style.fontFamily;
+  }
   return normalized;
 }
 
@@ -192,6 +439,15 @@ function buildBrowserLayoutModel(sourceModel, style) {
       sourceEndOffset: paragraph.endOffset,
       blockIndex: index,
       text: paragraph.text,
+      visibleLines: [],
+    })),
+    sourceLineBlocks: sourceModel.originalLines.map((line) => ({
+      id: `layout-source-${line.id}`,
+      sourceLineId: line.id,
+      sourceStartOffset: line.startOffset,
+      sourceEndOffset: line.endOffset,
+      blockIndex: line.index,
+      text: line.text,
       visibleLines: [],
     })),
     notes: [
@@ -284,36 +540,163 @@ function createMarkdownBlockElement(block, textType) {
   return paragraph;
 }
 
+function getVisualLineRects(element) {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const elementRect = element.getBoundingClientRect();
+  const rects = Array.from(range.getClientRects())
+    .filter((rect) => rect.width > 0 && rect.height > 0)
+    .map((rect) => ({
+      top: rect.top,
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      right: rect.right,
+    }))
+    .sort((a, b) => a.top - b.top || a.left - b.left);
+  range.detach();
+
+  if (!rects.length && element.textContent?.trim()) {
+    return [{
+      top: elementRect.top,
+      bottom: elementRect.bottom,
+      height: elementRect.height,
+      left: elementRect.left,
+      right: elementRect.right,
+    }];
+  }
+
+  const grouped = [];
+  rects.forEach((rect) => {
+    const previous = grouped[grouped.length - 1];
+    if (previous && Math.abs(previous.top - rect.top) < 2) {
+      previous.left = Math.min(previous.left, rect.left);
+      previous.right = Math.max(previous.right, rect.right);
+      previous.bottom = Math.max(previous.bottom, rect.bottom);
+      previous.height = Math.max(previous.height, rect.height);
+      return;
+    }
+    grouped.push({ ...rect });
+  });
+  return grouped;
+}
+
+function renderLineNumberLayer(targetText, lineNumbering) {
+  targetText.querySelector(".preview-line-number-layer")?.remove();
+  if (!lineNumbering.enabled) return;
+
+  const layer = document.createElement("div");
+  layer.className = "preview-line-number-layer";
+  targetText.appendChild(layer);
+
+  const targetRect = targetText.getBoundingClientRect();
+  const blocks = Array.from(targetText.querySelectorAll(".preview-body-block"));
+  let lineIndex = 0;
+
+  blocks.forEach((block) => {
+    const visualRects = lineNumbering.mode === "source-lines"
+      ? getVisualLineRects(block)
+      : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
+
+    visualRects.forEach((rect) => {
+      lineIndex += 1;
+      const lineNumber = lineNumbering.start + lineIndex - 1;
+      if (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0) return;
+      const label = document.createElement("span");
+      label.className = "preview-line-number";
+      label.textContent = String(lineNumber);
+      label.style.top = `${rect.bottom - targetRect.top}px`;
+      layer.appendChild(label);
+    });
+  });
+}
+
+function scheduleLineNumberLayer(targetText, lineNumbering) {
+  targetText.querySelector(".preview-line-number-layer")?.remove();
+  if (!lineNumbering.enabled) return;
+  window.requestAnimationFrame(() => {
+    renderLineNumberLayer(targetText, lineNumbering);
+  });
+}
+
+function createPreviewDocumentHead(project) {
+  const metadata = project.metadata || {};
+  const title = String(project.title || "").trim();
+  const subtitle = String(metadata.subtitle || "").trim();
+  const authors = normalizePersonList(metadata.authors).filter(Boolean);
+  if (!title && !subtitle && !authors.length) return null;
+
+  const head = document.createElement("header");
+  head.className = "preview-document-head";
+  if (title) {
+    const titleElement = document.createElement("h1");
+    titleElement.className = "preview-document-title";
+    titleElement.textContent = title;
+    head.appendChild(titleElement);
+  }
+  if (subtitle) {
+    const subtitleElement = document.createElement("p");
+    subtitleElement.className = "preview-document-subtitle";
+    subtitleElement.textContent = subtitle;
+    head.appendChild(subtitleElement);
+  }
+  if (authors.length) {
+    const authorElement = document.createElement("p");
+    authorElement.className = "preview-document-authors";
+    authorElement.textContent = authors.join(", ");
+    head.appendChild(authorElement);
+  }
+  return head;
+}
+
 function renderTextView(targetPage, targetText, project, layoutModel) {
   if (!targetPage || !targetText) return;
   const style = project.style;
+  const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
+  const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
   targetPage.style.setProperty("--preview-line-height", String(style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
   targetText.style.fontFamily = style.fontFamily;
   targetText.style.textAlign = style.textAlign;
-  targetText.lang = style.language;
-  targetText.style.hyphens = style.hyphenation;
-  targetText.classList.toggle("has-line-numbers", style.lineNumbers === true);
+  targetText.lang = hyphenationSettings.language;
+  targetText.style.hyphens = hyphenationSettings.mode;
+  targetText.style.setProperty("--hyphenate-limit-lines", String(hyphenationSettings.consecutiveLines));
+  targetText.style.setProperty("--hyphenate-limit-chars", `${hyphenationSettings.before} ${hyphenationSettings.after} ${hyphenationSettings.minWordLength}`);
+  targetText.style.setProperty("-webkit-hyphenate-limit-lines", String(hyphenationSettings.consecutiveLines));
+  targetText.style.setProperty("-webkit-hyphenate-limit-before", String(hyphenationSettings.before));
+  targetText.style.setProperty("-webkit-hyphenate-limit-after", String(hyphenationSettings.after));
+  targetText.classList.toggle("has-line-numbers", lineNumbering.enabled === true);
   targetText.classList.remove("is-text-type-prose", "is-text-type-lyric", "is-text-type-drama", "is-text-type-note");
   targetText.classList.add(`is-text-type-${project.source.textType || "prose"}`);
   clearElement(targetText);
 
-  if (!layoutModel.blocks.length) {
+  const documentHead = createPreviewDocumentHead(project);
+  if (documentHead) targetText.appendChild(documentHead);
+
+  const blocks = lineNumbering.mode === "source-lines" && project.source.textType === "lyric"
+    ? (layoutModel.sourceLineBlocks || []).filter((block) => lineNumbering.includeBlankLines || String(block.text || "").trim())
+    : layoutModel.blocks;
+
+  if (!blocks.length) {
     const empty = document.createElement("p");
     empty.className = "preview-empty";
     empty.textContent = "Beginne unten mit deinem Text.";
     targetText.appendChild(empty);
+    scheduleLineNumberLayer(targetText, lineNumbering);
     return;
   }
 
-  layoutModel.blocks.forEach((block) => {
+  blocks.forEach((block) => {
     const element = createMarkdownBlockElement(block, project.source.textType || "prose");
+    element.classList.add("preview-body-block");
     element.dataset.layoutBlockId = block.id;
-    element.dataset.sourceRangeId = block.sourceRangeId;
+    if (block.sourceRangeId) element.dataset.sourceRangeId = block.sourceRangeId;
+    if (block.sourceLineId) element.dataset.sourceLineId = block.sourceLineId;
     element.dataset.sourceStart = String(block.sourceStartOffset);
     element.dataset.sourceEnd = String(block.sourceEndOffset);
     targetText.appendChild(element);
   });
+  scheduleLineNumberLayer(targetText, lineNumbering);
 }
 
 function renderViewLayer(project, sourceModel, layoutModel) {
@@ -335,6 +718,70 @@ function rebuildModelsAndPreview() {
   state.sourceModel = buildSourceModel(project);
   state.layoutModel = buildBrowserLayoutModel(state.sourceModel, project.style);
   renderViewLayer(project, state.sourceModel, state.layoutModel);
+}
+
+function buildGoogleFontUrl(family) {
+  const encodedFamily = normalizeFontFamilyName(family).replace(/\s+/g, "+");
+  return `https://fonts.googleapis.com/css2?family=${encodedFamily}:wght@400;500;600;700&display=swap`;
+}
+
+function getFontLinkId(family) {
+  return `typemap-google-font-${normalizeFontFamilyName(family).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+}
+
+function loadGoogleFont(family) {
+  const normalizedFamily = normalizeFontFamilyName(family);
+  if (!normalizedFamily || document.getElementById(getFontLinkId(normalizedFamily))) return;
+  const link = document.createElement("link");
+  link.id = getFontLinkId(normalizedFamily);
+  link.rel = "stylesheet";
+  link.href = buildGoogleFontUrl(normalizedFamily);
+  document.head.appendChild(link);
+}
+
+function loadProjectFonts(projects = state.projects) {
+  projects.forEach((project) => {
+    normalizeProjectFonts(project?.typography?.projectFonts).forEach((font) => {
+      if (font.source === "google") loadGoogleFont(font.family);
+    });
+  });
+}
+
+function renderFontOptions(project) {
+  if (!ui.fontFamilySelect || !project) return;
+  clearElement(ui.fontFamilySelect);
+
+  const appGroup = document.createElement("optgroup");
+  appGroup.label = "App-Schriften";
+  APP_FONTS.forEach((font) => {
+    const option = document.createElement("option");
+    option.value = font.css;
+    option.textContent = font.label;
+    appGroup.appendChild(option);
+  });
+  ui.fontFamilySelect.appendChild(appGroup);
+
+  const projectFonts = normalizeProjectFonts(project.typography?.projectFonts);
+  if (projectFonts.length) {
+    const projectGroup = document.createElement("optgroup");
+    projectGroup.label = "Projekt-Schriften";
+    projectFonts.forEach((font) => {
+      const option = document.createElement("option");
+      option.value = font.css;
+      option.textContent = font.label || font.family;
+      projectGroup.appendChild(option);
+    });
+    ui.fontFamilySelect.appendChild(projectGroup);
+  }
+
+  const optionValues = Array.from(ui.fontFamilySelect.options).map((option) => option.value);
+  if (!optionValues.includes(project.style.fontFamily)) {
+    const fallbackOption = document.createElement("option");
+    fallbackOption.value = project.style.fontFamily;
+    fallbackOption.textContent = "Aktuelle Schrift";
+    ui.fontFamilySelect.appendChild(fallbackOption);
+  }
+  ui.fontFamilySelect.value = project.style.fontFamily;
 }
 
 function renderProjectList() {
@@ -382,7 +829,8 @@ function renderEditor() {
   if (!project) return;
   if (ui.projectInfo) ui.projectInfo.textContent = `${state.projects.length} Projekt${state.projects.length === 1 ? "" : "e"}`;
   if (ui.editorTitle) ui.editorTitle.textContent = project.title;
-  if (ui.projectTitleInput) ui.projectTitleInput.value = project.title;
+  loadProjectFonts([project]);
+  renderFontOptions(project);
   if (ui.textTypeSelect) ui.textTypeSelect.value = project.source.textType;
   if (ui.textInput) ui.textInput.value = project.source.rawText;
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
@@ -390,13 +838,259 @@ function renderEditor() {
   if (ui.lineHeightInput) ui.lineHeightInput.value = String(project.style.lineHeight);
   if (ui.measureInput) ui.measureInput.value = String(project.style.measure);
   if (ui.textAlignSelect) ui.textAlignSelect.value = project.style.textAlign;
-  if (ui.hyphenationSelect) ui.hyphenationSelect.value = project.style.hyphenation;
   if (ui.languageSelect) ui.languageSelect.value = project.style.language;
-  if (ui.lineNumbersInput) ui.lineNumbersInput.checked = project.style.lineNumbers === true;
+}
+
+function setDialogOpen(isOpen) {
+  if (ui.documentPropertiesOverlay) ui.documentPropertiesOverlay.hidden = !isOpen;
+  if (ui.documentPropertiesDialog) ui.documentPropertiesDialog.hidden = !isOpen;
+}
+
+function setFontDialogOpen(isOpen) {
+  if (ui.fontDialogOverlay) ui.fontDialogOverlay.hidden = !isOpen;
+  if (ui.fontDialog) ui.fontDialog.hidden = !isOpen;
+}
+
+function setLineNumberDialogOpen(isOpen) {
+  if (ui.lineNumberDialogOverlay) ui.lineNumberDialogOverlay.hidden = !isOpen;
+  if (ui.lineNumberDialog) ui.lineNumberDialog.hidden = !isOpen;
+}
+
+function setHyphenationDialogOpen(isOpen) {
+  if (ui.hyphenationDialogOverlay) ui.hyphenationDialogOverlay.hidden = !isOpen;
+  if (ui.hyphenationDialog) ui.hyphenationDialog.hidden = !isOpen;
+}
+
+function renderPersonRows(container, values, type) {
+  if (!container) return;
+  clearElement(container);
+  const entries = normalizePersonList(values);
+  entries.forEach((value, index) => {
+    const row = document.createElement("div");
+    row.className = "property-repeat-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = value;
+    input.autocomplete = "off";
+    input.dataset.personType = type;
+    input.setAttribute("aria-label", type === "authors" ? "Autor" : "Mitwirkende");
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "property-repeat-remove";
+    removeButton.textContent = "X";
+    removeButton.disabled = entries.length <= 1;
+    removeButton.setAttribute("aria-label", type === "authors" ? "Autor entfernen" : "Mitwirkende entfernen");
+    removeButton.addEventListener("click", () => {
+      const nextValues = getPersonRows(container).filter((_, valueIndex) => valueIndex !== index);
+      renderPersonRows(container, nextValues.length ? nextValues : [""], type);
+    });
+
+    row.append(input, removeButton);
+    container.appendChild(row);
+  });
+}
+
+function getPersonRows(container) {
+  return Array.from(container?.querySelectorAll("input") || [])
+    .map((input) => input.value.trim())
+    .filter(Boolean);
+}
+
+function addPersonRow(container, type) {
+  const values = getPersonRows(container);
+  values.push("");
+  renderPersonRows(container, values, type);
+  const lastInput = container?.querySelector(".property-repeat-row:last-child input");
+  lastInput?.focus();
+}
+
+function openDocumentPropertiesDialog() {
+  const project = getActiveProject();
+  if (!project) return;
+  const metadata = {
+    ...createDefaultMetadata(),
+    ...(project.metadata || {}),
+  };
+  if (ui.docTextKindInput) ui.docTextKindInput.value = metadata.textKind;
+  if (ui.docTitleInput) ui.docTitleInput.value = project.title;
+  if (ui.docSubtitleInput) ui.docSubtitleInput.value = metadata.subtitle || "";
+  renderPersonRows(ui.docAuthorsList, metadata.authors, "authors");
+  renderPersonRows(ui.docContributorsList, metadata.contributors, "contributors");
+  if (ui.docCreatedDateInput) ui.docCreatedDateInput.value = metadata.createdDate || "";
+  if (ui.docModifiedDateInput) ui.docModifiedDateInput.value = metadata.modifiedDate || "";
+  if (ui.docRightsHolderInput) ui.docRightsHolderInput.value = metadata.rightsHolder || "";
+  if (ui.docCopyrightYearInput) ui.docCopyrightYearInput.value = metadata.copyrightYear || "";
+  if (ui.docLicenseInput) ui.docLicenseInput.value = metadata.license || "";
+  if (ui.docAllowUseInput) ui.docAllowUseInput.checked = metadata.allowUse === true;
+  if (ui.docAllowEditInput) ui.docAllowEditInput.checked = metadata.allowEdit === true;
+  if (ui.docAllowShareInput) ui.docAllowShareInput.checked = metadata.allowShare === true;
+  if (ui.docAttributionInput) ui.docAttributionInput.value = metadata.attribution || "";
+  if (ui.docStatusInput) ui.docStatusInput.value = metadata.status || "draft";
+  if (ui.docVersionInput) ui.docVersionInput.value = metadata.version || "";
+  if (ui.docPublishedDateInput) ui.docPublishedDateInput.value = metadata.publishedDate || "";
+  if (ui.docLanguageMetaInput) ui.docLanguageMetaInput.value = metadata.language || "";
+  if (ui.docTagsInput) ui.docTagsInput.value = metadata.tags || "";
+  if (ui.docDescriptionInput) ui.docDescriptionInput.value = metadata.description || "";
+  setDialogOpen(true);
+  ui.docTitleInput?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function saveDocumentPropertiesDialog() {
+  updateActiveProject((project) => {
+    project.title = ui.docTitleInput?.value.trim() || "Unbenannte TypeMap";
+    project.metadata = {
+      ...createDefaultMetadata(),
+      ...(project.metadata || {}),
+      textKind: ui.docTextKindInput?.value || "essay",
+      subtitle: ui.docSubtitleInput?.value.trim() || "",
+      authors: normalizePersonList(getPersonRows(ui.docAuthorsList)),
+      contributors: normalizePersonList(getPersonRows(ui.docContributorsList)),
+      createdDate: ui.docCreatedDateInput?.value || "",
+      modifiedDate: ui.docModifiedDateInput?.value || "",
+      rightsHolder: ui.docRightsHolderInput?.value.trim() || "",
+      copyrightYear: ui.docCopyrightYearInput?.value || "",
+      license: ui.docLicenseInput?.value.trim() || "",
+      allowUse: ui.docAllowUseInput?.checked === true,
+      allowEdit: ui.docAllowEditInput?.checked === true,
+      allowShare: ui.docAllowShareInput?.checked === true,
+      attribution: ui.docAttributionInput?.value.trim() || "",
+      status: ui.docStatusInput?.value || "draft",
+      version: ui.docVersionInput?.value.trim() || "",
+      publishedDate: ui.docPublishedDateInput?.value || "",
+      language: ui.docLanguageMetaInput?.value.trim() || "",
+      tags: ui.docTagsInput?.value.trim() || "",
+      description: ui.docDescriptionInput?.value.trim() || "",
+    };
+  });
+  renderEditor();
+  setDialogOpen(false);
+}
+
+function updateFontPreviewSample() {
+  const family = normalizeFontFamilyName(ui.fontFamilySearchInput?.value || "");
+  if (!ui.fontPreviewSample) return;
+  if (!family) {
+    ui.fontPreviewSample.style.fontFamily = "";
+    return;
+  }
+  loadGoogleFont(family);
+  ui.fontPreviewSample.style.fontFamily = createGoogleFontCssValue(family);
+}
+
+function openFontDialog() {
+  if (ui.fontFamilySearchInput) ui.fontFamilySearchInput.value = "";
+  updateFontPreviewSample();
+  setFontDialogOpen(true);
+  ui.fontFamilySearchInput?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function addFontToActiveProject() {
+  const family = normalizeFontFamilyName(ui.fontFamilySearchInput?.value || "");
+  if (!family) return;
+  const css = createGoogleFontCssValue(family);
+  loadGoogleFont(family);
+  updateActiveProject((project) => {
+    const projectFonts = normalizeProjectFonts(project.typography?.projectFonts);
+    const exists = projectFonts.some((font) => font.family.toLowerCase() === family.toLowerCase());
+    project.typography = {
+      ...createDefaultTypography(),
+      ...(project.typography || {}),
+      projectFonts: exists
+        ? projectFonts
+        : [
+            ...projectFonts,
+            {
+              family,
+              label: family,
+              css,
+              source: "google",
+              variants: ["400", "700"],
+            },
+          ],
+    };
+    project.style.fontFamily = css;
+  });
+  renderEditor();
+  setFontDialogOpen(false);
+}
+
+function openLineNumberDialog() {
+  const project = getActiveProject();
+  if (!project) return;
+  const settings = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
+  if (ui.lineNumberEnabledInput) ui.lineNumberEnabledInput.checked = settings.enabled;
+  if (ui.lineNumberModeInput) ui.lineNumberModeInput.value = settings.mode;
+  if (ui.lineNumberIncludeBlankInput) ui.lineNumberIncludeBlankInput.checked = settings.includeBlankLines;
+  if (ui.lineNumberIntervalInput) ui.lineNumberIntervalInput.value = String(settings.interval);
+  if (ui.lineNumberStartInput) ui.lineNumberStartInput.value = String(settings.start);
+  setLineNumberDialogOpen(true);
+  ui.lineNumberEnabledInput?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function saveLineNumberDialog() {
+  updateActiveProject((project) => {
+    const settings = {
+      enabled: ui.lineNumberEnabledInput?.checked === true,
+      mode: ui.lineNumberModeInput?.value || "paragraphs",
+      includeBlankLines: ui.lineNumberIncludeBlankInput?.checked === true,
+      interval: clampInteger(ui.lineNumberIntervalInput?.value, 1, 1, 100),
+      start: clampInteger(ui.lineNumberStartInput?.value, 1, 0, 99999),
+    };
+    project.style.lineNumbering = normalizeLineNumbering(settings);
+    project.style.lineNumbers = project.style.lineNumbering.enabled;
+  });
+  renderEditor();
+  setLineNumberDialogOpen(false);
+}
+
+function openHyphenationDialog() {
+  const project = getActiveProject();
+  if (!project) return;
+  const settings = normalizeHyphenationSettings(project.style.hyphenationSettings, project.style.hyphenation, project.style.language);
+  if (ui.hyphenationModeInput) ui.hyphenationModeInput.value = settings.mode;
+  if (ui.hyphenationLanguageInput) ui.hyphenationLanguageInput.value = settings.language;
+  if (ui.hyphenationConsecutiveInput) ui.hyphenationConsecutiveInput.value = String(settings.consecutiveLines);
+  if (ui.hyphenationMinWordLengthInput) ui.hyphenationMinWordLengthInput.value = String(settings.minWordLength);
+  if (ui.hyphenationBeforeInput) ui.hyphenationBeforeInput.value = String(settings.before);
+  if (ui.hyphenationAfterInput) ui.hyphenationAfterInput.value = String(settings.after);
+  setHyphenationDialogOpen(true);
+  ui.hyphenationModeInput?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function saveHyphenationDialog() {
+  updateActiveProject((project) => {
+    const settings = normalizeHyphenationSettings({
+      mode: ui.hyphenationModeInput?.value || "manual",
+      language: ui.hyphenationLanguageInput?.value || "de",
+      consecutiveLines: ui.hyphenationConsecutiveInput?.value,
+      minWordLength: ui.hyphenationMinWordLengthInput?.value,
+      before: ui.hyphenationBeforeInput?.value,
+      after: ui.hyphenationAfterInput?.value,
+    });
+    project.style.hyphenationSettings = settings;
+    project.style.hyphenation = settings.mode;
+    project.style.language = settings.language;
+  });
+  renderEditor();
+  setHyphenationDialogOpen(false);
 }
 
 function renderApp() {
   renderProjectList();
+  loadProjectFonts();
   renderEditor();
   rebuildModelsAndPreview();
 }
@@ -473,14 +1167,269 @@ function applySnapshot(snapshot) {
 
 function exportProjects() {
   const blob = new Blob([JSON.stringify(buildSnapshot(), null, 2)], { type: "application/json" });
+  downloadBlob(blob, "typemap-project.json");
+}
+
+function slugifyFilename(value, fallback = "typemap") {
+  const slug = String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+  return slug || fallback;
+}
+
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "typemap-project.json";
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildMarkdownExport(project) {
+  const metadata = project.metadata || {};
+  const lines = [];
+  if (project.title) lines.push(`# ${project.title}`, "");
+  if (metadata.subtitle) lines.push(`## ${metadata.subtitle}`, "");
+  const authors = normalizePersonList(metadata.authors).filter(Boolean);
+  if (authors.length) lines.push(`*${authors.join(", ")}*`, "");
+  lines.push(project.source.rawText || "");
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+function exportMarkdown() {
+  const project = getActiveProject();
+  if (!project) return;
+  const blob = new Blob([buildMarkdownExport(project)], { type: "text/markdown;charset=utf-8" });
+  downloadBlob(blob, `${slugifyFilename(project.title)}.md`);
+}
+
+function buildHtmlExport(project) {
+  const metadata = project.metadata || {};
+  const authors = normalizePersonList(metadata.authors).filter(Boolean);
+  const sourceModel = buildSourceModel(project);
+  const layoutModel = buildBrowserLayoutModel(sourceModel, project.style);
+  const blocks = layoutModel.blocks.map((block) => `<p>${escapeHtml(block.text).replace(/\n/g, "<br>")}</p>`).join("\n");
+  return `<!DOCTYPE html>
+<html lang="${escapeHtml(metadata.language || project.style.language || "de")}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(project.title || "TypeMap")}</title>
+  <style>
+    body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
+    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}px; line-height: ${project.style.lineHeight}; text-align: ${project.style.textAlign}; hyphens: ${project.style.hyphenation}; }
+    header { margin: 0 0 1.55em; text-align: center; }
+    h1 { margin: 0; font-size: 1.48em; line-height: 1.12; }
+    .subtitle { margin: .34em 0 0; color: #555; font-size: .86em; line-height: 1.28; }
+    .authors { margin: .68em 0 0; color: #333; font-size: .76em; font-weight: 500; line-height: 1.28; }
+    p { margin: 0 0 .72em; white-space: pre-wrap; overflow-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>${escapeHtml(project.title || "")}</h1>
+      ${metadata.subtitle ? `<p class="subtitle">${escapeHtml(metadata.subtitle)}</p>` : ""}
+      ${authors.length ? `<p class="authors">${escapeHtml(authors.join(", "))}</p>` : ""}
+    </header>
+    ${blocks}
+  </main>
+</body>
+</html>`;
+}
+
+function exportHtml() {
+  const project = getActiveProject();
+  if (!project) return;
+  const blob = new Blob([buildHtmlExport(project)], { type: "text/html;charset=utf-8" });
+  downloadBlob(blob, `${slugifyFilename(project.title)}.html`);
+}
+
+async function exportPng() {
+  const project = getActiveProject();
+  if (!project) return;
+  await document.fonts?.ready;
+
+  const style = project.style;
+  const metadata = project.metadata || {};
+  const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
+  const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
+  const fontSize = Number(style.fontSize) || 34;
+  const lineHeightPx = fontSize * (Number(style.lineHeight) || 1.38);
+  const measureWidth = Math.max(420, Math.round(fontSize * (Number(style.measure) || 64) * 0.55));
+  const numberGutter = lineNumbering.enabled ? 54 : 0;
+  const padding = 82;
+  const contentX = padding + numberGutter;
+  const contentWidth = measureWidth;
+  const canvasWidth = contentX + contentWidth + padding;
+  const family = style.fontFamily || "Arial, Helvetica, sans-serif";
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const rows = [];
+
+  function setFont(size, weight = 400) {
+    context.font = `${weight} ${size}px ${family}`;
+  }
+
+  function stripMarkdown(value) {
+    return String(value || "")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  }
+
+  function wrapText(text, size = fontSize, weight = 400) {
+    setFont(size, weight);
+    const sourceLines = stripMarkdown(text).split(/\r\n|\r|\n/);
+    const wrapped = [];
+    sourceLines.forEach((sourceLine) => {
+      if (!sourceLine.trim()) {
+        wrapped.push("");
+        return;
+      }
+      const words = sourceLine.split(/\s+/);
+      let line = "";
+      words.forEach((word) => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (context.measureText(candidate).width <= contentWidth || !line) {
+          line = candidate;
+        } else {
+          wrapped.push(line);
+          line = word;
+        }
+      });
+      wrapped.push(line);
+    });
+    return wrapped;
+  }
+
+  function pushLine(text, options = {}) {
+    rows.push({
+      text,
+      size: options.size || fontSize,
+      weight: options.weight || 400,
+      align: options.align || style.textAlign || "left",
+      color: options.color || "#111",
+      lineHeight: options.lineHeight || lineHeightPx,
+      countLine: options.countLine === true,
+    });
+  }
+
+  function pushSpacer(height) {
+    rows.push({ spacer: true, lineHeight: height });
+  }
+
+  if (project.title) {
+    wrapText(project.title, fontSize * 1.48, 700).forEach((line) => pushLine(line, {
+      size: fontSize * 1.48,
+      weight: 700,
+      align: "center",
+      lineHeight: fontSize * 1.48 * 1.12,
+    }));
+  }
+  if (metadata.subtitle) {
+    pushSpacer(fontSize * 0.34);
+    wrapText(metadata.subtitle, fontSize * 0.86, 400).forEach((line) => pushLine(line, {
+      size: fontSize * 0.86,
+      align: "center",
+      color: "#444",
+      lineHeight: fontSize * 0.86 * 1.28,
+    }));
+  }
+  const authors = normalizePersonList(metadata.authors).filter(Boolean);
+  if (authors.length) {
+    pushSpacer(fontSize * 0.68);
+    wrapText(authors.join(", "), fontSize * 0.76, 500).forEach((line) => pushLine(line, {
+      size: fontSize * 0.76,
+      weight: 500,
+      align: "center",
+      color: "#333",
+      lineHeight: fontSize * 0.76 * 1.28,
+    }));
+  }
+  if (project.title || metadata.subtitle || authors.length) pushSpacer(fontSize * 1.55);
+
+  const paragraphs = String(project.source.rawText || "").split(/\n\s*\n/);
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    wrapText(paragraph).forEach((line) => pushLine(line, { countLine: Boolean(line.trim()) }));
+    if (paragraphIndex < paragraphs.length - 1) pushSpacer(lineHeightPx * 0.72);
+  });
+
+  const canvasHeight = Math.ceil(padding * 2 + rows.reduce((sum, row) => sum + row.lineHeight, 0));
+  canvas.width = canvasWidth * scale;
+  canvas.height = canvasHeight * scale;
+  context.scale(scale, scale);
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, canvasWidth, canvasHeight);
+  context.textBaseline = "alphabetic";
+
+  let y = padding;
+  let countedLine = 0;
+  rows.forEach((row) => {
+    y += row.lineHeight;
+    if (row.spacer) return;
+    setFont(row.size, row.weight);
+    context.fillStyle = row.color;
+    const textWidth = context.measureText(row.text).width;
+    let x = contentX;
+    if (row.align === "center") {
+      x = contentX + (contentWidth - textWidth) / 2;
+    } else if (row.align === "right") {
+      x = contentX + contentWidth - textWidth;
+    }
+    context.fillText(row.text, x, y);
+    if (!row.countLine) return;
+    countedLine += 1;
+    const lineNumber = lineNumbering.start + countedLine - 1;
+    if (!lineNumbering.enabled || (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0)) return;
+    context.font = `${Math.round(fontSize * 0.62)}px ${family}`;
+    context.fillStyle = "#5f6368";
+    context.textAlign = "right";
+    context.fillText(String(lineNumber), contentX - 24, y - fontSize * 0.12);
+    context.textAlign = "left";
+  });
+
+  canvas.toBlob((blob) => {
+    if (blob) downloadBlob(blob, `${slugifyFilename(project.title)}.png`);
+  }, "image/png");
+}
+
+function setExportMenuOpen(isOpen) {
+  if (ui.exportMenu) ui.exportMenu.hidden = !isOpen;
+  ui.exportProjectButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function handleExportFormat(format) {
+  setExportMenuOpen(false);
+  if (format === "md") {
+    exportMarkdown();
+  } else if (format === "html") {
+    exportHtml();
+  } else if (format === "png") {
+    exportPng().catch((error) => {
+      console.error("PNG export failed", error);
+      window.alert("PNG-Export fehlgeschlagen. Bitte versuche es erneut.");
+    });
+  } else {
+    exportProjects();
+  }
 }
 
 async function importProjectFile(file) {
@@ -598,11 +1547,32 @@ function bindMenu() {
     });
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setMenuOpen(false);
+    if (event.key === "Escape") {
+      setMenuOpen(false);
+      setDialogOpen(false);
+      setFontDialogOpen(false);
+      setLineNumberDialogOpen(false);
+      setHyphenationDialogOpen(false);
+      setExportMenuOpen(false);
+    }
   });
 }
 
 function bindEditor() {
+  document.querySelectorAll(".editor-menu").forEach((menu) => {
+    menu.addEventListener("toggle", () => {
+      if (!menu.open) return;
+      document.querySelectorAll(".editor-menu").forEach((otherMenu) => {
+        if (otherMenu !== menu) otherMenu.open = false;
+      });
+    });
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".editor-menu")) return;
+    document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+      menu.open = false;
+    });
+  });
   document.querySelectorAll("[data-type-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       setProjectEditorTab(button.dataset.typeTab);
@@ -618,7 +1588,20 @@ function bindEditor() {
   });
   ui.newProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
   ui.createProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
-  ui.exportProjectButton?.addEventListener("click", exportProjects);
+  ui.exportProjectButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setExportMenuOpen(ui.exportProjectButton.getAttribute("aria-expanded") !== "true");
+  });
+  ui.exportMenu?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-export-format]") : null;
+    if (!button) return;
+    event.stopPropagation();
+    handleExportFormat(button.dataset.exportFormat);
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".export-control")) return;
+    setExportMenuOpen(false);
+  });
   ui.importProjectButton?.addEventListener("click", () => ui.projectFileInput?.click());
   ui.openImportButton?.addEventListener("click", () => ui.projectFileInput?.click());
   ui.projectFileInput?.addEventListener("change", async () => {
@@ -632,12 +1615,47 @@ function bindEditor() {
     }
   });
 
-  ui.projectTitleInput?.addEventListener("input", () => {
-    updateActiveProject((project) => {
-      project.title = ui.projectTitleInput.value.trim() || "Unbenannte TypeMap";
-    });
-    if (ui.editorTitle) ui.editorTitle.textContent = getActiveProject()?.title || "Text setzen";
+  ui.documentPropertiesButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openDocumentPropertiesDialog();
   });
+  ui.documentPropertiesOverlay?.addEventListener("click", () => setDialogOpen(false));
+  ui.documentPropertiesCloseButton?.addEventListener("click", () => setDialogOpen(false));
+  ui.documentPropertiesCancelButton?.addEventListener("click", () => setDialogOpen(false));
+  ui.documentPropertiesSaveButton?.addEventListener("click", saveDocumentPropertiesDialog);
+  ui.addDocAuthorButton?.addEventListener("click", () => addPersonRow(ui.docAuthorsList, "authors"));
+  ui.addDocContributorButton?.addEventListener("click", () => addPersonRow(ui.docContributorsList, "contributors"));
+  ui.addFontButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openFontDialog();
+  });
+  ui.fontDialogOverlay?.addEventListener("click", () => setFontDialogOpen(false));
+  ui.fontDialogCloseButton?.addEventListener("click", () => setFontDialogOpen(false));
+  ui.fontDialogCancelButton?.addEventListener("click", () => setFontDialogOpen(false));
+  ui.fontDialogAddButton?.addEventListener("click", addFontToActiveProject);
+  ui.fontFamilySearchInput?.addEventListener("input", updateFontPreviewSample);
+  ui.fontFamilySearchInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addFontToActiveProject();
+    }
+  });
+  ui.lineNumberSettingsButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openLineNumberDialog();
+  });
+  ui.lineNumberDialogOverlay?.addEventListener("click", () => setLineNumberDialogOpen(false));
+  ui.lineNumberDialogCloseButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
+  ui.lineNumberDialogCancelButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
+  ui.lineNumberDialogSaveButton?.addEventListener("click", saveLineNumberDialog);
+  ui.hyphenationSettingsButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openHyphenationDialog();
+  });
+  ui.hyphenationDialogOverlay?.addEventListener("click", () => setHyphenationDialogOpen(false));
+  ui.hyphenationDialogCloseButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
+  ui.hyphenationDialogCancelButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
+  ui.hyphenationDialogSaveButton?.addEventListener("click", saveHyphenationDialog);
   ui.textInput?.addEventListener("input", () => {
     updateActiveProject((project) => {
       project.source.rawText = ui.textInput.value;
@@ -673,19 +1691,17 @@ function bindEditor() {
       project.style.textAlign = ui.textAlignSelect.value;
     });
   });
-  ui.hyphenationSelect?.addEventListener("change", () => {
-    updateActiveProject((project) => {
-      project.style.hyphenation = ui.hyphenationSelect.value;
-    });
-  });
   ui.languageSelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.language = ui.languageSelect.value;
-    });
-  });
-  ui.lineNumbersInput?.addEventListener("change", () => {
-    updateActiveProject((project) => {
-      project.style.lineNumbers = ui.lineNumbersInput.checked;
+      project.style.hyphenationSettings = normalizeHyphenationSettings(
+        {
+          ...(project.style.hyphenationSettings || {}),
+          language: ui.languageSelect.value,
+        },
+        project.style.hyphenation,
+        ui.languageSelect.value,
+      );
     });
   });
 }

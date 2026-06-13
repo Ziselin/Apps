@@ -7,7 +7,10 @@
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
-  <link rel="icon" type="image/svg+xml" href="../assets/typemap-app-icon.svg?v=20260613a">
+  <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Literata:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;500;700&family=Source+Sans+3:wght@400;500;700&family=Source+Serif+4:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="typemap.css?v=20260613a">
 </head>
 <body>
@@ -27,7 +30,15 @@
         </div>
         <div class="control-grid">
           <button type="button" id="newProjectButton">Neu</button>
-          <button type="button" id="exportProjectButton">Export</button>
+          <div class="export-control">
+            <button type="button" id="exportProjectButton" aria-expanded="false" aria-controls="exportMenu">Export</button>
+            <div id="exportMenu" class="export-menu" hidden>
+              <button type="button" data-export-format="md">MD</button>
+              <button type="button" data-export-format="html">HTML</button>
+              <button type="button" data-export-format="png">PNG</button>
+              <button type="button" data-export-format="json">Projekt JSON</button>
+            </div>
+          </div>
           <button type="button" id="importProjectButton">Import</button>
         </div>
       </header>
@@ -142,18 +153,13 @@
             <summary>Format</summary>
             <div class="editor-menu-panel">
               <label class="field">
-                <span>Titel</span>
-                <input id="projectTitleInput" type="text" autocomplete="off">
-              </label>
-              <label class="field">
                 <span>Schrift</span>
-                <select id="fontFamilySelect">
-                  <option value="Arial, Helvetica, sans-serif">Arial</option>
-                  <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-                  <option value="'Times New Roman', Times, serif">Times New Roman</option>
-                  <option value="'Courier New', Courier, monospace">Courier New</option>
-                </select>
+                <select id="fontFamilySelect"></select>
               </label>
+              <button type="button" id="addFontButton" class="editor-menu-action">
+                <img src="https://api.iconify.design/material-symbols/add.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>Schrift hinzufügen</span>
+              </button>
               <label class="field">
                 <span>Ausrichtung</span>
                 <select id="textAlignSelect">
@@ -179,14 +185,10 @@
                 <span>Satzbreite</span>
                 <input id="measureInput" type="range" min="36" max="86" step="1">
               </label>
-              <label class="field">
-                <span>Zeilentrennung</span>
-                <select id="hyphenationSelect">
-                  <option value="manual">Manuell</option>
-                  <option value="auto">Automatisch</option>
-                  <option value="none">Keine</option>
-                </select>
-              </label>
+              <button type="button" id="hyphenationSettingsButton" class="editor-menu-action">
+                <img src="https://api.iconify.design/material-symbols/text-fields-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>Worttrennung</span>
+              </button>
               <label class="field">
                 <span>Sprache</span>
                 <select id="languageSelect">
@@ -201,10 +203,19 @@
           <details class="editor-menu">
             <summary>Ansicht</summary>
             <div class="editor-menu-panel">
-              <label class="field checkbox-field">
-                <input id="lineNumbersInput" type="checkbox">
+              <button type="button" id="lineNumberSettingsButton" class="editor-menu-action">
+                <img src="https://api.iconify.design/material-symbols/format-list-numbered-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                 <span>Zeilennummerierung</span>
-              </label>
+              </button>
+            </div>
+          </details>
+          <details class="editor-menu">
+            <summary>Dokument</summary>
+            <div class="editor-menu-panel editor-menu-panel-right">
+              <button type="button" id="documentPropertiesButton" class="editor-menu-action">
+                <img src="https://api.iconify.design/lucide/table-properties.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>Dokumentdaten</span>
+              </button>
             </div>
           </details>
         </div>
@@ -219,6 +230,273 @@
       </article>
     </section>
   </main>
+
+  <div id="documentPropertiesOverlay" class="modal-overlay" hidden></div>
+  <section id="documentPropertiesDialog" class="property-dialog" role="dialog" aria-modal="true" aria-labelledby="documentPropertiesTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Dokument</span>
+        <h2 id="documentPropertiesTitle">Dokumentdaten</h2>
+      </div>
+      <button type="button" id="documentPropertiesCloseButton" class="dialog-icon-button" aria-label="Dokumentdaten schließen">X</button>
+    </div>
+
+    <div class="property-dialog-body">
+      <section class="property-section">
+        <h3>Grunddaten</h3>
+        <div class="property-list">
+          <label class="property-row">
+            <span>Textart</span>
+            <select id="docTextKindInput">
+              <option value="artikel">Artikel</option>
+              <option value="essay">Essay</option>
+              <option value="buchkapitel">Buchkapitel</option>
+              <option value="gedicht">Gedicht</option>
+              <option value="brief">Brief</option>
+              <option value="wissenschaftlicher-text">Wissenschaftlicher Text</option>
+              <option value="vertrag">Vertrag</option>
+              <option value="notiz">Notiz</option>
+            </select>
+          </label>
+          <label class="property-row">
+            <span>Titel</span>
+            <input id="docTitleInput" type="text" autocomplete="off">
+          </label>
+          <label class="property-row">
+            <span>Untertitel</span>
+            <input id="docSubtitleInput" type="text" autocomplete="off">
+          </label>
+          <div class="property-row property-row-stack">
+            <span>Autor</span>
+            <div>
+              <div id="docAuthorsList" class="property-repeat-list"></div>
+              <button type="button" id="addDocAuthorButton" class="property-add-button">+ Autor hinzufügen</button>
+            </div>
+          </div>
+          <div class="property-row property-row-stack">
+            <span>Mitwirkende</span>
+            <div>
+              <div id="docContributorsList" class="property-repeat-list"></div>
+              <button type="button" id="addDocContributorButton" class="property-add-button">+ Mitwirkende hinzufügen</button>
+            </div>
+          </div>
+          <label class="property-row">
+            <span>Erstellungsdatum</span>
+            <input id="docCreatedDateInput" type="date">
+          </label>
+          <label class="property-row">
+            <span>Änderungsdatum</span>
+            <input id="docModifiedDateInput" type="date">
+          </label>
+        </div>
+      </section>
+
+      <section class="property-section">
+        <h3>Rechte</h3>
+        <div class="property-list">
+          <label class="property-row">
+            <span>Rechteinhaber</span>
+            <input id="docRightsHolderInput" type="text" autocomplete="off">
+          </label>
+          <label class="property-row">
+            <span>Copyright-Jahr</span>
+            <input id="docCopyrightYearInput" type="number" min="0" step="1">
+          </label>
+          <label class="property-row">
+            <span>Lizenz</span>
+            <input id="docLicenseInput" type="text" autocomplete="off">
+          </label>
+          <label class="property-row property-toggle-row">
+            <span>Nutzung erlaubt?</span>
+            <input id="docAllowUseInput" type="checkbox">
+          </label>
+          <label class="property-row property-toggle-row">
+            <span>Bearbeitung erlaubt?</span>
+            <input id="docAllowEditInput" type="checkbox">
+          </label>
+          <label class="property-row property-toggle-row">
+            <span>Weitergabe erlaubt?</span>
+            <input id="docAllowShareInput" type="checkbox">
+          </label>
+          <label class="property-row">
+            <span>Quellenhinweis / Attribution</span>
+            <textarea id="docAttributionInput" rows="2"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="property-section">
+        <h3>Veröffentlichung</h3>
+        <div class="property-list">
+          <label class="property-row">
+            <span>Status</span>
+            <select id="docStatusInput">
+              <option value="draft">Entwurf</option>
+              <option value="working">In Bearbeitung</option>
+              <option value="final">Final</option>
+              <option value="published">Veröffentlicht</option>
+            </select>
+          </label>
+          <label class="property-row">
+            <span>Version</span>
+            <input id="docVersionInput" type="text" autocomplete="off">
+          </label>
+          <label class="property-row">
+            <span>Veröffentlichungsdatum</span>
+            <input id="docPublishedDateInput" type="date">
+          </label>
+          <label class="property-row">
+            <span>Sprache</span>
+            <input id="docLanguageMetaInput" type="text" autocomplete="off" placeholder="de">
+          </label>
+          <label class="property-row">
+            <span>Schlagwörter</span>
+            <input id="docTagsInput" type="text" autocomplete="off">
+          </label>
+          <label class="property-row">
+            <span>Kurzbeschreibung</span>
+            <textarea id="docDescriptionInput" rows="3"></textarea>
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <div class="property-dialog-actions">
+      <button type="button" id="documentPropertiesCancelButton" class="secondary-button">Abbrechen</button>
+      <button type="button" id="documentPropertiesSaveButton" class="secondary-button primary-action">Übernehmen</button>
+    </div>
+  </section>
+
+  <div id="fontDialogOverlay" class="modal-overlay" hidden></div>
+  <section id="fontDialog" class="property-dialog font-dialog" role="dialog" aria-modal="true" aria-labelledby="fontDialogTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Typografie</span>
+        <h2 id="fontDialogTitle">Schrift hinzufügen</h2>
+      </div>
+      <button type="button" id="fontDialogCloseButton" class="dialog-icon-button" aria-label="Schrift-Dialog schließen">X</button>
+    </div>
+    <div class="property-dialog-body">
+      <section class="property-section">
+        <h3>Google Fonts</h3>
+        <p class="event-description">Trage eine Schriftfamilie ein. TypeMap lädt sie nur für dieses Projekt und nimmt sie in die Projektschriften auf.</p>
+        <div class="property-list">
+          <label class="property-row">
+            <span>Schriftfamilie</span>
+            <input id="fontFamilySearchInput" type="text" autocomplete="off" placeholder="z. B. Crimson Pro">
+          </label>
+          <div class="property-row">
+            <span>Vorschau</span>
+            <div id="fontPreviewSample" class="font-preview-sample">Franz jagt im komplett verwahrlosten Taxi quer durch Bayern.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="property-dialog-actions">
+      <button type="button" id="fontDialogCancelButton" class="secondary-button">Abbrechen</button>
+      <button type="button" id="fontDialogAddButton" class="secondary-button primary-action">Zum Projekt hinzufügen</button>
+    </div>
+  </section>
+
+  <div id="lineNumberDialogOverlay" class="modal-overlay" hidden></div>
+  <section id="lineNumberDialog" class="property-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="lineNumberDialogTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Ansicht</span>
+        <h2 id="lineNumberDialogTitle">Zeilennummerierung</h2>
+      </div>
+      <button type="button" id="lineNumberDialogCloseButton" class="dialog-icon-button" aria-label="Zeilennummerierung schließen">X</button>
+    </div>
+    <div class="property-dialog-body">
+      <section class="property-section">
+        <h3>Nummerierung</h3>
+        <div class="property-list">
+          <label class="property-row property-toggle-row">
+            <span>Nummerierung anzeigen</span>
+            <input id="lineNumberEnabledInput" type="checkbox">
+          </label>
+          <label class="property-row">
+            <span>Bezugsgröße</span>
+            <select id="lineNumberModeInput">
+              <option value="paragraphs">Absätze</option>
+              <option value="source-lines">Einzelzeilen</option>
+            </select>
+          </label>
+          <label class="property-row property-toggle-row">
+            <span>Freizeilen mitzählen</span>
+            <input id="lineNumberIncludeBlankInput" type="checkbox">
+          </label>
+          <label class="property-row">
+            <span>Jede wievielte Zeile</span>
+            <input id="lineNumberIntervalInput" type="number" min="1" max="100" step="1">
+          </label>
+          <label class="property-row">
+            <span>Startwert</span>
+            <input id="lineNumberStartInput" type="number" min="0" max="99999" step="1">
+          </label>
+        </div>
+      </section>
+    </div>
+    <div class="property-dialog-actions">
+      <button type="button" id="lineNumberDialogCancelButton" class="secondary-button">Abbrechen</button>
+      <button type="button" id="lineNumberDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
+    </div>
+  </section>
+
+  <div id="hyphenationDialogOverlay" class="modal-overlay" hidden></div>
+  <section id="hyphenationDialog" class="property-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="hyphenationDialogTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Satz</span>
+        <h2 id="hyphenationDialogTitle">Worttrennung</h2>
+      </div>
+      <button type="button" id="hyphenationDialogCloseButton" class="dialog-icon-button" aria-label="Worttrennung schließen">X</button>
+    </div>
+    <div class="property-dialog-body">
+      <section class="property-section">
+        <h3>Trennverhalten</h3>
+        <div class="property-list">
+          <label class="property-row">
+            <span>Modus</span>
+            <select id="hyphenationModeInput">
+              <option value="manual">Manuell</option>
+              <option value="auto">Automatisch</option>
+              <option value="none">Keine</option>
+            </select>
+          </label>
+          <label class="property-row">
+            <span>Sprache</span>
+            <select id="hyphenationLanguageInput">
+              <option value="de">Deutsch</option>
+              <option value="en">Englisch</option>
+              <option value="fr">Französisch</option>
+              <option value="la">Latein</option>
+            </select>
+          </label>
+          <label class="property-row">
+            <span>Trennungen in Folge</span>
+            <input id="hyphenationConsecutiveInput" type="number" min="0" max="12" step="1">
+          </label>
+          <label class="property-row">
+            <span>Mindestwortlänge</span>
+            <input id="hyphenationMinWordLengthInput" type="number" min="4" max="24" step="1">
+          </label>
+          <label class="property-row">
+            <span>Mindestzeichen vor Trennung</span>
+            <input id="hyphenationBeforeInput" type="number" min="2" max="12" step="1">
+          </label>
+          <label class="property-row">
+            <span>Mindestzeichen nach Trennung</span>
+            <input id="hyphenationAfterInput" type="number" min="2" max="12" step="1">
+          </label>
+        </div>
+      </section>
+    </div>
+    <div class="property-dialog-actions">
+      <button type="button" id="hyphenationDialogCancelButton" class="secondary-button">Abbrechen</button>
+      <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
+    </div>
+  </section>
   <script src="typemap.js?v=20260613a"></script>
 </body>
 </html>
