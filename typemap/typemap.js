@@ -1,11 +1,13 @@
-const LOCAL_DB_NAME = "typemap-local-db";
+﻿const LOCAL_DB_NAME = "typemap-local-db";
 const LOCAL_DB_VERSION = 1;
 const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
+const THEME_STORAGE_KEY = "typemap-theme";
 
 const ui = {
   menuButton: document.getElementById("typeMenuButton"),
+  menuIcon: document.querySelector("#typeMenuButton img"),
   menuCloseButton: document.getElementById("typeMenuCloseButton"),
   menuOverlay: document.getElementById("typeMenuOverlay"),
   sideMenu: document.getElementById("typeSideMenu"),
@@ -15,6 +17,8 @@ const ui = {
   newProjectButton: document.getElementById("newProjectButton"),
   exportProjectButton: document.getElementById("exportProjectButton"),
   exportMenu: document.getElementById("exportMenu"),
+  themeToggleButton: document.getElementById("themeToggleButton"),
+  themeToggleIcon: document.getElementById("themeToggleIcon"),
   importProjectButton: document.getElementById("importProjectButton"),
   createProjectButton: document.getElementById("createProjectButton"),
   openImportButton: document.getElementById("openImportButton"),
@@ -50,6 +54,16 @@ const ui = {
   docLanguageMetaInput: document.getElementById("docLanguageMetaInput"),
   docTagsInput: document.getElementById("docTagsInput"),
   docDescriptionInput: document.getElementById("docDescriptionInput"),
+  fontSettingsButton: document.getElementById("fontSettingsButton"),
+  fontSettingsDialogOverlay: document.getElementById("fontSettingsDialogOverlay"),
+  fontSettingsDialog: document.getElementById("fontSettingsDialog"),
+  fontSettingsDialogCloseButton: document.getElementById("fontSettingsDialogCloseButton"),
+  fontSettingsDialogCloseActionButton: document.getElementById("fontSettingsDialogCloseActionButton"),
+  textFormatSettingsButton: document.getElementById("textFormatSettingsButton"),
+  textFormatDialogOverlay: document.getElementById("textFormatDialogOverlay"),
+  textFormatDialog: document.getElementById("textFormatDialog"),
+  textFormatDialogCloseButton: document.getElementById("textFormatDialogCloseButton"),
+  textFormatDialogCloseActionButton: document.getElementById("textFormatDialogCloseActionButton"),
   addFontButton: document.getElementById("addFontButton"),
   fontDialogOverlay: document.getElementById("fontDialogOverlay"),
   fontDialog: document.getElementById("fontDialog"),
@@ -58,7 +72,6 @@ const ui = {
   fontDialogAddButton: document.getElementById("fontDialogAddButton"),
   fontFamilySearchInput: document.getElementById("fontFamilySearchInput"),
   fontPreviewSample: document.getElementById("fontPreviewSample"),
-  textTypeSelect: document.getElementById("textTypeSelect"),
   textInput: document.getElementById("textInput"),
   fontFamilySelect: document.getElementById("fontFamilySelect"),
   fontSizeInput: document.getElementById("fontSizeInput"),
@@ -90,9 +103,11 @@ const ui = {
   lineNumberIntervalInput: document.getElementById("lineNumberIntervalInput"),
   lineNumberStartInput: document.getElementById("lineNumberStartInput"),
   previewPage: document.querySelector(".preview-page"),
+  typeStage: document.querySelector(".type-stage"),
   previewText: document.getElementById("previewText"),
   sidePreviewPage: document.querySelector(".side-preview-page"),
   sidePreviewText: document.getElementById("sidePreviewText"),
+  textInputHighlight: document.getElementById("textInputHighlight"),
 };
 
 const defaultProjectText = [
@@ -152,6 +167,13 @@ function createDefaultMetadata() {
   };
 }
 
+function sourceTextTypeFromDocumentKind(textKind) {
+  if (textKind === "gedicht") return "lyric";
+  if (textKind === "drama") return "drama";
+  if (textKind === "notiz") return "note";
+  return "prose";
+}
+
 function createDefaultTypography() {
   return {
     projectFonts: [],
@@ -183,6 +205,10 @@ function clampInteger(value, fallback, min, max) {
   const number = Number.parseInt(value, 10);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, number));
+}
+
+function ptToPx(value) {
+  return (Number(value) || 12) * (4 / 3);
 }
 
 function normalizeLineNumbering(value, legacyEnabled = false) {
@@ -269,8 +295,8 @@ function createDefaultProject(title = "Neue TypeMap") {
       textType: "prose",
     },
     style: {
-      fontFamily: "Arial, Helvetica, sans-serif",
-      fontSize: 34,
+      fontFamily: "'EB Garamond', Georgia, serif",
+      fontSize: 12,
       lineHeight: 1.38,
       measure: 64,
       textAlign: "left",
@@ -340,6 +366,7 @@ function normalizeProject(project) {
     "essay",
     "buchkapitel",
     "gedicht",
+    "drama",
     "brief",
     "wissenschaftlicher-text",
     "vertrag",
@@ -461,20 +488,33 @@ function clearElement(element) {
   while (element?.firstChild) element.removeChild(element.firstChild);
 }
 
+function appendTextNode(parent, text) {
+  if (text) parent.appendChild(document.createTextNode(text));
+}
+
 function appendInlineMarkdown(parent, text) {
-  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  const pattern = /(`[^`\n]+`|==[^=\n]+==|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]]+\]\([^)]+\))/g;
   let cursor = 0;
   String(text).replace(pattern, (match, _token, offset) => {
-    if (offset > cursor) parent.appendChild(document.createTextNode(text.slice(cursor, offset)));
+    if (offset > cursor) appendTextNode(parent, text.slice(cursor, offset));
     let node;
-    if (match.startsWith("**")) {
+    if (match.startsWith("`")) {
+      node = document.createElement("code");
+      node.textContent = match.slice(1, -1);
+    } else if (match.startsWith("==")) {
+      node = document.createElement("mark");
+      node.textContent = match.slice(2, -2);
+    } else if (match.startsWith("**")) {
+      node = document.createElement("strong");
+      node.textContent = match.slice(2, -2);
+    } else if (match.startsWith("__")) {
       node = document.createElement("strong");
       node.textContent = match.slice(2, -2);
     } else if (match.startsWith("*")) {
       node = document.createElement("em");
       node.textContent = match.slice(1, -1);
-    } else if (match.startsWith("`")) {
-      node = document.createElement("code");
+    } else if (match.startsWith("_")) {
+      node = document.createElement("em");
       node.textContent = match.slice(1, -1);
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
@@ -488,11 +528,17 @@ function appendInlineMarkdown(parent, text) {
     cursor = offset + match.length;
     return match;
   });
-  if (cursor < text.length) parent.appendChild(document.createTextNode(text.slice(cursor)));
+  if (cursor < text.length) appendTextNode(parent, text.slice(cursor));
 }
 
 function createMarkdownBlockElement(block, textType) {
   const text = String(block.text || "");
+  if (textType === "lyric" && !text.trim()) {
+    const blankLine = document.createElement("p");
+    blankLine.className = "preview-blank-line";
+    blankLine.textContent = "\u00a0";
+    return blankLine;
+  }
   const headingMatch = text.match(/^(#{1,3})\s+(.+)$/);
   if (headingMatch && textType !== "lyric") {
     const heading = document.createElement(`h${headingMatch[1].length}`);
@@ -594,6 +640,9 @@ function renderLineNumberLayer(targetText, lineNumbering) {
   let lineIndex = 0;
 
   blocks.forEach((block) => {
+    if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) {
+      return;
+    }
     const visualRects = lineNumbering.mode === "source-lines"
       ? getVisualLineRects(block)
       : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
@@ -652,12 +701,13 @@ function createPreviewDocumentHead(project) {
 function renderTextView(targetPage, targetText, project, layoutModel) {
   if (!targetPage || !targetText) return;
   const style = project.style;
+  const textType = project.source.textType || "prose";
   const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
   const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
-  targetPage.style.setProperty("--preview-line-height", String(style.lineHeight));
+  targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
   targetText.style.fontFamily = style.fontFamily;
-  targetText.style.textAlign = style.textAlign;
+  targetText.style.textAlign = textType === "lyric" ? "left" : style.textAlign;
   targetText.lang = hyphenationSettings.language;
   targetText.style.hyphens = hyphenationSettings.mode;
   targetText.style.setProperty("--hyphenate-limit-lines", String(hyphenationSettings.consecutiveLines));
@@ -667,14 +717,14 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetText.style.setProperty("-webkit-hyphenate-limit-after", String(hyphenationSettings.after));
   targetText.classList.toggle("has-line-numbers", lineNumbering.enabled === true);
   targetText.classList.remove("is-text-type-prose", "is-text-type-lyric", "is-text-type-drama", "is-text-type-note");
-  targetText.classList.add(`is-text-type-${project.source.textType || "prose"}`);
+  targetText.classList.add(`is-text-type-${textType}`);
   clearElement(targetText);
 
   const documentHead = createPreviewDocumentHead(project);
   if (documentHead) targetText.appendChild(documentHead);
 
-  const blocks = lineNumbering.mode === "source-lines" && project.source.textType === "lyric"
-    ? (layoutModel.sourceLineBlocks || []).filter((block) => lineNumbering.includeBlankLines || String(block.text || "").trim())
+  const blocks = lineNumbering.mode === "source-lines" && textType === "lyric"
+    ? (layoutModel.sourceLineBlocks || [])
     : layoutModel.blocks;
 
   if (!blocks.length) {
@@ -687,11 +737,17 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   }
 
   blocks.forEach((block) => {
-    const element = createMarkdownBlockElement(block, project.source.textType || "prose");
+    const element = createMarkdownBlockElement(block, textType);
     element.classList.add("preview-body-block");
+    if (textType === "lyric" && !String(block.text || "").trim()) {
+      element.dataset.sourceBlankLine = "true";
+    }
     element.dataset.layoutBlockId = block.id;
     if (block.sourceRangeId) element.dataset.sourceRangeId = block.sourceRangeId;
-    if (block.sourceLineId) element.dataset.sourceLineId = block.sourceLineId;
+    if (block.sourceLineId) {
+      element.dataset.sourceLineId = block.sourceLineId;
+      element.classList.add("preview-source-line-block");
+    }
     element.dataset.sourceStart = String(block.sourceStartOffset);
     element.dataset.sourceEnd = String(block.sourceEndOffset);
     targetText.appendChild(element);
@@ -701,12 +757,12 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
 
 function renderViewLayer(project, sourceModel, layoutModel) {
   if (ui.previewPage) {
-    ui.previewPage.style.setProperty("--preview-font-size", `${project.style.fontSize}px`);
+    ui.previewPage.style.setProperty("--preview-font-size", `${ptToPx(project.style.fontSize)}px`);
   }
   renderTextView(ui.previewPage, ui.previewText, project, layoutModel);
 
   if (ui.sidePreviewPage) {
-    const compactFontSize = Math.max(14, Math.round(project.style.fontSize * 0.52));
+    const compactFontSize = Math.max(10, Math.round(ptToPx(project.style.fontSize) * 0.72));
     ui.sidePreviewPage.style.setProperty("--preview-font-size", `${compactFontSize}px`);
   }
   renderTextView(ui.sidePreviewPage, ui.sidePreviewText, project, layoutModel);
@@ -722,7 +778,7 @@ function rebuildModelsAndPreview() {
 
 function buildGoogleFontUrl(family) {
   const encodedFamily = normalizeFontFamilyName(family).replace(/\s+/g, "+");
-  return `https://fonts.googleapis.com/css2?family=${encodedFamily}:wght@400;500;600;700&display=swap`;
+  return `https://fonts.googleapis.com/css2?family=${encodedFamily}:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap`;
 }
 
 function getFontLinkId(family) {
@@ -784,6 +840,59 @@ function renderFontOptions(project) {
   ui.fontFamilySelect.value = project.style.fontFamily;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function renderEditorHighlight(rawText) {
+  if (!ui.textInputHighlight) return;
+  const text = String(rawText || "");
+  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^#{1,6}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
+  let cursor = 0;
+  let html = "";
+  text.replace(pattern, (match, _token, offset) => {
+    html += escapeHtml(text.slice(cursor, offset));
+    let className = "markdown-editor-emphasis";
+    if (match.startsWith("```")) {
+      className = "markdown-editor-fence";
+    } else if (match.startsWith("`")) {
+      className = "markdown-editor-code";
+    } else if (match.startsWith("#")) {
+      className = "markdown-editor-heading";
+    } else if (match.startsWith("==")) {
+      className = "markdown-editor-mark";
+    } else if (match.startsWith("**") || match.startsWith("__")) {
+      className = "markdown-editor-strong";
+    } else if (match.startsWith("[")) {
+      className = "markdown-editor-link";
+    }
+    html += `<span class="${className}">${escapeHtml(match)}</span>`;
+    cursor = offset + match.length;
+    return match;
+  });
+  html += escapeHtml(text.slice(cursor));
+  ui.textInputHighlight.innerHTML = html || " ";
+}
+
+function syncEditorHighlightScroll() {
+  if (!ui.textInput || !ui.textInputHighlight) return;
+  ui.textInputHighlight.style.transform = `translate(${-ui.textInput.scrollLeft}px, ${-ui.textInput.scrollTop}px)`;
+}
+
+function ensureSelectOption(select, value, label = "Aktueller Wert") {
+  if (!select) return;
+  const stringValue = String(value);
+  const exists = Array.from(select.options).some((option) => option.value === stringValue);
+  if (exists) return;
+  const option = document.createElement("option");
+  option.value = stringValue;
+  option.textContent = `${label}: ${stringValue}`;
+  select.appendChild(option);
+}
+
 function renderProjectList() {
   if (!ui.projectList) return;
   clearElement(ui.projectList);
@@ -831,9 +940,13 @@ function renderEditor() {
   if (ui.editorTitle) ui.editorTitle.textContent = project.title;
   loadProjectFonts([project]);
   renderFontOptions(project);
-  if (ui.textTypeSelect) ui.textTypeSelect.value = project.source.textType;
   if (ui.textInput) ui.textInput.value = project.source.rawText;
+  renderEditorHighlight(project.source.rawText);
+  syncEditorHighlightScroll();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
+  ensureSelectOption(ui.fontSizeInput, project.style.fontSize, "Aktuelle Schriftgröße");
+  ensureSelectOption(ui.lineHeightInput, project.style.lineHeight, "Aktuelle Zeilenhöhe");
+  ensureSelectOption(ui.measureInput, project.style.measure, "Aktuelle Satzbreite");
   if (ui.fontSizeInput) ui.fontSizeInput.value = String(project.style.fontSize);
   if (ui.lineHeightInput) ui.lineHeightInput.value = String(project.style.lineHeight);
   if (ui.measureInput) ui.measureInput.value = String(project.style.measure);
@@ -849,6 +962,16 @@ function setDialogOpen(isOpen) {
 function setFontDialogOpen(isOpen) {
   if (ui.fontDialogOverlay) ui.fontDialogOverlay.hidden = !isOpen;
   if (ui.fontDialog) ui.fontDialog.hidden = !isOpen;
+}
+
+function setFontSettingsDialogOpen(isOpen) {
+  if (ui.fontSettingsDialogOverlay) ui.fontSettingsDialogOverlay.hidden = !isOpen;
+  if (ui.fontSettingsDialog) ui.fontSettingsDialog.hidden = !isOpen;
+}
+
+function setTextFormatDialogOpen(isOpen) {
+  if (ui.textFormatDialogOverlay) ui.textFormatDialogOverlay.hidden = !isOpen;
+  if (ui.textFormatDialog) ui.textFormatDialog.hidden = !isOpen;
 }
 
 function setLineNumberDialogOpen(isOpen) {
@@ -942,10 +1065,11 @@ function openDocumentPropertiesDialog() {
 function saveDocumentPropertiesDialog() {
   updateActiveProject((project) => {
     project.title = ui.docTitleInput?.value.trim() || "Unbenannte TypeMap";
+    const textKind = ui.docTextKindInput?.value || "essay";
     project.metadata = {
       ...createDefaultMetadata(),
       ...(project.metadata || {}),
-      textKind: ui.docTextKindInput?.value || "essay",
+      textKind,
       subtitle: ui.docSubtitleInput?.value.trim() || "",
       authors: normalizePersonList(getPersonRows(ui.docAuthorsList)),
       contributors: normalizePersonList(getPersonRows(ui.docContributorsList)),
@@ -965,6 +1089,11 @@ function saveDocumentPropertiesDialog() {
       tags: ui.docTagsInput?.value.trim() || "",
       description: ui.docDescriptionInput?.value.trim() || "",
     };
+    project.source.textType = sourceTextTypeFromDocumentKind(textKind);
+    if (project.source.textType === "lyric") {
+      project.style.textAlign = "left";
+      project.style.lineHeight = 1.5;
+    }
   });
   renderEditor();
   setDialogOpen(false);
@@ -986,6 +1115,26 @@ function openFontDialog() {
   updateFontPreviewSample();
   setFontDialogOpen(true);
   ui.fontFamilySearchInput?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function openFontSettingsDialog() {
+  const project = getActiveProject();
+  if (!project) return;
+  renderFontOptions(project);
+  setFontSettingsDialogOpen(true);
+  ui.fontFamilySelect?.focus();
+  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function openTextFormatDialog() {
+  renderEditor();
+  setTextFormatDialogOpen(true);
+  ui.fontSizeInput?.focus();
   document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
     menu.open = false;
   });
@@ -1232,7 +1381,7 @@ function buildHtmlExport(project) {
   <title>${escapeHtml(project.title || "TypeMap")}</title>
   <style>
     body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
-    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}px; line-height: ${project.style.lineHeight}; text-align: ${project.style.textAlign}; hyphens: ${project.style.hyphenation}; }
+    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${project.style.lineHeight}; text-align: ${project.style.textAlign}; hyphens: ${project.style.hyphenation}; }
     header { margin: 0 0 1.55em; text-align: center; }
     h1 { margin: 0; font-size: 1.48em; line-height: 1.12; }
     .subtitle { margin: .34em 0 0; color: #555; font-size: .86em; line-height: 1.28; }
@@ -1269,7 +1418,7 @@ async function exportPng() {
   const metadata = project.metadata || {};
   const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
   const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
-  const fontSize = Number(style.fontSize) || 34;
+  const fontSize = ptToPx(style.fontSize);
   const lineHeightPx = fontSize * (Number(style.lineHeight) || 1.38);
   const measureWidth = Math.max(420, Math.round(fontSize * (Number(style.measure) || 64) * 0.55));
   const numberGutter = lineNumbering.enabled ? 54 : 0;
@@ -1505,11 +1654,56 @@ function setMenuOpen(isOpen) {
   ui.menuButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
 }
 
+function setTheme(theme, persist = true) {
+  const isLight = theme === "light";
+  document.body.classList.toggle("typemap-theme-light", isLight);
+  ui.themeToggleButton?.setAttribute("aria-pressed", isLight ? "true" : "false");
+  ui.themeToggleButton?.setAttribute("aria-label", isLight ? "Dunklen Modus aktivieren" : "Hellen Modus aktivieren");
+  if (ui.themeToggleIcon) {
+    ui.themeToggleIcon.src = isLight
+      ? "https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633"
+      : "https://api.iconify.design/boxicons/sun-bright.svg?color=%23ffb347";
+  }
+  if (ui.menuIcon) {
+    ui.menuIcon.src = isLight
+      ? "https://api.iconify.design/material-symbols/menu.svg?color=%23213633"
+      : "https://api.iconify.design/material-symbols/menu.svg?color=%23d28a05";
+  }
+  if (persist) {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, isLight ? "light" : "dark");
+    } catch (error) {
+      console.warn("TypeMap theme preference could not be saved", error);
+    }
+  }
+}
+
+function getStoredTheme() {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+  } catch (error) {
+    return "dark";
+  }
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.contains("typemap-theme-light");
+  setTheme(isLight ? "dark" : "light");
+}
+
 function setWorkspaceSection(section) {
   const activeSection = section === "details" ? "details" : "preview";
+  const previousSection = state.activeWorkspaceSection;
   state.activeWorkspaceSection = activeSection;
   ui.appFrame?.classList.toggle("workspace-mode-details", activeSection === "details");
   ui.appFrame?.classList.toggle("workspace-mode-preview", activeSection !== "details");
+  if (activeSection === "preview" && previousSection !== "preview") {
+    window.requestAnimationFrame(() => {
+      if (!ui.typeStage) return;
+      ui.typeStage.scrollTop = 0;
+      ui.typeStage.scrollLeft = 0;
+    });
+  }
 }
 
 function setProjectEditorTab(tab) {
@@ -1551,6 +1745,8 @@ function bindMenu() {
       setMenuOpen(false);
       setDialogOpen(false);
       setFontDialogOpen(false);
+      setFontSettingsDialogOpen(false);
+      setTextFormatDialogOpen(false);
       setLineNumberDialogOpen(false);
       setHyphenationDialogOpen(false);
       setExportMenuOpen(false);
@@ -1588,6 +1784,7 @@ function bindEditor() {
   });
   ui.newProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
   ui.createProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
+  ui.themeToggleButton?.addEventListener("click", toggleTheme);
   ui.exportProjectButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setExportMenuOpen(ui.exportProjectButton.getAttribute("aria-expanded") !== "true");
@@ -1625,6 +1822,20 @@ function bindEditor() {
   ui.documentPropertiesSaveButton?.addEventListener("click", saveDocumentPropertiesDialog);
   ui.addDocAuthorButton?.addEventListener("click", () => addPersonRow(ui.docAuthorsList, "authors"));
   ui.addDocContributorButton?.addEventListener("click", () => addPersonRow(ui.docContributorsList, "contributors"));
+  ui.fontSettingsButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openFontSettingsDialog();
+  });
+  ui.fontSettingsDialogOverlay?.addEventListener("click", () => setFontSettingsDialogOpen(false));
+  ui.fontSettingsDialogCloseButton?.addEventListener("click", () => setFontSettingsDialogOpen(false));
+  ui.fontSettingsDialogCloseActionButton?.addEventListener("click", () => setFontSettingsDialogOpen(false));
+  ui.textFormatSettingsButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openTextFormatDialog();
+  });
+  ui.textFormatDialogOverlay?.addEventListener("click", () => setTextFormatDialogOpen(false));
+  ui.textFormatDialogCloseButton?.addEventListener("click", () => setTextFormatDialogOpen(false));
+  ui.textFormatDialogCloseActionButton?.addEventListener("click", () => setTextFormatDialogOpen(false));
   ui.addFontButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     openFontDialog();
@@ -1657,15 +1868,13 @@ function bindEditor() {
   ui.hyphenationDialogCancelButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
   ui.hyphenationDialogSaveButton?.addEventListener("click", saveHyphenationDialog);
   ui.textInput?.addEventListener("input", () => {
+    renderEditorHighlight(ui.textInput.value);
+    syncEditorHighlightScroll();
     updateActiveProject((project) => {
       project.source.rawText = ui.textInput.value;
     });
   });
-  ui.textTypeSelect?.addEventListener("change", () => {
-    updateActiveProject((project) => {
-      project.source.textType = ui.textTypeSelect.value;
-    });
-  });
+  ui.textInput?.addEventListener("scroll", syncEditorHighlightScroll);
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.fontFamily = ui.fontFamilySelect.value;
@@ -1676,12 +1885,27 @@ function bindEditor() {
       project.style.fontSize = Number(ui.fontSizeInput.value);
     });
   });
+  ui.fontSizeInput?.addEventListener("change", () => {
+    updateActiveProject((project) => {
+      project.style.fontSize = Number(ui.fontSizeInput.value);
+    });
+  });
   ui.lineHeightInput?.addEventListener("input", () => {
     updateActiveProject((project) => {
       project.style.lineHeight = Number(ui.lineHeightInput.value);
     });
   });
+  ui.lineHeightInput?.addEventListener("change", () => {
+    updateActiveProject((project) => {
+      project.style.lineHeight = Number(ui.lineHeightInput.value);
+    });
+  });
   ui.measureInput?.addEventListener("input", () => {
+    updateActiveProject((project) => {
+      project.style.measure = Number(ui.measureInput.value);
+    });
+  });
+  ui.measureInput?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.measure = Number(ui.measureInput.value);
     });
@@ -1707,6 +1931,7 @@ function bindEditor() {
 }
 
 async function init() {
+  setTheme(getStoredTheme(), false);
   bindMenu();
   bindEditor();
   const snapshot = await loadLocalSnapshot();
@@ -1725,3 +1950,4 @@ async function init() {
 init().catch((error) => {
   console.error("TypeMap konnte nicht initialisiert werden", error);
 });
+
