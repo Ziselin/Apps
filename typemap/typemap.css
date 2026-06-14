@@ -16,6 +16,38 @@
   --shadow: rgba(0, 0, 0, 0.28);
 }
 
+@font-face {
+  font-family: "CMU Serif";
+  src: url("../assets/fonts/cmu/cmunrm.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CMU Serif";
+  src: url("../assets/fonts/cmu/cmunti.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CMU Serif";
+  src: url("../assets/fonts/cmu/cmunbx.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CMU Serif";
+  src: url("../assets/fonts/cmu/cmunbi.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 body.typemap-theme-light {
   color-scheme: light;
   --bg: #f3efe6;
@@ -62,7 +94,9 @@ textarea {
   position: relative;
   overflow: hidden;
   height: 100vh;
-  min-height: 760px;
+  height: 100svh;
+  height: 100dvh;
+  min-height: 0;
   background:
     radial-gradient(circle at 50% 24%, rgba(255, 179, 71, 0.055), transparent 32%),
     linear-gradient(180deg, #182128 0%, #151c22 100%);
@@ -444,6 +478,12 @@ body.typemap-theme-light .type-menu-popup {
   overflow-wrap: break-word;
   text-wrap: pretty;
   font-synthesis-style: none;
+}
+
+.preview-view .preview-text.has-ligatures {
+  font-variant-ligatures: common-ligatures contextual;
+  font-feature-settings: "liga" 1, "clig" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
 }
 
 .preview-text p {

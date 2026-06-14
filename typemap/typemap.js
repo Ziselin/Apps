@@ -76,6 +76,7 @@ const ui = {
   fontPreviewSample: document.getElementById("fontPreviewSample"),
   textInput: document.getElementById("textInput"),
   fontFamilySelect: document.getElementById("fontFamilySelect"),
+  fontLigaturesInput: document.getElementById("fontLigaturesInput"),
   fontSizeInput: document.getElementById("fontSizeInput"),
   lineHeightInput: document.getElementById("lineHeightInput"),
   measureInput: document.getElementById("measureInput"),
@@ -120,6 +121,7 @@ const defaultProjectText = [
 
 const APP_FONTS = [
   { label: "Arial", family: "Arial", css: "Arial, Helvetica, sans-serif", source: "system" },
+  { label: "Computer Modern", family: "CMU Serif", css: "'CMU Serif', 'Computer Modern Serif', Georgia, serif", source: "app" },
   { label: "Roboto", family: "Roboto", css: "'Roboto', Arial, Helvetica, sans-serif", source: "app" },
   { label: "EB Garamond", family: "EB Garamond", css: "'EB Garamond', Georgia, serif", source: "app" },
   { label: "Literata", family: "Literata", css: "'Literata', Georgia, serif", source: "app" },
@@ -309,6 +311,7 @@ function createDefaultProject(title = "Neue TypeMap") {
       lineHeight: 1.38,
       measure: 64,
       textAlign: "left",
+      ligatures: true,
       hyphenation: "manual",
       language: "de",
       lineNumbers: false,
@@ -355,6 +358,7 @@ function normalizeProject(project) {
   normalized.style.fontSize = Number(normalized.style.fontSize) || fallback.style.fontSize;
   normalized.style.lineHeight = Number(normalized.style.lineHeight) || fallback.style.lineHeight;
   normalized.style.measure = Number(normalized.style.measure) || fallback.style.measure;
+  normalized.style.ligatures = normalized.style.ligatures !== false;
   normalized.style.hyphenation = ["manual", "auto", "none"].includes(normalized.style.hyphenation)
     ? normalized.style.hyphenation
     : fallback.style.hyphenation;
@@ -877,6 +881,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetText.style.setProperty("-webkit-hyphenate-limit-before", String(hyphenationSettings.before));
   targetText.style.setProperty("-webkit-hyphenate-limit-after", String(hyphenationSettings.after));
   targetText.classList.toggle("has-line-numbers", lineNumbering.enabled === true);
+  targetText.classList.toggle("has-ligatures", targetText === ui.previewText && style.ligatures !== false);
   targetText.classList.remove("is-text-type-prose", "is-text-type-lyric", "is-text-type-drama", "is-text-type-note");
   targetText.classList.add(`is-text-type-${textType}`);
   clearElement(targetText);
@@ -1273,6 +1278,7 @@ function renderEditor() {
   renderEditorHighlight(editorText);
   syncEditorHighlightScroll();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
+  if (ui.fontLigaturesInput) ui.fontLigaturesInput.checked = project.style.ligatures !== false;
   ensureSelectOption(ui.fontSizeInput, project.style.fontSize, "Aktuelle Schriftgröße");
   ensureSelectOption(ui.lineHeightInput, project.style.lineHeight, "Aktuelle Zeilenhöhe");
   ensureSelectOption(ui.measureInput, project.style.measure, "Aktuelle Satzbreite");
@@ -1747,6 +1753,16 @@ function buildHtmlBlockMarkup(block, textType) {
   return element.outerHTML;
 }
 
+function buildHtmlFontFaceCss(project) {
+  if (!String(project?.style?.fontFamily || "").includes("CMU Serif")) return "";
+  return `
+    @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunrm.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunti.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunbx.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunbi.ttf") format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }
+`;
+}
+
 function buildHtmlExport(project) {
   const metadata = project.metadata || {};
   const authors = normalizePersonList(metadata.authors).filter(Boolean);
@@ -1760,6 +1776,9 @@ function buildHtmlExport(project) {
     : layoutModel.blocks;
   const blocks = exportBlocks.map((block) => buildHtmlBlockMarkup(block, textType)).join("\n");
   const lineNumberingScriptData = escapeScriptJson(lineNumbering);
+  const ligatureCss = project.style.ligatures !== false
+    ? ' font-variant-ligatures: common-ligatures contextual; font-feature-settings: "liga" 1, "clig" 1, "calt" 1; text-rendering: optimizeLegibility;'
+    : "";
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(metadata.language || project.style.language || "de")}">
 <head>
@@ -1767,6 +1786,7 @@ function buildHtmlExport(project) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(project.title || "TypeMap")}</title>
   <style>
+${buildHtmlFontFaceCss(project)}
     * { box-sizing: border-box; }
     body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
     main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; overflow-wrap: break-word; }
@@ -1774,7 +1794,7 @@ function buildHtmlExport(project) {
     h1 { margin: 0; font-size: 1.48em; line-height: 1.12; }
     .subtitle { margin: .34em 0 0; color: #555; font-size: .86em; line-height: 1.28; }
     .authors { margin: .68em 0 0; color: #333; font-size: .76em; font-weight: 500; line-height: 1.28; }
-    .typemap-text { position: relative; }
+    .typemap-text { position: relative;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     p { margin: 0 0 .72em; white-space: pre-wrap; overflow-wrap: break-word; }
     em { font-style: italic; }
@@ -2389,6 +2409,11 @@ function bindEditor() {
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.fontFamily = ui.fontFamilySelect.value;
+    });
+  });
+  ui.fontLigaturesInput?.addEventListener("change", () => {
+    updateActiveProject((project) => {
+      project.style.ligatures = ui.fontLigaturesInput.checked;
     });
   });
   ui.fontSizeInput?.addEventListener("input", () => {

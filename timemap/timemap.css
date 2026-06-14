@@ -64,6 +64,7 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
+  height: 100svh;
   height: 100dvh;
   overflow: hidden;
   background: var(--surface);
@@ -7194,8 +7195,10 @@ body.presentation-render-mode .timeline-stage {
   }
 
   .app-frame {
-    height: auto;
-    overflow: visible;
+    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .timeline-stage {
@@ -7235,7 +7238,7 @@ body.presentation-render-mode .timeline-stage {
   }
 
   .timeline-view {
-    min-height: auto;
+    min-height: 100%;
     padding: 16px 16px 0;
   }
 
@@ -7244,15 +7247,15 @@ body.presentation-render-mode .timeline-stage {
   }
 
   .details-view {
-    height: auto;
-    overflow: visible;
-    min-height: auto;
+    height: 100%;
+    overflow: hidden;
+    min-height: 100%;
     grid-template-columns: 1fr;
     padding: 16px;
   }
 
   .details-inline {
-    overflow: visible;
+    overflow: auto;
   }
 
   .search-form,
