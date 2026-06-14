@@ -94,8 +94,8 @@
         </article>
       </section>
 
-      <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Projekteditor">
-        <span class="workspace-strip-label">Projekteditor</span>
+      <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Projektbrowser">
+        <span class="workspace-strip-label">Projektbrowser</span>
       </div>
     </section>
 
@@ -104,12 +104,14 @@
         <span class="workspace-strip-label">TypeMap</span>
       </div>
       <article class="details-inline browser-panel">
-        <div class="panel-header">
-          <span class="label">Projekteditor</span>
-          <strong>TypeMap-Projekte</strong>
+        <div class="panel-header panel-header-with-action">
+          <span class="label">Projektbrowser</span>
+          <button type="button" id="layoutCycleButton" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+          </button>
         </div>
 
-        <div class="project-tabs" role="tablist" aria-label="Projekteditor">
+        <div class="project-tabs" role="tablist" aria-label="Projektbrowser">
           <button type="button" class="project-tab is-active" data-type-tab="browser" role="tab" aria-selected="true">Browser</button>
           <button type="button" class="project-tab" data-type-tab="preview" role="tab" aria-selected="false">Vorschau</button>
         </div>
@@ -137,6 +139,9 @@
             <span class="label">Editor</span>
             <strong id="editorTitle">Text setzen</strong>
           </div>
+          <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+          </button>
         </div>
 
         <div class="editor-controls">

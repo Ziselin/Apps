@@ -14,6 +14,8 @@ const ui = {
   appFrame: document.querySelector(".app-frame"),
   openWorkspaceStrip: document.getElementById("openWorkspaceStrip"),
   returnPreviewStrip: document.getElementById("returnPreviewStrip"),
+  layoutCycleButton: document.getElementById("layoutCycleButton"),
+  layoutCycleButtons: Array.from(document.querySelectorAll("[data-layout-cycle-button]")),
   newProjectButton: document.getElementById("newProjectButton"),
   exportProjectButton: document.getElementById("exportProjectButton"),
   exportMenu: document.getElementById("exportMenu"),
@@ -137,6 +139,13 @@ const state = {
   layoutModel: null,
   activeWorkspaceSection: "preview",
   activeProjectEditorTab: "browser",
+  activeSourceRange: null,
+  expandedProjectIds: [],
+  expandedTreeNodeIds: [],
+  expandedContentNodeIds: [],
+  projectBrowserRenderTimer: 0,
+  detailsLayoutMode: "normal",
+  detailsLayoutStep: 0,
 };
 
 function createId(prefix) {
@@ -392,6 +401,149 @@ function normalizeProject(project) {
   return normalized;
 }
 
+function isTreeNodeExpanded(nodeId) {
+  return state.expandedTreeNodeIds.includes(nodeId);
+}
+
+function setTreeNodeExpanded(nodeId, isExpanded) {
+  if (!nodeId) return;
+  const set = new Set(state.expandedTreeNodeIds);
+  if (isExpanded) {
+    set.add(nodeId);
+  } else {
+    set.delete(nodeId);
+  }
+  state.expandedTreeNodeIds = Array.from(set);
+}
+
+function isContentNodeExpanded(nodeId) {
+  return state.expandedContentNodeIds.includes(nodeId);
+}
+
+function setContentNodeExpanded(nodeId, isExpanded) {
+  if (!nodeId) return;
+  const set = new Set(state.expandedContentNodeIds);
+  if (isExpanded) {
+    set.add(nodeId);
+  } else {
+    set.delete(nodeId);
+  }
+  state.expandedContentNodeIds = Array.from(set);
+}
+
+function isProjectExpanded(projectId) {
+  return state.expandedProjectIds.includes(projectId);
+}
+
+function setProjectExpanded(projectId, isExpanded) {
+  if (!projectId) return;
+  if (isExpanded) {
+    state.expandedProjectIds = [projectId];
+  } else {
+    const set = new Set(state.expandedProjectIds);
+    set.delete(projectId);
+    state.expandedProjectIds = Array.from(set);
+  }
+}
+
+function getMarkdownBlockType(text) {
+  const value = String(text || "");
+  if (/^#{1,6}\s+/.test(value)) return "heading";
+  if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
+  if (/^```/.test(value)) return "code";
+  if (/^>\s?/m.test(value)) return "quote";
+  if (value.split("\n").filter(Boolean).every((line) => /^[-*]\s+/.test(line))) return "list";
+  if (value.split("\n").filter(Boolean).every((line) => /^\d+\.\s+/.test(line))) return "list";
+  return "paragraph";
+}
+
+function createMarkdownBlockNode(block, index) {
+  const headingMatch = String(block.text || "").match(/^(#{1,6})\s+(.+)$/);
+  const type = headingMatch ? "heading" : getMarkdownBlockType(block.text);
+  const title = headingMatch
+    ? headingMatch[2].trim()
+    : type === "table"
+      ? "Tabelle"
+      : type === "code"
+        ? "Codeblock"
+        : type === "quote"
+          ? "Zitat"
+          : type === "list"
+            ? "Liste"
+            : "Absatz";
+  return {
+    id: `block-${index + 1}-${block.startOffset}`,
+    type,
+    level: headingMatch ? headingMatch[1].length : null,
+    title,
+    text: block.text,
+    startOffset: block.startOffset,
+    endOffset: block.endOffset,
+    children: [],
+  };
+}
+
+function buildDocumentTree(blocks, rawText) {
+  const documentNode = {
+    id: "document-root",
+    type: "document",
+    title: "Dokument",
+    startOffset: 0,
+    endOffset: rawText.length,
+    children: [],
+  };
+  const stack = [{ level: 0, node: documentNode }];
+  const sectionCounters = [];
+
+  blocks.forEach((block, index) => {
+    const node = createMarkdownBlockNode(block, index);
+    if (node.type === "heading") {
+      while (stack.length > 1 && stack[stack.length - 1].level >= node.level) {
+        const closed = stack.pop().node;
+        closed.endOffset = node.startOffset;
+      }
+      sectionCounters.length = node.level;
+      sectionCounters[node.level - 1] = (sectionCounters[node.level - 1] || 0) + 1;
+      const section = {
+        id: `section-${index + 1}-${node.startOffset}`,
+        type: "section",
+        level: node.level,
+        number: sectionCounters.slice(0, node.level).filter(Boolean).join("."),
+        title: node.title,
+        startOffset: node.startOffset,
+        endOffset: rawText.length,
+        headingNodeId: node.id,
+        children: [],
+      };
+      stack[stack.length - 1].node.children.push(section);
+      stack.push({ level: node.level, node: section });
+      return;
+    }
+    stack[stack.length - 1].node.children.push(node);
+  });
+
+  while (stack.length > 1) {
+    const closed = stack.pop().node;
+    closed.endOffset = rawText.length;
+  }
+  return documentNode;
+}
+
+function collectDocumentSections(node, sections = []) {
+  if (!node) return sections;
+  if (node.type === "section") {
+    sections.push({
+      id: node.id,
+      title: node.title,
+      level: node.level,
+      startOffset: node.startOffset,
+      endOffset: node.endOffset,
+    });
+  }
+  (node.children || []).forEach((child) => collectDocumentSections(child, sections));
+  return sections;
+}
+
 function buildSourceModel(project) {
   const rawText = String(project?.source?.rawText || "");
   const paragraphs = [];
@@ -438,6 +590,7 @@ function buildSourceModel(project) {
     cursor = endOffset + 1;
   });
   flushParagraph(rawText.length);
+  const documentTree = buildDocumentTree(paragraphs, rawText);
 
   return {
     version: 1,
@@ -450,16 +603,24 @@ function buildSourceModel(project) {
       endOffset: paragraph.endOffset,
     })),
     paragraphs,
+    documentTree,
+    sections: collectDocumentSections(documentTree),
   };
 }
 
-function buildBrowserLayoutModel(sourceModel, style) {
+function buildBrowserLayoutModel(sourceModel, style, range = null) {
+  const rangeStart = Number.isFinite(range?.startOffset) ? range.startOffset : 0;
+  const rangeEnd = Number.isFinite(range?.endOffset) ? range.endOffset : sourceModel.rawText.length;
+  const isInRange = (item) => item.endOffset > rangeStart && item.startOffset < rangeEnd;
+  const paragraphs = sourceModel.paragraphs.filter(isInRange);
+  const originalLines = sourceModel.originalLines.filter(isInRange);
   return {
     version: 1,
     engine: "browser-dom",
     status: "browser-owned-layout",
     style: { ...style },
-    blocks: sourceModel.paragraphs.map((paragraph, index) => ({
+    activeRange: range ? { ...range } : null,
+    blocks: paragraphs.map((paragraph, index) => ({
       id: `layout-block-${paragraph.id}`,
       sourceRangeId: paragraph.id,
       sourceStartOffset: paragraph.startOffset,
@@ -468,7 +629,7 @@ function buildBrowserLayoutModel(sourceModel, style) {
       text: paragraph.text,
       visibleLines: [],
     })),
-    sourceLineBlocks: sourceModel.originalLines.map((line) => ({
+    sourceLineBlocks: originalLines.map((line) => ({
       id: `layout-source-${line.id}`,
       sourceLineId: line.id,
       sourceStartOffset: line.startOffset,
@@ -720,8 +881,11 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetText.classList.add(`is-text-type-${textType}`);
   clearElement(targetText);
 
-  const documentHead = createPreviewDocumentHead(project);
-  if (documentHead) targetText.appendChild(documentHead);
+  const isScopedSection = layoutModel.activeRange && layoutModel.activeRange.id !== "document-root";
+  if (!isScopedSection) {
+    const documentHead = createPreviewDocumentHead(project);
+    if (documentHead) targetText.appendChild(documentHead);
+  }
 
   const blocks = lineNumbering.mode === "source-lines" && textType === "lyric"
     ? (layoutModel.sourceLineBlocks || [])
@@ -772,7 +936,8 @@ function rebuildModelsAndPreview() {
   const project = getActiveProject();
   if (!project) return;
   state.sourceModel = buildSourceModel(project);
-  state.layoutModel = buildBrowserLayoutModel(state.sourceModel, project.style);
+  const activeRange = getActiveSourceRangeForProject(project, state.sourceModel);
+  state.layoutModel = buildBrowserLayoutModel(state.sourceModel, project.style, activeRange);
   renderViewLayer(project, state.sourceModel, state.layoutModel);
 }
 
@@ -893,14 +1058,173 @@ function ensureSelectOption(select, value, label = "Aktueller Wert") {
   select.appendChild(option);
 }
 
+function getActiveSourceRangeForProject(project, sourceModel = null) {
+  if (!project || state.activeSourceRange?.projectId !== project.id) return null;
+  const model = sourceModel || buildSourceModel(project);
+  if (state.activeSourceRange.id === "document-root") {
+    return {
+      id: "document-root",
+      title: "Dokument",
+      startOffset: 0,
+      endOffset: model.rawText.length,
+      type: "document",
+    };
+  }
+  const section = model.sections.find((entry) => entry.id === state.activeSourceRange.id);
+  if (!section) return null;
+  return {
+    ...section,
+    type: "section",
+  };
+}
+
+function getEditorSourceText(project) {
+  const sourceModel = buildSourceModel(project);
+  const range = getActiveSourceRangeForProject(project, sourceModel);
+  if (!range || range.id === "document-root") return project.source.rawText;
+  return project.source.rawText.slice(range.startOffset, range.endOffset);
+}
+
+function getTreeNodeIcon(type) {
+  if (type === "document") return "▣";
+  if (type === "heading") return "#";
+  if (type === "table") return "▤";
+  if (type === "code") return "{}";
+  if (type === "quote") return ">";
+  if (type === "list") return "•";
+  return "¶";
+}
+
+function createTreeNodeButton(project, node, depth) {
+  const children = Array.isArray(node.children) ? node.children : [];
+  const structuralChildren = children.filter((child) => child.type === "section");
+  const contentChildren = children.filter((child) => child.type !== "section");
+  const hasChildren = structuralChildren.length > 0;
+  const isExpanded = isTreeNodeExpanded(node.id);
+  const isSelectable = node.type === "document" || node.type === "section";
+  const isContentExpanded = isContentNodeExpanded(node.id);
+  const isActive = state.activeSourceRange?.projectId === project.id
+    && (state.activeSourceRange?.id || "document-root") === node.id;
+
+  const row = document.createElement("div");
+  row.className = `document-tree-row${isActive ? " is-active" : ""}${isSelectable ? " is-selectable" : ""}`;
+  row.style.setProperty("--tree-depth", String(depth));
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "document-tree-toggle";
+  toggle.textContent = hasChildren ? (isExpanded ? "▾" : "▸") : "";
+  toggle.setAttribute("aria-label", hasChildren ? `${node.title} ${isExpanded ? "einklappen" : "aufklappen"}` : "");
+  toggle.disabled = !hasChildren;
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!hasChildren) return;
+    setTreeNodeExpanded(node.id, !isExpanded);
+    renderProjectList();
+  });
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "document-tree-label";
+  button.disabled = !isSelectable;
+  button.addEventListener("click", () => {
+    if (!isSelectable) return;
+    const nextContentState = contentChildren.length ? !isContentExpanded : isContentExpanded;
+    state.activeProjectId = project.id;
+    state.activeSourceRange = {
+      projectId: project.id,
+      id: node.id,
+      startOffset: node.startOffset,
+      endOffset: node.endOffset,
+      title: node.title,
+      type: node.type,
+    };
+    if (contentChildren.length) setContentNodeExpanded(node.id, nextContentState);
+    renderApp();
+  });
+
+  const icon = document.createElement("span");
+  icon.className = "document-tree-icon";
+  icon.textContent = node.type === "section" ? (node.number || "§") : getTreeNodeIcon(node.type);
+  const copy = document.createElement("span");
+  copy.className = "document-tree-copy";
+  const title = document.createElement("span");
+  title.className = "document-tree-title";
+  title.textContent = node.title || node.type;
+  copy.appendChild(title);
+  if (node.type !== "document" && node.type !== "section") {
+    const meta = document.createElement("span");
+    meta.className = "document-tree-meta";
+    meta.textContent = node.type === "paragraph"
+      ? `Text: "${String(node.text || "").replace(/\s+/g, " ").trim().slice(0, 44)}${String(node.text || "").trim().length > 44 ? "…" : ""}"`
+      : node.type;
+    copy.appendChild(meta);
+  }
+  button.append(icon, copy);
+  row.append(toggle, button);
+  return row;
+}
+
+function renderDocumentTreeNode(container, project, node, depth = 0) {
+  container.appendChild(createTreeNodeButton(project, node, depth));
+  const children = Array.isArray(node.children) ? node.children : [];
+  const structuralChildren = children.filter((child) => child.type === "section");
+  const contentChildren = children.filter((child) => child.type !== "section");
+  const isExpanded = isTreeNodeExpanded(node.id);
+  if (isContentNodeExpanded(node.id)) {
+    contentChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1));
+  }
+  if (!isExpanded) return;
+  structuralChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1));
+}
+
+function renderDocumentTree(project) {
+  const tree = document.createElement("div");
+  tree.className = "document-tree";
+  const sourceModel = buildSourceModel(project);
+  renderDocumentTreeNode(tree, project, sourceModel.documentTree, 0);
+  return tree;
+}
+
+function scheduleProjectBrowserRender() {
+  window.clearTimeout(state.projectBrowserRenderTimer);
+  state.projectBrowserRenderTimer = window.setTimeout(() => {
+    renderProjectList();
+  }, 260);
+}
+
 function renderProjectList() {
   if (!ui.projectList) return;
   clearElement(ui.projectList);
   state.projects.forEach((project) => {
+    const item = document.createElement("section");
+    item.className = `project-browser-item${project.id === state.activeProjectId ? " is-active" : ""}`;
+
     const row = document.createElement("div");
-    row.className = `project-row${project.id === state.activeProjectId ? " is-active" : ""}`;
+    row.className = "project-row";
     row.tabIndex = 0;
     row.setAttribute("role", "button");
+
+    const toggleProjectButton = document.createElement("button");
+    toggleProjectButton.type = "button";
+    toggleProjectButton.className = "project-tree-toggle";
+    const projectExpanded = isProjectExpanded(project.id);
+    toggleProjectButton.textContent = projectExpanded ? "▾" : "▸";
+    toggleProjectButton.setAttribute("aria-label", `${project.title} ${projectExpanded ? "einklappen" : "aufklappen"}`);
+    toggleProjectButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (projectExpanded) {
+        setProjectExpanded(project.id, false);
+        if (state.activeProjectId === project.id) {
+          renderProjectList();
+          scheduleAutosave();
+          return;
+        }
+      } else {
+        setProjectExpanded(project.id, true);
+      }
+      activateProject(project.id, { preserveSourceRange: true, preserveExpandedState: true });
+    });
 
     const copy = document.createElement("div");
     const title = document.createElement("strong");
@@ -928,8 +1252,12 @@ function renderProjectList() {
       }
     });
 
-    row.append(copy, deleteButton);
-    ui.projectList.appendChild(row);
+    row.append(toggleProjectButton, copy, deleteButton);
+    item.appendChild(row);
+    if (projectExpanded) {
+      item.appendChild(renderDocumentTree(project));
+    }
+    ui.projectList.appendChild(item);
   });
 }
 
@@ -940,8 +1268,9 @@ function renderEditor() {
   if (ui.editorTitle) ui.editorTitle.textContent = project.title;
   loadProjectFonts([project]);
   renderFontOptions(project);
-  if (ui.textInput) ui.textInput.value = project.source.rawText;
-  renderEditorHighlight(project.source.rawText);
+  const editorText = getEditorSourceText(project);
+  if (ui.textInput) ui.textInput.value = editorText;
+  renderEditorHighlight(editorText);
   syncEditorHighlightScroll();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
   ensureSelectOption(ui.fontSizeInput, project.style.fontSize, "Aktuelle Schriftgröße");
@@ -1250,8 +1579,14 @@ function markProjectChanged(project) {
   scheduleAutosave();
 }
 
-function activateProject(projectId) {
+function activateProject(projectId, options = {}) {
+  if (!options.preserveSourceRange && state.activeProjectId !== projectId) {
+    state.activeSourceRange = null;
+  }
   state.activeProjectId = projectId;
+  if (!options.preserveExpandedState) {
+    setProjectExpanded(projectId, true);
+  }
   renderApp();
   scheduleAutosave();
 }
@@ -1260,6 +1595,8 @@ function addProject(title = "Neue TypeMap") {
   const project = createDefaultProject(title);
   state.projects.push(project);
   state.activeProjectId = project.id;
+  state.activeSourceRange = null;
+  setProjectExpanded(project.id, true);
   renderApp();
   scheduleAutosave();
 }
@@ -1272,19 +1609,45 @@ function deleteProject(projectId) {
     state.projects = state.projects.filter((project) => project.id !== projectId);
     if (state.activeProjectId === projectId) {
       state.activeProjectId = state.projects[0]?.id || null;
+      state.activeSourceRange = null;
     }
   }
+  state.expandedProjectIds = state.expandedProjectIds.filter((id) => id !== projectId);
   renderApp();
   scheduleAutosave();
 }
 
-function updateActiveProject(mutator) {
+function updateActiveProject(mutator, options = {}) {
   const project = getActiveProject();
   if (!project) return;
   mutator(project);
   markProjectChanged(project);
-  renderProjectList();
+  if (options.renderBrowser !== false) {
+    renderProjectList();
+  }
   rebuildModelsAndPreview();
+}
+
+function updateActiveProjectTextFromEditor(nextText) {
+  updateActiveProject((project) => {
+    const sourceModel = buildSourceModel(project);
+    const range = getActiveSourceRangeForProject(project, sourceModel);
+    if (!range || range.id === "document-root") {
+      project.source.rawText = nextText;
+      state.activeSourceRange = null;
+      return;
+    }
+    const before = project.source.rawText.slice(0, range.startOffset);
+    const after = project.source.rawText.slice(range.endOffset);
+    const needsTrailingBreak = after.trimStart().startsWith("#") && nextText && !/\n\s*\n$/.test(nextText);
+    const replacementText = needsTrailingBreak ? `${nextText.replace(/\s+$/, "")}\n\n` : nextText;
+    project.source.rawText = `${before}${replacementText}${after}`;
+    state.activeSourceRange = {
+      ...range,
+      projectId: project.id,
+      endOffset: range.startOffset + replacementText.length,
+    };
+  }, { renderBrowser: false });
 }
 
 function buildSnapshot() {
@@ -1310,6 +1673,8 @@ function applySnapshot(snapshot) {
   state.activeProjectId = state.projects.some((project) => project.id === snapshot?.state?.activeProjectId)
     ? snapshot.state.activeProjectId
     : state.projects[0].id;
+  state.activeSourceRange = null;
+  setProjectExpanded(state.activeProjectId, true);
   renderApp();
   scheduleAutosave();
 }
@@ -1367,12 +1732,34 @@ function exportMarkdown() {
   downloadBlob(blob, `${slugifyFilename(project.title)}.md`);
 }
 
+function escapeScriptJson(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function buildHtmlBlockMarkup(block, textType) {
+  const element = createMarkdownBlockElement(block, textType);
+  element.classList.add("preview-body-block");
+  if (textType === "lyric" && !String(block.text || "").trim()) {
+    element.dataset.sourceBlankLine = "true";
+  }
+  element.dataset.sourceStart = String(block.sourceStartOffset);
+  element.dataset.sourceEnd = String(block.sourceEndOffset);
+  return element.outerHTML;
+}
+
 function buildHtmlExport(project) {
   const metadata = project.metadata || {};
   const authors = normalizePersonList(metadata.authors).filter(Boolean);
   const sourceModel = buildSourceModel(project);
   const layoutModel = buildBrowserLayoutModel(sourceModel, project.style);
-  const blocks = layoutModel.blocks.map((block) => `<p>${escapeHtml(block.text).replace(/\n/g, "<br>")}</p>`).join("\n");
+  const textType = project.source.textType || "prose";
+  const lineNumbering = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
+  const hyphenationSettings = normalizeHyphenationSettings(project.style.hyphenationSettings, project.style.hyphenation, project.style.language);
+  const exportBlocks = lineNumbering.mode === "source-lines" && textType === "lyric"
+    ? layoutModel.sourceLineBlocks
+    : layoutModel.blocks;
+  const blocks = exportBlocks.map((block) => buildHtmlBlockMarkup(block, textType)).join("\n");
+  const lineNumberingScriptData = escapeScriptJson(lineNumbering);
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(metadata.language || project.style.language || "de")}">
 <head>
@@ -1380,13 +1767,34 @@ function buildHtmlExport(project) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(project.title || "TypeMap")}</title>
   <style>
+    * { box-sizing: border-box; }
     body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
-    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${project.style.lineHeight}; text-align: ${project.style.textAlign}; hyphens: ${project.style.hyphenation}; }
-    header { margin: 0 0 1.55em; text-align: center; }
+    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; overflow-wrap: break-word; }
+    header { margin: 0 0 1.55em; text-align: ${textType === "lyric" ? "left" : "center"}; }
     h1 { margin: 0; font-size: 1.48em; line-height: 1.12; }
     .subtitle { margin: .34em 0 0; color: #555; font-size: .86em; line-height: 1.28; }
     .authors { margin: .68em 0 0; color: #333; font-size: .76em; font-weight: 500; line-height: 1.28; }
+    .typemap-text { position: relative; }
+    .typemap-text.has-line-numbers { position: relative; }
     p { margin: 0 0 .72em; white-space: pre-wrap; overflow-wrap: break-word; }
+    em { font-style: italic; }
+    strong { font-weight: 700; }
+    mark { background: transparent; text-decoration: underline; color: inherit; }
+    a { color: #70531c; text-decoration: underline; text-underline-offset: .12em; }
+    h1, h2, h3 { margin: 1.1em 0 .38em; line-height: 1.12; }
+    h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+    h1 { font-size: 1.48em; }
+    h2 { font-size: 1.22em; }
+    h3 { font-size: 1.06em; }
+    blockquote { margin: .9em 0; padding-left: 1.1em; border-left: 2px solid #bbb; color: #333; }
+    ul, ol { margin: 0 0 .85em 1.4em; padding: 0; }
+    li { margin: .18em 0; }
+    code { font-family: "Source Code Pro", "Courier New", monospace; font-size: .88em; background: #f0eee8; padding: .08em .24em; border-radius: 3px; }
+    pre { margin: .9em 0; padding: .9em 1em; border-radius: 6px; background: #171f24; color: #f5f1e8; overflow-x: auto; }
+    pre code { background: transparent; color: inherit; padding: 0; }
+    .preview-blank-line { min-height: 1.5em; margin: 0; }
+    .line-number-layer { position: absolute; inset: 0 auto 0 0; width: 0; pointer-events: none; }
+    .line-number { position: absolute; right: calc(100% + 1.1em); transform: translateY(calc(-100% - 0.1em)); color: #666; font-size: 0.72em; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -1396,8 +1804,69 @@ function buildHtmlExport(project) {
       ${metadata.subtitle ? `<p class="subtitle">${escapeHtml(metadata.subtitle)}</p>` : ""}
       ${authors.length ? `<p class="authors">${escapeHtml(authors.join(", "))}</p>` : ""}
     </header>
-    ${blocks}
+    <section id="typemapText" class="typemap-text${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">
+      ${blocks}
+    </section>
   </main>
+  <script>
+    const lineNumbering = ${lineNumberingScriptData};
+    const text = document.getElementById("typemapText");
+    function getVisualLineRects(element) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const elementRect = element.getBoundingClientRect();
+      const rects = Array.from(range.getClientRects())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map((rect) => ({ top: rect.top, bottom: rect.bottom, height: rect.height, left: rect.left, right: rect.right }))
+        .sort((a, b) => a.top - b.top || a.left - b.left);
+      range.detach();
+      if (!rects.length && element.textContent.trim()) {
+        return [{ top: elementRect.top, bottom: elementRect.bottom, height: elementRect.height, left: elementRect.left, right: elementRect.right }];
+      }
+      return rects.reduce((grouped, rect) => {
+        const previous = grouped[grouped.length - 1];
+        if (previous && Math.abs(previous.top - rect.top) < 2) {
+          previous.left = Math.min(previous.left, rect.left);
+          previous.right = Math.max(previous.right, rect.right);
+          previous.bottom = Math.max(previous.bottom, rect.bottom);
+          previous.height = Math.max(previous.height, rect.height);
+        } else {
+          grouped.push({ ...rect });
+        }
+        return grouped;
+      }, []);
+    }
+    function renderLineNumbers() {
+      text.querySelector(".line-number-layer")?.remove();
+      if (!lineNumbering.enabled) return;
+      const layer = document.createElement("div");
+      layer.className = "line-number-layer";
+      text.appendChild(layer);
+      const targetRect = text.getBoundingClientRect();
+      const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
+      let lineIndex = 0;
+      blocks.forEach((block) => {
+        if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) return;
+        const rects = lineNumbering.mode === "source-lines"
+          ? getVisualLineRects(block)
+          : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
+        rects.forEach((rect) => {
+          lineIndex += 1;
+          const lineNumber = lineNumbering.start + lineIndex - 1;
+          if (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0) return;
+          const label = document.createElement("span");
+          label.className = "line-number";
+          label.textContent = String(lineNumber);
+          label.style.top = (rect.bottom - targetRect.top) + "px";
+          layer.appendChild(label);
+        });
+      });
+    }
+    window.addEventListener("load", renderLineNumbers);
+    window.addEventListener("resize", renderLineNumbers);
+    if (document.fonts?.ready) document.fonts.ready.then(renderLineNumbers);
+    renderLineNumbers();
+  </script>
 </body>
 </html>`;
 }
@@ -1691,12 +2160,51 @@ function toggleTheme() {
   setTheme(isLight ? "dark" : "light");
 }
 
+function isNarrowDetailsViewport() {
+  return window.matchMedia("(max-width: 920px)").matches;
+}
+
+function normalizeDetailsLayoutMode(mode) {
+  if (isNarrowDetailsViewport()) return mode === "editor" ? "editor" : "browser";
+  return ["normal", "browser", "editor"].includes(mode) ? mode : "normal";
+}
+
+function setDetailsLayoutMode(mode) {
+  const normalizedMode = normalizeDetailsLayoutMode(mode);
+  state.detailsLayoutMode = normalizedMode;
+  ui.appFrame?.classList.toggle("details-layout-normal", normalizedMode === "normal");
+  ui.appFrame?.classList.toggle("details-layout-browser", normalizedMode === "browser");
+  ui.appFrame?.classList.toggle("details-layout-editor", normalizedMode === "editor");
+  const label = normalizedMode === "browser"
+    ? "Projektbrowser aufgeblättert"
+    : normalizedMode === "editor"
+      ? "Editor aufgeblättert"
+      : "Normale Projektansicht";
+  ui.layoutCycleButtons.forEach((button) => {
+    button.setAttribute("aria-label", `${label}. Ansicht umblättern`);
+    button.setAttribute("title", label);
+  });
+}
+
+function cycleDetailsLayoutMode() {
+  if (isNarrowDetailsViewport()) {
+    setDetailsLayoutMode(state.detailsLayoutMode === "browser" ? "editor" : "browser");
+    return;
+  }
+  const order = ["normal", "browser", "normal", "editor"];
+  state.detailsLayoutStep = (state.detailsLayoutStep + 1) % order.length;
+  setDetailsLayoutMode(order[state.detailsLayoutStep]);
+}
+
 function setWorkspaceSection(section) {
   const activeSection = section === "details" ? "details" : "preview";
   const previousSection = state.activeWorkspaceSection;
   state.activeWorkspaceSection = activeSection;
   ui.appFrame?.classList.toggle("workspace-mode-details", activeSection === "details");
   ui.appFrame?.classList.toggle("workspace-mode-preview", activeSection !== "details");
+  if (activeSection === "details") {
+    setDetailsLayoutMode(state.detailsLayoutMode);
+  }
   if (activeSection === "preview" && previousSection !== "preview") {
     window.requestAnimationFrame(() => {
       if (!ui.typeStage) return;
@@ -1782,6 +2290,10 @@ function bindEditor() {
   ui.returnPreviewStrip?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") handleWorkspaceToggle(event, "preview");
   });
+  ui.layoutCycleButtons.forEach((button) => {
+    button.addEventListener("click", cycleDetailsLayoutMode);
+  });
+  window.addEventListener("resize", () => setDetailsLayoutMode(state.detailsLayoutMode));
   ui.newProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
   ui.createProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
@@ -1870,9 +2382,8 @@ function bindEditor() {
   ui.textInput?.addEventListener("input", () => {
     renderEditorHighlight(ui.textInput.value);
     syncEditorHighlightScroll();
-    updateActiveProject((project) => {
-      project.source.rawText = ui.textInput.value;
-    });
+    updateActiveProjectTextFromEditor(ui.textInput.value);
+    scheduleProjectBrowserRender();
   });
   ui.textInput?.addEventListener("scroll", syncEditorHighlightScroll);
   ui.fontFamilySelect?.addEventListener("change", () => {
@@ -1932,6 +2443,7 @@ function bindEditor() {
 
 async function init() {
   setTheme(getStoredTheme(), false);
+  setDetailsLayoutMode("normal");
   bindMenu();
   bindEditor();
   const snapshot = await loadLocalSnapshot();
@@ -1940,6 +2452,7 @@ async function init() {
   } else {
     state.projects = [createDefaultProject("Erste TypeMap")];
     state.activeProjectId = state.projects[0].id;
+    setProjectExpanded(state.activeProjectId, true);
     renderApp();
     scheduleAutosave();
   }

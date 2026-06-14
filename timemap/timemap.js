@@ -334,6 +334,7 @@ const ui = {
   returnTimelineStrip: document.getElementById("returnTimelineStrip"),
   returnTimelineStripLabel: document.getElementById("returnTimelineStripLabel"),
   returnFullscreenButton: document.getElementById("returnFullscreenButton"),
+  layoutCycleButtons: Array.from(document.querySelectorAll("[data-layout-cycle-button]")),
   fullscreenButton: document.getElementById("fullscreenButton"),
   presentationZoomOutButton: document.getElementById("presentationZoomOutButton"),
   presentationZoomInButton: document.getElementById("presentationZoomInButton"),
@@ -1860,6 +1861,8 @@ const state = {
   height: 0,
   tickCount: 0,
   activeWorkspaceSection: "timeline",
+  detailsLayoutMode: "normal",
+  detailsLayoutStep: 0,
   resizeLockedWorkspaceSection: null,
   resizeUnlockTimer: 0,
   anchorDetailsOnScrollBack: false,
@@ -19435,11 +19438,57 @@ function getContainerScrollTopFor(element) {
   return ui.appFrame.scrollTop + (elementRect.top - containerRect.top);
 }
 
+function isNarrowDetailsViewport() {
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function normalizeDetailsLayoutMode(mode) {
+  if (isNarrowDetailsViewport()) {
+    return mode === "right" ? "right" : "left";
+  }
+  return mode === "left" || mode === "right" ? mode : "normal";
+}
+
+function setDetailsLayoutMode(mode) {
+  if (!ui.appFrame) return;
+  const normalizedMode = normalizeDetailsLayoutMode(mode);
+  state.detailsLayoutMode = normalizedMode;
+  ui.appFrame.classList.toggle("details-layout-left", normalizedMode === "left");
+  ui.appFrame.classList.toggle("details-layout-right", normalizedMode === "right");
+  ui.appFrame.classList.toggle("details-layout-normal", normalizedMode === "normal");
+
+  const label = normalizedMode === "left"
+    ? "Ereignisbibliothek aufgeblättert"
+    : normalizedMode === "right"
+      ? "Suche und Editor aufgeblättert"
+      : "Geteilte Ereignisbibliothek";
+  ui.layoutCycleButtons?.forEach((button) => {
+    button.setAttribute("aria-label", `${label}. Ansicht umblättern`);
+    button.setAttribute("title", label);
+  });
+}
+
+function cycleDetailsLayoutMode() {
+  if (isNarrowDetailsViewport()) {
+    const nextMode = state.detailsLayoutMode === "left" ? "right" : "left";
+    state.detailsLayoutStep = nextMode === "left" ? 1 : 3;
+    setDetailsLayoutMode(nextMode);
+    return;
+  }
+
+  const layoutOrder = ["normal", "left", "normal", "right"];
+  state.detailsLayoutStep = (state.detailsLayoutStep + 1) % layoutOrder.length;
+  setDetailsLayoutMode(layoutOrder[state.detailsLayoutStep]);
+}
+
 function applyWorkspaceSectionMode() {
   if (!ui.appFrame) return;
   const activeSection = state.activeWorkspaceSection === "details" ? "details" : "timeline";
   ui.appFrame.classList.toggle("workspace-mode-details", activeSection === "details");
   ui.appFrame.classList.toggle("workspace-mode-timeline", activeSection !== "details");
+  if (activeSection === "details") {
+    setDetailsLayoutMode(state.detailsLayoutMode);
+  }
 }
 
 function syncActiveWorkspaceSectionFromScroll() {
@@ -35222,6 +35271,9 @@ function bindEvents() {
   ui.eventList?.addEventListener("click", clearSelectionFromEmptyArea);
   document.querySelector(".event-library")?.addEventListener("click", clearSelectionFromEmptyArea);
   window.addEventListener("resize", requestRedraw);
+  window.addEventListener("resize", () => {
+    setDetailsLayoutMode(state.detailsLayoutMode);
+  });
   ui.appFrame.addEventListener("scroll", handleScrollAnchor, { passive: true });
   ui.searchForm.addEventListener("submit", handleSearchSubmit);
   ui.searchInput?.addEventListener("input", handleSearchInputChange);
@@ -35285,6 +35337,9 @@ function bindEvents() {
   ui.openWorkspaceStrip.addEventListener("wheel", (event) => {
     handleWorkspaceStripOpen(event);
   }, { passive: false });
+  ui.layoutCycleButtons.forEach((button) => {
+    button.addEventListener("click", cycleDetailsLayoutMode);
+  });
   ui.returnTimelineStrip?.addEventListener("click", (event) => {
     handleTimelineStripReturn(event);
   });

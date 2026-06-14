@@ -1200,12 +1200,22 @@ button:focus-visible {
   min-height: 100%;
   padding: 24px;
   display: grid;
-  grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 18px;
   background: var(--surface-soft);
   overflow: hidden;
   align-content: start;
+}
+
+.app-frame.details-layout-left .details-view,
+.app-frame.details-layout-right .details-view {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-frame.details-layout-left .search-panel,
+.app-frame.details-layout-right .editor-panel {
+  display: none;
 }
 
 .details-inline {
@@ -1255,7 +1265,8 @@ button:focus-visible {
 }
 
 .panel-header-icon-button,
-.panel-header-minimize-button {
+.panel-header-minimize-button,
+.panel-layout-button {
   flex: 0 0 auto;
   width: 34px;
   height: 34px;
@@ -1278,10 +1289,21 @@ button:focus-visible {
 }
 
 .panel-header-icon-button:hover,
-.panel-header-minimize-button:hover {
+.panel-header-minimize-button:hover,
+.panel-layout-button:hover {
   color: var(--text);
   border-color: rgba(255, 179, 71, 0.28);
   background: rgba(255, 179, 71, 0.06);
+}
+
+.panel-layout-button {
+  cursor: pointer;
+}
+
+.panel-layout-button img {
+  width: 19px;
+  height: 19px;
+  display: block;
 }
 
 .panel-header-export-button svg {
