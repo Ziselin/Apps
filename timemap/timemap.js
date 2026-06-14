@@ -30826,6 +30826,160 @@ function handleWheel(event) {
   pan(direction);
 }
 
+const timelineTouchGesture = {
+  pointers: new Map(),
+  mode: null,
+  moved: false,
+  lastPanClientX: 0,
+  pinchStartDistance: 0,
+  pinchStartStepIndex: 0,
+  lastPanClientY: 0,
+};
+
+function getTimelineTouchPoints() {
+  return Array.from(timelineTouchGesture.pointers.values());
+}
+
+function getTouchPointDistance(left, right) {
+  return Math.hypot(right.clientX - left.clientX, right.clientY - left.clientY);
+}
+
+function getTouchPointCenter(left, right) {
+  return {
+    clientX: (left.clientX + right.clientX) / 2,
+    clientY: (left.clientY + right.clientY) / 2,
+  };
+}
+
+function resetTimelineTouchGesture() {
+  timelineTouchGesture.pointers.clear();
+  timelineTouchGesture.mode = null;
+  timelineTouchGesture.moved = false;
+  timelineTouchGesture.lastPanClientX = 0;
+  timelineTouchGesture.lastPanClientY = 0;
+  timelineTouchGesture.pinchStartDistance = 0;
+  timelineTouchGesture.pinchStartStepIndex = state.stepIndex;
+}
+
+function suppressTimelineTouchClick() {
+  state.suppressClickUntil = Date.now() + 300;
+}
+
+function panTimelineByClientDelta(startClientX, endClientX) {
+  if (!Number.isFinite(startClientX) || !Number.isFinite(endClientX) || startClientX === endClientX) return;
+  const startValue = getTimelineValueAtRatio(getTimelineRatioForClientX(startClientX));
+  const endValue = getTimelineValueAtRatio(getTimelineRatioForClientX(endClientX));
+  if (!Number.isFinite(startValue) || !Number.isFinite(endValue)) return;
+  state.subYearTickAnchorValue = null;
+  state.centerYear = normalizeZoomCenterYear(state.centerYear + (startValue - endValue), getStep());
+  drawTimeline();
+}
+
+function zoomTimelineToStepIndexAtClientX(targetIndex, clientX) {
+  const nextIndex = clamp(targetIndex, 0, scaleSteps.length - 1);
+  if (nextIndex === state.stepIndex) return;
+  const direction = Math.sign(nextIndex - state.stepIndex);
+  while (state.stepIndex !== nextIndex) {
+    zoomAtClientX(direction, clientX);
+  }
+}
+
+function beginTimelineTouchPinch(points) {
+  if (points.length < 2) return;
+  timelineTouchGesture.mode = "pinch";
+  timelineTouchGesture.moved = true;
+  timelineTouchGesture.pinchStartDistance = Math.max(1, getTouchPointDistance(points[0], points[1]));
+  timelineTouchGesture.pinchStartStepIndex = state.stepIndex;
+  suppressTimelineTouchClick();
+}
+
+function handleTimelineTouchPointerDown(event) {
+  if (event.pointerType !== "touch") return;
+  if (state.dragState || state.pendingConnectionParentId) return;
+  event.preventDefault();
+  svg.setPointerCapture?.(event.pointerId);
+  timelineTouchGesture.pointers.set(event.pointerId, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  });
+  const points = getTimelineTouchPoints();
+  if (points.length === 1) {
+    timelineTouchGesture.mode = "pan";
+    timelineTouchGesture.moved = false;
+    timelineTouchGesture.lastPanClientX = event.clientX;
+    timelineTouchGesture.lastPanClientY = event.clientY;
+    return;
+  }
+  beginTimelineTouchPinch(points);
+}
+
+function handleTimelineTouchPointerMove(event) {
+  if (event.pointerType !== "touch") return;
+  if (!timelineTouchGesture.pointers.has(event.pointerId)) return;
+  event.preventDefault();
+  timelineTouchGesture.pointers.set(event.pointerId, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  });
+  const points = getTimelineTouchPoints();
+  if (points.length >= 2) {
+    if (timelineTouchGesture.mode !== "pinch") beginTimelineTouchPinch(points);
+    const distance = Math.max(1, getTouchPointDistance(points[0], points[1]));
+    const ratio = distance / Math.max(1, timelineTouchGesture.pinchStartDistance);
+    const stepShift = Math.trunc(Math.log(ratio) / Math.log(1.18));
+    const targetIndex = clamp(
+      timelineTouchGesture.pinchStartStepIndex - stepShift,
+      0,
+      scaleSteps.length - 1,
+    );
+    if (targetIndex !== state.stepIndex) {
+      const center = getTouchPointCenter(points[0], points[1]);
+      zoomTimelineToStepIndexAtClientX(targetIndex, center.clientX);
+      suppressTimelineTouchClick();
+    }
+    return;
+  }
+  if (timelineTouchGesture.mode !== "pan" || points.length !== 1) return;
+  const point = points[0];
+  const deltaX = point.clientX - timelineTouchGesture.lastPanClientX;
+  const deltaY = point.clientY - timelineTouchGesture.lastPanClientY;
+  if (!timelineTouchGesture.moved && Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) {
+    return;
+  }
+  timelineTouchGesture.moved = true;
+  panTimelineByClientDelta(timelineTouchGesture.lastPanClientX, point.clientX);
+  timelineTouchGesture.lastPanClientX = point.clientX;
+  timelineTouchGesture.lastPanClientY = point.clientY;
+  suppressTimelineTouchClick();
+}
+
+function handleTimelineTouchPointerEnd(event) {
+  if (event.pointerType !== "touch") return;
+  if (!timelineTouchGesture.pointers.has(event.pointerId)) return;
+  const wasGesture = timelineTouchGesture.moved || timelineTouchGesture.mode === "pinch";
+  if (timelineTouchGesture.moved) suppressTimelineTouchClick();
+  timelineTouchGesture.pointers.delete(event.pointerId);
+  try {
+    svg.releasePointerCapture?.(event.pointerId);
+  } catch (error) {
+    // Some tablet browsers release captures eagerly during gesture cancellation.
+  }
+  const points = getTimelineTouchPoints();
+  if (!points.length) {
+    if (wasGesture) suppressTimelineTouchClick();
+    resetTimelineTouchGesture();
+    return;
+  }
+  if (points.length === 1) {
+    timelineTouchGesture.mode = "pan";
+    timelineTouchGesture.moved = wasGesture;
+    timelineTouchGesture.lastPanClientX = points[0].clientX;
+    timelineTouchGesture.lastPanClientY = points[0].clientY;
+    return;
+  }
+  beginTimelineTouchPinch(points);
+}
+
 function handleScrollAnchor() {
   syncActiveWorkspaceSectionFromScroll();
 }
@@ -35150,6 +35304,11 @@ function createNewChartToCsvCodeTab() {
 
 function bindEvents() {
   svg.addEventListener("wheel", handleWheel, { passive: false });
+  svg.addEventListener("pointerdown", handleTimelineTouchPointerDown);
+  svg.addEventListener("pointermove", handleTimelineTouchPointerMove);
+  svg.addEventListener("pointerup", handleTimelineTouchPointerEnd);
+  svg.addEventListener("pointercancel", handleTimelineTouchPointerEnd);
+  svg.addEventListener("lostpointercapture", handleTimelineTouchPointerEnd);
   ui.eventTooltip?.addEventListener("wheel", handleTooltipWheel, { passive: false });
   svg.addEventListener("pointermove", (event) => {
     if (state.pendingConnectionParentId) {
@@ -35162,6 +35321,11 @@ function bindEvents() {
     drawTimeline();
   });
   svg.addEventListener("click", async (event) => {
+    if (Date.now() < state.suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (state.pendingChartCommentPlacement) {
       event.preventDefault();
       event.stopPropagation();
