@@ -29,6 +29,13 @@ const ui = {
   projectInfo: document.getElementById("projectInfo"),
   editorTitle: document.getElementById("editorTitle"),
   documentPropertiesButton: document.getElementById("documentPropertiesButton"),
+  toolbarTextKindSelect: document.getElementById("toolbarTextKindSelect"),
+  editorZoomSelect: document.getElementById("editorZoomSelect"),
+  decreaseFontSizeButton: document.getElementById("decreaseFontSizeButton"),
+  increaseFontSizeButton: document.getElementById("increaseFontSizeButton"),
+  toolbarFontSizeValue: document.getElementById("toolbarFontSizeValue"),
+  clearFormattingButton: document.getElementById("clearFormattingButton"),
+  textFormatWidthButton: document.getElementById("textFormatWidthButton"),
   documentPropertiesOverlay: document.getElementById("documentPropertiesOverlay"),
   documentPropertiesDialog: document.getElementById("documentPropertiesDialog"),
   documentPropertiesCloseButton: document.getElementById("documentPropertiesCloseButton"),
@@ -66,14 +73,6 @@ const ui = {
   textFormatDialog: document.getElementById("textFormatDialog"),
   textFormatDialogCloseButton: document.getElementById("textFormatDialogCloseButton"),
   textFormatDialogCloseActionButton: document.getElementById("textFormatDialogCloseActionButton"),
-  addFontButton: document.getElementById("addFontButton"),
-  fontDialogOverlay: document.getElementById("fontDialogOverlay"),
-  fontDialog: document.getElementById("fontDialog"),
-  fontDialogCloseButton: document.getElementById("fontDialogCloseButton"),
-  fontDialogCancelButton: document.getElementById("fontDialogCancelButton"),
-  fontDialogAddButton: document.getElementById("fontDialogAddButton"),
-  fontFamilySearchInput: document.getElementById("fontFamilySearchInput"),
-  fontPreviewSample: document.getElementById("fontPreviewSample"),
   textInput: document.getElementById("textInput"),
   fontFamilySelect: document.getElementById("fontFamilySelect"),
   fontLigaturesInput: document.getElementById("fontLigaturesInput"),
@@ -163,17 +162,11 @@ function syncProjectTitleFromHeading(project) {
 }
 
 const APP_FONTS = [
-  { label: "Arial", family: "Arial", css: "Arial, Helvetica, sans-serif", source: "system" },
-  { label: "Computer Modern", family: "CMU Serif", css: "'CMU Serif', 'Computer Modern Serif', Georgia, serif", source: "app" },
+  { label: "Univers Modern", family: "CMU Serif", css: "'CMU Serif', 'Computer Modern Serif', Georgia, serif", source: "app" },
   { label: "Roboto", family: "Roboto", css: "'Roboto', Arial, Helvetica, sans-serif", source: "app" },
-  { label: "EB Garamond", family: "EB Garamond", css: "'EB Garamond', Georgia, serif", source: "app" },
-  { label: "Literata", family: "Literata", css: "'Literata', Georgia, serif", source: "app" },
-  { label: "Source Serif 4", family: "Source Serif 4", css: "'Source Serif 4', Georgia, serif", source: "app" },
+  { label: "Garamond", family: "EB Garamond", css: "'EB Garamond', Georgia, serif", source: "app" },
   { label: "Source Sans 3", family: "Source Sans 3", css: "'Source Sans 3', Arial, sans-serif", source: "app" },
   { label: "Source Code Pro", family: "Source Code Pro", css: "'Source Code Pro', 'Courier New', monospace", source: "app" },
-  { label: "Georgia", family: "Georgia", css: "Georgia, 'Times New Roman', serif", source: "system" },
-  { label: "Times New Roman", family: "Times New Roman", css: "'Times New Roman', Times, serif", source: "system" },
-  { label: "Courier New", family: "Courier New", css: "'Courier New', Courier, monospace", source: "system" },
 ];
 
 const state = {
@@ -191,6 +184,7 @@ const state = {
   projectBrowserRenderTimer: 0,
   detailsLayoutMode: "normal",
   detailsLayoutStep: 0,
+  editorZoom: 1,
 };
 
 function createId(prefix) {
@@ -199,7 +193,7 @@ function createId(prefix) {
 
 function createDefaultMetadata() {
   return {
-    textKind: "artikel",
+    textKind: "paper",
     subtitle: "",
     authors: [""],
     contributors: [""],
@@ -222,50 +216,54 @@ function createDefaultMetadata() {
 }
 
 function sourceTextTypeFromDocumentKind(textKind) {
-  if (textKind === "gedicht") return "lyric";
-  if (textKind === "drama") return "drama";
-  if (textKind === "notiz") return "note";
+  if (textKind === "notes") return "note";
+  if (textKind === "code") return "note";
   return "prose";
 }
 
-const DOCUMENT_STYLE_PRESETS = {
-  artikel: {
-    style: {
-      fontFamily: "'CMU Serif', 'Computer Modern Serif', Georgia, serif",
-      fontSize: 14,
-      lineHeight: 1.38,
-      measure: 64,
-      textAlign: "left",
-      ligatures: true,
-      hyphenation: "manual",
-      language: "de",
-    },
-    headingScale: {
-      1: 1.72,
-      2: 1.44,
-      3: 1.2,
-      4: 1,
-      5: 1,
-      6: 0.94,
-      7: 0.9,
-    },
-    titleScale: {
-      title: 1.72,
-      subtitle: 1.2,
-      authors: 1.2,
-      titleLineHeight: 1.12,
-      subtitleLineHeight: 1.2,
-      authorsLineHeight: 1.2,
-    },
-  },
+const DOCUMENT_STYLE_REGISTRY = window.TypeMapDocumentStyles || { styles: {}, order: [] };
+const DOCUMENT_STYLE_PRESETS = DOCUMENT_STYLE_REGISTRY.styles || {};
+const DOCUMENT_STYLE_ORDER = DOCUMENT_STYLE_REGISTRY.order?.length
+  ? DOCUMENT_STYLE_REGISTRY.order
+  : Object.keys(DOCUMENT_STYLE_PRESETS);
+const LEGACY_DOCUMENT_STYLE_MAP = {
+  artikel: "paper",
+  buchkapitel: "paper",
+  gedicht: "essay",
+  drama: "manuscript",
+  brief: "letter",
+  "wissenschaftlicher-text": "paper",
+  vertrag: "technical",
+  notiz: "notes",
 };
 
 function getDocumentStylePreset(textKind) {
   return DOCUMENT_STYLE_PRESETS[textKind] || null;
 }
 
+function normalizeDocumentStyleId(value) {
+  const raw = String(value || "").trim();
+  const mapped = LEGACY_DOCUMENT_STYLE_MAP[raw] || raw;
+  return DOCUMENT_STYLE_PRESETS[mapped] ? mapped : (DOCUMENT_STYLE_ORDER[0] || "paper");
+}
+
+function populateDocumentStyleSelect(select) {
+  if (!select) return;
+  clearElement(select);
+  DOCUMENT_STYLE_ORDER.forEach((styleId) => {
+    const preset = DOCUMENT_STYLE_PRESETS[styleId];
+    if (!preset) return;
+    const option = document.createElement("option");
+    option.value = styleId;
+    option.textContent = preset.label || styleId;
+    option.title = preset.purpose || "";
+    select.appendChild(option);
+  });
+}
+
 function applyDocumentStylePreset(project, textKind, options = {}) {
-  const preset = getDocumentStylePreset(textKind);
+  const normalizedTextKind = normalizeDocumentStyleId(textKind);
+  const preset = getDocumentStylePreset(normalizedTextKind);
   if (!project || !preset) return;
   const { includeFontSize = true } = options;
   project.style = {
@@ -279,6 +277,12 @@ function applyDocumentStylePreset(project, textKind, options = {}) {
     headingScale: { ...preset.headingScale },
     titleScale: { ...preset.titleScale },
   };
+  project.metadata = {
+    ...createDefaultMetadata(),
+    ...(project.metadata || {}),
+    textKind: normalizedTextKind,
+  };
+  project.source.textType = sourceTextTypeFromDocumentKind(normalizedTextKind);
 }
 
 function createDefaultTypography() {
@@ -361,36 +365,8 @@ function normalizePersonList(value) {
   return normalized.length ? normalized : [""];
 }
 
-function normalizeFontFamilyName(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function createGoogleFontCssValue(family) {
-  const normalizedFamily = normalizeFontFamilyName(family);
-  return normalizedFamily ? `'${normalizedFamily.replace(/'/g, "\\'")}', Arial, sans-serif` : APP_FONTS[0].css;
-}
-
 function normalizeProjectFonts(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  return value
-    .map((font) => {
-      const family = normalizeFontFamilyName(font?.family || font?.label || font);
-      if (!family) return null;
-      const key = family.toLowerCase();
-      if (seen.has(key)) return null;
-      seen.add(key);
-      return {
-        family,
-        label: String(font?.label || family),
-        css: String(font?.css || createGoogleFontCssValue(family)),
-        source: font?.source === "local" ? "local" : "google",
-        variants: Array.isArray(font?.variants) && font.variants.length ? font.variants.map(String) : ["400", "700"],
-      };
-    })
-    .filter(Boolean);
+  return [];
 }
 
 function createDefaultProject(title = "Neues Dokument") {
@@ -475,33 +451,17 @@ function normalizeProject(project) {
   );
   normalized.style.hyphenation = normalized.style.hyphenationSettings.mode;
   normalized.style.language = normalized.style.hyphenationSettings.language;
-  normalized.metadata.textKind = [
-    "artikel",
-    "essay",
-    "buchkapitel",
-    "gedicht",
-    "drama",
-    "brief",
-    "wissenschaftlicher-text",
-    "vertrag",
-    "notiz",
-  ].includes(normalized.metadata.textKind)
-    ? normalized.metadata.textKind
-    : fallback.metadata.textKind;
-  if (
-    normalized.metadata.textKind === "artikel"
-    && (!normalized.typography.headingScale || !Object.keys(normalized.typography.headingScale).length)
-  ) {
-    normalized.typography.headingScale = { ...DOCUMENT_STYLE_PRESETS.artikel.headingScale };
+  normalized.metadata.textKind = normalizeDocumentStyleId(normalized.metadata.textKind || fallback.metadata.textKind);
+  const preset = getDocumentStylePreset(normalized.metadata.textKind);
+  if (preset && (!normalized.typography.headingScale || !Object.keys(normalized.typography.headingScale).length)) {
+    normalized.typography.headingScale = { ...preset.headingScale };
   }
-  if (
-    normalized.metadata.textKind === "artikel"
-    && (!normalized.typography.titleScale || !Object.keys(normalized.typography.titleScale).length)
-  ) {
-    normalized.typography.titleScale = { ...DOCUMENT_STYLE_PRESETS.artikel.titleScale };
+  if (preset && (!normalized.typography.titleScale || !Object.keys(normalized.typography.titleScale).length)) {
+    normalized.typography.titleScale = { ...preset.titleScale };
   }
   normalized.metadata.authors = normalizePersonList(normalized.metadata.authors);
   normalized.metadata.contributors = normalizePersonList(normalized.metadata.contributors);
+  normalized.source.textType = sourceTextTypeFromDocumentKind(normalized.metadata.textKind);
   normalized.metadata.allowUse = normalized.metadata.allowUse === true;
   normalized.metadata.allowEdit = normalized.metadata.allowEdit === true;
   normalized.metadata.allowShare = normalized.metadata.allowShare === true;
@@ -1028,6 +988,15 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
   targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
+  targetPage.style.setProperty("--preview-body-font", style.fontFamily);
+  targetPage.style.setProperty("--preview-title-font", style.titleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-subtitle-font", style.subtitleFontFamily || style.titleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-meta-font", style.metaFontFamily || style.subtitleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-heading-font", style.headingFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-quote-font", style.quoteFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-code-font", style.codeFontFamily || "'Source Code Pro', 'Courier New', monospace");
+  targetPage.style.setProperty("--preview-paragraph-spacing", `${Number(style.paragraphSpacing) || 0}em`);
+  targetPage.style.setProperty("--preview-first-line-indent", style.firstLineIndent ? "1.3em" : "0");
   for (let level = 1; level <= 7; level += 1) {
     targetPage.style.setProperty(`--preview-heading-${level}`, `${Number(headingScale[level]) || 1}em`);
   }
@@ -1038,6 +1007,8 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-subtitle-line-height", String(Number(titleScale.subtitleLineHeight) || 1.28));
   targetPage.style.setProperty("--preview-authors-line-height", String(Number(titleScale.authorsLineHeight) || 1.28));
   targetText.style.fontFamily = style.fontFamily;
+  targetText.classList.toggle("has-first-line-indent", style.firstLineIndent === true);
+  targetText.classList.toggle("has-italic-quotes", style.quoteStyle === "italic");
   targetText.style.textAlign = textType === "lyric" ? "left" : style.textAlign;
   targetText.lang = hyphenationSettings.language;
   targetText.style.hyphens = hyphenationSettings.mode;
@@ -1119,31 +1090,8 @@ function rebuildModelsAndPreview() {
   renderViewLayer(project, state.sourceModel, state.layoutModel);
 }
 
-function buildGoogleFontUrl(family) {
-  const encodedFamily = normalizeFontFamilyName(family).replace(/\s+/g, "+");
-  return `https://fonts.googleapis.com/css2?family=${encodedFamily}:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap`;
-}
-
-function getFontLinkId(family) {
-  return `typemap-google-font-${normalizeFontFamilyName(family).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-}
-
-function loadGoogleFont(family) {
-  const normalizedFamily = normalizeFontFamilyName(family);
-  if (!normalizedFamily || document.getElementById(getFontLinkId(normalizedFamily))) return;
-  const link = document.createElement("link");
-  link.id = getFontLinkId(normalizedFamily);
-  link.rel = "stylesheet";
-  link.href = buildGoogleFontUrl(normalizedFamily);
-  document.head.appendChild(link);
-}
-
 function loadProjectFonts(projects = state.projects) {
-  projects.forEach((project) => {
-    normalizeProjectFonts(project?.typography?.projectFonts).forEach((font) => {
-      if (font.source === "google") loadGoogleFont(font.family);
-    });
-  });
+  return;
 }
 
 function renderFontOptions(project) {
@@ -1159,19 +1107,6 @@ function renderFontOptions(project) {
     appGroup.appendChild(option);
   });
   ui.fontFamilySelect.appendChild(appGroup);
-
-  const projectFonts = normalizeProjectFonts(project.typography?.projectFonts);
-  if (projectFonts.length) {
-    const projectGroup = document.createElement("optgroup");
-    projectGroup.label = "Dokument-Schriften";
-    projectFonts.forEach((font) => {
-      const option = document.createElement("option");
-      option.value = font.css;
-      option.textContent = font.label || font.family;
-      projectGroup.appendChild(option);
-    });
-    ui.fontFamilySelect.appendChild(projectGroup);
-  }
 
   const optionValues = Array.from(ui.fontFamilySelect.options).map((option) => option.value);
   if (!optionValues.includes(project.style.fontFamily)) {
@@ -1204,7 +1139,7 @@ function renderEditorHighlight(rawText) {
     } else if (match.startsWith("`")) {
       className = "markdown-editor-code";
     } else if (match.startsWith("#")) {
-      className = "markdown-editor-heading";
+      className = /^#\s+/.test(match) ? "markdown-editor-title" : "markdown-editor-heading";
     } else if (match.startsWith("==")) {
       className = "markdown-editor-mark";
     } else if (match.startsWith("**") || match.startsWith("__")) {
@@ -1484,6 +1419,10 @@ function renderEditor() {
   syncEditorHighlightScroll();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
   if (ui.fontLigaturesInput) ui.fontLigaturesInput.checked = project.style.ligatures !== false;
+  populateDocumentStyleSelect(ui.toolbarTextKindSelect);
+  if (ui.toolbarTextKindSelect) ui.toolbarTextKindSelect.value = normalizeDocumentStyleId(project.metadata?.textKind);
+  if (ui.editorZoomSelect) ui.editorZoomSelect.value = String(state.editorZoom);
+  if (ui.toolbarFontSizeValue) ui.toolbarFontSizeValue.textContent = String(Number(project.style.fontSize) || 14);
   ensureSelectOption(ui.fontSizeInput, project.style.fontSize, "Aktuelle Schriftgröße");
   ensureSelectOption(ui.lineHeightInput, project.style.lineHeight, "Aktuelle Zeilenhöhe");
   ensureSelectOption(ui.measureInput, project.style.measure, "Aktuelle Satzbreite");
@@ -1497,11 +1436,6 @@ function renderEditor() {
 function setDialogOpen(isOpen) {
   if (ui.documentPropertiesOverlay) ui.documentPropertiesOverlay.hidden = !isOpen;
   if (ui.documentPropertiesDialog) ui.documentPropertiesDialog.hidden = !isOpen;
-}
-
-function setFontDialogOpen(isOpen) {
-  if (ui.fontDialogOverlay) ui.fontDialogOverlay.hidden = !isOpen;
-  if (ui.fontDialog) ui.fontDialog.hidden = !isOpen;
 }
 
 function setFontSettingsDialogOpen(isOpen) {
@@ -1522,6 +1456,75 @@ function setLineNumberDialogOpen(isOpen) {
 function setHyphenationDialogOpen(isOpen) {
   if (ui.hyphenationDialogOverlay) ui.hyphenationDialogOverlay.hidden = !isOpen;
   if (ui.hyphenationDialog) ui.hyphenationDialog.hidden = !isOpen;
+}
+
+function closeEditorMenus() {
+  document.querySelectorAll(".editor-menu[open], .toolbar-popover[open]").forEach((menu) => {
+    menu.open = false;
+  });
+}
+
+function setActiveTextKind(textKind) {
+  const normalizedTextKind = normalizeDocumentStyleId(textKind);
+  updateActiveProject((project) => {
+    const previousTextKind = project.metadata?.textKind || createDefaultMetadata().textKind;
+    project.metadata = {
+      ...createDefaultMetadata(),
+      ...(project.metadata || {}),
+      textKind: normalizedTextKind,
+    };
+    project.source.textType = sourceTextTypeFromDocumentKind(normalizedTextKind);
+    if (normalizedTextKind !== previousTextKind) {
+      applyDocumentStylePreset(project, normalizedTextKind);
+    }
+    if (project.source.textType === "lyric") {
+      project.style.textAlign = "left";
+      project.style.lineHeight = 1.5;
+    }
+  });
+  renderEditor();
+}
+
+function replaceEditorSelection(transform) {
+  const input = ui.textInput;
+  if (!input) return;
+  const start = input.selectionStart ?? 0;
+  const end = input.selectionEnd ?? start;
+  const value = input.value;
+  const selected = value.slice(start, end);
+  const replacement = transform(selected);
+  input.value = `${value.slice(0, start)}${replacement}${value.slice(end)}`;
+  input.focus();
+  const selectionStart = start;
+  const selectionEnd = start + replacement.length;
+  input.setSelectionRange(selectionStart, selectionEnd);
+  syncEditorHighlightScroll();
+  updateActiveProjectTextFromEditor(input.value);
+}
+
+function wrapEditorSelection(marker) {
+  replaceEditorSelection((selected) => `${marker}${selected || "Text"}${marker}`);
+}
+
+function clearEditorFormatting() {
+  replaceEditorSelection((selected) => String(selected || "")
+    .replace(/(```|`|==|\*\*|__|\*|_)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"));
+}
+
+function updateEditorZoom(value) {
+  const zoom = Number(value) || 1;
+  state.editorZoom = zoom;
+  document.documentElement.style.setProperty("--editor-zoom", String(zoom));
+  syncEditorHighlightScroll();
+}
+
+function changeActiveFontSize(delta) {
+  updateActiveProject((project) => {
+    const current = Number(project.style.fontSize) || 14;
+    project.style.fontSize = Math.max(8, Math.min(72, current + delta));
+  });
+  renderEditor();
 }
 
 function renderPersonRows(container, values, type) {
@@ -1575,6 +1578,8 @@ function openDocumentPropertiesDialog() {
     ...createDefaultMetadata(),
     ...(project.metadata || {}),
   };
+  metadata.textKind = normalizeDocumentStyleId(metadata.textKind);
+  populateDocumentStyleSelect(ui.docTextKindInput);
   if (ui.docTextKindInput) ui.docTextKindInput.value = metadata.textKind;
   if (ui.docTitleInput) ui.docTitleInput.value = project.title;
   if (ui.docSubtitleInput) ui.docSubtitleInput.value = metadata.subtitle || "";
@@ -1608,7 +1613,7 @@ function saveDocumentPropertiesDialog() {
     const previousTextKind = project.metadata?.textKind || createDefaultMetadata().textKind;
     project.title = ui.docTitleInput?.value.trim() || "Unbenanntes Dokument";
     syncProjectTitleHeading(project, previousTitle);
-    const textKind = ui.docTextKindInput?.value || "essay";
+    const textKind = normalizeDocumentStyleId(ui.docTextKindInput?.value || createDefaultMetadata().textKind);
     project.metadata = {
       ...createDefaultMetadata(),
       ...(project.metadata || {}),
@@ -1645,27 +1650,6 @@ function saveDocumentPropertiesDialog() {
   setDialogOpen(false);
 }
 
-function updateFontPreviewSample() {
-  const family = normalizeFontFamilyName(ui.fontFamilySearchInput?.value || "");
-  if (!ui.fontPreviewSample) return;
-  if (!family) {
-    ui.fontPreviewSample.style.fontFamily = "";
-    return;
-  }
-  loadGoogleFont(family);
-  ui.fontPreviewSample.style.fontFamily = createGoogleFontCssValue(family);
-}
-
-function openFontDialog() {
-  if (ui.fontFamilySearchInput) ui.fontFamilySearchInput.value = "";
-  updateFontPreviewSample();
-  setFontDialogOpen(true);
-  ui.fontFamilySearchInput?.focus();
-  document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
-    menu.open = false;
-  });
-}
-
 function openFontSettingsDialog() {
   const project = getActiveProject();
   if (!project) return;
@@ -1684,36 +1668,6 @@ function openTextFormatDialog() {
   document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
     menu.open = false;
   });
-}
-
-function addFontToActiveProject() {
-  const family = normalizeFontFamilyName(ui.fontFamilySearchInput?.value || "");
-  if (!family) return;
-  const css = createGoogleFontCssValue(family);
-  loadGoogleFont(family);
-  updateActiveProject((project) => {
-    const projectFonts = normalizeProjectFonts(project.typography?.projectFonts);
-    const exists = projectFonts.some((font) => font.family.toLowerCase() === family.toLowerCase());
-    project.typography = {
-      ...createDefaultTypography(),
-      ...(project.typography || {}),
-      projectFonts: exists
-        ? projectFonts
-        : [
-            ...projectFonts,
-            {
-              family,
-              label: family,
-              css,
-              source: "google",
-              variants: ["400", "700"],
-            },
-          ],
-    };
-    project.style.fontFamily = css;
-  });
-  renderEditor();
-  setFontDialogOpen(false);
 }
 
 function openLineNumberDialog() {
@@ -2503,7 +2457,6 @@ function bindMenu() {
     if (event.key === "Escape") {
       setMenuOpen(false);
       setDialogOpen(false);
-      setFontDialogOpen(false);
       setFontSettingsDialogOpen(false);
       setTextFormatDialogOpen(false);
       setLineNumberDialogOpen(false);
@@ -2514,19 +2467,17 @@ function bindMenu() {
 }
 
 function bindEditor() {
-  document.querySelectorAll(".editor-menu").forEach((menu) => {
+  document.querySelectorAll(".editor-menu, .toolbar-popover").forEach((menu) => {
     menu.addEventListener("toggle", () => {
       if (!menu.open) return;
-      document.querySelectorAll(".editor-menu").forEach((otherMenu) => {
+      document.querySelectorAll(".editor-menu, .toolbar-popover").forEach((otherMenu) => {
         if (otherMenu !== menu) otherMenu.open = false;
       });
     });
   });
   document.addEventListener("click", (event) => {
-    if (event.target instanceof Element && event.target.closest(".editor-menu")) return;
-    document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
-      menu.open = false;
-    });
+    if (event.target instanceof Element && event.target.closest(".editor-menu, .toolbar-popover")) return;
+    closeEditorMenus();
   });
   document.querySelectorAll("[data-type-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2583,6 +2534,55 @@ function bindEditor() {
     event.stopPropagation();
     openDocumentPropertiesDialog();
   });
+  ui.toolbarTextKindSelect?.addEventListener("change", () => {
+    setActiveTextKind(ui.toolbarTextKindSelect.value || createDefaultMetadata().textKind);
+  });
+  ui.editorZoomSelect?.addEventListener("change", () => {
+    updateEditorZoom(ui.editorZoomSelect.value);
+  });
+  ui.decreaseFontSizeButton?.addEventListener("click", () => changeActiveFontSize(-1));
+  ui.increaseFontSizeButton?.addEventListener("click", () => changeActiveFontSize(1));
+  ui.clearFormattingButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    clearEditorFormatting();
+    closeEditorMenus();
+  });
+  ui.textFormatWidthButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openTextFormatDialog();
+  });
+  document.querySelectorAll("[data-toolbar-align]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const align = button.dataset.toolbarAlign || "left";
+      updateActiveProject((project) => {
+        project.style.textAlign = align;
+      });
+      closeEditorMenus();
+    });
+  });
+  document.querySelectorAll("[data-toolbar-line-height]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      updateActiveProject((project) => {
+        project.style.lineHeight = Number(button.dataset.toolbarLineHeight) || project.style.lineHeight;
+      });
+      closeEditorMenus();
+    });
+  });
+  document.querySelectorAll("[data-wrap-markdown]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      wrapEditorSelection(button.dataset.wrapMarkdown || "");
+      closeEditorMenus();
+    });
+  });
+  document.querySelectorAll("[data-insert-object], [data-future-action], [data-view-option]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      closeEditorMenus();
+    });
+  });
   ui.documentPropertiesOverlay?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesCloseButton?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesCancelButton?.addEventListener("click", () => setDialogOpen(false));
@@ -2603,21 +2603,6 @@ function bindEditor() {
   ui.textFormatDialogOverlay?.addEventListener("click", () => setTextFormatDialogOpen(false));
   ui.textFormatDialogCloseButton?.addEventListener("click", () => setTextFormatDialogOpen(false));
   ui.textFormatDialogCloseActionButton?.addEventListener("click", () => setTextFormatDialogOpen(false));
-  ui.addFontButton?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    openFontDialog();
-  });
-  ui.fontDialogOverlay?.addEventListener("click", () => setFontDialogOpen(false));
-  ui.fontDialogCloseButton?.addEventListener("click", () => setFontDialogOpen(false));
-  ui.fontDialogCancelButton?.addEventListener("click", () => setFontDialogOpen(false));
-  ui.fontDialogAddButton?.addEventListener("click", addFontToActiveProject);
-  ui.fontFamilySearchInput?.addEventListener("input", updateFontPreviewSample);
-  ui.fontFamilySearchInput?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addFontToActiveProject();
-    }
-  });
   ui.lineNumberSettingsButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     openLineNumberDialog();

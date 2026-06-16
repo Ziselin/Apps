@@ -10,8 +10,8 @@
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260616j">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="typemap.css?v=20260616l">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -32,10 +32,22 @@
           <div class="export-control">
             <button type="button" id="exportProjectButton" aria-expanded="false" aria-controls="exportMenu">Export</button>
             <div id="exportMenu" class="export-menu" hidden>
-              <button type="button" data-export-format="md">MD</button>
-              <button type="button" data-export-format="html">HTML</button>
-              <button type="button" data-export-format="png">PNG</button>
-              <button type="button" data-export-format="json">Dokument JSON</button>
+              <button type="button" data-export-format="md">
+                <img src="https://api.iconify.design/material-symbols/markdown.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>MD</span>
+              </button>
+              <button type="button" data-export-format="html">
+                <img src="https://api.iconify.design/material-symbols/html.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>HTML</span>
+              </button>
+              <button type="button" data-export-format="png">
+                <img src="https://api.iconify.design/material-symbols/file-png.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span>PNG</span>
+              </button>
+              <button type="button" data-export-format="json">
+                <img src="https://api.iconify.design/devicon/json.svg" alt="" aria-hidden="true">
+                <span>JSON</span>
+              </button>
             </div>
           </div>
           <button type="button" id="themeToggleButton" class="theme-toggle-button" aria-label="Hellen Modus aktivieren" aria-pressed="false">
@@ -145,42 +157,148 @@
         </div>
 
         <div class="editor-controls">
-        <div class="editor-toolbar" role="toolbar" aria-label="Texteditor-Menü">
-          <details class="editor-menu">
-            <summary>Satz</summary>
-            <div class="editor-menu-panel">
-              <button type="button" id="fontSettingsButton" class="editor-menu-action">
-                <img src="https://api.iconify.design/material-symbols/font-download-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
-                <span>Schrift</span>
-              </button>
-              <button type="button" id="textFormatSettingsButton" class="editor-menu-action">
-                <img src="https://api.iconify.design/material-symbols/format-size-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
-                <span>Textformat</span>
-              </button>
-              <button type="button" id="hyphenationSettingsButton" class="editor-menu-action">
-                <img src="https://api.iconify.design/material-symbols/text-fields-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
-                <span>Worttrennung</span>
-              </button>
+        <div class="editor-menu-room" aria-label="Texteditor-Menü">
+          <div class="editor-toolbar editor-toolbar-primary" role="menubar">
+            <details class="editor-menu">
+              <summary>Einfügen</summary>
+              <div class="editor-menu-panel">
+                <button type="button" class="editor-menu-action" data-insert-object="image">
+                  <img src="https://api.iconify.design/clarity/picture-solid.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Bild</span>
+                </button>
+                <button type="button" class="editor-menu-action" data-insert-object="table">
+                  <img src="https://api.iconify.design/lucide/table.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Tabelle</span>
+                </button>
+                <button type="button" class="editor-menu-action" data-insert-object="formula">
+                  <img src="https://api.iconify.design/material-symbols/functions.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Formel</span>
+                </button>
+                <button type="button" class="editor-menu-action" data-insert-object="list">
+                  <img src="https://api.iconify.design/material-symbols/format-list-bulleted-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Liste</span>
+                </button>
+                <button type="button" class="editor-menu-action" data-insert-object="quote">
+                  <img src="https://api.iconify.design/material-symbols/format-quote-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Zitat</span>
+                </button>
+                <button type="button" class="editor-menu-action" data-insert-object="toc">
+                  <img src="https://api.iconify.design/material-symbols/toc-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Inhaltsverzeichnis</span>
+                </button>
+              </div>
+            </details>
+            <details class="editor-menu">
+              <summary>Format</summary>
+              <div class="editor-menu-panel">
+                <button type="button" id="fontSettingsButton" class="editor-menu-action">
+                  <img src="https://api.iconify.design/material-symbols/text-fields-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Schrift</span>
+                </button>
+                <div class="editor-menu-action editor-submenu">
+                  <img src="https://api.iconify.design/majesticons/text-align-left.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Ausrichten</span>
+                  <span class="editor-submenu-arrow">›</span>
+                  <div class="editor-submenu-panel">
+                    <button type="button" data-toolbar-align="left">Linksbündig</button>
+                    <button type="button" data-toolbar-align="center">Zentriert</button>
+                    <button type="button" data-toolbar-align="right">Rechtsbündig</button>
+                    <button type="button" data-toolbar-align="justify">Blocksatz</button>
+                  </div>
+                </div>
+                <div class="editor-menu-action editor-submenu">
+                  <img src="https://api.iconify.design/material-symbols/format-line-spacing-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Zeilen- und Absatzabstand</span>
+                  <span class="editor-submenu-arrow">›</span>
+                  <div class="editor-submenu-panel">
+                    <button type="button" id="textFormatSettingsButton">Textformat</button>
+                    <button type="button" data-toolbar-line-height="1">Einzeilig</button>
+                    <button type="button" data-toolbar-line-height="1.5">1,5-zeilig</button>
+                    <button type="button" data-toolbar-line-height="2">Doppelt</button>
+                  </div>
+                </div>
+                <div class="editor-menu-action editor-submenu">
+                  <img src="https://api.iconify.design/material-symbols/splitscreen-top-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Kopf- und Fußzeile</span>
+                  <span class="editor-submenu-arrow">›</span>
+                  <div class="editor-submenu-panel">
+                    <button type="button" data-future-action="header">Kopfzeile</button>
+                    <button type="button" data-future-action="footer">Fußzeile</button>
+                  </div>
+                </div>
+                <button type="button" class="editor-menu-action" id="clearFormattingButton">
+                  <img src="https://api.iconify.design/material-symbols/format-clear-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Formatierung entfernen</span>
+                </button>
+              </div>
+            </details>
+            <details class="editor-menu">
+              <summary>Ansicht</summary>
+              <div class="editor-menu-panel editor-menu-panel-right">
+                <button type="button" class="editor-menu-action" data-view-option="toc">
+                  <img src="https://api.iconify.design/material-symbols/toc-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Inhaltsverzeichnis</span>
+                </button>
+                <button type="button" id="textFormatWidthButton" class="editor-menu-action">
+                  <img src="https://api.iconify.design/material-symbols/width-normal-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Breite</span>
+                </button>
+                <button type="button" id="hyphenationSettingsButton" class="editor-menu-action">
+                  <img src="https://api.iconify.design/material-symbols/text-fields-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Worttrennung</span>
+                </button>
+                <button type="button" id="lineNumberSettingsButton" class="editor-menu-action">
+                  <img src="https://api.iconify.design/material-symbols/format-list-numbered-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Zeilennummerierung</span>
+                </button>
+              </div>
+            </details>
+          </div>
+          <div class="editor-toolbar editor-toolbar-format" role="toolbar" aria-label="Schnellformatierung">
+            <select id="toolbarTextKindSelect" class="toolbar-select" aria-label="Textart"></select>
+            <button type="button" id="documentPropertiesButton" class="toolbar-button">
+              <img src="https://api.iconify.design/lucide/table-properties.svg?color=%23ffb347" alt="" aria-hidden="true">
+              <span>Eigenschaften</span>
+            </button>
+            <select id="editorZoomSelect" class="toolbar-select toolbar-select-compact" aria-label="Editor-Zoom">
+              <option value="0.75">75%</option>
+              <option value="0.9">90%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.1">110%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+            </select>
+            <details class="toolbar-popover">
+              <summary class="toolbar-icon-button" aria-label="Textausrichtung">
+                <img src="https://api.iconify.design/majesticons/text-align-left.svg?color=%23ffb347" alt="" aria-hidden="true">
+              </summary>
+              <div class="toolbar-popover-panel toolbar-align-panel">
+                <button type="button" data-toolbar-align="left" aria-label="Linksbündig"><img src="https://api.iconify.design/majesticons/text-align-left.svg?color=%23ffb347" alt=""></button>
+                <button type="button" data-toolbar-align="center" aria-label="Zentriert"><img src="https://api.iconify.design/majesticons/text-align-center.svg?color=%23ffb347" alt=""></button>
+                <button type="button" data-toolbar-align="right" aria-label="Rechtsbündig"><span>r</span></button>
+                <button type="button" data-toolbar-align="justify" aria-label="Blocksatz"><span>b</span></button>
+              </div>
+            </details>
+            <div class="font-size-stepper" aria-label="Schriftgröße">
+              <button type="button" id="decreaseFontSizeButton" aria-label="Schrift verkleinern">-</button>
+              <span id="toolbarFontSizeValue">14</span>
+              <button type="button" id="increaseFontSizeButton" aria-label="Schrift vergrößern">+</button>
             </div>
-          </details>
-          <details class="editor-menu">
-            <summary>Ansicht</summary>
-            <div class="editor-menu-panel">
-              <button type="button" id="lineNumberSettingsButton" class="editor-menu-action">
-                <img src="https://api.iconify.design/material-symbols/format-list-numbered-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
-                <span>Zeilennummerierung</span>
-              </button>
-            </div>
-          </details>
-          <details class="editor-menu">
-            <summary>Dokument</summary>
-            <div class="editor-menu-panel editor-menu-panel-right">
-              <button type="button" id="documentPropertiesButton" class="editor-menu-action">
-                <img src="https://api.iconify.design/lucide/table-properties.svg?color=%23ffb347" alt="" aria-hidden="true">
-                <span>Dokumentdaten</span>
-              </button>
-            </div>
-          </details>
+            <button type="button" class="toolbar-icon-button toolbar-text-button" data-wrap-markdown="__" aria-label="Fett">B</button>
+            <button type="button" class="toolbar-icon-button toolbar-text-button is-italic" data-wrap-markdown="_" aria-label="Kursiv">i</button>
+            <details class="toolbar-popover">
+              <summary class="toolbar-icon-button toolbar-text-button is-underlined" aria-label="Unterstreichen">u</summary>
+              <div class="toolbar-popover-panel">
+                <button type="button" data-wrap-markdown="==">Unterstrichen</button>
+                <button type="button" data-wrap-markdown="==">Doppelt unterstrichen</button>
+                <button type="button" data-wrap-markdown="==">Farbig</button>
+                <button type="button" data-wrap-markdown="==">Gewellt</button>
+                <button type="button" data-wrap-markdown="==">Ausschraffiert</button>
+                <button type="button" data-wrap-markdown="==">Gestrichelt</button>
+                <button type="button" data-wrap-markdown="==">Gepunktet</button>
+              </div>
+            </details>
+          </div>
         </div>
         </div>
 
@@ -213,17 +331,7 @@
         <div class="property-list">
           <label class="property-row">
             <span>Textart</span>
-            <select id="docTextKindInput">
-              <option value="artikel">Artikel</option>
-              <option value="essay">Essay</option>
-              <option value="buchkapitel">Buchkapitel</option>
-              <option value="gedicht">Gedicht</option>
-              <option value="drama">Drama</option>
-              <option value="brief">Brief</option>
-              <option value="wissenschaftlicher-text">Wissenschaftlicher Text</option>
-              <option value="vertrag">Vertrag</option>
-              <option value="notiz">Notiz</option>
-            </select>
+            <select id="docTextKindInput"></select>
           </label>
           <label class="property-row">
             <span>Titel</span>
@@ -355,10 +463,6 @@
             <span>Ligaturen</span>
             <input id="fontLigaturesInput" type="checkbox">
           </label>
-          <div class="property-row">
-            <span>Dokument-Schrift</span>
-            <button type="button" id="addFontButton" class="property-add-button">Schrift hinzufügen</button>
-          </div>
         </div>
       </section>
     </div>
@@ -425,6 +529,7 @@
             <select id="textAlignSelect">
               <option value="left">Links</option>
               <option value="center">Zentriert</option>
+              <option value="right">Rechts</option>
               <option value="justify">Blocksatz</option>
             </select>
           </label>
@@ -442,37 +547,6 @@
     </div>
     <div class="property-dialog-actions">
       <button type="button" id="textFormatDialogCloseActionButton" class="secondary-button primary-action">Schließen</button>
-    </div>
-  </section>
-
-  <div id="fontDialogOverlay" class="modal-overlay" hidden></div>
-  <section id="fontDialog" class="property-dialog font-dialog" role="dialog" aria-modal="true" aria-labelledby="fontDialogTitle" hidden>
-    <div class="property-dialog-head">
-      <div>
-        <span class="label">Typografie</span>
-        <h2 id="fontDialogTitle">Schrift hinzufügen</h2>
-      </div>
-      <button type="button" id="fontDialogCloseButton" class="dialog-icon-button" aria-label="Schrift-Dialog schließen">X</button>
-    </div>
-    <div class="property-dialog-body">
-      <section class="property-section">
-        <h3>Google Fonts</h3>
-        <p class="event-description">Trage eine Schriftfamilie ein. TypeMap lädt sie nur für dieses Dokument und nimmt sie in die Dokumentschriften auf.</p>
-        <div class="property-list">
-          <label class="property-row">
-            <span>Schriftfamilie</span>
-            <input id="fontFamilySearchInput" type="text" autocomplete="off" placeholder="z. B. Crimson Pro">
-          </label>
-          <div class="property-row">
-            <span>Vorschau</span>
-            <div id="fontPreviewSample" class="font-preview-sample">Franz jagt im komplett verwahrlosten Taxi quer durch Bayern.</div>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="property-dialog-actions">
-      <button type="button" id="fontDialogCancelButton" class="secondary-button">Abbrechen</button>
-      <button type="button" id="fontDialogAddButton" class="secondary-button primary-action">Zum Dokument hinzufügen</button>
     </div>
   </section>
 
@@ -575,7 +649,8 @@
       <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
     </div>
   </section>
-  <script src="typemap.js?v=20260616i"></script>
+  <script src="styles/document-styles.js?v=20260616a"></script>
+  <script src="typemap.js?v=20260616m"></script>
 </body>
 </html>
 
