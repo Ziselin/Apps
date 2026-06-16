@@ -5,6 +5,8 @@ const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
+const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
+const PARATEXT_END_PATTERN = /^:::\s*$/;
 
 const ui = {
   menuButton: document.getElementById("typeMenuButton"),
@@ -123,9 +125,32 @@ function normalizeMarkdownHeadingText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function stripInlineMarkdownSyntax(value) {
+  let text = String(value || "");
+  let previous = "";
+  while (text && text !== previous) {
+    previous = text;
+    text = text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/`([^`\n]+)`/g, "$1")
+      .replace(/==([^=\n]+)==/g, "$1")
+      .replace(/~~([^~\n]+)~~/g, "$1")
+      .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+      .replace(/__([^_\n]+)__/g, "$1")
+      .replace(/\*([^*\n]+)\*/g, "$1")
+      .replace(/_([^_\n]+)_/g, "$1");
+  }
+  return normalizeMarkdownHeadingText(text);
+}
+
+function getPlainDocumentLabel(value, fallback = "") {
+  return stripInlineMarkdownSyntax(value) || fallback;
+}
+
 function getOpeningTitleHeading(rawText) {
   const match = String(rawText || "").match(/^\s*#\s+([^\r\n]+)/);
-  return match ? normalizeMarkdownHeadingText(match[1]) : "";
+  return match ? getPlainDocumentLabel(match[1]) : "";
 }
 
 function projectStartsWithTitleHeading(project) {
@@ -186,6 +211,7 @@ const state = {
   detailsLayoutMode: "normal",
   detailsLayoutStep: 0,
   editorZoom: 1,
+  sideTocUpdateTimer: 0,
 };
 
 function createId(prefix) {
@@ -558,6 +584,7 @@ function setProjectExpanded(projectId, isExpanded) {
 function getMarkdownBlockType(text) {
   const value = String(text || "");
   if (value.trim() === TOC_OBJECT_MARKER) return "toc";
+  if (isParatextMarker(value)) return "paratext-marker";
   if (/^#{1,7}\s+/.test(value)) return "heading";
   if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
   if (/^```/.test(value)) return "code";
@@ -567,11 +594,30 @@ function getMarkdownBlockType(text) {
   return "paragraph";
 }
 
+function normalizeParatextKind(value) {
+  const kind = String(value || "").toLowerCase();
+  if (kind === "front" || kind === "frontmatter") return "front";
+  if (kind === "back" || kind === "backmatter") return "back";
+  return "body";
+}
+
+function getParatextMarkerKind(text) {
+  const value = String(text || "").trim();
+  const startMatch = value.match(PARATEXT_START_PATTERN);
+  if (startMatch) return normalizeParatextKind(startMatch[1]);
+  if (PARATEXT_END_PATTERN.test(value)) return "body";
+  return null;
+}
+
+function isParatextMarker(text) {
+  return getParatextMarkerKind(text) !== null;
+}
+
 function createMarkdownBlockNode(block, index) {
   const headingMatch = String(block.text || "").match(/^(#{1,7})\s+(.+)$/);
   const type = headingMatch ? "heading" : getMarkdownBlockType(block.text);
   const title = headingMatch
-    ? headingMatch[2].trim()
+    ? getPlainDocumentLabel(headingMatch[2], "Ohne Titel")
     : type === "toc"
       ? "Inhaltsverzeichnis"
       : type === "table"
@@ -591,40 +637,92 @@ function createMarkdownBlockNode(block, index) {
     text: block.text,
     startOffset: block.startOffset,
     endOffset: block.endOffset,
+    matter: block.matter || "body",
     children: [],
   };
 }
 
 function buildDocumentTree(blocks, rawText) {
+  const frontNode = {
+    id: "document-frontmatter",
+    type: "matter",
+    matter: "front",
+    title: "Paratexte (Anfang)",
+    startOffset: rawText.length,
+    endOffset: 0,
+    children: [],
+  };
+  const bodyNode = {
+    id: "document-body",
+    type: "matter",
+    matter: "body",
+    title: "Text",
+    startOffset: rawText.length,
+    endOffset: 0,
+    children: [],
+  };
+  const backNode = {
+    id: "document-backmatter",
+    type: "matter",
+    matter: "back",
+    title: "Paratexte (Ende)",
+    startOffset: rawText.length,
+    endOffset: 0,
+    children: [],
+  };
   const documentNode = {
     id: "document-root",
     type: "document",
     title: "Dokument",
     startOffset: 0,
     endOffset: rawText.length,
-    children: [],
+    children: [frontNode, bodyNode, backNode],
   };
-  const stack = [{ level: 0, node: documentNode }];
-  const sectionCounters = [];
+  const matterNodes = { front: frontNode, body: bodyNode, back: backNode };
+  const matterStacks = {
+    front: [{ level: 0, node: frontNode }],
+    body: [{ level: 0, node: bodyNode }],
+    back: [{ level: 0, node: backNode }],
+  };
+  const sectionCounters = { front: [], body: [], back: [] };
+
+  function touchMatterNode(matter, startOffset, endOffset) {
+    const node = matterNodes[matter] || bodyNode;
+    node.startOffset = Math.min(node.startOffset, startOffset);
+    node.endOffset = Math.max(node.endOffset, endOffset);
+  }
+
+  function closeStackTo(matter, sectionLevel, startOffset) {
+    const stack = matterStacks[matter] || matterStacks.body;
+    while (stack.length > 1 && stack[stack.length - 1].level >= sectionLevel) {
+      const closed = stack.pop().node;
+      closed.endOffset = startOffset;
+    }
+  }
 
   blocks.forEach((block, index) => {
     const node = createMarkdownBlockNode(block, index);
+    if (node.type === "paratext-marker") return;
+    const matter = ["front", "back"].includes(node.matter) ? node.matter : "body";
+    const stack = matterStacks[matter] || matterStacks.body;
+    touchMatterNode(matter, node.startOffset, node.endOffset);
     if (node.type === "heading") {
       if (node.level === 1) {
         return;
       }
       const sectionLevel = Math.max(1, node.level - 1);
-      while (stack.length > 1 && stack[stack.length - 1].level >= sectionLevel) {
-        const closed = stack.pop().node;
-        closed.endOffset = node.startOffset;
+      closeStackTo(matter, sectionLevel, node.startOffset);
+      const counters = sectionCounters[matter] || sectionCounters.body;
+      counters.length = sectionLevel;
+      if (matter === "body") {
+        counters[sectionLevel - 1] = (counters[sectionLevel - 1] || 0) + 1;
       }
-      sectionCounters.length = sectionLevel;
-      sectionCounters[sectionLevel - 1] = (sectionCounters[sectionLevel - 1] || 0) + 1;
       const section = {
         id: `section-${index + 1}-${node.startOffset}`,
         type: "section",
+        matter,
         level: sectionLevel,
-        number: sectionCounters.slice(0, sectionLevel).filter(Boolean).join("."),
+        number: matter === "body" ? counters.slice(0, sectionLevel).filter(Boolean).join(".") : "",
         title: node.title,
         startOffset: node.startOffset,
         endOffset: rawText.length,
@@ -638,10 +736,18 @@ function buildDocumentTree(blocks, rawText) {
     stack[stack.length - 1].node.children.push(node);
   });
 
-  while (stack.length > 1) {
-    const closed = stack.pop().node;
-    closed.endOffset = rawText.length;
-  }
+  Object.entries(matterStacks).forEach(([matter, stack]) => {
+    const fallbackEnd = matterNodes[matter]?.endOffset || rawText.length;
+    while (stack.length > 1) {
+      const closed = stack.pop().node;
+      closed.endOffset = fallbackEnd;
+    }
+    if (!matterNodes[matter].children.length) {
+      matterNodes[matter].startOffset = matter === "body" ? 0 : rawText.length;
+      matterNodes[matter].endOffset = matter === "body" ? rawText.length : 0;
+    }
+  });
+  documentNode.children = documentNode.children.filter((child) => child.type !== "matter" || child.matter === "body" || child.children.length);
   return documentNode;
 }
 
@@ -668,6 +774,8 @@ function buildSourceModel(project) {
   let cursor = 0;
   let paragraphLines = [];
   let paragraphStart = 0;
+  let paragraphMatter = "body";
+  let currentMatter = "body";
 
   function flushParagraph(endOffset) {
     if (!paragraphLines.length) return;
@@ -680,8 +788,10 @@ function buildSourceModel(project) {
       startOffset: paragraphStart,
       endOffset,
       lineIds: paragraphLines.map((line) => line.id),
+      matter: paragraphMatter,
     });
     paragraphLines = [];
+    paragraphMatter = currentMatter;
   }
 
   function pushSingleLineBlock(line) {
@@ -693,6 +803,7 @@ function buildSourceModel(project) {
       startOffset: line.startOffset,
       endOffset: line.endOffset,
       lineIds: [line.id],
+      matter: currentMatter,
     });
   }
 
@@ -705,8 +816,19 @@ function buildSourceModel(project) {
       text,
       startOffset,
       endOffset,
+      matter: currentMatter,
     };
     sourceLines.push(line);
+
+    const paratextMarkerKind = getParatextMarkerKind(text);
+    if (paratextMarkerKind) {
+      flushParagraph(startOffset);
+      pushSingleLineBlock(line);
+      currentMatter = paratextMarkerKind;
+      paragraphMatter = currentMatter;
+      cursor = endOffset + 1;
+      return;
+    }
 
     if (/^#{1,7}\s+/.test(text.trim())) {
       flushParagraph(startOffset);
@@ -723,7 +845,10 @@ function buildSourceModel(project) {
     }
 
     if (text.trim()) {
-      if (!paragraphLines.length) paragraphStart = startOffset;
+      if (!paragraphLines.length) {
+        paragraphStart = startOffset;
+        paragraphMatter = currentMatter;
+      }
       paragraphLines.push(line);
     } else {
       flushParagraph(endOffset);
@@ -741,6 +866,7 @@ function buildSourceModel(project) {
     semanticRanges: paragraphs.map((paragraph) => ({
       id: paragraph.id,
       type: paragraph.type,
+      matter: paragraph.matter || "body",
       startOffset: paragraph.startOffset,
       endOffset: paragraph.endOffset,
     })),
@@ -769,6 +895,7 @@ function buildBrowserLayoutModel(sourceModel, style, range = null) {
       sourceEndOffset: paragraph.endOffset,
       blockIndex: index,
       text: paragraph.text,
+      matter: paragraph.matter || "body",
       visibleLines: [],
     })),
     sourceLineBlocks: originalLines.map((line) => ({
@@ -778,6 +905,7 @@ function buildBrowserLayoutModel(sourceModel, style, range = null) {
       sourceEndOffset: line.endOffset,
       blockIndex: line.index,
       text: line.text,
+      matter: line.matter || "body",
       visibleLines: [],
     })),
     notes: [
@@ -905,6 +1033,10 @@ function isTableOfContentsBlock(block) {
   return String(block?.text || "").trim() === TOC_OBJECT_MARKER;
 }
 
+function isParatextMarkerBlock(block) {
+  return isParatextMarker(String(block?.text || ""));
+}
+
 function getMarkdownHeadingLevel(text) {
   const match = String(text || "").match(/^(#{1,7})\s+/);
   return match ? match[1].length : 0;
@@ -926,6 +1058,64 @@ function jumpPreviewStageToHeading(heading) {
   });
 }
 
+function getActivePreviewHeadingStart() {
+  if (!ui.typeStage || !ui.previewText) return "";
+  const headings = Array.from(ui.previewText.querySelectorAll(".preview-heading-anchor"));
+  if (!headings.length) return "";
+  const stageRect = ui.typeStage.getBoundingClientRect();
+  const markerY = stageRect.top + Math.min(150, Math.max(70, stageRect.height * 0.18));
+  let activeHeading = headings[0];
+  for (const heading of headings) {
+    const rect = heading.getBoundingClientRect();
+    if (rect.top <= markerY) {
+      activeHeading = heading;
+    } else {
+      break;
+    }
+  }
+  return activeHeading?.dataset?.sourceStart || "";
+}
+
+function updateSideTableOfContentsState(nav = null) {
+  const tocNodes = nav ? [nav] : Array.from(document.querySelectorAll(".preview-side-toc"));
+  if (!tocNodes.length) return;
+  const activeStart = getActivePreviewHeadingStart();
+  tocNodes.forEach((toc) => {
+    const items = Array.from(toc.querySelectorAll(".preview-side-toc-item"));
+    if (!items.length) return;
+    const activeItem = items.find((item) => item.dataset.sourceStart === activeStart) || items[0];
+    const activeTopId = activeItem?.dataset.tocTopId || activeItem?.dataset.tocId || "";
+    items.forEach((item) => {
+      const level = Number(item.dataset.tocLevel) || 1;
+      const belongsToActiveTop = item.dataset.tocTopId === activeTopId || item.dataset.tocId === activeTopId;
+      const isVisible = level <= 1 || belongsToActiveTop;
+      const isActive = item === activeItem;
+      item.hidden = !isVisible;
+      item.classList.toggle("is-active", isActive);
+      item.setAttribute("aria-current", isActive ? "true" : "false");
+    });
+    const list = toc.querySelector(".preview-side-toc-list");
+    if (activeItem && list instanceof HTMLElement && !activeItem.hidden) {
+      const listRect = list.getBoundingClientRect();
+      const itemRect = activeItem.getBoundingClientRect();
+      const comfortTop = listRect.top + listRect.height * 0.28;
+      const comfortBottom = listRect.top + listRect.height * 0.72;
+      if (itemRect.top < comfortTop || itemRect.bottom > comfortBottom) {
+        const delta = itemRect.top - (listRect.top + listRect.height * 0.38);
+        list.scrollTo({
+          top: Math.max(0, list.scrollTop + delta),
+          behavior: "smooth",
+        });
+      }
+    }
+  });
+}
+
+function scheduleSideTableOfContentsStateUpdate() {
+  window.cancelAnimationFrame(state.sideTocUpdateTimer);
+  state.sideTocUpdateTimer = window.requestAnimationFrame(() => updateSideTableOfContentsState());
+}
+
 function renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks) {
   targetPage.querySelector(".preview-side-toc")?.remove();
   targetPage.classList.remove("has-side-toc");
@@ -944,24 +1134,35 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
   title.className = "preview-side-toc-title";
   title.textContent = "Inhaltsverzeichnis";
   nav.appendChild(title);
+  const list = document.createElement("div");
+  list.className = "preview-side-toc-list";
+  nav.appendChild(list);
 
+  let currentTopId = "";
   sections.forEach((section) => {
+    if ((Number(section.level) || 1) <= 1) currentTopId = section.id;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "preview-side-toc-item";
     button.style.setProperty("--toc-level", String(Math.max(1, section.level || 1) - 1));
+    button.dataset.sourceStart = String(section.startOffset);
+    button.dataset.tocId = section.id;
+    button.dataset.tocTopId = currentTopId || section.id;
+    button.dataset.tocLevel = String(Math.max(1, section.level || 1));
     button.textContent = section.title;
     button.addEventListener("click", () => {
       const heading = document.getElementById(getPreviewHeadingId(section.startOffset));
       if (heading && targetText.contains(heading)) {
         jumpPreviewStageToHeading(heading);
+        window.setTimeout(() => updateSideTableOfContentsState(nav), 0);
       }
     });
-    nav.appendChild(button);
+    list.appendChild(button);
   });
 
   targetPage.classList.add("has-side-toc");
   targetPage.insertBefore(nav, targetText);
+  updateSideTableOfContentsState(nav);
 }
 
 function getVisualLineRects(element) {
@@ -1173,7 +1374,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   }
 
   blocks.forEach((block, index) => {
-    if (isTableOfContentsBlock(block)) return;
+    if (isTableOfContentsBlock(block) || isParatextMarkerBlock(block)) return;
     const element = createMarkdownBlockElement(block, textType);
     element.classList.add("preview-body-block");
     if (getMarkdownHeadingLevel(block.text)) {
@@ -1197,6 +1398,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     }
   });
   scheduleLineNumberLayer(targetText, lineNumbering);
+  if (targetText === ui.previewText) scheduleSideTableOfContentsStateUpdate();
 }
 
 function renderViewLayer(project, sourceModel, layoutModel) {
@@ -1259,7 +1461,7 @@ function escapeHtml(value) {
 function renderEditorHighlight(rawText) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
-  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^\{\{toc\}\}$|^#{1,7}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
+  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^\{\{toc\}\}$|^:::\s*(?:paratext\s+)?(?:front|back|frontmatter|backmatter)\s*$|^:::\s*$|^#{1,7}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gim;
   let cursor = 0;
   let html = "";
   text.replace(pattern, (match, _token, offset) => {
@@ -1271,6 +1473,8 @@ function renderEditorHighlight(rawText) {
       className = "markdown-editor-code";
     } else if (match === TOC_OBJECT_MARKER) {
       className = "markdown-editor-object";
+    } else if (isParatextMarker(match)) {
+      className = "markdown-editor-paratext";
     } else if (match.startsWith("#")) {
       className = /^#\s+/.test(match) ? "markdown-editor-title" : "markdown-editor-heading";
     } else if (match.startsWith("==")) {
@@ -1315,6 +1519,16 @@ function ensureSelectOption(select, value, label = "Aktueller Wert") {
   select.appendChild(option);
 }
 
+function findDocumentTreeNodeById(node, nodeId) {
+  if (!node || !nodeId) return null;
+  if (node.id === nodeId) return node;
+  for (const child of node.children || []) {
+    const match = findDocumentTreeNodeById(child, nodeId);
+    if (match) return match;
+  }
+  return null;
+}
+
 function getActiveSourceRangeForProject(project, sourceModel = null) {
   if (!project || state.activeSourceRange?.projectId !== project.id) return null;
   const model = sourceModel || buildSourceModel(project);
@@ -1328,7 +1542,18 @@ function getActiveSourceRangeForProject(project, sourceModel = null) {
     };
   }
   const section = model.sections.find((entry) => entry.id === state.activeSourceRange.id);
-  if (!section) return null;
+  if (!section) {
+    const treeNode = findDocumentTreeNodeById(model.documentTree, state.activeSourceRange.id);
+    if (!treeNode || !["matter", "document"].includes(treeNode.type)) return null;
+    return {
+      id: treeNode.id,
+      title: treeNode.title,
+      startOffset: treeNode.startOffset,
+      endOffset: treeNode.endOffset,
+      type: treeNode.type,
+      matter: treeNode.matter || "body",
+    };
+  }
   return {
     ...section,
     type: "section",
@@ -1344,6 +1569,7 @@ function getEditorSourceText(project) {
 
 function getTreeNodeIcon(type) {
   if (type === "document") return "▣";
+  if (type === "matter") return "";
   if (type === "toc") return "";
   if (type === "heading") return "#";
   if (type === "table") return "▤";
@@ -1355,11 +1581,11 @@ function getTreeNodeIcon(type) {
 
 function createTreeNodeButton(project, node, depth) {
   const children = Array.isArray(node.children) ? node.children : [];
-  const structuralChildren = children.filter((child) => child.type === "section");
-  const contentChildren = children.filter((child) => child.type !== "section");
-  const hasChildren = structuralChildren.length > 0;
+  const structuralChildren = children.filter((child) => child.type === "section" || child.type === "matter");
+  const contentChildren = children.filter((child) => child.type !== "section" && child.type !== "matter");
+  const hasChildren = children.length > 0;
   const isExpanded = isTreeNodeExpanded(node.id);
-  const isSelectable = node.type === "document" || node.type === "section";
+  const isSelectable = node.type === "document" || node.type === "section" || node.type === "matter";
   const isContentExpanded = isContentNodeExpanded(node.id);
   const isActive = state.activeSourceRange?.projectId === project.id
     && (state.activeSourceRange?.id || "document-root") === node.id;
@@ -1402,8 +1628,8 @@ function createTreeNodeButton(project, node, depth) {
   });
 
   const icon = document.createElement("span");
-  icon.className = `document-tree-icon document-tree-icon-${node.type}`;
-  icon.textContent = node.type === "section" ? (node.number || "§") : getTreeNodeIcon(node.type);
+  icon.className = `document-tree-icon document-tree-icon-${node.type}${node.matter ? ` document-tree-icon-${node.matter}` : ""}`;
+  icon.textContent = node.type === "section" ? (node.number || "") : getTreeNodeIcon(node.type);
   const copy = document.createElement("span");
   copy.className = "document-tree-copy";
   const title = document.createElement("span");
@@ -1440,8 +1666,9 @@ function renderDocumentTree(project) {
   const tree = document.createElement("div");
   tree.className = "document-tree";
   const sourceModel = buildSourceModel(project);
-  const chapters = (sourceModel.documentTree.children || []).filter((child) => child.type === "section");
-  const looseContent = (sourceModel.documentTree.children || []).filter((child) => child.type !== "section");
+  const treeChildren = sourceModel.documentTree.children || [];
+  const chapters = treeChildren.filter((child) => child.type === "section");
+  const looseContent = treeChildren.filter((child) => child.type !== "section");
   if (!chapters.length && !looseContent.length) {
     const empty = document.createElement("p");
     empty.className = "document-tree-empty";
@@ -1449,9 +1676,10 @@ function renderDocumentTree(project) {
     tree.appendChild(empty);
     return tree;
   }
-  [...chapters, ...looseContent]
-    .sort((a, b) => a.startOffset - b.startOffset)
-    .forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
+  treeChildren.forEach((child) => {
+    if (child.type === "matter") setTreeNodeExpanded(child.id, true);
+    renderDocumentTreeNode(tree, project, child, 0);
+  });
   return tree;
 }
 
@@ -2062,6 +2290,7 @@ function escapeScriptJson(value) {
 
 function buildHtmlBlockMarkup(block, textType) {
   if (isTableOfContentsBlock(block)) return "";
+  if (isParatextMarkerBlock(block)) return "";
   const element = createMarkdownBlockElement(block, textType);
   element.classList.add("preview-body-block");
   if (getMarkdownHeadingLevel(block.text)) {
@@ -2843,6 +3072,7 @@ function bindEditor() {
     scheduleProjectBrowserRender();
   });
   ui.textInput?.addEventListener("scroll", syncEditorHighlightScroll);
+  ui.typeStage?.addEventListener("scroll", scheduleSideTableOfContentsStateUpdate, { passive: true });
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.fontFamily = ui.fontFamilySelect.value;
