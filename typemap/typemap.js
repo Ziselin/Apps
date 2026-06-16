@@ -119,6 +119,49 @@ const defaultProjectText = [
   "Der Text bleibt als strukturierte Quelle erhalten. Die Vorschau oben zeigt das gerenderte Ergebnis, ohne den Inhalt in ein Bild zu verwandeln.",
 ].join("\n");
 
+function normalizeMarkdownHeadingText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function getOpeningTitleHeading(rawText) {
+  const match = String(rawText || "").match(/^\s*#\s+([^\r\n]+)/);
+  return match ? normalizeMarkdownHeadingText(match[1]) : "";
+}
+
+function projectStartsWithTitleHeading(project) {
+  const title = normalizeMarkdownHeadingText(project?.title || "");
+  return Boolean(title) && getOpeningTitleHeading(project?.source?.rawText || "") === title;
+}
+
+function syncProjectTitleHeading(project, previousTitle = null) {
+  if (!project?.source) return;
+  const title = normalizeMarkdownHeadingText(project.title || "Unbenanntes Dokument");
+  if (!title) return;
+  const rawText = String(project.source.rawText || "");
+  const previous = previousTitle == null ? null : normalizeMarkdownHeadingText(previousTitle);
+  const openingHeading = getOpeningTitleHeading(rawText);
+  const nextHeading = `# ${title}`;
+  if (!rawText.trim()) {
+    project.source.rawText = `${nextHeading}\n\n`;
+    return;
+  }
+  if (openingHeading && (openingHeading === title || (previous && openingHeading === previous))) {
+    project.source.rawText = rawText.replace(/^\s*#\s+[^\r\n]*(\r?\n|$)/, `${nextHeading}\n`);
+    return;
+  }
+  if (!openingHeading) {
+    project.source.rawText = `${nextHeading}\n\n${rawText.replace(/^\s+/, "")}`;
+  }
+}
+
+function syncProjectTitleFromHeading(project) {
+  const headingTitle = getOpeningTitleHeading(project?.source?.rawText || "");
+  if (!headingTitle || !project) return;
+  if (project.title !== headingTitle) {
+    project.title = headingTitle;
+  }
+}
+
 const APP_FONTS = [
   { label: "Arial", family: "Arial", css: "Arial, Helvetica, sans-serif", source: "system" },
   { label: "Computer Modern", family: "CMU Serif", css: "'CMU Serif', 'Computer Modern Serif', Georgia, serif", source: "app" },
@@ -156,7 +199,7 @@ function createId(prefix) {
 
 function createDefaultMetadata() {
   return {
-    textKind: "essay",
+    textKind: "artikel",
     subtitle: "",
     authors: [""],
     contributors: [""],
@@ -185,9 +228,64 @@ function sourceTextTypeFromDocumentKind(textKind) {
   return "prose";
 }
 
+const DOCUMENT_STYLE_PRESETS = {
+  artikel: {
+    style: {
+      fontFamily: "'CMU Serif', 'Computer Modern Serif', Georgia, serif",
+      fontSize: 14,
+      lineHeight: 1.38,
+      measure: 64,
+      textAlign: "left",
+      ligatures: true,
+      hyphenation: "manual",
+      language: "de",
+    },
+    headingScale: {
+      1: 1.72,
+      2: 1.44,
+      3: 1.2,
+      4: 1,
+      5: 1,
+      6: 0.94,
+      7: 0.9,
+    },
+    titleScale: {
+      title: 1.72,
+      subtitle: 1.2,
+      authors: 1.2,
+      titleLineHeight: 1.12,
+      subtitleLineHeight: 1.2,
+      authorsLineHeight: 1.2,
+    },
+  },
+};
+
+function getDocumentStylePreset(textKind) {
+  return DOCUMENT_STYLE_PRESETS[textKind] || null;
+}
+
+function applyDocumentStylePreset(project, textKind, options = {}) {
+  const preset = getDocumentStylePreset(textKind);
+  if (!project || !preset) return;
+  const { includeFontSize = true } = options;
+  project.style = {
+    ...project.style,
+    ...preset.style,
+    fontSize: includeFontSize ? preset.style.fontSize : project.style.fontSize,
+  };
+  project.typography = {
+    ...createDefaultTypography(),
+    ...(project.typography || {}),
+    headingScale: { ...preset.headingScale },
+    titleScale: { ...preset.titleScale },
+  };
+}
+
 function createDefaultTypography() {
   return {
     projectFonts: [],
+    headingScale: {},
+    titleScale: {},
   };
 }
 
@@ -295,19 +393,19 @@ function normalizeProjectFonts(value) {
     .filter(Boolean);
 }
 
-function createDefaultProject(title = "Neue TypeMap") {
-  return {
+function createDefaultProject(title = "Neues Dokument") {
+  const project = {
     id: createId("typemap-project"),
     title,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     source: {
-      rawText: defaultProjectText,
+      rawText: `# ${normalizeMarkdownHeadingText(title)}\n\n${defaultProjectText}`,
       textType: "prose",
     },
     style: {
-      fontFamily: "'EB Garamond', Georgia, serif",
-      fontSize: 12,
+      fontFamily: "'CMU Serif', 'Computer Modern Serif', Georgia, serif",
+      fontSize: 14,
       lineHeight: 1.38,
       measure: 64,
       textAlign: "left",
@@ -321,6 +419,8 @@ function createDefaultProject(title = "Neue TypeMap") {
     metadata: createDefaultMetadata(),
     typography: createDefaultTypography(),
   };
+  applyDocumentStylePreset(project, project.metadata.textKind);
+  return project;
 }
 
 function getActiveProject() {
@@ -350,8 +450,9 @@ function normalizeProject(project) {
     },
   };
   normalized.id = String(normalized.id || createId("typemap-project"));
-  normalized.title = String(normalized.title || "Unbenannte TypeMap");
+  normalized.title = String(normalized.title || "Unbenanntes Dokument");
   normalized.source.rawText = String(normalized.source.rawText || "");
+  syncProjectTitleHeading(normalized);
   normalized.source.textType = ["prose", "lyric", "drama", "note"].includes(normalized.source.textType)
     ? normalized.source.textType
     : "prose";
@@ -387,6 +488,18 @@ function normalizeProject(project) {
   ].includes(normalized.metadata.textKind)
     ? normalized.metadata.textKind
     : fallback.metadata.textKind;
+  if (
+    normalized.metadata.textKind === "artikel"
+    && (!normalized.typography.headingScale || !Object.keys(normalized.typography.headingScale).length)
+  ) {
+    normalized.typography.headingScale = { ...DOCUMENT_STYLE_PRESETS.artikel.headingScale };
+  }
+  if (
+    normalized.metadata.textKind === "artikel"
+    && (!normalized.typography.titleScale || !Object.keys(normalized.typography.titleScale).length)
+  ) {
+    normalized.typography.titleScale = { ...DOCUMENT_STYLE_PRESETS.artikel.titleScale };
+  }
   normalized.metadata.authors = normalizePersonList(normalized.metadata.authors);
   normalized.metadata.contributors = normalizePersonList(normalized.metadata.contributors);
   normalized.metadata.allowUse = normalized.metadata.allowUse === true;
@@ -452,7 +565,7 @@ function setProjectExpanded(projectId, isExpanded) {
 
 function getMarkdownBlockType(text) {
   const value = String(text || "");
-  if (/^#{1,6}\s+/.test(value)) return "heading";
+  if (/^#{1,7}\s+/.test(value)) return "heading";
   if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
   if (/^```/.test(value)) return "code";
   if (/^>\s?/m.test(value)) return "quote";
@@ -462,7 +575,7 @@ function getMarkdownBlockType(text) {
 }
 
 function createMarkdownBlockNode(block, index) {
-  const headingMatch = String(block.text || "").match(/^(#{1,6})\s+(.+)$/);
+  const headingMatch = String(block.text || "").match(/^(#{1,7})\s+(.+)$/);
   const type = headingMatch ? "heading" : getMarkdownBlockType(block.text);
   const title = headingMatch
     ? headingMatch[2].trim()
@@ -502,17 +615,21 @@ function buildDocumentTree(blocks, rawText) {
   blocks.forEach((block, index) => {
     const node = createMarkdownBlockNode(block, index);
     if (node.type === "heading") {
-      while (stack.length > 1 && stack[stack.length - 1].level >= node.level) {
+      if (node.level === 1) {
+        return;
+      }
+      const sectionLevel = Math.max(1, node.level - 1);
+      while (stack.length > 1 && stack[stack.length - 1].level >= sectionLevel) {
         const closed = stack.pop().node;
         closed.endOffset = node.startOffset;
       }
-      sectionCounters.length = node.level;
-      sectionCounters[node.level - 1] = (sectionCounters[node.level - 1] || 0) + 1;
+      sectionCounters.length = sectionLevel;
+      sectionCounters[sectionLevel - 1] = (sectionCounters[sectionLevel - 1] || 0) + 1;
       const section = {
         id: `section-${index + 1}-${node.startOffset}`,
         type: "section",
-        level: node.level,
-        number: sectionCounters.slice(0, node.level).filter(Boolean).join("."),
+        level: sectionLevel,
+        number: sectionCounters.slice(0, sectionLevel).filter(Boolean).join("."),
         title: node.title,
         startOffset: node.startOffset,
         endOffset: rawText.length,
@@ -572,6 +689,18 @@ function buildSourceModel(project) {
     paragraphLines = [];
   }
 
+  function pushSingleLineBlock(line) {
+    const id = `paragraph-${paragraphs.length + 1}`;
+    paragraphs.push({
+      id,
+      type: "paragraph",
+      text: line.text,
+      startOffset: line.startOffset,
+      endOffset: line.endOffset,
+      lineIds: [line.id],
+    });
+  }
+
   rawLines.forEach((text, index) => {
     const startOffset = cursor;
     const endOffset = startOffset + text.length;
@@ -583,6 +712,13 @@ function buildSourceModel(project) {
       endOffset,
     };
     sourceLines.push(line);
+
+    if (/^#{1,7}\s+/.test(text.trim())) {
+      flushParagraph(startOffset);
+      pushSingleLineBlock(line);
+      cursor = endOffset + 1;
+      return;
+    }
 
     if (text.trim()) {
       if (!paragraphLines.length) paragraphStart = startOffset;
@@ -704,9 +840,12 @@ function createMarkdownBlockElement(block, textType) {
     blankLine.textContent = "\u00a0";
     return blankLine;
   }
-  const headingMatch = text.match(/^(#{1,3})\s+(.+)$/);
-  if (headingMatch && textType !== "lyric") {
-    const heading = document.createElement(`h${headingMatch[1].length}`);
+  const headingMatch = text.match(/^(#{1,7})\s+(.+)$/);
+  if (headingMatch) {
+    const headingLevel = headingMatch[1].length;
+    const heading = document.createElement(`h${Math.min(6, headingLevel)}`);
+    heading.className = `preview-heading preview-heading-level-${headingLevel}`;
+    heading.dataset.headingLevel = String(headingLevel);
     appendInlineMarkdown(heading, headingMatch[2]);
     return heading;
   }
@@ -833,16 +972,25 @@ function scheduleLineNumberLayer(targetText, lineNumbering) {
   });
 }
 
-function createPreviewDocumentHead(project) {
+function getDocumentTitleAlignment(project) {
+  const textType = project?.source?.textType || "prose";
+  if (textType === "lyric") return "left";
+  const align = project?.style?.textAlign || "left";
+  return align === "center" || align === "right" ? align : "left";
+}
+
+function createPreviewDocumentHead(project, options = {}) {
+  const { includeTitle = true, align = getDocumentTitleAlignment(project) } = options;
   const metadata = project.metadata || {};
   const title = String(project.title || "").trim();
   const subtitle = String(metadata.subtitle || "").trim();
   const authors = normalizePersonList(metadata.authors).filter(Boolean);
-  if (!title && !subtitle && !authors.length) return null;
+  if ((!includeTitle || !title) && !subtitle && !authors.length) return null;
 
   const head = document.createElement("header");
   head.className = "preview-document-head";
-  if (title) {
+  head.style.textAlign = align;
+  if (includeTitle && title) {
     const titleElement = document.createElement("h1");
     titleElement.className = "preview-document-title";
     titleElement.textContent = title;
@@ -866,11 +1014,29 @@ function createPreviewDocumentHead(project) {
 function renderTextView(targetPage, targetText, project, layoutModel) {
   if (!targetPage || !targetText) return;
   const style = project.style;
+  const headingScale = {
+    ...(getDocumentStylePreset(project.metadata?.textKind)?.headingScale || {}),
+    ...(project.typography?.headingScale || {}),
+  };
+  const titleScale = {
+    ...(getDocumentStylePreset(project.metadata?.textKind)?.titleScale || {}),
+    ...(project.typography?.titleScale || {}),
+  };
   const textType = project.source.textType || "prose";
   const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
+  const documentTitleAlign = getDocumentTitleAlignment(project);
   const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
   targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
+  for (let level = 1; level <= 7; level += 1) {
+    targetPage.style.setProperty(`--preview-heading-${level}`, `${Number(headingScale[level]) || 1}em`);
+  }
+  targetPage.style.setProperty("--preview-title-size", `${Number(titleScale.title) || 1.48}em`);
+  targetPage.style.setProperty("--preview-subtitle-size", `${Number(titleScale.subtitle) || 0.86}em`);
+  targetPage.style.setProperty("--preview-authors-size", `${Number(titleScale.authors) || 0.76}em`);
+  targetPage.style.setProperty("--preview-title-line-height", String(Number(titleScale.titleLineHeight) || 1.12));
+  targetPage.style.setProperty("--preview-subtitle-line-height", String(Number(titleScale.subtitleLineHeight) || 1.28));
+  targetPage.style.setProperty("--preview-authors-line-height", String(Number(titleScale.authorsLineHeight) || 1.28));
   targetText.style.fontFamily = style.fontFamily;
   targetText.style.textAlign = textType === "lyric" ? "left" : style.textAlign;
   targetText.lang = hyphenationSettings.language;
@@ -887,10 +1053,14 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   clearElement(targetText);
 
   const isScopedSection = layoutModel.activeRange && layoutModel.activeRange.id !== "document-root";
-  if (!isScopedSection) {
-    const documentHead = createPreviewDocumentHead(project);
-    if (documentHead) targetText.appendChild(documentHead);
-  }
+  const hasSourceTitleHeading = !isScopedSection && projectStartsWithTitleHeading(project);
+  const documentHead = !isScopedSection
+    ? createPreviewDocumentHead(project, {
+      includeTitle: !hasSourceTitleHeading,
+      align: getDocumentTitleAlignment(project),
+    })
+    : null;
+  if (documentHead && !hasSourceTitleHeading) targetText.appendChild(documentHead);
 
   const blocks = lineNumbering.mode === "source-lines" && textType === "lyric"
     ? (layoutModel.sourceLineBlocks || [])
@@ -905,7 +1075,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     return;
   }
 
-  blocks.forEach((block) => {
+  blocks.forEach((block, index) => {
     const element = createMarkdownBlockElement(block, textType);
     element.classList.add("preview-body-block");
     if (textType === "lyric" && !String(block.text || "").trim()) {
@@ -920,6 +1090,9 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     element.dataset.sourceStart = String(block.sourceStartOffset);
     element.dataset.sourceEnd = String(block.sourceEndOffset);
     targetText.appendChild(element);
+    if (index === 0 && documentHead && hasSourceTitleHeading) {
+      targetText.appendChild(documentHead);
+    }
   });
   scheduleLineNumberLayer(targetText, lineNumbering);
 }
@@ -990,7 +1163,7 @@ function renderFontOptions(project) {
   const projectFonts = normalizeProjectFonts(project.typography?.projectFonts);
   if (projectFonts.length) {
     const projectGroup = document.createElement("optgroup");
-    projectGroup.label = "Projekt-Schriften";
+    projectGroup.label = "Dokument-Schriften";
     projectFonts.forEach((font) => {
       const option = document.createElement("option");
       option.value = font.css;
@@ -1020,7 +1193,7 @@ function escapeHtml(value) {
 function renderEditorHighlight(rawText) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
-  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^#{1,6}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
+  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^#{1,7}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
   let cursor = 0;
   let html = "";
   text.replace(pattern, (match, _token, offset) => {
@@ -1049,6 +1222,17 @@ function renderEditorHighlight(rawText) {
 
 function syncEditorHighlightScroll() {
   if (!ui.textInput || !ui.textInputHighlight) return;
+  const textarea = ui.textInput;
+  const style = window.getComputedStyle(textarea);
+  const borderBoxWidth = textarea.clientWidth;
+  const borderBoxHeight = Math.max(textarea.clientHeight, textarea.scrollHeight);
+  ui.textInputHighlight.style.width = `${borderBoxWidth}px`;
+  ui.textInputHighlight.style.minHeight = `${borderBoxHeight}px`;
+  ui.textInputHighlight.style.padding = style.padding;
+  ui.textInputHighlight.style.font = style.font;
+  ui.textInputHighlight.style.lineHeight = style.lineHeight;
+  ui.textInputHighlight.style.letterSpacing = style.letterSpacing;
+  ui.textInputHighlight.style.tabSize = style.tabSize;
   ui.textInputHighlight.style.transform = `translate(${-ui.textInput.scrollLeft}px, ${-ui.textInput.scrollTop}px)`;
 }
 
@@ -1187,7 +1371,17 @@ function renderDocumentTree(project) {
   const tree = document.createElement("div");
   tree.className = "document-tree";
   const sourceModel = buildSourceModel(project);
-  renderDocumentTreeNode(tree, project, sourceModel.documentTree, 0);
+  const chapters = (sourceModel.documentTree.children || []).filter((child) => child.type === "section");
+  const looseContent = (sourceModel.documentTree.children || []).filter((child) => child.type !== "section");
+  if (!chapters.length && !looseContent.length) {
+    const empty = document.createElement("p");
+    empty.className = "document-tree-empty";
+    empty.textContent = "Noch keine Kapitel";
+    tree.appendChild(empty);
+    return tree;
+  }
+  chapters.forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
+  looseContent.forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
   return tree;
 }
 
@@ -1232,11 +1426,22 @@ function renderProjectList() {
     });
 
     const copy = document.createElement("div");
+    copy.className = "project-row-copy";
+    const heading = document.createElement("div");
+    heading.className = "project-row-heading";
     const title = document.createElement("strong");
     title.textContent = project.title;
+    heading.appendChild(title);
+    const authors = normalizePersonList(project.metadata?.authors).filter(Boolean);
+    if (authors.length) {
+      const author = document.createElement("span");
+      author.className = "project-row-author";
+      author.textContent = `(${authors.join(", ")})`;
+      heading.appendChild(author);
+    }
     const meta = document.createElement("span");
     meta.textContent = `${project.source.rawText.length} Zeichen`;
-    copy.append(title, meta);
+    copy.append(heading, meta);
 
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -1269,7 +1474,7 @@ function renderProjectList() {
 function renderEditor() {
   const project = getActiveProject();
   if (!project) return;
-  if (ui.projectInfo) ui.projectInfo.textContent = `${state.projects.length} Projekt${state.projects.length === 1 ? "" : "e"}`;
+  if (ui.projectInfo) ui.projectInfo.textContent = `${state.projects.length} Dokument${state.projects.length === 1 ? "" : "e"}`;
   if (ui.editorTitle) ui.editorTitle.textContent = project.title;
   loadProjectFonts([project]);
   renderFontOptions(project);
@@ -1399,7 +1604,10 @@ function openDocumentPropertiesDialog() {
 
 function saveDocumentPropertiesDialog() {
   updateActiveProject((project) => {
-    project.title = ui.docTitleInput?.value.trim() || "Unbenannte TypeMap";
+    const previousTitle = project.title;
+    const previousTextKind = project.metadata?.textKind || createDefaultMetadata().textKind;
+    project.title = ui.docTitleInput?.value.trim() || "Unbenanntes Dokument";
+    syncProjectTitleHeading(project, previousTitle);
     const textKind = ui.docTextKindInput?.value || "essay";
     project.metadata = {
       ...createDefaultMetadata(),
@@ -1425,6 +1633,9 @@ function saveDocumentPropertiesDialog() {
       description: ui.docDescriptionInput?.value.trim() || "",
     };
     project.source.textType = sourceTextTypeFromDocumentKind(textKind);
+    if (textKind !== previousTextKind) {
+      applyDocumentStylePreset(project, textKind);
+    }
     if (project.source.textType === "lyric") {
       project.style.textAlign = "left";
       project.style.lineHeight = 1.5;
@@ -1597,7 +1808,7 @@ function activateProject(projectId, options = {}) {
   scheduleAutosave();
 }
 
-function addProject(title = "Neue TypeMap") {
+function addProject(title = "Neues Dokument") {
   const project = createDefaultProject(title);
   state.projects.push(project);
   state.activeProjectId = project.id;
@@ -1609,7 +1820,7 @@ function addProject(title = "Neue TypeMap") {
 
 function deleteProject(projectId) {
   if (state.projects.length <= 1) {
-    state.projects = [createDefaultProject("Neue TypeMap")];
+    state.projects = [createDefaultProject("Neues Dokument")];
     state.activeProjectId = state.projects[0].id;
   } else {
     state.projects = state.projects.filter((project) => project.id !== projectId);
@@ -1640,6 +1851,7 @@ function updateActiveProjectTextFromEditor(nextText) {
     const range = getActiveSourceRangeForProject(project, sourceModel);
     if (!range || range.id === "document-root") {
       project.source.rawText = nextText;
+      syncProjectTitleFromHeading(project);
       state.activeSourceRange = null;
       return;
     }
@@ -1648,6 +1860,7 @@ function updateActiveProjectTextFromEditor(nextText) {
     const needsTrailingBreak = after.trimStart().startsWith("#") && nextText && !/\n\s*\n$/.test(nextText);
     const replacementText = needsTrailingBreak ? `${nextText.replace(/\s+$/, "")}\n\n` : nextText;
     project.source.rawText = `${before}${replacementText}${after}`;
+    syncProjectTitleFromHeading(project);
     state.activeSourceRange = {
       ...range,
       projectId: project.id,
@@ -1675,7 +1888,7 @@ function applySnapshot(snapshot) {
       ? snapshot.projects
       : [];
   state.projects = rawProjects.map(normalizeProject);
-  if (!state.projects.length) state.projects = [createDefaultProject("Neue TypeMap")];
+  if (!state.projects.length) state.projects = [createDefaultProject("Neues Dokument")];
   state.activeProjectId = state.projects.some((project) => project.id === snapshot?.state?.activeProjectId)
     ? snapshot.state.activeProjectId
     : state.projects[0].id;
@@ -1687,7 +1900,7 @@ function applySnapshot(snapshot) {
 
 function exportProjects() {
   const blob = new Blob([JSON.stringify(buildSnapshot(), null, 2)], { type: "application/json" });
-  downloadBlob(blob, "typemap-project.json");
+  downloadBlob(blob, "typemap-dokument.json");
 }
 
 function slugifyFilename(value, fallback = "typemap") {
@@ -1721,12 +1934,7 @@ function escapeHtml(value) {
 }
 
 function buildMarkdownExport(project) {
-  const metadata = project.metadata || {};
   const lines = [];
-  if (project.title) lines.push(`# ${project.title}`, "");
-  if (metadata.subtitle) lines.push(`## ${metadata.subtitle}`, "");
-  const authors = normalizePersonList(metadata.authors).filter(Boolean);
-  if (authors.length) lines.push(`*${authors.join(", ")}*`, "");
   lines.push(project.source.rawText || "");
   return lines.join("\n").replace(/\n{3,}/g, "\n\n");
 }
@@ -1768,7 +1976,17 @@ function buildHtmlExport(project) {
   const authors = normalizePersonList(metadata.authors).filter(Boolean);
   const sourceModel = buildSourceModel(project);
   const layoutModel = buildBrowserLayoutModel(sourceModel, project.style);
+  const hasSourceTitleHeading = projectStartsWithTitleHeading(project);
   const textType = project.source.textType || "prose";
+  const documentTitleAlign = getDocumentTitleAlignment(project);
+  const headingScale = {
+    ...(getDocumentStylePreset(project.metadata?.textKind)?.headingScale || {}),
+    ...(project.typography?.headingScale || {}),
+  };
+  const titleScale = {
+    ...(getDocumentStylePreset(project.metadata?.textKind)?.titleScale || {}),
+    ...(project.typography?.titleScale || {}),
+  };
   const lineNumbering = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
   const hyphenationSettings = normalizeHyphenationSettings(project.style.hyphenationSettings, project.style.hyphenation, project.style.language);
   const exportBlocks = lineNumbering.mode === "source-lines" && textType === "lyric"
@@ -1790,10 +2008,10 @@ ${buildHtmlFontFaceCss(project)}
     * { box-sizing: border-box; }
     body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
     main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; overflow-wrap: break-word; }
-    header { margin: 0 0 1.55em; text-align: ${textType === "lyric" ? "left" : "center"}; }
-    h1 { margin: 0; font-size: 1.48em; line-height: 1.12; }
-    .subtitle { margin: .34em 0 0; color: #555; font-size: .86em; line-height: 1.28; }
-    .authors { margin: .68em 0 0; color: #333; font-size: .76em; font-weight: 500; line-height: 1.28; }
+    header { margin: 0 0 1.55em; text-align: ${documentTitleAlign}; }
+    h1 { margin: 0; font-size: ${Number(titleScale.title) || 1.48}em; line-height: ${Number(titleScale.titleLineHeight) || 1.12}; }
+    .subtitle { margin: .34em 0 0; color: #555; font-size: ${Number(titleScale.subtitle) || 0.86}em; line-height: ${Number(titleScale.subtitleLineHeight) || 1.28}; }
+    .authors { margin: .68em 0 0; color: #333; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: 400; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
     .typemap-text { position: relative;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     p { margin: 0 0 .72em; white-space: pre-wrap; overflow-wrap: break-word; }
@@ -1801,11 +2019,15 @@ ${buildHtmlFontFaceCss(project)}
     strong { font-weight: 700; }
     mark { background: transparent; text-decoration: underline; color: inherit; }
     a { color: #70531c; text-decoration: underline; text-underline-offset: .12em; }
-    h1, h2, h3 { margin: 1.1em 0 .38em; line-height: 1.12; }
-    h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
-    h1 { font-size: 1.48em; }
-    h2 { font-size: 1.22em; }
-    h3 { font-size: 1.06em; }
+    h1, h2, h3, h4, h5, h6 { margin: 1.1em 0 .38em; line-height: 1.12; font-weight: 700; }
+    h1:first-child, h2:first-child, h3:first-child, h4:first-child, h5:first-child, h6:first-child { margin-top: 0; }
+    .preview-heading-level-1 { font-size: ${Number(headingScale[1]) || 1.48}em; }
+    .preview-heading-level-2 { font-size: ${Number(headingScale[2]) || 1.22}em; }
+    .preview-heading-level-3 { font-size: ${Number(headingScale[3]) || 1.06}em; }
+    .preview-heading-level-4 { font-size: ${Number(headingScale[4]) || 1}em; font-weight: 700; }
+    .preview-heading-level-5 { font-size: ${Number(headingScale[5]) || 1}em; font-weight: 600; font-style: italic; }
+    .preview-heading-level-6 { font-size: ${Number(headingScale[6]) || 0.94}em; font-weight: 600; font-style: italic; }
+    .preview-heading-level-7 { font-size: ${Number(headingScale[7]) || 0.9}em; font-weight: 600; font-style: italic; }
     blockquote { margin: .9em 0; padding-left: 1.1em; border-left: 2px solid #bbb; color: #333; }
     ul, ol { margin: 0 0 .85em 1.4em; padding: 0; }
     li { margin: .18em 0; }
@@ -1819,8 +2041,8 @@ ${buildHtmlFontFaceCss(project)}
 </head>
 <body>
   <main>
-    <header>
-      <h1>${escapeHtml(project.title || "")}</h1>
+    <header${hasSourceTitleHeading && !metadata.subtitle && !authors.length ? " hidden" : ""}>
+      ${hasSourceTitleHeading ? "" : `<h1>${escapeHtml(project.title || "")}</h1>`}
       ${metadata.subtitle ? `<p class="subtitle">${escapeHtml(metadata.subtitle)}</p>` : ""}
       ${authors.length ? `<p class="authors">${escapeHtml(authors.join(", "))}</p>` : ""}
     </header>
@@ -1905,6 +2127,12 @@ async function exportPng() {
 
   const style = project.style;
   const metadata = project.metadata || {};
+  const hasSourceTitleHeading = projectStartsWithTitleHeading(project);
+  const documentTitleAlign = getDocumentTitleAlignment(project);
+  const titleScale = {
+    ...(getDocumentStylePreset(project.metadata?.textKind)?.titleScale || {}),
+    ...(project.typography?.titleScale || {}),
+  };
   const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
   const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
   const fontSize = ptToPx(style.fontSize);
@@ -1926,7 +2154,7 @@ async function exportPng() {
 
   function stripMarkdown(value) {
     return String(value || "")
-      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/^#{1,7}\s+/gm, "")
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/\*([^*]+)\*/g, "$1")
       .replace(/`([^`]+)`/g, "$1")
@@ -1974,32 +2202,35 @@ async function exportPng() {
     rows.push({ spacer: true, lineHeight: height });
   }
 
-  if (project.title) {
-    wrapText(project.title, fontSize * 1.48, 700).forEach((line) => pushLine(line, {
-      size: fontSize * 1.48,
+  if (project.title && !hasSourceTitleHeading) {
+    const titleSize = fontSize * (Number(titleScale.title) || 1.48);
+    wrapText(project.title, titleSize, 700).forEach((line) => pushLine(line, {
+      size: titleSize,
       weight: 700,
-      align: "center",
-      lineHeight: fontSize * 1.48 * 1.12,
+      align: documentTitleAlign,
+      lineHeight: titleSize * (Number(titleScale.titleLineHeight) || 1.12),
     }));
   }
   if (metadata.subtitle) {
     pushSpacer(fontSize * 0.34);
-    wrapText(metadata.subtitle, fontSize * 0.86, 400).forEach((line) => pushLine(line, {
-      size: fontSize * 0.86,
-      align: "center",
+    const subtitleSize = fontSize * (Number(titleScale.subtitle) || 0.86);
+    wrapText(metadata.subtitle, subtitleSize, 400).forEach((line) => pushLine(line, {
+      size: subtitleSize,
+      align: documentTitleAlign,
       color: "#444",
-      lineHeight: fontSize * 0.86 * 1.28,
+      lineHeight: subtitleSize * (Number(titleScale.subtitleLineHeight) || 1.28),
     }));
   }
   const authors = normalizePersonList(metadata.authors).filter(Boolean);
   if (authors.length) {
     pushSpacer(fontSize * 0.68);
-    wrapText(authors.join(", "), fontSize * 0.76, 500).forEach((line) => pushLine(line, {
-      size: fontSize * 0.76,
-      weight: 500,
-      align: "center",
+    const authorsSize = fontSize * (Number(titleScale.authors) || 0.76);
+    wrapText(authors.join(", "), authorsSize, 400).forEach((line) => pushLine(line, {
+      size: authorsSize,
+      weight: 400,
+      align: documentTitleAlign,
       color: "#333",
-      lineHeight: fontSize * 0.76 * 1.28,
+      lineHeight: authorsSize * (Number(titleScale.authorsLineHeight) || 1.28),
     }));
   }
   if (project.title || metadata.subtitle || authors.length) pushSpacer(fontSize * 1.55);
@@ -2196,10 +2427,10 @@ function setDetailsLayoutMode(mode) {
   ui.appFrame?.classList.toggle("details-layout-browser", normalizedMode === "browser");
   ui.appFrame?.classList.toggle("details-layout-editor", normalizedMode === "editor");
   const label = normalizedMode === "browser"
-    ? "Projektbrowser aufgeblättert"
+    ? "Dokumentbrowser aufgeblättert"
     : normalizedMode === "editor"
       ? "Editor aufgeblättert"
-      : "Normale Projektansicht";
+      : "Normale Dokumentansicht";
   ui.layoutCycleButtons.forEach((button) => {
     button.setAttribute("aria-label", `${label}. Ansicht umblättern`);
     button.setAttribute("title", label);
@@ -2313,9 +2544,13 @@ function bindEditor() {
   ui.layoutCycleButtons.forEach((button) => {
     button.addEventListener("click", cycleDetailsLayoutMode);
   });
-  window.addEventListener("resize", () => setDetailsLayoutMode(state.detailsLayoutMode));
-  ui.newProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
-  ui.createProjectButton?.addEventListener("click", () => addProject("Neue TypeMap"));
+  window.addEventListener("resize", () => {
+    setDetailsLayoutMode(state.detailsLayoutMode);
+    syncEditorHighlightScroll();
+  });
+  document.fonts?.ready?.then(syncEditorHighlightScroll);
+  ui.newProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
+  ui.createProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
   ui.exportProjectButton?.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -2475,7 +2710,7 @@ async function init() {
   if (snapshot) {
     applySnapshot(snapshot);
   } else {
-    state.projects = [createDefaultProject("Erste TypeMap")];
+    state.projects = [createDefaultProject("Erstes Dokument")];
     state.activeProjectId = state.projects[0].id;
     setProjectExpanded(state.activeProjectId, true);
     renderApp();

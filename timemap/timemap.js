@@ -1908,6 +1908,7 @@ const state = {
   pendingConnectionPointer: null,
   pendingConnectionMagneticTarget: null,
   pendingConnectionPreviewFrame: 0,
+  freeTimelineCenter: false,
   suppressClickUntil: 0,
   timelineMenuOpen: false,
   language: "de",
@@ -4026,7 +4027,9 @@ function applyProjectConstraints() {
   state.stepIndex = clamp(state.stepIndex, minIndex, maxIndex);
   const step = getStep();
   state.centerYear = clampCenterYearToProjectBounds(state.centerYear, step);
-  state.centerYear = alignTimelineValueToStepStart(state.centerYear, step);
+  if (!state.freeTimelineCenter) {
+    state.centerYear = alignTimelineValueToStepStart(state.centerYear, step);
+  }
 }
 
 function getPresentationCenterBoundsForStep(step = getStep()) {
@@ -4062,7 +4065,9 @@ function applyPresentationConstraints() {
   state.stepIndex = clamp(state.stepIndex, minIndex, maxIndex);
   const step = getStep();
   state.centerYear = clampCenterYearToPresentation(state.centerYear, step);
-  state.centerYear = alignTimelineValueToStepStart(state.centerYear, step);
+  if (!state.freeTimelineCenter) {
+    state.centerYear = alignTimelineValueToStepStart(state.centerYear, step);
+  }
   state.activeWorkspaceSection = "timeline";
 }
 
@@ -22207,7 +22212,9 @@ function drawTimeline() {
   syncViewMetrics();
   applyTimelineConstraints();
   updateTimelineZoomButtonState();
-  state.centerYear = alignTimelineValueToStepStart(state.centerYear, getStep());
+  if (!state.freeTimelineCenter) {
+    state.centerYear = alignTimelineValueToStepStart(state.centerYear, getStep());
+  }
   svg.replaceChildren();
 
   const paddingX = TIMELINE_PADDING_X;
@@ -30752,6 +30759,7 @@ function renderEventList() {
 
 function pan(direction) {
   const step = getStep();
+  state.freeTimelineCenter = false;
   if (step.unit === "year") {
     state.subYearTickAnchorValue = null;
     state.centerYear = state.centerYear + direction * getStepYears(step);
@@ -30769,6 +30777,7 @@ function zoom(direction) {
   const currentIndex = state.stepIndex;
   const nextIndex = clamp(state.stepIndex + direction, 0, scaleSteps.length - 1);
   if (nextIndex === state.stepIndex) return;
+  state.freeTimelineCenter = false;
   const nextStep = scaleSteps[nextIndex];
   const isSubYearTransition = currentStep.unit !== "year" || nextStep.unit !== "year";
   const anchoredValue = getClosestVisibleTickValue(state.centerYear);
@@ -30791,6 +30800,7 @@ function zoomAtClientX(direction, clientX) {
   const currentIndex = state.stepIndex;
   const nextIndex = clamp(state.stepIndex + direction, 0, scaleSteps.length - 1);
   if (nextIndex === state.stepIndex) return;
+  state.freeTimelineCenter = false;
 
   const nextStep = scaleSteps[nextIndex];
   const anchoredValue = getTimelineValueAtRatio(getTimelineRatioForClientX(clientX));
@@ -30811,14 +30821,33 @@ function zoomAtClientX(direction, clientX) {
 
 function resetView() {
   state.subYearTickAnchorValue = null;
+  state.freeTimelineCenter = false;
   state.centerYear = getNowTimelineValue();
   state.stepIndex = scaleSteps.findIndex((step) => step.id === "1a");
   clearSelectedEvent();
 }
 
+function getWheelNavigationDirection(event) {
+  const deltaX = Number(event.deltaX) || 0;
+  const deltaY = Number(event.deltaY) || 0;
+  let primaryDelta = Math.abs(deltaY) >= Math.abs(deltaX) ? deltaY : deltaX;
+  const legacyWheelDelta = Number(event.wheelDelta) || 0;
+  if (legacyWheelDelta) {
+    const legacyDelta = -legacyWheelDelta;
+    const primarySign = Math.sign(primaryDelta);
+    const legacySign = Math.sign(legacyDelta);
+    if (!primaryDelta || (primarySign && legacySign && primarySign === -legacySign)) {
+      primaryDelta = legacyDelta;
+    }
+  }
+  if (!primaryDelta) return 0;
+  return primaryDelta > 0 ? 1 : -1;
+}
+
 function handleWheel(event) {
   event.preventDefault();
-  const direction = event.deltaY > 0 ? 1 : -1;
+  const direction = getWheelNavigationDirection(event);
+  if (!direction) return;
   if (event.shiftKey) {
     zoomAtClientX(direction, event.clientX);
     return;
@@ -30834,6 +30863,10 @@ const timelineTouchGesture = {
   pinchStartDistance: 0,
   pinchStartStepIndex: 0,
   lastPanClientY: 0,
+  panStartClientX: 0,
+  panStartCenterYear: 0,
+  panComparableStart: 0,
+  panComparableEnd: 0,
 };
 
 function getTimelineTouchPoints() {
@@ -30857,6 +30890,10 @@ function resetTimelineTouchGesture() {
   timelineTouchGesture.moved = false;
   timelineTouchGesture.lastPanClientX = 0;
   timelineTouchGesture.lastPanClientY = 0;
+  timelineTouchGesture.panStartClientX = 0;
+  timelineTouchGesture.panStartCenterYear = state.centerYear;
+  timelineTouchGesture.panComparableStart = 0;
+  timelineTouchGesture.panComparableEnd = 0;
   timelineTouchGesture.pinchStartDistance = 0;
   timelineTouchGesture.pinchStartStepIndex = state.stepIndex;
 }
@@ -30865,13 +30902,39 @@ function suppressTimelineTouchClick() {
   state.suppressClickUntil = Date.now() + 300;
 }
 
-function panTimelineByClientDelta(startClientX, endClientX) {
-  if (!Number.isFinite(startClientX) || !Number.isFinite(endClientX) || startClientX === endClientX) return;
-  const startValue = getTimelineValueAtRatio(getTimelineRatioForClientX(startClientX));
-  const endValue = getTimelineValueAtRatio(getTimelineRatioForClientX(endClientX));
-  if (!Number.isFinite(startValue) || !Number.isFinite(endValue)) return;
+function beginTimelineTouchPan(point) {
+  timelineTouchGesture.mode = "pan";
+  timelineTouchGesture.moved = false;
+  timelineTouchGesture.lastPanClientX = point.clientX;
+  timelineTouchGesture.lastPanClientY = point.clientY;
+  timelineTouchGesture.panStartClientX = point.clientX;
+  timelineTouchGesture.panStartCenterYear = state.centerYear;
+  const range = getVisibleRange();
+  const step = getStep();
+  timelineTouchGesture.panComparableStart = getComparableTimelinePosition(range.start, step);
+  timelineTouchGesture.panComparableEnd = getComparableTimelinePosition(range.end, step);
+}
+
+function panTimelineToClientX(clientX) {
+  if (!Number.isFinite(clientX)) return;
+  const rect = svg.getBoundingClientRect();
+  const usableClientWidth = Math.max(
+    1,
+    rect.width * ((state.width - TIMELINE_PADDING_X * 2) / Math.max(1, state.width)),
+  );
+  const comparableRange = timelineTouchGesture.panComparableEnd - timelineTouchGesture.panComparableStart;
+  if (!Number.isFinite(comparableRange) || comparableRange === 0) return;
+  const deltaComparable = ((clientX - timelineTouchGesture.panStartClientX) / usableClientWidth) * comparableRange;
+  const step = getStep();
+  const startComparableCenter = getComparableTimelinePosition(timelineTouchGesture.panStartCenterYear, step);
+  const nextComparableCenter = startComparableCenter - deltaComparable;
+  const nextCenterYear = step.unit === "year"
+    ? nextComparableCenter
+    : dateToTimelineValue(new Date(nextComparableCenter));
+  if (!Number.isFinite(nextCenterYear)) return;
+  state.freeTimelineCenter = true;
   state.subYearTickAnchorValue = null;
-  state.centerYear = normalizeZoomCenterYear(state.centerYear + (startValue - endValue), getStep());
+  state.centerYear = clampCenterYearToProjectBounds(nextCenterYear, step);
   drawTimeline();
 }
 
@@ -30904,10 +30967,7 @@ function handleTimelineTouchPointerDown(event) {
   });
   const points = getTimelineTouchPoints();
   if (points.length === 1) {
-    timelineTouchGesture.mode = "pan";
-    timelineTouchGesture.moved = false;
-    timelineTouchGesture.lastPanClientX = event.clientX;
-    timelineTouchGesture.lastPanClientY = event.clientY;
+    beginTimelineTouchPan(points[0]);
     return;
   }
   beginTimelineTouchPinch(points);
@@ -30947,7 +31007,7 @@ function handleTimelineTouchPointerMove(event) {
     return;
   }
   timelineTouchGesture.moved = true;
-  panTimelineByClientDelta(timelineTouchGesture.lastPanClientX, point.clientX);
+  panTimelineToClientX(point.clientX);
   timelineTouchGesture.lastPanClientX = point.clientX;
   timelineTouchGesture.lastPanClientY = point.clientY;
   suppressTimelineTouchClick();
@@ -30971,10 +31031,9 @@ function handleTimelineTouchPointerEnd(event) {
     return;
   }
   if (points.length === 1) {
-    timelineTouchGesture.mode = "pan";
     timelineTouchGesture.moved = wasGesture;
-    timelineTouchGesture.lastPanClientX = points[0].clientX;
-    timelineTouchGesture.lastPanClientY = points[0].clientY;
+    beginTimelineTouchPan(points[0]);
+    timelineTouchGesture.moved = wasGesture;
     return;
   }
   beginTimelineTouchPinch(points);

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260614b">
+  <link rel="stylesheet" href="typemap.css?v=20260616j">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -35,7 +35,7 @@
               <button type="button" data-export-format="md">MD</button>
               <button type="button" data-export-format="html">HTML</button>
               <button type="button" data-export-format="png">PNG</button>
-              <button type="button" data-export-format="json">Projekt JSON</button>
+              <button type="button" data-export-format="json">Dokument JSON</button>
             </div>
           </div>
           <button type="button" id="themeToggleButton" class="theme-toggle-button" aria-label="Hellen Modus aktivieren" aria-pressed="false">
@@ -70,13 +70,13 @@
                 <span>Entwicklungsstand</span>
               </button>
               <div class="type-menu-popup" data-menu-popup="development" hidden>
-                <p class="event-description">TypeMap ist ein erster struktureller Prototyp. Text, Satzoptionen und Projektlogik sind angelegt; Exportformate und feinere typografische Werkzeuge folgen später.</p>
+                <p class="event-description">TypeMap ist ein erster struktureller Prototyp. Text, Satzoptionen und Dokumentlogik sind angelegt; Exportformate und feinere typografische Werkzeuge folgen später.</p>
               </div>
             </div>
             <div class="type-menu-section type-menu-section-project">
               <button type="button" class="type-menu-item" data-menu-panel="project" aria-expanded="false">
                 <img class="type-menu-icon" src="https://api.iconify.design/material-symbols/source-notes-sharp.svg" alt="" aria-hidden="true">
-                <span>Projektbeschreibung</span>
+                <span>Appbeschreibung</span>
               </button>
               <div class="type-menu-popup" data-menu-popup="project" hidden>
                 <p class="event-description">TypeMap ist eine App zur hochwertigen Textsetzung in interaktiven, strukturierten Textmaps.</p>
@@ -94,8 +94,8 @@
         </article>
       </section>
 
-      <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Projektbrowser">
-        <span class="workspace-strip-label">Projektbrowser</span>
+      <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Dokumentbrowser">
+        <span class="workspace-strip-label">Dokumentbrowser</span>
       </div>
     </section>
 
@@ -105,13 +105,13 @@
       </div>
       <article class="details-inline browser-panel">
         <div class="panel-header panel-header-with-action">
-          <span class="label">Projektbrowser</span>
+          <span class="label">Dokumentbrowser</span>
           <button type="button" id="layoutCycleButton" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
             <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
           </button>
         </div>
 
-        <div class="project-tabs" role="tablist" aria-label="Projektbrowser">
+        <div class="project-tabs" role="tablist" aria-label="Dokumentbrowser">
           <button type="button" class="project-tab is-active" data-type-tab="browser" role="tab" aria-selected="true">Browser</button>
           <button type="button" class="project-tab" data-type-tab="preview" role="tab" aria-selected="false">Vorschau</button>
         </div>
@@ -119,7 +119,7 @@
         <div class="project-tab-panel" data-type-tab-panel="browser">
           <p id="projectInfo" class="event-description"></p>
           <div class="library-actions">
-            <button type="button" id="createProjectButton" class="secondary-button">Neues Projekt</button>
+            <button type="button" id="createProjectButton" class="secondary-button">Neues Dokument</button>
             <button type="button" id="openImportButton" class="secondary-button">Importieren</button>
           </div>
           <input id="projectFileInput" type="file" accept=".json,application/json" hidden>
@@ -356,7 +356,7 @@
             <input id="fontLigaturesInput" type="checkbox">
           </label>
           <div class="property-row">
-            <span>Projekt-Schrift</span>
+            <span>Dokument-Schrift</span>
             <button type="button" id="addFontButton" class="property-add-button">Schrift hinzufügen</button>
           </div>
         </div>
@@ -457,7 +457,7 @@
     <div class="property-dialog-body">
       <section class="property-section">
         <h3>Google Fonts</h3>
-        <p class="event-description">Trage eine Schriftfamilie ein. TypeMap lädt sie nur für dieses Projekt und nimmt sie in die Projektschriften auf.</p>
+        <p class="event-description">Trage eine Schriftfamilie ein. TypeMap lädt sie nur für dieses Dokument und nimmt sie in die Dokumentschriften auf.</p>
         <div class="property-list">
           <label class="property-row">
             <span>Schriftfamilie</span>
@@ -472,7 +472,7 @@
     </div>
     <div class="property-dialog-actions">
       <button type="button" id="fontDialogCancelButton" class="secondary-button">Abbrechen</button>
-      <button type="button" id="fontDialogAddButton" class="secondary-button primary-action">Zum Projekt hinzufügen</button>
+      <button type="button" id="fontDialogAddButton" class="secondary-button primary-action">Zum Dokument hinzufügen</button>
     </div>
   </section>
 
@@ -575,7 +575,7 @@
       <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
     </div>
   </section>
-  <script src="typemap.js?v=20260614a"></script>
+  <script src="typemap.js?v=20260616i"></script>
 </body>
 </html>
 
