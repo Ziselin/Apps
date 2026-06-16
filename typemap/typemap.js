@@ -4,6 +4,7 @@ const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
+const TOC_OBJECT_MARKER = "{{toc}}";
 
 const ui = {
   menuButton: document.getElementById("typeMenuButton"),
@@ -271,6 +272,18 @@ function applyDocumentStylePreset(project, textKind, options = {}) {
     ...preset.style,
     fontSize: includeFontSize ? preset.style.fontSize : project.style.fontSize,
   };
+  project.style.hyphenationSettings = normalizeHyphenationSettings(
+    {
+      ...(project.style.hyphenationSettings || {}),
+      mode: preset.style.hyphenation,
+      language: preset.style.language,
+    },
+    preset.style.hyphenation,
+    preset.style.language,
+  );
+  project.style.hyphenation = project.style.hyphenationSettings.mode;
+  project.style.language = project.style.hyphenationSettings.language;
+  enableAutoHyphenationForJustifiedText(project);
   project.typography = {
     ...createDefaultTypography(),
     ...(project.typography || {}),
@@ -357,6 +370,20 @@ function normalizeHyphenationSettings(value, legacyMode = "manual", legacyLangua
     before: clampInteger(source.before, fallback.before, 2, 12),
     after: clampInteger(source.after, fallback.after, 2, 12),
   };
+}
+
+function enableAutoHyphenationForJustifiedText(project) {
+  if (!project?.style || project.style.textAlign !== "justify") return;
+  project.style.hyphenationSettings = normalizeHyphenationSettings(
+    {
+      ...(project.style.hyphenationSettings || {}),
+      mode: "auto",
+    },
+    "auto",
+    project.style.language,
+  );
+  project.style.hyphenation = project.style.hyphenationSettings.mode;
+  project.style.language = project.style.hyphenationSettings.language;
 }
 
 function normalizePersonList(value) {
@@ -451,8 +478,13 @@ function normalizeProject(project) {
   );
   normalized.style.hyphenation = normalized.style.hyphenationSettings.mode;
   normalized.style.language = normalized.style.hyphenationSettings.language;
-  normalized.metadata.textKind = normalizeDocumentStyleId(normalized.metadata.textKind || fallback.metadata.textKind);
+  const rawTextKind = String(normalized.metadata.textKind || fallback.metadata.textKind);
+  const wasLegacyTextKind = Boolean(LEGACY_DOCUMENT_STYLE_MAP[rawTextKind]);
+  normalized.metadata.textKind = normalizeDocumentStyleId(rawTextKind);
   const preset = getDocumentStylePreset(normalized.metadata.textKind);
+  if (preset && (wasLegacyTextKind || !normalized.style.titleFontFamily)) {
+    applyDocumentStylePreset(normalized, normalized.metadata.textKind);
+  }
   if (preset && (!normalized.typography.headingScale || !Object.keys(normalized.typography.headingScale).length)) {
     normalized.typography.headingScale = { ...preset.headingScale };
   }
@@ -525,6 +557,7 @@ function setProjectExpanded(projectId, isExpanded) {
 
 function getMarkdownBlockType(text) {
   const value = String(text || "");
+  if (value.trim() === TOC_OBJECT_MARKER) return "toc";
   if (/^#{1,7}\s+/.test(value)) return "heading";
   if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
   if (/^```/.test(value)) return "code";
@@ -539,7 +572,9 @@ function createMarkdownBlockNode(block, index) {
   const type = headingMatch ? "heading" : getMarkdownBlockType(block.text);
   const title = headingMatch
     ? headingMatch[2].trim()
-    : type === "table"
+    : type === "toc"
+      ? "Inhaltsverzeichnis"
+      : type === "table"
       ? "Tabelle"
       : type === "code"
         ? "Codeblock"
@@ -680,6 +715,13 @@ function buildSourceModel(project) {
       return;
     }
 
+    if (text.trim() === TOC_OBJECT_MARKER) {
+      flushParagraph(startOffset);
+      pushSingleLineBlock(line);
+      cursor = endOffset + 1;
+      return;
+    }
+
     if (text.trim()) {
       if (!paragraphLines.length) paragraphStart = startOffset;
       paragraphLines.push(line);
@@ -794,6 +836,15 @@ function appendInlineMarkdown(parent, text) {
 
 function createMarkdownBlockElement(block, textType) {
   const text = String(block.text || "");
+  if (text.trim() === TOC_OBJECT_MARKER) {
+    const object = document.createElement("p");
+    object.className = "preview-embedded-object preview-toc-object";
+    const capsule = document.createElement("span");
+    capsule.className = "preview-object-capsule";
+    capsule.textContent = "Inhaltsverzeichnis";
+    object.appendChild(capsule);
+    return object;
+  }
   if (textType === "lyric" && !text.trim()) {
     const blankLine = document.createElement("p");
     blankLine.className = "preview-blank-line";
@@ -850,6 +901,69 @@ function createMarkdownBlockElement(block, textType) {
   return paragraph;
 }
 
+function isTableOfContentsBlock(block) {
+  return String(block?.text || "").trim() === TOC_OBJECT_MARKER;
+}
+
+function getMarkdownHeadingLevel(text) {
+  const match = String(text || "").match(/^(#{1,7})\s+/);
+  return match ? match[1].length : 0;
+}
+
+function getPreviewHeadingId(sourceStartOffset) {
+  return `typemap-heading-${sourceStartOffset}`;
+}
+
+function jumpPreviewStageToHeading(heading) {
+  if (!heading || !ui.typeStage) return;
+  const stageRect = ui.typeStage.getBoundingClientRect();
+  const headingRect = heading.getBoundingClientRect();
+  const nextTop = ui.typeStage.scrollTop + (headingRect.top - stageRect.top) - 18;
+  ui.typeStage.scrollTo({
+    top: Math.max(0, nextTop),
+    left: ui.typeStage.scrollLeft,
+    behavior: "auto",
+  });
+}
+
+function renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks) {
+  targetPage.querySelector(".preview-side-toc")?.remove();
+  targetPage.classList.remove("has-side-toc");
+  if (targetText !== ui.previewText) return;
+  if (layoutModel.activeRange && layoutModel.activeRange.id !== "document-root") return;
+  if (!blocks.some(isTableOfContentsBlock)) return;
+
+  const sourceModel = buildSourceModel(project);
+  const sections = sourceModel.sections || [];
+  if (!sections.length) return;
+
+  const nav = document.createElement("nav");
+  nav.className = "preview-side-toc";
+  nav.setAttribute("aria-label", "Inhaltsverzeichnis");
+  const title = document.createElement("span");
+  title.className = "preview-side-toc-title";
+  title.textContent = "Inhaltsverzeichnis";
+  nav.appendChild(title);
+
+  sections.forEach((section) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "preview-side-toc-item";
+    button.style.setProperty("--toc-level", String(Math.max(1, section.level || 1) - 1));
+    button.textContent = section.title;
+    button.addEventListener("click", () => {
+      const heading = document.getElementById(getPreviewHeadingId(section.startOffset));
+      if (heading && targetText.contains(heading)) {
+        jumpPreviewStageToHeading(heading);
+      }
+    });
+    nav.appendChild(button);
+  });
+
+  targetPage.classList.add("has-side-toc");
+  targetPage.insertBefore(nav, targetText);
+}
+
 function getVisualLineRects(element) {
   const range = document.createRange();
   range.selectNodeContents(element);
@@ -891,6 +1005,11 @@ function getVisualLineRects(element) {
   return grouped;
 }
 
+function shouldExcludeBlockFromLineNumbering(block) {
+  return block?.classList?.contains("preview-heading-level-1") === true
+    || block?.classList?.contains("preview-embedded-object") === true;
+}
+
 function renderLineNumberLayer(targetText, lineNumbering) {
   targetText.querySelector(".preview-line-number-layer")?.remove();
   if (!lineNumbering.enabled) return;
@@ -904,6 +1023,7 @@ function renderLineNumberLayer(targetText, lineNumbering) {
   let lineIndex = 0;
 
   blocks.forEach((block) => {
+    if (shouldExcludeBlockFromLineNumbering(block)) return;
     if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) {
       return;
     }
@@ -990,11 +1110,16 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
   targetPage.style.setProperty("--preview-body-font", style.fontFamily);
   targetPage.style.setProperty("--preview-title-font", style.titleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-title-weight", String(Number(style.titleWeight) || 700));
   targetPage.style.setProperty("--preview-subtitle-font", style.subtitleFontFamily || style.titleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-subtitle-weight", String(Number(style.subtitleWeight) || 400));
   targetPage.style.setProperty("--preview-meta-font", style.metaFontFamily || style.subtitleFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-meta-weight", String(Number(style.metaWeight) || 400));
   targetPage.style.setProperty("--preview-heading-font", style.headingFontFamily || style.fontFamily);
+  targetPage.style.setProperty("--preview-heading-weight", String(Number(style.headingWeight) || 700));
   targetPage.style.setProperty("--preview-quote-font", style.quoteFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-code-font", style.codeFontFamily || "'Source Code Pro', 'Courier New', monospace");
+  targetPage.style.setProperty("--preview-code-size", `${ptToPx(Math.max(8, (Number(style.fontSize) || 14) - 2))}px`);
   targetPage.style.setProperty("--preview-paragraph-spacing", `${Number(style.paragraphSpacing) || 0}em`);
   targetPage.style.setProperty("--preview-first-line-indent", style.firstLineIndent ? "1.3em" : "0");
   for (let level = 1; level <= 7; level += 1) {
@@ -1036,6 +1161,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   const blocks = lineNumbering.mode === "source-lines" && textType === "lyric"
     ? (layoutModel.sourceLineBlocks || [])
     : layoutModel.blocks;
+  renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks);
 
   if (!blocks.length) {
     const empty = document.createElement("p");
@@ -1047,8 +1173,13 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   }
 
   blocks.forEach((block, index) => {
+    if (isTableOfContentsBlock(block)) return;
     const element = createMarkdownBlockElement(block, textType);
     element.classList.add("preview-body-block");
+    if (getMarkdownHeadingLevel(block.text)) {
+      element.id = getPreviewHeadingId(block.sourceStartOffset);
+      element.classList.add("preview-heading-anchor");
+    }
     if (textType === "lyric" && !String(block.text || "").trim()) {
       element.dataset.sourceBlankLine = "true";
     }
@@ -1128,7 +1259,7 @@ function escapeHtml(value) {
 function renderEditorHighlight(rawText) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
-  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^#{1,7}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
+  const pattern = /(```[\s\S]*?```|`[^`\n]+`|^\{\{toc\}\}$|^#{1,7}\s+[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gm;
   let cursor = 0;
   let html = "";
   text.replace(pattern, (match, _token, offset) => {
@@ -1138,6 +1269,8 @@ function renderEditorHighlight(rawText) {
       className = "markdown-editor-fence";
     } else if (match.startsWith("`")) {
       className = "markdown-editor-code";
+    } else if (match === TOC_OBJECT_MARKER) {
+      className = "markdown-editor-object";
     } else if (match.startsWith("#")) {
       className = /^#\s+/.test(match) ? "markdown-editor-title" : "markdown-editor-heading";
     } else if (match.startsWith("==")) {
@@ -1211,6 +1344,7 @@ function getEditorSourceText(project) {
 
 function getTreeNodeIcon(type) {
   if (type === "document") return "▣";
+  if (type === "toc") return "";
   if (type === "heading") return "#";
   if (type === "table") return "▤";
   if (type === "code") return "{}";
@@ -1268,7 +1402,7 @@ function createTreeNodeButton(project, node, depth) {
   });
 
   const icon = document.createElement("span");
-  icon.className = "document-tree-icon";
+  icon.className = `document-tree-icon document-tree-icon-${node.type}`;
   icon.textContent = node.type === "section" ? (node.number || "§") : getTreeNodeIcon(node.type);
   const copy = document.createElement("span");
   copy.className = "document-tree-copy";
@@ -1315,8 +1449,9 @@ function renderDocumentTree(project) {
     tree.appendChild(empty);
     return tree;
   }
-  chapters.forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
-  looseContent.forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
+  [...chapters, ...looseContent]
+    .sort((a, b) => a.startOffset - b.startOffset)
+    .forEach((child) => renderDocumentTreeNode(tree, project, child, 0));
   return tree;
 }
 
@@ -1388,12 +1523,12 @@ function renderProjectList() {
     });
 
     row.addEventListener("click", () => {
-      activateProject(project.id);
+      activateProject(project.id, { resetSourceRange: true });
     });
     row.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        activateProject(project.id);
+        activateProject(project.id, { resetSourceRange: true });
       }
     });
 
@@ -1737,6 +1872,27 @@ function saveHyphenationDialog() {
   setHyphenationDialogOpen(false);
 }
 
+function insertTableOfContentsObject() {
+  updateActiveProject((project) => {
+    const rawText = String(project.source.rawText || "");
+    const withoutExistingToc = rawText
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== TOC_OBJECT_MARKER)
+      .join("\n");
+    const openingTitleMatch = withoutExistingToc.match(/^(\s*#\s+[^\r\n]+)(\r?\n)?/);
+    if (openingTitleMatch) {
+      const titleLine = openingTitleMatch[1];
+      const rest = withoutExistingToc.slice(openingTitleMatch[0].length).replace(/^\s+/, "");
+      project.source.rawText = `${titleLine}\n\n${TOC_OBJECT_MARKER}${rest ? `\n\n${rest}` : "\n"}`;
+    } else {
+      project.source.rawText = `${TOC_OBJECT_MARKER}\n\n${withoutExistingToc.replace(/^\s+/, "")}`;
+    }
+    syncProjectTitleFromHeading(project);
+    state.activeSourceRange = null;
+  });
+  renderEditor();
+}
+
 function renderApp() {
   renderProjectList();
   loadProjectFonts();
@@ -1751,7 +1907,7 @@ function markProjectChanged(project) {
 }
 
 function activateProject(projectId, options = {}) {
-  if (!options.preserveSourceRange && state.activeProjectId !== projectId) {
+  if (options.resetSourceRange || (!options.preserveSourceRange && state.activeProjectId !== projectId)) {
     state.activeSourceRange = null;
   }
   state.activeProjectId = projectId;
@@ -1905,8 +2061,12 @@ function escapeScriptJson(value) {
 }
 
 function buildHtmlBlockMarkup(block, textType) {
+  if (isTableOfContentsBlock(block)) return "";
   const element = createMarkdownBlockElement(block, textType);
   element.classList.add("preview-body-block");
+  if (getMarkdownHeadingLevel(block.text)) {
+    element.id = getPreviewHeadingId(block.sourceStartOffset);
+  }
   if (textType === "lyric" && !String(block.text || "").trim()) {
     element.dataset.sourceBlankLine = "true";
   }
@@ -1916,13 +2076,28 @@ function buildHtmlBlockMarkup(block, textType) {
 }
 
 function buildHtmlFontFaceCss(project) {
-  if (!String(project?.style?.fontFamily || "").includes("CMU Serif")) return "";
+  const style = project?.style || {};
+  const families = [
+    style.fontFamily,
+    style.titleFontFamily,
+    style.subtitleFontFamily,
+    style.metaFontFamily,
+    style.headingFontFamily,
+    style.quoteFontFamily,
+  ].join(" ");
+  if (!families.includes("CMU Serif")) return "";
   return `
     @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunrm.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
     @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunti.ttf") format("truetype"); font-weight: 400; font-style: italic; font-display: swap; }
     @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunbx.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
     @font-face { font-family: "CMU Serif"; src: url("../assets/fonts/cmu/cmunbi.ttf") format("truetype"); font-weight: 700; font-style: italic; font-display: swap; }
 `;
+}
+
+function buildHtmlAppFontLinks() {
+  return `<link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">`;
 }
 
 function buildHtmlExport(project) {
@@ -1946,34 +2121,52 @@ function buildHtmlExport(project) {
   const exportBlocks = lineNumbering.mode === "source-lines" && textType === "lyric"
     ? layoutModel.sourceLineBlocks
     : layoutModel.blocks;
+  const hasTocObject = exportBlocks.some(isTableOfContentsBlock);
   const blocks = exportBlocks.map((block) => buildHtmlBlockMarkup(block, textType)).join("\n");
+  const tocHtml = hasTocObject && sourceModel.sections.length
+    ? `<nav class="html-side-toc" aria-label="Inhaltsverzeichnis">
+      <span class="html-side-toc-title">Inhaltsverzeichnis</span>
+      ${sourceModel.sections.map((section) => `<a class="html-side-toc-item" style="--toc-level:${Math.max(0, (section.level || 1) - 1)}" href="#${escapeHtml(getPreviewHeadingId(section.startOffset))}">${escapeHtml(section.title)}</a>`).join("\n      ")}
+    </nav>`
+    : "";
   const lineNumberingScriptData = escapeScriptJson(lineNumbering);
   const ligatureCss = project.style.ligatures !== false
     ? ' font-variant-ligatures: common-ligatures contextual; font-feature-settings: "liga" 1, "clig" 1, "calt" 1; text-rendering: optimizeLegibility;'
     : "";
+  const paragraphSpacing = Number(project.style.paragraphSpacing) || 0.72;
+  const firstLineIndent = project.style.firstLineIndent ? "1.3em" : "0";
+  const quoteStyle = project.style.quoteStyle === "italic" ? "italic" : "normal";
+  const codeFontSize = Math.max(8, (Number(project.style.fontSize) || 14) - 2);
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(metadata.language || project.style.language || "de")}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(project.title || "TypeMap")}</title>
+  ${buildHtmlAppFontLinks()}
   <style>
 ${buildHtmlFontFaceCss(project)}
     * { box-sizing: border-box; }
     body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
-    main { max-width: ${project.style.measure}ch; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; overflow-wrap: break-word; }
+    main { max-width: ${hasTocObject ? `calc(${project.style.measure}ch + 250px)` : `${project.style.measure}ch`}; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; overflow-wrap: break-word; }
+    main.has-side-toc { display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, ${project.style.measure}ch); gap: 30px; align-items: start; }
     header { margin: 0 0 1.55em; text-align: ${documentTitleAlign}; }
-    h1 { margin: 0; font-size: ${Number(titleScale.title) || 1.48}em; line-height: ${Number(titleScale.titleLineHeight) || 1.12}; }
-    .subtitle { margin: .34em 0 0; color: #555; font-size: ${Number(titleScale.subtitle) || 0.86}em; line-height: ${Number(titleScale.subtitleLineHeight) || 1.28}; }
-    .authors { margin: .68em 0 0; color: #333; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: 400; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
-    .typemap-text { position: relative;${ligatureCss} }
+    header h1 { margin: 0; font-family: ${project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.title) || 1.48}em; font-weight: ${Number(project.style.titleWeight) || 700}; line-height: ${Number(titleScale.titleLineHeight) || 1.12}; }
+    .subtitle { margin: .34em 0 0; color: #555; font-family: ${project.style.subtitleFontFamily || project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.subtitle) || 0.86}em; font-weight: ${Number(project.style.subtitleWeight) || 400}; line-height: ${Number(titleScale.subtitleLineHeight) || 1.28}; }
+    .authors { margin: .68em 0 0; color: #333; font-family: ${project.style.metaFontFamily || project.style.subtitleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: ${Number(project.style.metaWeight) || 400}; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
+    .typemap-text { position: relative; font-family: ${project.style.fontFamily};${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
-    p { margin: 0 0 .72em; white-space: pre-wrap; overflow-wrap: break-word; }
+    .html-side-toc { position: sticky; top: 24px; display: grid; gap: 2px; max-height: calc(100vh - 80px); overflow: auto; color: #6b746f; font-family: "Source Sans 3", Arial, sans-serif; font-size: 11.5pt; line-height: 1.28; text-align: left; }
+    .html-side-toc-title { margin-bottom: .55em; color: #8f5d14; font-size: 8.5pt; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+    .html-side-toc-item { display: block; min-height: 24px; padding: 3px 6px 3px calc(4px + var(--toc-level, 0) * 13px); border-radius: 6px; color: inherit; text-decoration: none; }
+    .html-side-toc-item:hover { background: rgba(196, 136, 47, .1); color: #8f5d14; }
+    @media (max-width: 860px) { main.has-side-toc { display: block; max-width: ${project.style.measure}ch; } .html-side-toc { position: static; max-height: none; margin-bottom: 1.2em; } }
+    p { margin: 0 0 ${paragraphSpacing}em; white-space: pre-wrap; overflow-wrap: break-word; text-indent: ${firstLineIndent}; }
     em { font-style: italic; }
     strong { font-weight: 700; }
     mark { background: transparent; text-decoration: underline; color: inherit; }
     a { color: #70531c; text-decoration: underline; text-underline-offset: .12em; }
-    h1, h2, h3, h4, h5, h6 { margin: 1.1em 0 .38em; line-height: 1.12; font-weight: 700; }
+    h1, h2, h3, h4, h5, h6 { margin: 1.1em 0 .38em; font-family: ${project.style.headingFontFamily || project.style.fontFamily}; line-height: 1.12; font-weight: ${Number(project.style.headingWeight) || 700}; }
     h1:first-child, h2:first-child, h3:first-child, h4:first-child, h5:first-child, h6:first-child { margin-top: 0; }
     .preview-heading-level-1 { font-size: ${Number(headingScale[1]) || 1.48}em; }
     .preview-heading-level-2 { font-size: ${Number(headingScale[2]) || 1.22}em; }
@@ -1982,11 +2175,13 @@ ${buildHtmlFontFaceCss(project)}
     .preview-heading-level-5 { font-size: ${Number(headingScale[5]) || 1}em; font-weight: 600; font-style: italic; }
     .preview-heading-level-6 { font-size: ${Number(headingScale[6]) || 0.94}em; font-weight: 600; font-style: italic; }
     .preview-heading-level-7 { font-size: ${Number(headingScale[7]) || 0.9}em; font-weight: 600; font-style: italic; }
-    blockquote { margin: .9em 0; padding-left: 1.1em; border-left: 2px solid #bbb; color: #333; }
+    .preview-embedded-object { margin: 0 0 .8em; line-height: inherit; }
+    .preview-object-capsule { display: inline-flex; align-items: center; max-height: 1.45em; padding: 0 .58em; border: 1px solid rgba(196, 136, 47, .42); border-radius: 999px; background: rgba(196, 136, 47, .13); color: #8f5d14; font-family: "Source Sans 3", Arial, sans-serif; font-size: .72em; font-weight: 700; line-height: 1.25; vertical-align: baseline; }
+    blockquote { margin: .9em 0; padding-left: 1.1em; border-left: 2px solid rgba(61, 75, 69, .42); color: rgba(38, 54, 50, .86); font-family: ${project.style.quoteFontFamily || project.style.fontFamily}; font-style: ${quoteStyle}; }
     ul, ol { margin: 0 0 .85em 1.4em; padding: 0; }
     li { margin: .18em 0; }
-    code { font-family: "Source Code Pro", "Courier New", monospace; font-size: .88em; background: #f0eee8; padding: .08em .24em; border-radius: 3px; }
-    pre { margin: .9em 0; padding: .9em 1em; border-radius: 6px; background: #171f24; color: #f5f1e8; overflow-x: auto; }
+    code { font-family: ${project.style.codeFontFamily || '"Source Code Pro", "Courier New", monospace'}; font-size: ${codeFontSize}pt; background: rgba(33, 54, 51, .08); color: #264f63; padding: .08em .24em; border-radius: 3px; }
+    pre { margin: .9em 0; padding: .9em 1em; border: 1px solid rgba(33, 54, 51, .14); border-radius: 6px; background: rgba(250, 247, 239, .78); color: #203431; overflow-x: auto; }
     pre code { background: transparent; color: inherit; padding: 0; }
     .preview-blank-line { min-height: 1.5em; margin: 0; }
     .line-number-layer { position: absolute; inset: 0 auto 0 0; width: 0; pointer-events: none; }
@@ -1994,7 +2189,9 @@ ${buildHtmlFontFaceCss(project)}
   </style>
 </head>
 <body>
-  <main>
+  <main${hasTocObject ? ' class="has-side-toc"' : ""}>
+    ${tocHtml}
+    <div class="html-document-flow">
     <header${hasSourceTitleHeading && !metadata.subtitle && !authors.length ? " hidden" : ""}>
       ${hasSourceTitleHeading ? "" : `<h1>${escapeHtml(project.title || "")}</h1>`}
       ${metadata.subtitle ? `<p class="subtitle">${escapeHtml(metadata.subtitle)}</p>` : ""}
@@ -2003,6 +2200,7 @@ ${buildHtmlFontFaceCss(project)}
     <section id="typemapText" class="typemap-text${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">
       ${blocks}
     </section>
+    </div>
   </main>
   <script>
     const lineNumbering = ${lineNumberingScriptData};
@@ -2042,6 +2240,8 @@ ${buildHtmlFontFaceCss(project)}
       const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
       let lineIndex = 0;
       blocks.forEach((block) => {
+        if (block.classList.contains("preview-heading-level-1")) return;
+        if (block.classList.contains("preview-embedded-object")) return;
         if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) return;
         const rects = lineNumbering.mode === "source-lines"
           ? getVisualLineRects(block)
@@ -2191,7 +2391,20 @@ async function exportPng() {
 
   const paragraphs = String(project.source.rawText || "").split(/\n\s*\n/);
   paragraphs.forEach((paragraph, paragraphIndex) => {
-    wrapText(paragraph).forEach((line) => pushLine(line, { countLine: Boolean(line.trim()) }));
+    const isSourceTitleHeading = /^#\s+/.test(String(paragraph || "").trim());
+    if (String(paragraph || "").trim() === TOC_OBJECT_MARKER) {
+      pushLine("Inhaltsverzeichnis", {
+        size: fontSize * 0.72,
+        weight: 700,
+        align: style.textAlign || "left",
+        color: "#8f5d14",
+        lineHeight: lineHeightPx,
+        countLine: false,
+      });
+      if (paragraphIndex < paragraphs.length - 1) pushSpacer(lineHeightPx * 0.72);
+      return;
+    }
+    wrapText(paragraph).forEach((line) => pushLine(line, { countLine: Boolean(line.trim()) && !isSourceTitleHeading }));
     if (paragraphIndex < paragraphs.length - 1) pushSpacer(lineHeightPx * 0.72);
   });
 
@@ -2557,6 +2770,7 @@ function bindEditor() {
       const align = button.dataset.toolbarAlign || "left";
       updateActiveProject((project) => {
         project.style.textAlign = align;
+        enableAutoHyphenationForJustifiedText(project);
       });
       closeEditorMenus();
     });
@@ -2580,6 +2794,9 @@ function bindEditor() {
   document.querySelectorAll("[data-insert-object], [data-future-action], [data-view-option]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
+      if (button.dataset.insertObject === "toc") {
+        insertTableOfContentsObject();
+      }
       closeEditorMenus();
     });
   });
@@ -2669,6 +2886,7 @@ function bindEditor() {
   ui.textAlignSelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.textAlign = ui.textAlignSelect.value;
+      enableAutoHyphenationForJustifiedText(project);
     });
   });
   ui.languageSelect?.addEventListener("change", () => {

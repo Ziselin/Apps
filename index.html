@@ -340,7 +340,7 @@
       isolation: isolate;
       width: min(1180px, calc(100vw - 56px));
       margin: 0 auto;
-      padding: clamp(68px, 9vw, 116px) 0 48px;
+      padding: clamp(42px, 6vw, 78px) 0 48px;
     }
 
     .page-shell::before {
@@ -361,30 +361,30 @@
       position: relative;
       display: grid;
       justify-items: start;
-      margin: 0 auto clamp(92px, 13vw, 150px);
-      width: min(840px, 100%);
+      margin: 0 auto clamp(48px, 7vw, 78px);
+      width: min(960px, 100%);
     }
 
     .claim-text {
       margin: 0;
       color: var(--ink-soft);
       font-family: Arial, Helvetica, sans-serif;
-      font-size: clamp(4rem, 7vw, 6.85rem);
+      font-size: clamp(3.6rem, 6.1vw, 5.75rem);
       font-weight: 700;
       line-height: 1.03;
       letter-spacing: 0;
-      text-wrap: balance;
+      text-wrap: normal;
     }
 
     .app-section {
-      width: min(840px, 100%);
+      width: min(960px, 100%);
       margin: 0 auto;
     }
 
     .collection-grid {
       display: grid;
-      grid-template-columns: minmax(280px, 420px);
-      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 28px;
       justify-content: start;
       align-items: start;
     }
@@ -472,7 +472,7 @@
     }
 
     .app-placeholder {
-      min-height: 88px;
+      min-height: 78px;
     }
 
     .empty-state {
@@ -507,7 +507,7 @@
       }
 
       .page-shell {
-        padding-top: 52px;
+        padding-top: 38px;
       }
 
       .page-shell::before {
@@ -517,13 +517,15 @@
       }
 
       .hero {
-        margin-bottom: 70px;
+        margin-bottom: 48px;
       }
 
       .claim-text {
-        font-size: clamp(3.2rem, 12vw, 5.4rem);
+        font-size: clamp(3rem, 8.6vw, 4.8rem);
       }
+    }
 
+    @media (max-width: 720px) {
       .collection-grid {
         grid-template-columns: minmax(260px, 420px);
       }
@@ -590,6 +592,7 @@
       <datalist id="appSearchOptions">
         <option value="TimeMap"></option>
         <option value="TypeMap"></option>
+        <option value="Sourcerer"></option>
       </datalist>
     </div>
   </header>
@@ -652,6 +655,13 @@
             <span class="app-description">Textsetzung (experimentell)</span>
           </span>
         </a>
+        <div class="app-tile app-placeholder" data-search-card data-search-text="sourcerer quellen recherche source">
+          <img class="app-icon" src="./assets/sourcerer-favicon.svg" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">Sourcerer</span>
+            <span class="app-description">(in Vorbereitung)</span>
+          </span>
+        </div>
         <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
       </div>
     </section>
