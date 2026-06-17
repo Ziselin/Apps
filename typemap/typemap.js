@@ -7,6 +7,7 @@ const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
 const PARATEXT_END_PATTERN = /^:::\s*$/;
+const PARATEXT_HEADING_PATTERN = /^#\s+(.+)$/;
 
 const ui = {
   menuButton: document.getElementById("typeMenuButton"),
@@ -149,13 +150,34 @@ function getPlainDocumentLabel(value, fallback = "") {
 }
 
 function getOpeningTitleHeading(rawText) {
-  const match = String(rawText || "").match(/^\s*#\s+([^\r\n]+)/);
-  return match ? getPlainDocumentLabel(match[1]) : "";
+  const lines = String(rawText || "").split(/\r\n|\r|\n/);
+  for (const line of lines) {
+    const match = line.match(/^\s*#\s+([^\r\n]+)/);
+    if (!match) continue;
+    if (getParatextHeadingKind(line)) continue;
+    return getPlainDocumentLabel(match[1]);
+  }
+  return "";
 }
 
 function projectStartsWithTitleHeading(project) {
   const title = normalizeMarkdownHeadingText(project?.title || "");
   return Boolean(title) && getOpeningTitleHeading(project?.source?.rawText || "") === title;
+}
+
+function replaceFirstDocumentTitleHeading(rawText, nextHeading, acceptedTitles = []) {
+  const source = String(rawText || "");
+  const accepted = new Set(acceptedTitles.map((title) => normalizeMarkdownHeadingText(title)).filter(Boolean));
+  const linePattern = /^(\s*)#\s+([^\r\n]*)(\r?\n|$)/gm;
+  let match;
+  while ((match = linePattern.exec(source))) {
+    const fullLine = match[0];
+    if (getParatextHeadingKind(fullLine)) continue;
+    const headingTitle = getPlainDocumentLabel(match[2]);
+    if (accepted.size && !accepted.has(headingTitle)) continue;
+    return `${source.slice(0, match.index)}${match[1]}${nextHeading}${match[3]}${source.slice(match.index + fullLine.length)}`;
+  }
+  return null;
 }
 
 function syncProjectTitleHeading(project, previousTitle = null) {
@@ -171,7 +193,7 @@ function syncProjectTitleHeading(project, previousTitle = null) {
     return;
   }
   if (openingHeading && (openingHeading === title || (previous && openingHeading === previous))) {
-    project.source.rawText = rawText.replace(/^\s*#\s+[^\r\n]*(\r?\n|$)/, `${nextHeading}\n`);
+    project.source.rawText = replaceFirstDocumentTitleHeading(rawText, nextHeading, [title, previous]) || rawText;
     return;
   }
   if (!openingHeading) {
@@ -595,14 +617,29 @@ function getMarkdownBlockType(text) {
 }
 
 function normalizeParatextKind(value) {
-  const kind = String(value || "").toLowerCase();
+  const kind = String(value || "").toLowerCase().trim();
   if (kind === "front" || kind === "frontmatter") return "front";
   if (kind === "back" || kind === "backmatter") return "back";
   return "body";
 }
 
+function getParatextHeadingKind(text) {
+  const match = String(text || "").trim().match(PARATEXT_HEADING_PATTERN);
+  if (!match) return null;
+  const label = getPlainDocumentLabel(match[1])
+    .toLowerCase()
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/^paratexte?\s+anfang$/.test(label) || label === "frontmatter") return "front";
+  if (/^paratexte?\s+ende$/.test(label) || label === "backmatter") return "back";
+  return null;
+}
+
 function getParatextMarkerKind(text) {
   const value = String(text || "").trim();
+  const headingKind = getParatextHeadingKind(value);
+  if (headingKind) return headingKind;
   const startMatch = value.match(PARATEXT_START_PATTERN);
   if (startMatch) return normalizeParatextKind(startMatch[1]);
   if (PARATEXT_END_PATTERN.test(value)) return "body";
@@ -615,8 +652,9 @@ function isParatextMarker(text) {
 
 function createMarkdownBlockNode(block, index) {
   const headingMatch = String(block.text || "").match(/^(#{1,7})\s+(.+)$/);
-  const type = headingMatch ? "heading" : getMarkdownBlockType(block.text);
-  const title = headingMatch
+  const blockType = getMarkdownBlockType(block.text);
+  const type = blockType === "paratext-marker" ? blockType : headingMatch ? "heading" : blockType;
+  const title = type === "heading" && headingMatch
     ? getPlainDocumentLabel(headingMatch[2], "Ohne Titel")
     : type === "toc"
       ? "Inhaltsverzeichnis"
@@ -632,7 +670,7 @@ function createMarkdownBlockNode(block, index) {
   return {
     id: `block-${index + 1}-${block.startOffset}`,
     type,
-    level: headingMatch ? headingMatch[1].length : null,
+    level: type === "heading" && headingMatch ? headingMatch[1].length : null,
     title,
     text: block.text,
     startOffset: block.startOffset,
@@ -828,6 +866,12 @@ function buildSourceModel(project) {
       paragraphMatter = currentMatter;
       cursor = endOffset + 1;
       return;
+    }
+
+    if (/^#\s+/.test(text.trim()) && currentMatter === "front") {
+      flushParagraph(startOffset);
+      currentMatter = "body";
+      paragraphMatter = currentMatter;
     }
 
     if (/^#{1,7}\s+/.test(text.trim())) {
@@ -2620,8 +2664,10 @@ async function exportPng() {
 
   const paragraphs = String(project.source.rawText || "").split(/\n\s*\n/);
   paragraphs.forEach((paragraph, paragraphIndex) => {
-    const isSourceTitleHeading = /^#\s+/.test(String(paragraph || "").trim());
-    if (String(paragraph || "").trim() === TOC_OBJECT_MARKER) {
+    const trimmedParagraph = String(paragraph || "").trim();
+    const isSourceTitleHeading = /^#\s+/.test(trimmedParagraph);
+    if (isParatextMarker(trimmedParagraph)) return;
+    if (trimmedParagraph === TOC_OBJECT_MARKER) {
       pushLine("Inhaltsverzeichnis", {
         size: fontSize * 0.72,
         weight: 700,
