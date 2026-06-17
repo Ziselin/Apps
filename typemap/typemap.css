@@ -1240,8 +1240,13 @@ body.typemap-theme-light .side-preview-page {
   padding-left: calc(var(--tree-depth, 0) * 18px);
 }
 
+.document-tree-row.has-visibility-toggle {
+  grid-template-columns: 22px 24px minmax(0, 1fr);
+}
+
 .document-tree-toggle,
-.document-tree-label {
+.document-tree-label,
+.document-tree-visibility {
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -1258,6 +1263,36 @@ body.typemap-theme-light .side-preview-page {
 .document-tree-toggle:disabled {
   cursor: default;
   opacity: 0.28;
+}
+
+.document-tree-visibility {
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.document-tree-visibility::before {
+  content: "";
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0 auto;
+  background: currentColor;
+  mask: url("https://api.iconify.design/mdi/eye-outline.svg") center / contain no-repeat;
+}
+
+.document-tree-visibility.is-visible {
+  color: var(--text);
+}
+
+.document-tree-visibility.is-hidden {
+  color: var(--quiet);
+  opacity: 0.46;
+}
+
+.document-tree-visibility:hover {
+  color: var(--accent);
 }
 
 .document-tree-label {
@@ -1289,14 +1324,17 @@ body.typemap-theme-light .side-preview-page {
   text-align: left;
 }
 
-.document-tree-icon-toc,
 .document-tree-icon-matter {
   width: 1.15em;
   height: 1.15em;
   align-self: center;
   background: var(--tree-accent);
   opacity: 0.92;
-  mask: url("https://api.iconify.design/streamline-block/content-box.svg") center / contain no-repeat;
+  mask: url("https://api.iconify.design/mdi/paperclip.svg") center / contain no-repeat;
+}
+
+.document-tree-icon-toc {
+  display: none;
 }
 
 .document-tree-icon-matter.document-tree-icon-body {
@@ -1844,24 +1882,32 @@ body.typemap-theme-light .text-editor-field .markdown-editor-frame {
 }
 
 .markdown-editor-title {
+  display: inline-block;
+  height: calc(23px * var(--editor-zoom, 1));
+  padding: 0 0.46em;
+  border: 1px solid rgba(255, 179, 71, 0.5);
+  border-radius: 7px;
+  background: rgba(255, 179, 71, 0.14);
   color: #ffb347 !important;
+  font-weight: 700;
+  line-height: inherit;
 }
 
 .markdown-editor-object {
   display: inline-block;
-  max-height: inherit;
-  padding: 0 0.48em;
-  border: 1px solid rgba(255, 179, 71, 0.5);
-  border-radius: 999px;
-  background: rgba(255, 179, 71, 0.18);
-  color: #ffcb7b !important;
+  height: calc(23px * var(--editor-zoom, 1));
+  padding: 0 0.46em;
+  border: 1px solid rgba(119, 219, 200, 0.46);
+  border-radius: 7px;
+  background: rgba(119, 219, 200, 0.13);
+  color: #9ce7da !important;
   font-weight: 700;
   line-height: inherit;
 }
 
 .markdown-editor-paratext {
   display: inline-block;
-  max-height: inherit;
+  height: calc(23px * var(--editor-zoom, 1));
   padding: 0 0.46em;
   border: 1px solid rgba(132, 202, 255, 0.42);
   border-radius: 7px;
