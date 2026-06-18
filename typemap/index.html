@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260617l">
+  <link rel="stylesheet" href="typemap.css?v=20260618m">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -251,9 +251,15 @@
                   <img src="https://api.iconify.design/material-symbols/format-list-numbered-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Zeilennummerierung</span>
                 </button>
-                <button type="button" class="editor-menu-action" data-view-option="chapter-numbers">
+                <button type="button" id="chapterNumbersToggleButton" class="editor-menu-action" aria-pressed="false">
                   <img src="https://api.iconify.design/mdi/number-1-box-multiple-outline.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Kapitelnummern</span>
+                  <img id="chapterNumbersToggleCheck" class="editor-menu-check" src="https://api.iconify.design/ic/round-check.svg?color=%23ffb347" alt="" aria-hidden="true" hidden>
+                </button>
+                <button type="button" id="spellcheckToggleButton" class="editor-menu-action" aria-pressed="false">
+                  <img src="https://api.iconify.design/streamline/stethoscope-remix.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Rechtschreibprüfung</span>
+                  <img id="spellcheckToggleCheck" class="editor-menu-check" src="https://api.iconify.design/ic/round-check.svg?color=%23ffb347" alt="" aria-hidden="true" hidden>
                 </button>
               </div>
             </details>
@@ -654,7 +660,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260616b"></script>
-  <script src="typemap.js?v=20260617n"></script>
+  <script src="typemap.js?v=20260618n"></script>
 </body>
 </html>
 

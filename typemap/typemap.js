@@ -6,6 +6,7 @@ const PROJECT_FILE_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
 const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
+const CHAPTER_ROLES = new Set(["foreword", "main", "afterword"]);
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
 const PARATEXT_END_PATTERN = /^:::\s*$/;
 const PARATEXT_HEADING_PATTERN = /^#\s*(.+)$/;
@@ -109,6 +110,10 @@ const ui = {
   lineNumberIncludeBlankInput: document.getElementById("lineNumberIncludeBlankInput"),
   lineNumberIntervalInput: document.getElementById("lineNumberIntervalInput"),
   lineNumberStartInput: document.getElementById("lineNumberStartInput"),
+  spellcheckToggleButton: document.getElementById("spellcheckToggleButton"),
+  spellcheckToggleCheck: document.getElementById("spellcheckToggleCheck"),
+  chapterNumbersToggleButton: document.getElementById("chapterNumbersToggleButton"),
+  chapterNumbersToggleCheck: document.getElementById("chapterNumbersToggleCheck"),
   previewPage: document.querySelector(".preview-page"),
   typeStage: document.querySelector(".type-stage"),
   previewText: document.getElementById("previewText"),
@@ -181,34 +186,58 @@ function replaceFirstDocumentTitleHeading(rawText, nextHeading, acceptedTitles =
   return null;
 }
 
-function ensureParatextHeadings(rawText) {
+function createChapterRoleKey(level, title) {
+  return `${Math.max(1, Number(level) || 1)}:${getPlainDocumentLabel(title).toLocaleLowerCase("de")}`;
+}
+
+function getExplicitChapterRole(project, level, title) {
+  const role = project?.chapterRoles?.[createChapterRoleKey(level, title)];
+  return CHAPTER_ROLES.has(role) ? role : "";
+}
+
+function ensureDocumentStructure(rawText, fallbackTitle = "Unbenanntes Dokument") {
   const source = String(rawText || "");
-  const buckets = { front: [], body: [], back: [] };
-  let currentMatter = "body";
+  let titleLine = "";
+  const content = [];
   source.split(/\r?\n/).forEach((line) => {
-    const kind = getParatextHeadingKind(line);
-    if (kind === "front" || kind === "back") {
-      currentMatter = kind;
+    if (getParatextHeadingKind(line) || PARATEXT_START_PATTERN.test(line) || PARATEXT_END_PATTERN.test(line)) return;
+    if (isTableOfContentsText(line)) return;
+    if (!titleLine && /^#\s+/.test(line)) {
+      titleLine = line.trim();
       return;
     }
-    if (isTableOfContentsText(line)) {
-      if (!buckets.front.some((entry) => isTableOfContentsText(entry))) {
-        buckets.front.push(TOC_OBJECT_HEADING);
-      }
-      return;
-    }
-    buckets[currentMatter].push(line);
+    content.push(line);
   });
-  const front = buckets.front.join("\n").trim();
-  const body = buckets.body.join("\n").trim();
-  const back = buckets.back.join("\n").trim();
+  if (!titleLine) titleLine = `# ${normalizeMarkdownHeadingText(fallbackTitle)}`;
+  const body = content.join("\n").trim();
   return [
-    "# Paratext (Anfang)",
-    front,
+    titleLine,
+    TOC_OBJECT_HEADING,
     body,
-    "# Paratext (Ende)",
-    back,
   ].filter((part) => part !== "").join("\n\n") + "\n";
+}
+
+function migrateLegacyChapterRoles(project) {
+  const rawText = String(project?.source?.rawText || "");
+  if (!project || !/(?:^|\n)(?:#\s*Paratext\s*\(|:::\s*(?:paratext\s+)?(?:front|back|frontmatter|backmatter))/i.test(rawText)) return;
+  let matter = "body";
+  const roles = { ...(project.chapterRoles || {}) };
+  rawText.split(/\r?\n/).forEach((line) => {
+    const nextMatter = getParatextMarkerKind(line);
+    if (nextMatter) {
+      matter = nextMatter;
+      return;
+    }
+    if (/^#\s+/.test(line) && !getParatextHeadingKind(line)) {
+      matter = "body";
+      return;
+    }
+    const match = line.match(/^(#{2,7})\s+(.+)$/);
+    if (!match || isTableOfContentsText(line)) return;
+    const role = matter === "front" ? "foreword" : matter === "back" ? "afterword" : "main";
+    roles[createChapterRoleKey(match[1].length, match[2])] = role;
+  });
+  project.chapterRoles = roles;
 }
 
 function syncProjectTitleHeading(project, previousTitle = null) {
@@ -220,18 +249,18 @@ function syncProjectTitleHeading(project, previousTitle = null) {
   const openingHeading = getOpeningTitleHeading(rawText);
   const nextHeading = `# ${title}`;
   if (!rawText.trim()) {
-    project.source.rawText = ensureParatextHeadings(`${nextHeading}\n\n`);
+    project.source.rawText = ensureDocumentStructure(`${nextHeading}\n\n`, title);
     return;
   }
   if (openingHeading && (openingHeading === title || (previous && openingHeading === previous))) {
-    project.source.rawText = ensureParatextHeadings(replaceFirstDocumentTitleHeading(rawText, nextHeading, [title, previous]) || rawText);
+    project.source.rawText = ensureDocumentStructure(replaceFirstDocumentTitleHeading(rawText, nextHeading, [title, previous]) || rawText, title);
     return;
   }
   if (!openingHeading) {
-    project.source.rawText = ensureParatextHeadings(`${nextHeading}\n\n${rawText.replace(/^\s+/, "")}`);
+    project.source.rawText = ensureDocumentStructure(`${nextHeading}\n\n${rawText.replace(/^\s+/, "")}`, title);
     return;
   }
-  project.source.rawText = ensureParatextHeadings(rawText);
+  project.source.rawText = ensureDocumentStructure(rawText, title);
 }
 
 function syncProjectTitleFromHeading(project, options = {}) {
@@ -240,9 +269,7 @@ function syncProjectTitleFromHeading(project, options = {}) {
   if (project.title !== headingTitle) {
     project.title = headingTitle;
   }
-  if (options.normalizeStructure) {
-    project.source.rawText = ensureParatextHeadings(project.source.rawText || "");
-  }
+  if (options.normalizeStructure) project.source.rawText = ensureDocumentStructure(project.source.rawText || "", project.title);
 }
 
 const APP_FONTS = [
@@ -271,6 +298,8 @@ const state = {
   detailsLayoutStep: 0,
   editorZoom: 1,
   sideTocUpdateTimer: 0,
+  editorGeometryFrame: 0,
+  editorResizeObserver: null,
 };
 
 function createId(prefix) {
@@ -488,7 +517,7 @@ function createDefaultProject(title = "Neues Dokument") {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     source: {
-      rawText: ensureParatextHeadings(`# ${normalizeMarkdownHeadingText(title)}\n\n${defaultProjectText}`),
+      rawText: ensureDocumentStructure(`# ${normalizeMarkdownHeadingText(title)}\n\n${defaultProjectText}`, title),
       textType: "prose",
     },
     style: {
@@ -501,12 +530,16 @@ function createDefaultProject(title = "Neues Dokument") {
       hyphenation: "manual",
       language: "de",
       lineNumbers: false,
+      spellcheck: false,
+      chapterNumbers: false,
       lineNumbering: createDefaultLineNumbering(),
       hyphenationSettings: createDefaultHyphenationSettings(),
     },
     metadata: createDefaultMetadata(),
     typography: createDefaultTypography(),
     paratextVisibility: {},
+    chapterRoles: {},
+    tocVisible: true,
   };
   applyDocumentStylePreset(project, project.metadata.textKind);
   return project;
@@ -540,11 +573,16 @@ function normalizeProject(project) {
     paratextVisibility: {
       ...(project?.paratextVisibility || {}),
     },
+    chapterRoles: {
+      ...(project?.chapterRoles || {}),
+    },
   };
   normalized.id = String(normalized.id || createId("typemap-project"));
   normalized.title = String(normalized.title || "Unbenanntes Dokument");
   normalized.source.rawText = String(normalized.source.rawText || "");
+  migrateLegacyChapterRoles(normalized);
   syncProjectTitleHeading(normalized);
+  normalized.tocVisible = normalized.tocVisible !== false;
   normalized.source.textType = ["prose", "lyric", "drama", "note"].includes(normalized.source.textType)
     ? normalized.source.textType
     : "prose";
@@ -559,6 +597,8 @@ function normalizeProject(project) {
     ? normalized.style.language
     : fallback.style.language;
   normalized.style.lineNumbers = normalized.style.lineNumbers === true;
+  normalized.style.spellcheck = normalized.style.spellcheck === true;
+  normalized.style.chapterNumbers = normalized.style.chapterNumbers === true;
   normalized.style.lineNumbering = normalizeLineNumbering(normalized.style.lineNumbering, normalized.style.lineNumbers);
   normalized.style.hyphenationSettings = normalizeHyphenationSettings(
     normalized.style.hyphenationSettings,
@@ -744,58 +784,19 @@ function createMarkdownBlockNode(block, index) {
   };
 }
 
-function buildDocumentTree(blocks, rawText) {
-  const frontNode = {
-    id: "document-frontmatter",
-    type: "matter",
-    matter: "front",
-    title: "Paratext (Anfang)",
-    startOffset: rawText.length,
-    endOffset: 0,
-    children: [],
-  };
-  const bodyNode = {
-    id: "document-body",
-    type: "matter",
-    matter: "body",
-    title: "Text",
-    startOffset: rawText.length,
-    endOffset: 0,
-    children: [],
-  };
-  const backNode = {
-    id: "document-backmatter",
-    type: "matter",
-    matter: "back",
-    title: "Paratext (Ende)",
-    startOffset: rawText.length,
-    endOffset: 0,
-    children: [],
-  };
+function buildDocumentTree(blocks, rawText, project = null) {
   const documentNode = {
     id: "document-root",
     type: "document",
     title: "Dokument",
     startOffset: 0,
     endOffset: rawText.length,
-    children: [frontNode, bodyNode, backNode],
+    children: [],
   };
-  const matterNodes = { front: frontNode, body: bodyNode, back: backNode };
-  const matterStacks = {
-    front: [{ level: 0, node: frontNode }],
-    body: [{ level: 0, node: bodyNode }],
-    back: [{ level: 0, node: backNode }],
-  };
-  const sectionCounters = { front: [], body: [], back: [] };
+  const stack = [{ level: 0, node: documentNode }];
+  const sectionCounters = [];
 
-  function touchMatterNode(matter, startOffset, endOffset) {
-    const node = matterNodes[matter] || bodyNode;
-    node.startOffset = Math.min(node.startOffset, startOffset);
-    node.endOffset = Math.max(node.endOffset, endOffset);
-  }
-
-  function closeStackTo(matter, sectionLevel, startOffset) {
-    const stack = matterStacks[matter] || matterStacks.body;
+  function closeStackTo(sectionLevel, startOffset) {
     while (stack.length > 1 && stack[stack.length - 1].level >= sectionLevel) {
       const closed = stack.pop().node;
       closed.endOffset = startOffset;
@@ -805,60 +806,42 @@ function buildDocumentTree(blocks, rawText) {
   blocks.forEach((block, index) => {
     const node = createMarkdownBlockNode(block, index);
     if (node.type === "paratext-marker") return;
-    const matter = ["front", "back"].includes(node.matter) ? node.matter : "body";
-    const stack = matterStacks[matter] || matterStacks.body;
-    touchMatterNode(matter, node.startOffset, node.endOffset);
     if (node.type === "heading") {
       if (node.level === 1) {
         return;
       }
       const sectionLevel = Math.max(1, node.level - 1);
-      closeStackTo(matter, sectionLevel, node.startOffset);
-      const counters = sectionCounters[matter] || sectionCounters.body;
-      counters.length = sectionLevel;
-      if (matter === "body") {
-        counters[sectionLevel - 1] = (counters[sectionLevel - 1] || 0) + 1;
-      }
+      closeStackTo(sectionLevel, node.startOffset);
+      const explicitRole = getExplicitChapterRole(project, node.level, node.title);
+      const hasMainAncestor = stack.some((entry) => entry.node.effectiveRole === "main");
+      const effectiveRole = explicitRole || (hasMainAncestor ? "main" : "");
+      sectionCounters.length = sectionLevel;
+      if (effectiveRole === "main") sectionCounters[sectionLevel - 1] = (sectionCounters[sectionLevel - 1] || 0) + 1;
       const section = {
         id: `section-${index + 1}-${node.startOffset}`,
         type: "section",
-        matter,
+        matter: "body",
         level: sectionLevel,
-        number: matter === "body" ? counters.slice(0, sectionLevel).filter(Boolean).join(".") : "",
+        markdownLevel: node.level,
+        roleKey: createChapterRoleKey(node.level, node.title),
+        explicitRole,
+        effectiveRole,
+        number: effectiveRole === "main" ? sectionCounters.slice(0, sectionLevel).filter(Boolean).join(".") : "",
         title: node.title,
         startOffset: node.startOffset,
         endOffset: rawText.length,
         headingNodeId: node.id,
-        visibilityKey: createParatextVisibilityKey({
-          type: "section",
-          matter,
-          startOffset: node.startOffset,
-        }),
+        visibilityKey: "",
         children: [],
       };
       stack[stack.length - 1].node.children.push(section);
-      stack.push({ level: node.level, node: section });
+      stack.push({ level: sectionLevel, node: section });
       return;
     }
     stack[stack.length - 1].node.children.push(node);
   });
 
-  Object.entries(matterStacks).forEach(([matter, stack]) => {
-    const fallbackEnd = matterNodes[matter]?.endOffset || rawText.length;
-    while (stack.length > 1) {
-      const closed = stack.pop().node;
-      closed.endOffset = fallbackEnd;
-    }
-    if (!matterNodes[matter].children.length) {
-      matterNodes[matter].startOffset = matter === "body" ? 0 : rawText.length;
-      matterNodes[matter].endOffset = matter === "body" ? rawText.length : 0;
-    }
-  });
-  documentNode.children = [
-    ...(frontNode.children.length ? [frontNode] : []),
-    ...bodyNode.children,
-    ...(backNode.children.length ? [backNode] : []),
-  ];
+  while (stack.length > 1) stack.pop().node.endOffset = rawText.length;
   return documentNode;
 }
 
@@ -870,6 +853,10 @@ function collectDocumentSections(node, sections = []) {
       title: node.title,
       level: node.level,
       matter: node.matter || "body",
+      markdownLevel: node.markdownLevel || (node.level + 1),
+      roleKey: node.roleKey || "",
+      explicitRole: node.explicitRole || "",
+      effectiveRole: node.effectiveRole || "",
       startOffset: node.startOffset,
       endOffset: node.endOffset,
       visibilityKey: node.visibilityKey || createParatextVisibilityKey(node),
@@ -955,13 +942,7 @@ function buildSourceModel(project) {
 
     if (isTableOfContentsText(text)) {
       flushParagraph(startOffset);
-      const previousMatter = currentMatter;
-      if (currentMatter === "body") {
-        currentMatter = "front";
-      }
       pushSingleLineBlock(line);
-      currentMatter = previousMatter;
-      paragraphMatter = currentMatter;
       cursor = endOffset + 1;
       return;
     }
@@ -991,7 +972,22 @@ function buildSourceModel(project) {
     cursor = endOffset + 1;
   });
   flushParagraph(rawText.length);
-  const documentTree = buildDocumentTree(paragraphs, rawText);
+  const documentTree = buildDocumentTree(paragraphs, rawText, project);
+  const sections = collectDocumentSections(documentTree);
+  const getSectionAtOffset = (offset) => {
+    const matches = sections.filter((section) => offset >= section.startOffset && offset < section.endOffset);
+    return matches.sort((a, b) => b.level - a.level)[0] || null;
+  };
+  paragraphs.forEach((paragraph) => {
+    const section = getSectionAtOffset(paragraph.startOffset);
+    paragraph.chapterRole = section?.effectiveRole || "";
+    paragraph.chapterNumber = section?.number || "";
+  });
+  sourceLines.forEach((line) => {
+    const section = getSectionAtOffset(line.startOffset);
+    line.chapterRole = section?.effectiveRole || "";
+    line.chapterNumber = section?.number || "";
+  });
 
   return {
     version: 1,
@@ -1001,12 +997,14 @@ function buildSourceModel(project) {
       id: paragraph.id,
       type: paragraph.type,
       matter: paragraph.matter || "body",
+      chapterRole: paragraph.chapterRole || "",
+      chapterNumber: paragraph.chapterNumber || "",
       startOffset: paragraph.startOffset,
       endOffset: paragraph.endOffset,
     })),
     paragraphs,
     documentTree,
-    sections: collectDocumentSections(documentTree),
+    sections,
   };
 }
 
@@ -1030,6 +1028,8 @@ function buildBrowserLayoutModel(sourceModel, style, range = null) {
       blockIndex: index,
       text: paragraph.text,
       matter: paragraph.matter || "body",
+      chapterRole: paragraph.chapterRole || "",
+      chapterNumber: paragraph.chapterNumber || "",
       visibleLines: [],
     })),
     sourceLineBlocks: originalLines.map((line) => ({
@@ -1040,6 +1040,8 @@ function buildBrowserLayoutModel(sourceModel, style, range = null) {
       blockIndex: line.index,
       text: line.text,
       matter: line.matter || "body",
+      chapterRole: line.chapterRole || "",
+      chapterNumber: line.chapterNumber || "",
       visibleLines: [],
     })),
     notes: [
@@ -1054,7 +1056,47 @@ function clearElement(element) {
 }
 
 function appendTextNode(parent, text) {
-  if (text) parent.appendChild(document.createTextNode(text));
+  const source = String(text || "");
+  if (!source) return;
+  const uppercaseWordPattern = /\p{Lu}+/gu;
+  const tokens = [];
+  let tokenMatch;
+  while ((tokenMatch = uppercaseWordPattern.exec(source))) {
+    const word = tokenMatch[0];
+    const start = tokenMatch.index;
+    const end = start + word.length;
+    const previous = source[start - 1] || "";
+    const next = source[end] || "";
+    if (/[\p{L}\p{N}]/u.test(previous) || /[\p{L}\p{N}]/u.test(next)) continue;
+    tokens.push({ word, start, end, isLong: word.length >= 2 });
+  }
+  const smallCapsRanges = [];
+  tokens.forEach((token, index) => {
+    const previous = tokens[index - 1];
+    const next = tokens[index + 1];
+    const previousSeparator = previous ? source.slice(previous.end, token.start) : "";
+    const nextSeparator = next ? source.slice(token.end, next.start) : "";
+    const joinsPrevious = previous && previousSeparator.length > 0
+      && /^[^\p{L}\p{N}]*$/u.test(previousSeparator);
+    const joinsNext = next && nextSeparator.length > 0
+      && /^[^\p{L}\p{N}]*$/u.test(nextSeparator);
+    const isInsideUppercasePhrase = (joinsPrevious && previous.isLong) || (joinsNext && next.isLong);
+    if (token.isLong || isInsideUppercasePhrase) {
+      smallCapsRanges.push(token);
+    }
+  });
+  let cursor = 0;
+  smallCapsRanges.forEach(({ word, start, end }) => {
+    if (start > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, start)));
+    const span = document.createElement("span");
+    span.className = "preview-small-caps";
+    span.textContent = word.toLocaleLowerCase("de-DE");
+    parent.appendChild(span);
+    cursor = end;
+  });
+  if (cursor < source.length) {
+    parent.appendChild(document.createTextNode(source.slice(cursor)));
+  }
 }
 
 function appendInlineMarkdown(parent, text) {
@@ -1068,23 +1110,23 @@ function appendInlineMarkdown(parent, text) {
       node.textContent = match.slice(1, -1);
     } else if (match.startsWith("==")) {
       node = document.createElement("mark");
-      node.textContent = match.slice(2, -2);
+      appendTextNode(node, match.slice(2, -2));
     } else if (match.startsWith("**")) {
       node = document.createElement("strong");
-      node.textContent = match.slice(2, -2);
+      appendTextNode(node, match.slice(2, -2));
     } else if (match.startsWith("__")) {
       node = document.createElement("strong");
-      node.textContent = match.slice(2, -2);
+      appendTextNode(node, match.slice(2, -2));
     } else if (match.startsWith("*")) {
       node = document.createElement("em");
-      node.textContent = match.slice(1, -1);
+      appendTextNode(node, match.slice(1, -1));
     } else if (match.startsWith("_")) {
       node = document.createElement("em");
-      node.textContent = match.slice(1, -1);
+      appendTextNode(node, match.slice(1, -1));
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       node = document.createElement("a");
-      node.textContent = linkMatch?.[1] || match;
+      appendTextNode(node, linkMatch?.[1] || match);
       node.href = linkMatch?.[2] || "#";
       node.rel = "noopener noreferrer";
       node.target = "_blank";
@@ -1096,7 +1138,7 @@ function appendInlineMarkdown(parent, text) {
   if (cursor < text.length) appendTextNode(parent, text.slice(cursor));
 }
 
-function createMarkdownBlockElement(block, textType) {
+function createMarkdownBlockElement(block, textType, options = {}) {
   const text = String(block.text || "");
   if (isTableOfContentsText(text)) {
     const object = document.createElement("p");
@@ -1119,7 +1161,12 @@ function createMarkdownBlockElement(block, textType) {
     const heading = document.createElement(`h${Math.min(6, headingLevel)}`);
     heading.className = `preview-heading preview-heading-level-${headingLevel}`;
     heading.dataset.headingLevel = String(headingLevel);
-    appendInlineMarkdown(heading, headingMatch[2]);
+    const headingLabel = options.chapterNumbers === true
+      && block.chapterRole === "main"
+      && block.chapterNumber
+      ? `${block.chapterNumber} ${headingMatch[2]}`
+      : headingMatch[2];
+    appendInlineMarkdown(heading, headingLabel);
     return heading;
   }
 
@@ -1180,6 +1227,10 @@ function getPreviewHeadingId(sourceStartOffset) {
   return `typemap-heading-${sourceStartOffset}`;
 }
 
+function isTableOfContentsSection(section) {
+  return getPlainDocumentLabel(section?.title || "").trim().toLowerCase() === "inhaltsverzeichnis";
+}
+
 function jumpPreviewStageToHeading(heading) {
   if (!heading || !ui.typeStage) return;
   const stageRect = ui.typeStage.getBoundingClientRect();
@@ -1217,12 +1268,22 @@ function updateSideTableOfContentsState(nav = null) {
   tocNodes.forEach((toc) => {
     const items = Array.from(toc.querySelectorAll(".preview-side-toc-item"));
     if (!items.length) return;
-    const activeItem = items.find((item) => item.dataset.sourceStart === activeStart) || items[0];
-    const activeTopId = activeItem?.dataset.tocTopId || activeItem?.dataset.tocId || "";
+    const activeItem = items.find((item) => item.dataset.sourceStart === activeStart) || null;
+    const activePath = new Set();
+    let pathItem = activeItem;
+    while (pathItem) {
+      const itemId = pathItem.dataset.tocId || "";
+      if (!itemId || activePath.has(itemId)) break;
+      activePath.add(itemId);
+      const parentId = pathItem.dataset.tocParentId || "";
+      pathItem = parentId
+        ? items.find((item) => item.dataset.tocId === parentId)
+        : null;
+    }
     items.forEach((item) => {
       const level = Number(item.dataset.tocLevel) || 1;
-      const belongsToActiveTop = item.dataset.tocTopId === activeTopId || item.dataset.tocId === activeTopId;
-      const isVisible = level <= 1 || belongsToActiveTop;
+      const parentId = item.dataset.tocParentId || "";
+      const isVisible = level <= 1 || activePath.has(parentId);
       const isActive = item === activeItem;
       item.hidden = !isVisible;
       item.classList.toggle("is-active", isActive);
@@ -1255,13 +1316,17 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
   targetPage.classList.remove("has-side-toc");
   if (targetText !== ui.previewText) return;
   if (layoutModel.activeRange && layoutModel.activeRange.id !== "document-root") return;
+  if (project?.tocVisible === false) return;
   if (!blocks.some((block) => isTableOfContentsBlock(block) && !isBlockHiddenByParatextVisibility(block, hiddenParatextRanges))) return;
 
   const sourceModel = buildSourceModel(project);
-  const sections = (sourceModel.sections || []).filter((section) => !isBlockHiddenByParatextVisibility({
-    matter: section.matter,
-    sourceStartOffset: section.startOffset,
-  }, hiddenParatextRanges));
+  const sections = (sourceModel.sections || []).filter((section) => (
+    !isTableOfContentsSection(section)
+    && !isBlockHiddenByParatextVisibility({
+      matter: section.matter,
+      sourceStartOffset: section.startOffset,
+    }, hiddenParatextRanges)
+  ));
   if (!sections.length) return;
 
   const nav = document.createElement("nav");
@@ -1275,17 +1340,21 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
   list.className = "preview-side-toc-list";
   nav.appendChild(list);
 
-  let currentTopId = "";
+  const sectionStack = [];
   sections.forEach((section) => {
-    if ((Number(section.level) || 1) <= 1) currentTopId = section.id;
+    const level = Math.max(1, Number(section.level) || 1);
+    while (sectionStack.length && sectionStack[sectionStack.length - 1].level >= level) {
+      sectionStack.pop();
+    }
+    const parentId = sectionStack[sectionStack.length - 1]?.id || "";
     const button = document.createElement("button");
     button.type = "button";
     button.className = "preview-side-toc-item";
-    button.style.setProperty("--toc-level", String(Math.max(1, section.level || 1) - 1));
+    button.style.setProperty("--toc-level", String(level - 1));
     button.dataset.sourceStart = String(section.startOffset);
     button.dataset.tocId = section.id;
-    button.dataset.tocTopId = currentTopId || section.id;
-    button.dataset.tocLevel = String(Math.max(1, section.level || 1));
+    button.dataset.tocParentId = parentId;
+    button.dataset.tocLevel = String(level);
     button.textContent = section.title;
     button.addEventListener("click", () => {
       const heading = document.getElementById(getPreviewHeadingId(section.startOffset));
@@ -1295,6 +1364,7 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
       }
     });
     list.appendChild(button);
+    sectionStack.push({ id: section.id, level });
   });
 
   targetPage.classList.add("has-side-toc");
@@ -1344,7 +1414,7 @@ function getVisualLineRects(element) {
 }
 
 function shouldExcludeBlockFromLineNumbering(block) {
-  return block?.dataset?.matter !== "body"
+  return block?.dataset?.chapterRole !== "main"
     || block?.classList?.contains("preview-heading-level-1") === true
     || block?.classList?.contains("preview-embedded-object") === true;
 }
@@ -1515,7 +1585,9 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   blocks.forEach((block, index) => {
     if (isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)) return;
     if (isTableOfContentsBlock(block) || isParatextMarkerBlock(block)) return;
-    const element = createMarkdownBlockElement(block, textType);
+    const element = createMarkdownBlockElement(block, textType, {
+      chapterNumbers: project.style.chapterNumbers === true,
+    });
     element.classList.add("preview-body-block");
     if (getMarkdownHeadingLevel(block.text)) {
       element.id = getPreviewHeadingId(block.sourceStartOffset);
@@ -1526,6 +1598,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     }
     element.dataset.layoutBlockId = block.id;
     element.dataset.matter = block.matter || "body";
+    element.dataset.chapterRole = block.chapterRole || "";
     if (block.sourceRangeId) element.dataset.sourceRangeId = block.sourceRangeId;
     if (block.sourceLineId) {
       element.dataset.sourceLineId = block.sourceLineId;
@@ -1599,9 +1672,13 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;");
 }
 
-function renderEditorHighlight(rawText) {
+function renderEditorHighlight(rawText, project = getActiveProject()) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
+  const sourceModel = project ? buildSourceModel(project) : null;
+  const activeRange = project && sourceModel ? getActiveSourceRangeForProject(project, sourceModel) : null;
+  const baseOffset = activeRange && activeRange.id !== "document-root" ? activeRange.startOffset : 0;
+  state.editorHeadingTargets = [];
   const pattern = /(```[\s\S]*?```|`[^`\n]+`|^\{\{toc\}\}[ \t]*$|^##[ \t]+Inhaltsverzeichnis[ \t]*$|^:::[ \t]*(?:paratext[ \t]+)?(?:front|back|frontmatter|backmatter)[ \t]*$|^:::[ \t]*$|^#{1,7}[ \t]*[^\n]+|==[^=\n]+==|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]\n]+\]\([^)]+\))/gim;
   let cursor = 0;
   let html = "";
@@ -1617,7 +1694,23 @@ function renderEditorHighlight(rawText) {
     } else if (isParatextMarker(match)) {
       className = "markdown-editor-paratext";
     } else if (match.startsWith("#")) {
-      className = /^#\s+/.test(match) ? "markdown-editor-title" : "markdown-editor-heading";
+      const headingMatch = match.match(/^(#{1,7})\s+(.+)$/);
+      const level = headingMatch?.[1]?.length || 1;
+      const title = getPlainDocumentLabel(headingMatch?.[2] || "");
+      if (level === 1 && title === project?.title) {
+        className = "markdown-editor-title";
+      } else {
+        const sourceStart = baseOffset + offset;
+        const section = sourceModel?.sections?.find((entry) => entry.startOffset === sourceStart)
+          || sourceModel?.sections?.find((entry) => entry.markdownLevel === level && entry.title === title);
+        const role = section?.effectiveRole || getExplicitChapterRole(project, level, title);
+        className = `markdown-editor-heading markdown-editor-heading-${role || "unset"}`;
+        const headingIndex = state.editorHeadingTargets.length;
+        state.editorHeadingTargets.push({ level, title, roleKey: createChapterRoleKey(level, title) });
+        html += `<span class="${className}" data-heading-index="${headingIndex}">${escapeHtml(match)}</span>`;
+        cursor = offset + match.length;
+        return match;
+      }
     } else if (match.startsWith("==")) {
       className = "markdown-editor-mark";
     } else if (match.startsWith("**") || match.startsWith("__")) {
@@ -1633,11 +1726,68 @@ function renderEditorHighlight(rawText) {
   ui.textInputHighlight.innerHTML = html || " ";
 }
 
+function closeChapterRoleMenu() {
+  document.querySelector(".chapter-role-menu")?.remove();
+}
+
+function setChapterRole(roleKey, role) {
+  updateActiveProject((project) => {
+    project.chapterRoles = { ...(project.chapterRoles || {}) };
+    if (CHAPTER_ROLES.has(role)) project.chapterRoles[roleKey] = role;
+    else delete project.chapterRoles[roleKey];
+  });
+  renderEditor();
+}
+
+function openChapterRoleMenu(event) {
+  const headingSpan = Array.from(ui.textInputHighlight?.querySelectorAll("[data-heading-index]") || [])
+    .find((span) => {
+      const rect = span.getBoundingClientRect();
+      return event.clientX >= rect.left && event.clientX <= rect.right
+        && event.clientY >= rect.top && event.clientY <= rect.bottom;
+    });
+  if (!headingSpan) return false;
+  const target = state.editorHeadingTargets?.[Number(headingSpan.dataset.headingIndex)];
+  if (!target) return false;
+  event.preventDefault();
+  closeChapterRoleMenu();
+
+  const project = getActiveProject();
+  const menu = document.createElement("div");
+  menu.className = "chapter-role-menu";
+  menu.style.left = `${Math.min(event.clientX, window.innerWidth - 230)}px`;
+  menu.style.top = `${Math.min(event.clientY, window.innerHeight - 170)}px`;
+  const label = document.createElement("span");
+  label.textContent = target.title;
+  const select = document.createElement("select");
+  [
+    ["", "Keine Auswahl"],
+    ["foreword", "Vorwort"],
+    ["main", "Haupttext"],
+    ["afterword", "Nachwort"],
+  ].forEach(([value, text]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  });
+  select.value = project?.chapterRoles?.[target.roleKey] || "";
+  select.addEventListener("change", () => {
+    setChapterRole(target.roleKey, select.value);
+    closeChapterRoleMenu();
+  });
+  menu.append(label, select);
+  document.body.appendChild(menu);
+  window.setTimeout(() => select.focus(), 0);
+  return true;
+}
+
 function syncEditorHighlightScroll() {
   if (!ui.textInput || !ui.textInputHighlight) return;
   const textarea = ui.textInput;
   const style = window.getComputedStyle(textarea);
   const borderBoxWidth = textarea.clientWidth;
+  if (borderBoxWidth < 80 || textarea.clientHeight < 40) return;
   const borderBoxHeight = Math.max(textarea.clientHeight, textarea.scrollHeight);
   ui.textInputHighlight.style.width = `${borderBoxWidth}px`;
   ui.textInputHighlight.style.minHeight = `${borderBoxHeight}px`;
@@ -1647,6 +1797,13 @@ function syncEditorHighlightScroll() {
   ui.textInputHighlight.style.letterSpacing = style.letterSpacing;
   ui.textInputHighlight.style.tabSize = style.tabSize;
   ui.textInputHighlight.style.transform = `translate(${-ui.textInput.scrollLeft}px, ${-ui.textInput.scrollTop}px)`;
+}
+
+function scheduleEditorGeometrySync() {
+  window.cancelAnimationFrame(state.editorGeometryFrame);
+  state.editorGeometryFrame = window.requestAnimationFrame(() => {
+    state.editorGeometryFrame = window.requestAnimationFrame(syncEditorHighlightScroll);
+  });
 }
 
 function ensureSelectOption(select, value, label = "Aktueller Wert") {
@@ -1702,18 +1859,27 @@ function getActiveSourceRangeForProject(project, sourceModel = null) {
 }
 
 function isParatextTreeItem(node) {
-  return ["front", "back"].includes(node?.matter) && node?.type !== "matter";
+  return node?.type === "toc" || node?.type === "section";
+}
+
+function getChapterVisibilityKey(node) {
+  return node?.type === "section" && node.roleKey ? `chapter:${node.roleKey}` : "";
 }
 
 function isParatextNodeVisible(project, node) {
-  const key = node?.visibilityKey || createParatextVisibilityKey(node);
+  if (node?.type === "toc") return project?.tocVisible !== false;
+  const key = getChapterVisibilityKey(node) || node?.visibilityKey || createParatextVisibilityKey(node);
   if (!key) return true;
   return project?.paratextVisibility?.[key] !== false;
 }
 
 function setParatextNodeVisible(project, node, visible) {
   if (!project || !node) return;
-  const key = node.visibilityKey || createParatextVisibilityKey(node);
+  if (node.type === "toc") {
+    project.tocVisible = visible !== false;
+    return;
+  }
+  const key = getChapterVisibilityKey(node) || node.visibilityKey || createParatextVisibilityKey(node);
   if (!key) return;
   project.paratextVisibility = {
     ...(project.paratextVisibility || {}),
@@ -1726,11 +1892,8 @@ function collectHiddenParatextRanges(project, sourceModel = null) {
   const ranges = [];
   function visit(node) {
     if (!node) return;
-    if (isParatextTreeItem(node) && !isParatextNodeVisible(project, node)) {
-      ranges.push({
-        startOffset: node.startOffset,
-        endOffset: node.endOffset,
-      });
+    if (node.type === "section" && !isParatextNodeVisible(project, node)) {
+      ranges.push({ startOffset: node.startOffset, endOffset: node.endOffset });
       return;
     }
     (node.children || []).forEach(visit);
@@ -1740,8 +1903,9 @@ function collectHiddenParatextRanges(project, sourceModel = null) {
 }
 
 function isBlockHiddenByParatextVisibility(block, hiddenRanges) {
-  if (!["front", "back"].includes(block?.matter)) return false;
-  return hiddenRanges.some((range) => block.sourceStartOffset >= range.startOffset && block.sourceStartOffset < range.endOffset);
+  const offset = Number(block?.sourceStartOffset ?? block?.startOffset);
+  return Number.isFinite(offset)
+    && hiddenRanges.some((range) => offset >= range.startOffset && offset < range.endOffset);
 }
 
 function getEditorSourceText(project) {
@@ -1763,7 +1927,7 @@ function getTreeNodeIcon(type) {
   return "¶";
 }
 
-function createTreeNodeButton(project, node, depth) {
+function createTreeNodeButton(project, node, depth, ancestorHidden = false) {
   const children = Array.isArray(node.children) ? node.children : [];
   const structuralChildren = children.filter((child) => child.type === "section" || child.type === "matter");
   const contentChildren = children.filter((child) => child.type !== "section" && child.type !== "matter");
@@ -1775,6 +1939,7 @@ function createTreeNodeButton(project, node, depth) {
     && (state.activeSourceRange?.id || "document-root") === node.id;
   const hasParatextVisibilityToggle = isParatextTreeItem(node);
   const isParatextVisible = isParatextNodeVisible(project, node);
+  const isInheritedHidden = hasParatextVisibilityToggle && isParatextVisible && ancestorHidden;
 
   const row = document.createElement("div");
   row.className = `document-tree-row${isActive ? " is-active" : ""}${isSelectable ? " is-selectable" : ""}${hasParatextVisibilityToggle ? " has-visibility-toggle" : ""}`;
@@ -1817,8 +1982,10 @@ function createTreeNodeButton(project, node, depth) {
   if (hasParatextVisibilityToggle) {
     visibilityButton = document.createElement("button");
     visibilityButton.type = "button";
-    visibilityButton.className = `document-tree-visibility${isParatextVisible ? " is-visible" : " is-hidden"}`;
-    visibilityButton.setAttribute("aria-label", `${node.title} ${isParatextVisible ? "ausblenden" : "einblenden"}`);
+    visibilityButton.className = `document-tree-visibility${isParatextVisible ? " is-visible" : " is-hidden"}${isInheritedHidden ? " is-inherited-hidden" : ""}`;
+    visibilityButton.setAttribute("aria-label", isInheritedHidden
+      ? `${node.title} wird durch ein übergeordnetes Kapitel ausgeblendet`
+      : `${node.title} ${isParatextVisible ? "ausblenden" : "einblenden"}`);
     visibilityButton.setAttribute("aria-pressed", isParatextVisible ? "true" : "false");
     visibilityButton.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1829,15 +1996,16 @@ function createTreeNodeButton(project, node, depth) {
   }
 
   const icon = document.createElement("span");
-  icon.className = `document-tree-icon document-tree-icon-${node.type}${node.matter ? ` document-tree-icon-${node.matter}` : ""}`;
-  icon.textContent = node.type === "section" ? (node.number || "") : getTreeNodeIcon(node.type);
+  const isParatextSection = node.type === "section" && ["foreword", "afterword"].includes(node.explicitRole);
+  icon.className = `document-tree-icon document-tree-icon-${node.type}${node.matter ? ` document-tree-icon-${node.matter}` : ""}${isParatextSection ? " document-tree-icon-paratext" : ""}`;
+  icon.textContent = node.type === "section" ? (isParatextSection ? "" : (node.number || "")) : getTreeNodeIcon(node.type);
   const copy = document.createElement("span");
   copy.className = "document-tree-copy";
   const title = document.createElement("span");
   title.className = "document-tree-title";
   title.textContent = node.title || node.type;
   copy.appendChild(title);
-  if (node.type !== "document" && node.type !== "section") {
+  if (node.type !== "document" && node.type !== "section" && node.type !== "toc") {
     const meta = document.createElement("span");
     meta.className = "document-tree-meta";
     meta.textContent = node.type === "paragraph"
@@ -1847,25 +2015,27 @@ function createTreeNodeButton(project, node, depth) {
   }
   button.append(icon, copy);
   row.append(toggle);
-  if (visibilityButton) row.append(visibilityButton);
   row.append(button);
+  if (visibilityButton) row.append(visibilityButton);
   return row;
 }
 
-function renderDocumentTreeNode(container, project, node, depth = 0) {
-  container.appendChild(createTreeNodeButton(project, node, depth));
+function renderDocumentTreeNode(container, project, node, depth = 0, ancestorHidden = false) {
+  container.appendChild(createTreeNodeButton(project, node, depth, ancestorHidden));
   const children = Array.isArray(node.children) ? node.children : [];
   const structuralChildren = children.filter((child) => child.type === "section" || child.type === "matter");
   const contentChildren = children.filter((child) => child.type !== "section" && child.type !== "matter");
   const isExpanded = isTreeNodeExpanded(node.id);
+  const descendantsHidden = ancestorHidden
+    || (node.type === "section" && !isParatextNodeVisible(project, node));
   const shouldShowContentChildren = node.type === "matter"
     ? isExpanded
     : isContentNodeExpanded(node.id);
   if (shouldShowContentChildren) {
-    contentChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1));
+    contentChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1, descendantsHidden));
   }
   if (!isExpanded) return;
-  structuralChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1));
+  structuralChildren.forEach((child) => renderDocumentTreeNode(container, project, child, depth + 1, descendantsHidden));
 }
 
 function renderDocumentTree(project) {
@@ -1985,9 +2155,20 @@ function renderEditor() {
   loadProjectFonts([project]);
   renderFontOptions(project);
   const editorText = getEditorSourceText(project);
-  if (ui.textInput) ui.textInput.value = editorText;
-  renderEditorHighlight(editorText);
+  if (ui.textInput) {
+    const spellcheckEnabled = project.style.spellcheck !== false;
+    ui.textInput.value = editorText;
+    ui.textInput.spellcheck = spellcheckEnabled;
+    ui.textInput.setAttribute("spellcheck", String(spellcheckEnabled));
+    ui.spellcheckToggleButton?.setAttribute("aria-pressed", String(spellcheckEnabled));
+    if (ui.spellcheckToggleCheck) ui.spellcheckToggleCheck.hidden = !spellcheckEnabled;
+  }
+  const chapterNumbersEnabled = project.style.chapterNumbers === true;
+  ui.chapterNumbersToggleButton?.setAttribute("aria-pressed", String(chapterNumbersEnabled));
+  if (ui.chapterNumbersToggleCheck) ui.chapterNumbersToggleCheck.hidden = !chapterNumbersEnabled;
+  renderEditorHighlight(editorText, project);
   syncEditorHighlightScroll();
+  scheduleEditorGeometrySync();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
   if (ui.fontLigaturesInput) ui.fontLigaturesInput.checked = project.style.ligatures !== false;
   populateDocumentStyleSelect(ui.toolbarTextKindSelect);
@@ -2315,7 +2496,7 @@ function insertTableOfContentsObject() {
       .split(/\r?\n/)
       .filter((line) => !isTableOfContentsText(line))
       .join("\n");
-    project.source.rawText = ensureParatextHeadings(`${TOC_OBJECT_HEADING}\n\n${withoutExistingToc}`);
+    project.source.rawText = ensureDocumentStructure(withoutExistingToc, project.title);
     syncProjectTitleFromHeading(project, { normalizeStructure: true });
     state.activeSourceRange = null;
   });
@@ -2489,10 +2670,10 @@ function escapeScriptJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function buildHtmlBlockMarkup(block, textType) {
+function buildHtmlBlockMarkup(block, textType, chapterNumbers = false) {
   if (isTableOfContentsBlock(block)) return "";
   if (isParatextMarkerBlock(block)) return "";
-  const element = createMarkdownBlockElement(block, textType);
+  const element = createMarkdownBlockElement(block, textType, { chapterNumbers });
   element.classList.add("preview-body-block");
   if (getMarkdownHeadingLevel(block.text)) {
     element.id = getPreviewHeadingId(block.sourceStartOffset);
@@ -2503,6 +2684,7 @@ function buildHtmlBlockMarkup(block, textType) {
   element.dataset.sourceStart = String(block.sourceStartOffset);
   element.dataset.sourceEnd = String(block.sourceEndOffset);
   element.dataset.matter = block.matter || "body";
+  element.dataset.chapterRole = block.chapterRole || "";
   return element.outerHTML;
 }
 
@@ -2554,13 +2736,16 @@ function buildHtmlExport(project) {
     : layoutModel.blocks;
   const hiddenParatextRanges = collectHiddenParatextRanges(project, sourceModel);
   const visibleExportBlocks = exportBlocks.filter((block) => !isBlockHiddenByParatextVisibility(block, hiddenParatextRanges));
-  const hasTocObject = visibleExportBlocks.some(isTableOfContentsBlock);
-  const blocks = visibleExportBlocks.map((block) => buildHtmlBlockMarkup(block, textType)).join("\n");
+  const hasTocObject = project.tocVisible !== false && visibleExportBlocks.some(isTableOfContentsBlock);
+  const blocks = visibleExportBlocks
+    .map((block) => buildHtmlBlockMarkup(block, textType, project.style.chapterNumbers === true))
+    .join("\n");
   const tocHtml = hasTocObject && sourceModel.sections.length
     ? `<nav class="html-side-toc" aria-label="Inhaltsverzeichnis">
       <span class="html-side-toc-title">Inhaltsverzeichnis</span>
       ${sourceModel.sections
-        .filter((section) => !isBlockHiddenByParatextVisibility({ matter: section.matter, sourceStartOffset: section.startOffset }, hiddenParatextRanges))
+        .filter((section) => !isTableOfContentsSection(section)
+          && !isBlockHiddenByParatextVisibility({ matter: section.matter, sourceStartOffset: section.startOffset }, hiddenParatextRanges))
         .map((section) => `<a class="html-side-toc-item" style="--toc-level:${Math.max(0, (section.level || 1) - 1)}" href="#${escapeHtml(getPreviewHeadingId(section.startOffset))}">${escapeHtml(section.title)}</a>`)
         .join("\n      ")}
     </nav>`
@@ -2592,6 +2777,7 @@ ${buildHtmlFontFaceCss(project)}
     .authors { margin: .68em 0 0; color: #333; font-family: ${project.style.metaFontFamily || project.style.subtitleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: ${Number(project.style.metaWeight) || 400}; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
     .typemap-text { position: relative; font-family: ${project.style.fontFamily};${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
+    .preview-small-caps { font-variant-caps: small-caps; font-feature-settings: "smcp" 1, "c2sc" 0; letter-spacing: .01em; }
     .html-side-toc { position: sticky; top: 24px; display: grid; gap: 2px; max-height: calc(100vh - 80px); overflow: auto; color: #6b746f; font-family: "Source Sans 3", Arial, sans-serif; font-size: 11.5pt; line-height: 1.28; text-align: left; }
     .html-side-toc-title { margin-bottom: .55em; color: #8f5d14; font-size: 8.5pt; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
     .html-side-toc-item { display: block; min-height: 24px; padding: 3px 6px 3px calc(4px + var(--toc-level, 0) * 13px); border-radius: 6px; color: inherit; text-decoration: none; }
@@ -2676,7 +2862,7 @@ ${buildHtmlFontFaceCss(project)}
       const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
       let lineIndex = 0;
       blocks.forEach((block) => {
-        if (block.dataset.matter !== "body") return;
+        if (block.dataset.chapterRole !== "main") return;
         if (block.classList.contains("preview-heading-level-1")) return;
         if (block.classList.contains("preview-embedded-object")) return;
         if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) return;
@@ -2831,23 +3017,20 @@ async function exportPng() {
   const hiddenParatextRanges = collectHiddenParatextRanges(project, sourceModel);
   const visibleBlocks = layoutModel.blocks.filter((block) => !isBlockHiddenByParatextVisibility(block, hiddenParatextRanges));
   visibleBlocks.forEach((block, paragraphIndex) => {
-    const paragraph = block.text;
+    let paragraph = block.text;
     const trimmedParagraph = String(paragraph || "").trim();
     const isSourceTitleHeading = /^#\s+/.test(trimmedParagraph);
     if (isParatextMarker(trimmedParagraph)) return;
     if (isTableOfContentsText(trimmedParagraph)) {
-      pushLine("Inhaltsverzeichnis", {
-        size: fontSize * 0.72,
-        weight: 700,
-        align: style.textAlign || "left",
-        color: "#8f5d14",
-        lineHeight: lineHeightPx,
-        countLine: false,
-      });
-      if (paragraphIndex < visibleBlocks.length - 1) pushSpacer(lineHeightPx * 0.72);
       return;
     }
-    const countAsBodyLine = block.matter === "body" && !isSourceTitleHeading;
+    if (project.style.chapterNumbers === true
+      && block.chapterRole === "main"
+      && block.chapterNumber
+      && /^#{2,7}\s+/.test(trimmedParagraph)) {
+      paragraph = paragraph.replace(/^(#{2,7}\s+)/, `$1${block.chapterNumber} `);
+    }
+    const countAsBodyLine = block.chapterRole === "main" && !isSourceTitleHeading;
     wrapText(paragraph).forEach((line) => pushLine(line, { countLine: Boolean(line.trim()) && countAsBodyLine }));
     if (paragraphIndex < visibleBlocks.length - 1) pushSpacer(lineHeightPx * 0.72);
   });
@@ -3046,6 +3229,7 @@ function setDetailsLayoutMode(mode) {
     button.setAttribute("aria-label", `${label}. Ansicht umblättern`);
     button.setAttribute("title", label);
   });
+  scheduleEditorGeometrySync();
 }
 
 function cycleDetailsLayoutMode() {
@@ -3154,9 +3338,16 @@ function bindEditor() {
   });
   window.addEventListener("resize", () => {
     setDetailsLayoutMode(state.detailsLayoutMode);
-    syncEditorHighlightScroll();
+    scheduleEditorGeometrySync();
   });
-  document.fonts?.ready?.then(syncEditorHighlightScroll);
+  if (typeof ResizeObserver === "function" && ui.textInput) {
+    state.editorResizeObserver?.disconnect();
+    state.editorResizeObserver = new ResizeObserver(scheduleEditorGeometrySync);
+    state.editorResizeObserver.observe(ui.textInput);
+    const editorFrame = ui.textInput.closest(".markdown-editor-frame");
+    if (editorFrame) state.editorResizeObserver.observe(editorFrame);
+  }
+  document.fonts?.ready?.then(scheduleEditorGeometrySync);
   ui.newProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
   ui.createProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
@@ -3272,6 +3463,22 @@ function bindEditor() {
   ui.lineNumberDialogCloseButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
   ui.lineNumberDialogCancelButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
   ui.lineNumberDialogSaveButton?.addEventListener("click", saveLineNumberDialog);
+  ui.spellcheckToggleButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    updateActiveProject((project) => {
+      project.style.spellcheck = project.style.spellcheck === false;
+    });
+    renderEditor();
+    closeEditorMenus();
+  });
+  ui.chapterNumbersToggleButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    updateActiveProject((project) => {
+      project.style.chapterNumbers = project.style.chapterNumbers !== true;
+    });
+    renderEditor();
+    closeEditorMenus();
+  });
   ui.hyphenationSettingsButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     openHyphenationDialog();
@@ -3281,12 +3488,28 @@ function bindEditor() {
   ui.hyphenationDialogCancelButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
   ui.hyphenationDialogSaveButton?.addEventListener("click", saveHyphenationDialog);
   ui.textInput?.addEventListener("input", () => {
-    renderEditorHighlight(ui.textInput.value);
-    syncEditorHighlightScroll();
     updateActiveProjectTextFromEditor(ui.textInput.value);
+    renderEditorHighlight(ui.textInput.value, getActiveProject());
+    syncEditorHighlightScroll();
     scheduleProjectBrowserRender();
   });
+  ui.textInput?.addEventListener("blur", () => {
+    const project = getActiveProject();
+    if (!project || state.activeSourceRange) return;
+    const normalized = ensureDocumentStructure(project.source.rawText, project.title);
+    if (normalized === project.source.rawText) return;
+    updateActiveProject((activeProject) => {
+      activeProject.source.rawText = normalized;
+    });
+    renderEditor();
+  });
   ui.textInput?.addEventListener("scroll", syncEditorHighlightScroll);
+  ui.textInput?.addEventListener("contextmenu", (event) => {
+    if (!openChapterRoleMenu(event)) closeChapterRoleMenu();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".chapter-role-menu")) closeChapterRoleMenu();
+  });
   ui.typeStage?.addEventListener("scroll", scheduleSideTableOfContentsStateUpdate, { passive: true });
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {

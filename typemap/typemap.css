@@ -508,6 +508,8 @@ body.typemap-theme-light .type-menu-popup {
   min-height: 0;
   padding: 16px 40px 54px;
   overflow: auto;
+  container-type: inline-size;
+  container-name: type-stage;
 }
 
 .preview-canvas {
@@ -618,6 +620,12 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
   font-variant-ligatures: common-ligatures contextual;
   font-feature-settings: "liga" 1, "clig" 1, "calt" 1;
   text-rendering: optimizeLegibility;
+}
+
+.preview-small-caps {
+  font-variant-caps: small-caps;
+  font-feature-settings: "smcp" 1, "c2sc" 0;
+  letter-spacing: 0.01em;
 }
 
 .preview-text p {
@@ -1241,7 +1249,7 @@ body.typemap-theme-light .side-preview-page {
 }
 
 .document-tree-row.has-visibility-toggle {
-  grid-template-columns: 22px 24px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr) 24px;
 }
 
 .document-tree-toggle,
@@ -1295,6 +1303,11 @@ body.typemap-theme-light .side-preview-page {
   color: var(--accent);
 }
 
+.document-tree-visibility.is-inherited-hidden {
+  color: #ef6a67;
+  opacity: 1;
+}
+
 .document-tree-label {
   min-width: 0;
   min-height: 28px;
@@ -1334,7 +1347,21 @@ body.typemap-theme-light .side-preview-page {
 }
 
 .document-tree-icon-toc {
-  display: none;
+  width: 1.05em;
+  height: 1.05em;
+  align-self: center;
+  background: var(--tree-accent);
+  opacity: 0.92;
+  mask: url("https://api.iconify.design/mdi/paperclip.svg") center / contain no-repeat;
+}
+
+.document-tree-icon-paratext {
+  width: 1.05em;
+  height: 1.05em;
+  align-self: center;
+  background: var(--tree-accent);
+  opacity: 0.92;
+  mask: url("https://api.iconify.design/mdi/paperclip.svg") center / contain no-repeat;
 }
 
 .document-tree-icon-matter.document-tree-icon-body {
@@ -1573,6 +1600,12 @@ body.typemap-theme-light .property-dialog {
   width: 19px;
   height: 19px;
   flex: 0 0 auto;
+}
+
+.editor-menu-action .editor-menu-check {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
 }
 
 .toolbar-select,
@@ -1878,42 +1911,81 @@ body.typemap-theme-light .text-editor-field .markdown-editor-frame {
 }
 
 .markdown-editor-heading {
-  color: #ff8fa3 !important;
+  --editor-capsule-border: rgba(186, 198, 205, 0.26);
+  --editor-capsule-fill: rgba(186, 198, 205, 0.09);
+  padding: 0 0.34em;
+  margin-inline: -0.34em;
+  border: 0;
+  outline: 1.5px solid var(--editor-capsule-border);
+  outline-offset: -1px;
+  border-radius: 7px;
+  background: var(--editor-capsule-fill);
+  box-shadow: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: #bcc8ce !important;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.markdown-editor-heading-main {
+  --editor-capsule-border: rgba(255, 179, 71, 0.34);
+  --editor-capsule-fill: rgba(255, 179, 71, 0.14);
+  color: #ffb347 !important;
+}
+
+.markdown-editor-heading-foreword,
+.markdown-editor-heading-afterword {
+  --editor-capsule-border: rgba(132, 202, 255, 0.32);
+  --editor-capsule-fill: rgba(132, 202, 255, 0.13);
+  color: #9bd2ff !important;
 }
 
 .markdown-editor-title {
-  display: inline-block;
-  height: calc(23px * var(--editor-zoom, 1));
-  padding: 0 0.46em;
-  border: 1px solid rgba(255, 179, 71, 0.5);
+  padding: 0 0.34em;
+  margin-inline: -0.34em;
+  border: 0;
+  outline: 1.5px solid rgba(255, 179, 71, 0.34);
+  outline-offset: -1px;
   border-radius: 7px;
   background: rgba(255, 179, 71, 0.14);
+  box-shadow: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   color: #ffb347 !important;
-  font-weight: 700;
+  font-weight: inherit;
   line-height: inherit;
 }
 
 .markdown-editor-object {
-  display: inline-block;
-  height: calc(23px * var(--editor-zoom, 1));
-  padding: 0 0.46em;
-  border: 1px solid rgba(119, 219, 200, 0.46);
+  padding: 0 0.34em;
+  margin-inline: -0.34em;
+  border: 0;
+  outline: 1.5px solid rgba(119, 219, 200, 0.34);
+  outline-offset: -1px;
   border-radius: 7px;
   background: rgba(119, 219, 200, 0.13);
+  box-shadow: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   color: #9ce7da !important;
-  font-weight: 700;
+  font-weight: inherit;
   line-height: inherit;
 }
 
 .markdown-editor-paratext {
-  display: inline-block;
-  height: calc(23px * var(--editor-zoom, 1));
-  padding: 0 0.46em;
-  border: 1px solid rgba(132, 202, 255, 0.42);
+  padding: 0 0.34em;
+  margin-inline: -0.34em;
+  border: 0;
+  outline: 1.5px solid rgba(132, 202, 255, 0.32);
+  outline-offset: -1px;
   border-radius: 7px;
   background: rgba(132, 202, 255, 0.13);
+  box-shadow: none;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   color: #9bd2ff !important;
-  font-weight: 700;
+  font-weight: inherit;
   line-height: inherit;
 }
 
@@ -1927,6 +1999,49 @@ body.typemap-theme-light .text-editor-field .markdown-editor-frame {
 
 .markdown-editor-fence {
   color: #ffcb7b !important;
+}
+
+.chapter-role-menu {
+  position: fixed;
+  z-index: 1200;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid rgba(255, 179, 71, 0.34);
+  border-radius: 7px;
+  background: #252f36;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  display: grid;
+  gap: 8px;
+}
+
+.chapter-role-menu > span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-role-menu select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(207, 216, 222, 0.18);
+  border-radius: 6px;
+  background: #313b42;
+  color: #edf2f4;
+  font: inherit;
+}
+
+body.typemap-theme-light .chapter-role-menu {
+  border-color: rgba(63, 76, 71, 0.2);
+  background: #f6f3eb;
+  box-shadow: 0 12px 30px rgba(45, 51, 48, 0.16);
+}
+
+body.typemap-theme-light .chapter-role-menu select {
+  border-color: rgba(63, 76, 71, 0.2);
+  background: #fffdf7;
+  color: #293b37;
 }
 
 .text-editor-field textarea {
@@ -2210,6 +2325,17 @@ body.typemap-theme-light .property-list {
   line-height: 1.35;
 }
 
+@container type-stage (max-width: 980px) {
+  .preview-page.has-side-toc {
+    width: min(920px, 100%);
+    margin-left: 0;
+  }
+
+  .preview-side-toc {
+    display: none;
+  }
+}
+
 @media (max-width: 920px) {
   .preview-page.has-side-toc {
     width: min(920px, 100%);
@@ -2236,12 +2362,9 @@ body.typemap-theme-light .property-list {
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 980px) {
   .preview-side-toc {
-    position: static;
-    width: auto;
-    max-height: none;
-    margin-bottom: 1.2em;
+    display: none;
   }
 }
 
