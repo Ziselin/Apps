@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260618m">
+  <link rel="stylesheet" href="typemap.css?v=20260618av">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -146,18 +146,9 @@
       </article>
 
       <article class="details-inline editor-panel">
-        <div class="panel-header panel-header-with-action">
-          <div>
-            <span class="label">Editor</span>
-            <strong id="editorTitle">Text setzen</strong>
-          </div>
-          <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
-            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
-          </button>
-        </div>
-
         <div class="editor-controls">
         <div class="editor-menu-room" aria-label="Texteditor-Menü">
+          <div class="editor-toolbar-top">
           <div class="editor-toolbar editor-toolbar-primary" role="menubar">
             <details class="editor-menu">
               <summary>Einfügen</summary>
@@ -264,6 +255,10 @@
               </div>
             </details>
           </div>
+          <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+          </button>
+          </div>
           <div class="editor-toolbar editor-toolbar-format" role="toolbar" aria-label="Schnellformatierung">
             <select id="toolbarTextKindSelect" class="toolbar-select" aria-label="Textart"></select>
             <button type="button" id="documentPropertiesButton" class="toolbar-button">
@@ -313,13 +308,12 @@
         </div>
 
         <section class="editor-section editor-text-section">
-          <label class="field text-editor-field">
-            <span>Text</span>
+          <div class="field text-editor-field">
             <div class="markdown-editor-frame">
               <pre id="textInputHighlight" class="markdown-editor-highlight" aria-hidden="true"></pre>
-              <textarea id="textInput" rows="10" spellcheck="true"></textarea>
+              <textarea id="textInput" rows="10" spellcheck="true" aria-label="Text"></textarea>
             </div>
-          </label>
+          </div>
         </section>
       </article>
     </section>
@@ -329,120 +323,154 @@
   <section id="documentPropertiesDialog" class="property-dialog" role="dialog" aria-modal="true" aria-labelledby="documentPropertiesTitle" hidden>
     <div class="property-dialog-head">
       <div>
-        <span class="label">Dokument</span>
-        <h2 id="documentPropertiesTitle">Dokumentdaten</h2>
+        <span class="label">Eigenschaften</span>
+        <h2 id="documentPropertiesTitle">Quellenangabe</h2>
       </div>
-      <button type="button" id="documentPropertiesCloseButton" class="dialog-icon-button" aria-label="Dokumentdaten schließen">X</button>
+      <button type="button" id="documentPropertiesCloseButton" class="dialog-icon-button" aria-label="Eigenschaften schließen">X</button>
     </div>
 
-    <div class="property-dialog-body">
-      <section class="property-section">
-        <h3>Grunddaten</h3>
-        <div class="property-list">
-          <label class="property-row">
-            <span>Textart</span>
-            <select id="docTextKindInput"></select>
-          </label>
-          <label class="property-row">
-            <span>Titel</span>
-            <input id="docTitleInput" type="text" autocomplete="off">
-          </label>
-          <label class="property-row">
-            <span>Untertitel</span>
-            <input id="docSubtitleInput" type="text" autocomplete="off">
-          </label>
-          <div class="property-row property-row-stack">
-            <span>Autor</span>
-            <div>
-              <div id="docAuthorsList" class="property-repeat-list"></div>
-              <button type="button" id="addDocAuthorButton" class="property-add-button">+ Autor hinzufügen</button>
+    <div class="property-tabs" role="tablist" aria-label="Eigenschaftsbereiche">
+      <button type="button" class="property-tab is-active" role="tab" aria-selected="true" aria-controls="propertyPanelSourceCitation" id="propertyTabSourceCitation">Quellenangabe</button>
+    </div>
+
+    <div class="property-dialog-body property-tab-body">
+      <section id="propertyPanelSourceCitation" class="property-tab-panel" role="tabpanel" aria-labelledby="propertyTabSourceCitation">
+        <section class="property-section">
+          <h3>Was ist die Quelle?</h3>
+          <div class="property-list">
+            <label class="property-row">
+              <span>Quellentyp</span>
+              <select id="sourceCitationTypeInput">
+                <option value="book">Buch</option>
+                <option value="book_chapter">Buchkapitel</option>
+                <option value="journal_article">Zeitschriftenartikel</option>
+                <option value="newspaper_article">Zeitungsartikel</option>
+                <option value="webpage">Webseite</option>
+                <option value="blog_post">Blogbeitrag</option>
+                <option value="report">Bericht</option>
+                <option value="legal_text">Rechtstext</option>
+                <option value="court_decision">Gerichtsentscheidung</option>
+                <option value="manuscript">Manuskript</option>
+                <option value="letter">Brief</option>
+                <option value="email">E-Mail</option>
+                <option value="other">Sonstiges</option>
+              </select>
+            </label>
+            <label class="property-row">
+              <span>Titel <em>Pflichtfeld</em></span>
+              <input id="sourceCitationTitleInput" type="text" autocomplete="off" required>
+            </label>
+            <label class="property-row">
+              <span>Untertitel</span>
+              <input id="sourceCitationSubtitleInput" type="text" autocomplete="off">
+            </label>
+            <label class="property-row">
+              <span>Sprache</span>
+              <input id="sourceCitationLanguageInput" type="text" autocomplete="off" placeholder="de">
+            </label>
+            <label class="property-row">
+              <span>Textfassung</span>
+              <select id="sourceCitationTextVersionInput">
+                <option value="original">Original</option>
+                <option value="translation">Übersetzung</option>
+              </select>
+            </label>
+            <div id="sourceCitationTranslationFields" class="property-conditional-fields" hidden>
+              <label class="property-row"><span>Originaltitel</span><input id="sourceCitationOriginalTitleInput" type="text" autocomplete="off"></label>
+              <label class="property-row"><span>Originalsprache</span><input id="sourceCitationOriginalLanguageInput" type="text" autocomplete="off" placeholder="z. B. en"></label>
             </div>
           </div>
-          <div class="property-row property-row-stack">
-            <span>Mitwirkende</span>
-            <div>
-              <div id="docContributorsList" class="property-repeat-list"></div>
-              <button type="button" id="addDocContributorButton" class="property-add-button">+ Mitwirkende hinzufügen</button>
+        </section>
+
+        <section class="property-section">
+          <h3>Wer ist verantwortlich?</h3>
+          <div class="property-list">
+            <div class="property-row property-row-stack">
+              <span>Autorinnen und Autoren</span>
+              <div>
+                <div id="sourceCitationAuthorsList" class="citation-author-list"></div>
+                <button type="button" id="addSourceCitationAuthorButton" class="property-add-button">+ Weitere Person hinzufügen</button>
+              </div>
+            </div>
+            <label class="property-row"><span>Institutioneller Urheber</span><input id="sourceCitationInstitutionalAuthorInput" type="text" autocomplete="off" placeholder="z. B. Bundesarchiv"></label>
+            <label class="property-row"><span>Herausgegeben von</span><input id="sourceCitationEditorsInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Weitere Mitwirkende</span><input id="sourceCitationContributorsInput" type="text" autocomplete="off"></label>
+            <div id="sourceCitationTranslatorsField" class="property-row property-row-stack" hidden>
+              <span>Übersetzt von</span>
+              <div>
+                <div id="sourceCitationTranslatorsList" class="citation-author-list"></div>
+                <button type="button" id="addSourceCitationTranslatorButton" class="property-add-button">+ Weitere Person hinzufügen</button>
+              </div>
             </div>
           </div>
-          <label class="property-row">
-            <span>Erstellungsdatum</span>
-            <input id="docCreatedDateInput" type="date">
-          </label>
-          <label class="property-row">
-            <span>Änderungsdatum</span>
-            <input id="docModifiedDateInput" type="date">
-          </label>
-        </div>
-      </section>
+          <p id="sourceCitationAuthorHint" class="property-hint" role="status" hidden>Für eine vollständige Quellenangabe empfiehlt sich mindestens eine Person oder Institution als verantwortliche Stelle.</p>
+        </section>
 
-      <section class="property-section">
-        <h3>Rechte</h3>
-        <div class="property-list">
-          <label class="property-row">
-            <span>Rechteinhaber</span>
-            <input id="docRightsHolderInput" type="text" autocomplete="off">
-          </label>
-          <label class="property-row">
-            <span>Copyright-Jahr</span>
-            <input id="docCopyrightYearInput" type="number" min="0" step="1">
-          </label>
-          <label class="property-row">
-            <span>Lizenz</span>
-            <input id="docLicenseInput" type="text" autocomplete="off">
-          </label>
-          <label class="property-row property-toggle-row">
-            <span>Nutzung erlaubt?</span>
-            <input id="docAllowUseInput" type="checkbox">
-          </label>
-          <label class="property-row property-toggle-row">
-            <span>Bearbeitung erlaubt?</span>
-            <input id="docAllowEditInput" type="checkbox">
-          </label>
-          <label class="property-row property-toggle-row">
-            <span>Weitergabe erlaubt?</span>
-            <input id="docAllowShareInput" type="checkbox">
-          </label>
-          <label class="property-row">
-            <span>Quellenhinweis / Attribution</span>
-            <textarea id="docAttributionInput" rows="2"></textarea>
-          </label>
-        </div>
-      </section>
+        <section class="property-section">
+          <h3>Wo ist sie erschienen?</h3>
+          <div class="property-list">
+            <label class="property-row"><span id="sourceCitationContainerLabel">Übergeordnetes Werk</span><input id="sourceCitationContainerTitleInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Verlag / herausgebende Stelle</span><input id="sourceCitationPublisherInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Erscheinungsort</span><input id="sourceCitationPublisherPlaceInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Band</span><input id="sourceCitationVolumeInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Heft / Ausgabe</span><input id="sourceCitationIssueInput" type="text" autocomplete="off"></label>
+            <label class="property-row"><span>Seitenbereich</span><input id="sourceCitationPageRangeInput" type="text" autocomplete="off" placeholder="z. B. 41–58"></label>
+          </div>
+        </section>
 
-      <section class="property-section">
-        <h3>Veröffentlichung</h3>
-        <div class="property-list">
-          <label class="property-row">
-            <span>Status</span>
-            <select id="docStatusInput">
-              <option value="draft">Entwurf</option>
-              <option value="working">In Bearbeitung</option>
-              <option value="final">Final</option>
-              <option value="published">Veröffentlicht</option>
-            </select>
-          </label>
-          <label class="property-row">
-            <span>Version</span>
-            <input id="docVersionInput" type="text" autocomplete="off">
-          </label>
-          <label class="property-row">
-            <span>Veröffentlichungsdatum</span>
-            <input id="docPublishedDateInput" type="date">
-          </label>
-          <label class="property-row">
-            <span>Sprache</span>
-            <input id="docLanguageMetaInput" type="text" autocomplete="off" placeholder="de">
-          </label>
-          <label class="property-row">
-            <span>Schlagwörter</span>
-            <input id="docTagsInput" type="text" autocomplete="off">
-          </label>
-          <label class="property-row">
-            <span>Kurzbeschreibung</span>
-            <textarea id="docDescriptionInput" rows="3"></textarea>
-          </label>
-        </div>
+        <section class="property-section">
+          <h3>Wann ist sie erschienen?</h3>
+          <div class="property-list">
+            <label class="property-row"><span>Erscheinungsjahr</span><input id="sourceCitationIssuedYearInput" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+            <label class="property-row"><span>Genaues Erscheinungsdatum</span><input id="sourceCitationIssuedDateInput" type="date"></label>
+            <label class="property-row"><span>Auflage</span><input id="sourceCitationEditionInput" type="text" autocomplete="off" placeholder="z. B. 2. Auflage"></label>
+            <label class="property-row"><span>Versionsangabe</span><input id="sourceCitationVersionStatementInput" type="text" autocomplete="off"></label>
+          </div>
+          <p id="sourceCitationIssuedHint" class="property-hint" role="status" hidden>Ohne Erscheinungsjahr oder genaues Datum ist die Quellenangabe wahrscheinlich unvollständig.</p>
+        </section>
+
+        <section class="property-section">
+          <h3>Online-Nachweis</h3>
+          <div class="property-list">
+            <label class="property-row"><span>DOI</span><input id="sourceCitationDoiInput" type="text" autocomplete="off" spellcheck="false" placeholder="10.…"></label>
+            <label class="property-row"><span>URL</span><input id="sourceCitationUrlInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+            <label class="property-row"><span>Archiv-URL</span><input id="sourceCitationArchiveUrlInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+            <label class="property-row"><span>Abgerufen am</span><input id="sourceCitationAccessedDateInput" type="date"></label>
+          </div>
+          <p id="sourceCitationAccessedHint" class="property-hint" role="status" hidden>Für diese Onlinequelle ist ein Abrufdatum empfehlenswert.</p>
+          <p id="sourceCitationDoiHint" class="property-hint" role="status" hidden>Der DOI wirkt formal unplausibel. Erwartet wird beispielsweise 10.1234/beispiel.</p>
+          <p id="sourceCitationUrlHint" class="property-hint" role="status" hidden>Mindestens eine eingegebene URL wirkt formal unplausibel. Empfohlen wird eine vollständige HTTP- oder HTTPS-Adresse.</p>
+        </section>
+
+        <section class="property-section">
+          <h3>Ausgabe</h3>
+          <div class="property-list">
+            <label class="property-row">
+              <span>Zitationsstil</span>
+              <select id="sourceCitationStyleInput">
+                <option value="APA">APA</option>
+                <option value="Chicago">Chicago</option>
+                <option value="MLA">MLA</option>
+                <option value="DIN ISO 690">DIN ISO 690</option>
+                <option value="Hausstil">Hausstil</option>
+              </select>
+            </label>
+            <div class="property-row property-row-stack">
+              <span>Kurzbeleg</span>
+              <div class="citation-output">
+                <textarea id="sourceCitationShortOutput" rows="2" readonly></textarea>
+                <button type="button" id="copyShortCitationButton" class="property-copy-button">Kurzbeleg kopieren</button>
+              </div>
+            </div>
+            <div class="property-row property-row-stack">
+              <span>Vollbeleg</span>
+              <div class="citation-output">
+                <div id="sourceCitationFullOutput" class="citation-rendered-output" role="textbox" aria-readonly="true" tabindex="0"></div>
+                <button type="button" id="copyFullCitationButton" class="property-copy-button">Vollbeleg kopieren</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </section>
     </div>
 
@@ -659,8 +687,8 @@
       <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
     </div>
   </section>
-  <script src="styles/document-styles.js?v=20260616b"></script>
-  <script src="typemap.js?v=20260618n"></script>
+  <script src="styles/document-styles.js?v=20260618u"></script>
+  <script src="typemap.js?v=20260618av"></script>
 </body>
 </html>
 
