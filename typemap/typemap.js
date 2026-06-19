@@ -44,12 +44,13 @@ const ui = {
   generateDialogStatus: document.getElementById("generateDialogStatus"),
   generatePromptButton: document.getElementById("generatePromptButton"),
   copyGeneratePromptButton: document.getElementById("copyGeneratePromptButton"),
-  pasteGeneratedJsonButton: document.getElementById("pasteGeneratedJsonButton"),
+  openGeneratedJsonEditorButton: document.getElementById("openGeneratedJsonEditorButton"),
   projectList: document.getElementById("projectList"),
   editorPanel: document.querySelector(".editor-panel"),
   editorToolbarPrimary: document.querySelector(".editor-toolbar-primary"),
   editorToolbarFormat: document.querySelector(".editor-toolbar-format"),
   editorDataViewSelect: document.getElementById("editorDataViewSelect"),
+  editorDataViewIcon: document.getElementById("editorDataViewIcon"),
   insertCitationObjectButton: document.getElementById("insertCitationObjectButton"),
   insertCitationObjectCheck: document.getElementById("insertCitationObjectCheck"),
   documentPropertiesButton: document.getElementById("documentPropertiesButton"),
@@ -77,6 +78,7 @@ const ui = {
   sourceCitationAuthorsList: document.getElementById("sourceCitationAuthorsList"),
   addSourceCitationAuthorButton: document.getElementById("addSourceCitationAuthorButton"),
   sourceCitationInstitutionalAuthorInput: document.getElementById("sourceCitationInstitutionalAuthorInput"),
+  sourceCitationNewsAgenciesInput: document.getElementById("sourceCitationNewsAgenciesInput"),
   sourceCitationEditorsInput: document.getElementById("sourceCitationEditorsInput"),
   sourceCitationContributorsInput: document.getElementById("sourceCitationContributorsInput"),
   sourceCitationTranslatorsField: document.getElementById("sourceCitationTranslatorsField"),
@@ -377,6 +379,7 @@ function createDefaultCitationSource(title = "") {
     original_language: "",
     authors: "",
     institutional_author: "",
+    news_agencies: "",
     editors: "",
     contributors: "",
     translators: "",
@@ -417,7 +420,7 @@ function normalizeCitationSource(value, project, legacySource = null) {
   normalized.lead = String(normalized.lead || "");
   normalized.language = String(normalized.language || "de");
   [
-    "authors", "institutional_author", "editors", "contributors", "translators", "original_title",
+    "authors", "institutional_author", "news_agencies", "editors", "contributors", "translators", "original_title",
     "original_language", "container_title", "publisher",
     "publisher_place", "volume", "issue", "page_range", "issued_year", "issued_date", "edition",
     "version_statement", "doi", "url", "archive_url", "accessed_date",
@@ -1243,9 +1246,13 @@ function clearElement(element) {
   while (element?.firstChild) element.removeChild(element.firstChild);
 }
 
-function appendTextNode(parent, text) {
+function appendTextNode(parent, text, options = {}) {
   const source = String(text || "");
   if (!source) return;
+  if (options.smallCaps === false) {
+    parent.appendChild(document.createTextNode(source));
+    return;
+  }
   const uppercaseWordPattern = /\p{Lu}+/gu;
   const tokens = [];
   let tokenMatch;
@@ -1297,35 +1304,35 @@ function appendTextNode(parent, text) {
   }
 }
 
-function appendInlineMarkdown(parent, text) {
+function appendInlineMarkdown(parent, text, options = {}) {
   text = stripOriginalPageMarkers(text);
   const pattern = /(`[^`\n]+`|==[^=\n]+==|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]]+\]\([^)]+\))/g;
   let cursor = 0;
   String(text).replace(pattern, (match, _token, offset) => {
-    if (offset > cursor) appendTextNode(parent, text.slice(cursor, offset));
+    if (offset > cursor) appendTextNode(parent, text.slice(cursor, offset), options);
     let node;
     if (match.startsWith("`")) {
       node = document.createElement("code");
       node.textContent = match.slice(1, -1);
     } else if (match.startsWith("==")) {
       node = document.createElement("mark");
-      appendTextNode(node, match.slice(2, -2));
+      appendTextNode(node, match.slice(2, -2), options);
     } else if (match.startsWith("**")) {
       node = document.createElement("strong");
-      appendTextNode(node, match.slice(2, -2));
+      appendTextNode(node, match.slice(2, -2), options);
     } else if (match.startsWith("__")) {
       node = document.createElement("strong");
-      appendTextNode(node, match.slice(2, -2));
+      appendTextNode(node, match.slice(2, -2), options);
     } else if (match.startsWith("*")) {
       node = document.createElement("em");
-      appendTextNode(node, match.slice(1, -1));
+      appendTextNode(node, match.slice(1, -1), options);
     } else if (match.startsWith("_")) {
       node = document.createElement("em");
-      appendTextNode(node, match.slice(1, -1));
+      appendTextNode(node, match.slice(1, -1), options);
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       node = document.createElement("a");
-      appendTextNode(node, linkMatch?.[1] || match);
+      appendTextNode(node, linkMatch?.[1] || match, options);
       node.href = linkMatch?.[2] || "#";
       node.rel = "noopener noreferrer";
       node.target = "_blank";
@@ -1334,7 +1341,7 @@ function appendInlineMarkdown(parent, text) {
     cursor = offset + match.length;
     return match;
   });
-  if (cursor < text.length) appendTextNode(parent, text.slice(cursor));
+  if (cursor < text.length) appendTextNode(parent, text.slice(cursor), options);
 }
 
 function createMarkdownBlockElement(block, textType, options = {}) {
@@ -1391,7 +1398,7 @@ function createMarkdownBlockElement(block, textType, options = {}) {
       && block.chapterNumber
       ? `${block.chapterNumber} ${headingMatch[2]}`
       : headingMatch[2];
-    appendInlineMarkdown(heading, headingLabel);
+    appendInlineMarkdown(heading, headingLabel, { smallCaps: false });
     return heading;
   }
 
@@ -1764,6 +1771,10 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
   targetPage.style.setProperty("--preview-body-font", style.fontFamily);
+  targetPage.style.setProperty(
+    "--preview-strong-font",
+    project.metadata?.textKind === "report" ? '"TypeMap EB Garamond Semibold", serif' : style.fontFamily,
+  );
   targetPage.style.setProperty("--preview-title-font", style.titleFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-title-weight", String(Number(style.titleWeight) || 700));
   targetPage.style.setProperty("--preview-subtitle-font", style.subtitleFontFamily || style.titleFontFamily || style.fontFamily);
@@ -2546,6 +2557,8 @@ function renderEditor() {
     : getEditorSourceText(project);
   ui.editorPanel?.classList.toggle("editor-json-mode", isJsonView);
   if (ui.editorDataViewSelect) ui.editorDataViewSelect.value = state.editorDataView;
+  ui.editorDataViewIcon?.classList.toggle("file-format-icon-markdown", !isJsonView);
+  ui.editorDataViewIcon?.classList.toggle("file-format-icon-json", isJsonView);
   if (ui.editorToolbarPrimary) ui.editorToolbarPrimary.inert = isJsonView;
   if (ui.editorToolbarFormat) ui.editorToolbarFormat.inert = isJsonView;
   if (ui.textInput) {
@@ -2650,6 +2663,7 @@ function readSourceCitationForm() {
     language: ui.sourceCitationLanguageInput.value.trim() || "de",
     authors: getCitationPeople(ui.sourceCitationAuthorsList).join("; "),
     institutional_author: ui.sourceCitationInstitutionalAuthorInput.value.trim(),
+    news_agencies: ui.sourceCitationNewsAgenciesInput.value.trim(),
     editors: ui.sourceCitationEditorsInput.value.trim(),
     contributors: ui.sourceCitationContributorsInput.value.trim(),
     translators: getCitationPeople(ui.sourceCitationTranslatorsList).join("; "),
@@ -2706,7 +2720,7 @@ function formatDinPersonName(value) {
 }
 
 function formatDinResponsibility(citation) {
-  if (!citation.authors) return citation.institutional_author || "o. V.";
+  if (!citation.authors) return citation.institutional_author || citation.news_agencies || "o. V.";
   return splitCitationAuthors(citation.authors).filter(Boolean).map(formatDinPersonName).join("; ");
 }
 
@@ -2731,7 +2745,7 @@ function isPlausibleHttpUrl(value) {
  */
 function formatSourceCitation(citation) {
   citation = getCitationForFieldProfile(citation);
-  const author = citation.authors || citation.institutional_author || "o. V.";
+  const author = citation.authors || citation.institutional_author || citation.news_agencies || "o. V.";
   const dinAuthor = formatDinResponsibility(citation);
   const title = [citation.title || "Ohne Titel", citation.subtitle]
     .filter(Boolean).join(": ");
@@ -2745,10 +2759,14 @@ function formatSourceCitation(citation) {
     ? `${citation.volume}${citation.issue ? ` (${citation.issue})` : ""}`
     : citation.issue;
   const responsibility = citation.editors ? `Hrsg.: ${citation.editors}` : citation.contributors;
-  const translationDetails = citation.text_version === "translation"
+  const agencyCredit = citation.news_agencies && author !== citation.news_agencies
+    ? `Agentur: ${citation.news_agencies}`
+    : "";
+  const translationCredit = citation.text_version === "translation"
     ? [citation.translators ? `Übers. von ${citation.translators}` : "", citation.original_title ? `Originaltitel: ${citation.original_title}` : ""]
       .filter(Boolean).join("; ")
     : "";
+  const translationDetails = [translationCredit, agencyCredit].filter(Boolean).join("; ");
   const short = {
     APA: `${author} (${year})`,
     Chicago: `${author}, ${year}`,
@@ -2818,7 +2836,7 @@ function renderFullCitationOutput(formatted) {
 }
 
 const CITATION_OPTIONAL_FIELDS = [
-  "lead", "editors", "contributors", "container_title", "publisher", "publisher_place", "volume", "issue",
+  "lead", "news_agencies", "editors", "contributors", "container_title", "publisher", "publisher_place", "volume", "issue",
   "page_range", "edition", "version_statement", "doi", "url", "archive_url", "accessed_date",
 ];
 
@@ -2826,8 +2844,8 @@ const CITATION_FIELD_PROFILES = {
   book: ["editors", "contributors", "publisher", "publisher_place", "edition", "version_statement", "doi", "url", "archive_url", "accessed_date"],
   book_chapter: ["editors", "contributors", "container_title", "publisher", "publisher_place", "volume", "page_range", "edition", "doi", "url", "archive_url", "accessed_date"],
   journal_article: ["container_title", "volume", "issue", "page_range", "version_statement", "doi", "url", "archive_url", "accessed_date"],
-  newspaper_article: ["lead", "contributors", "container_title", "issue", "page_range", "version_statement", "url", "archive_url", "accessed_date"],
-  webpage: ["contributors", "container_title", "publisher", "version_statement", "doi", "url", "archive_url", "accessed_date"],
+  newspaper_article: ["lead", "news_agencies", "contributors", "container_title", "issue", "page_range", "version_statement", "url", "archive_url", "accessed_date"],
+  webpage: ["news_agencies", "contributors", "container_title", "publisher", "version_statement", "doi", "url", "archive_url", "accessed_date"],
   report: ["contributors", "publisher", "publisher_place", "version_statement", "doi", "url", "archive_url", "accessed_date"],
 };
 
@@ -2845,6 +2863,7 @@ function getCitationForFieldProfile(citation) {
 function getCitationOptionalFieldControls() {
   return {
     lead: ui.sourceCitationLeadInput,
+    news_agencies: ui.sourceCitationNewsAgenciesInput,
     editors: ui.sourceCitationEditorsInput,
     contributors: ui.sourceCitationContributorsInput,
     container_title: ui.sourceCitationContainerTitleInput,
@@ -2888,7 +2907,7 @@ function updateSourceCitationForm() {
   const isTranslation = citation.text_version === "translation";
   ui.sourceCitationTranslationFields.hidden = !isTranslation;
   ui.sourceCitationTranslatorsField.hidden = !isTranslation;
-  ui.sourceCitationAuthorHint.hidden = Boolean(citation.authors || citation.institutional_author);
+  ui.sourceCitationAuthorHint.hidden = Boolean(citation.authors || citation.institutional_author || citation.news_agencies);
   ui.sourceCitationIssuedHint.hidden = Boolean(citation.issued_year || citation.issued_date);
   const isOnlineSource = citation.source_type === "webpage"
     || citation.source_type === "blog_post"
@@ -3034,6 +3053,7 @@ function openDocumentPropertiesDialog() {
   renderCitationPeople(ui.sourceCitationAuthorsList, citation.authors, "Autorin oder Autor");
   renderCitationPeople(ui.sourceCitationTranslatorsList, citation.translators, "Übersetzerin oder Übersetzer");
   ui.sourceCitationInstitutionalAuthorInput.value = citation.institutional_author;
+  ui.sourceCitationNewsAgenciesInput.value = citation.news_agencies;
   ui.sourceCitationEditorsInput.value = citation.editors;
   ui.sourceCitationContributorsInput.value = citation.contributors;
   ui.sourceCitationContainerTitleInput.value = citation.container_title;
@@ -3260,6 +3280,30 @@ function addProject(title = "Neues Dokument") {
   scheduleAutosave();
 }
 
+function addGeneratedProject(jsonText) {
+  const sourceProject = getProjectFromGeneratedPayload(parseGeneratedJson(jsonText));
+  const now = new Date().toISOString();
+  const project = normalizeProject({
+    ...sourceProject,
+    id: createId("typemap-project"),
+    createdAt: now,
+    updatedAt: now,
+  });
+  // Generierte Dokumente erhalten einmalig den zur erkannten Textsorte
+  // gehörenden Ausgangsstil; danach bleiben individuelle Anpassungen erhalten.
+  applyDocumentStylePreset(project, project.metadata.textKind);
+  state.projects.push(project);
+  state.activeProjectId = project.id;
+  state.activeSourceRange = null;
+  state.editorDataView = "json";
+  state.jsonEditorDraft = "";
+  state.jsonEditorDraftProjectId = null;
+  setProjectExpanded(project.id, true);
+  renderApp();
+  scheduleAutosave();
+  window.setTimeout(() => ui.textInput?.focus(), 0);
+}
+
 function setGenerateDialogOpen(isOpen) {
   if (ui.generateDialogOverlay) ui.generateDialogOverlay.hidden = !isOpen;
   if (ui.generateDialog) ui.generateDialog.hidden = !isOpen;
@@ -3310,13 +3354,14 @@ BIBLIOGRAFISCHE REGELN
 - source_type ist einer dieser Werte: book, book_chapter, journal_article, newspaper_article, webpage, blog_post, report, legal_text, court_decision, manuscript, letter, email, other.
 - Wähle journal_article nur bei einer erkennbaren Fachzeitschrift, newspaper_article bei einer Zeitung, blog_post bei einem Blog und report bei einem formal herausgegebenen Bericht; sonst webpage.
 - title ist Pflicht. subtitle enthält nur einen ausdrücklich ausgewiesenen Untertitel. lead enthält ausschließlich einen redaktionell erkennbaren Lead oder Teaser, niemals eine selbst erzeugte Zusammenfassung.
-- authors enthält Personen als "NACHNAME, Vorname; NACHNAME, Vorname". Bei mehreren Personen dient das Semikolon als Trennzeichen. institutional_author enthält die verantwortliche Organisation, wenn keine Person verantwortlich zeichnet.
+- authors enthält namentlich ausgewiesene Personen als "NACHNAME, Vorname; NACHNAME, Vorname". Bei mehreren Personen dient das Semikolon als Trennzeichen. institutional_author enthält eine tatsächlich als Urheber verantwortliche Organisation.
+- news_agencies enthält bei journalistischen Texten ausdrücklich genannte Nachrichtenagenturen oder Agenturcredits, beispielsweise "dpa; Reuters". Agenturen werden nicht als Autoren oder institutionelle Urheber umgedeutet. authors und news_agencies dürfen gleichzeitig belegt sein.
 - container_title bezeichnet Website, Zeitung, Zeitschrift oder übergeordnetes Werk. publisher und publisher_place werden nur bei belegten Angaben gesetzt.
 - issued_date verwendet nach Möglichkeit YYYY-MM-DD; issued_year nur das vierstellige Erscheinungsjahr. Verwende nicht das Abrufdatum als Erscheinungsdatum.
 - url enthält die kanonische Artikel-URL, archive_url nur eine belegte Archivfassung und accessed_date das vorgegebene Abrufdatum.
 - doi enthält nur einen tatsächlich angegebenen DOI. citation_style bleibt "Hausstil"; short_citation und full_citation bleiben leer, da TypeMap sie berechnet.
 - text_version ist "translation" nur bei einer erkennbaren Übersetzung. Dann original_title, original_language und translators ausfüllen; andernfalls "original".
-- citationSource.language und style.language verwenden de, en, fr oder la. Autorenname, Untertitel und Lead stehen ausschließlich unter citationSource; lege dafür keine parallelen Felder unter metadata an.
+- citationSource.language und style.language verwenden de, en, fr oder la. Autorenname, Agenturcredit, Untertitel und Lead stehen ausschließlich unter citationSource; lege dafür keine parallelen Felder unter metadata an.
 - Setze metadata.textKind bei journalistischen Artikeln, Zeitungstexten und redaktionellen Webbeiträgen auf "report", bei wissenschaftlichen Artikeln auf "paper" und bei universellen Rohtexten auf "notebook".
 - Behalte die vorgegebenen Darstellungswerte unter style, typography, paratextVisibility, chapterRoles und tocVisible unverändert. Verwende leere id-/Zeitfelder; TypeMap vergibt diese lokal.
 
@@ -3344,30 +3389,13 @@ function getProjectFromGeneratedPayload(payload) {
   throw new Error("missing-project");
 }
 
-function addGeneratedProject(payload) {
-  const sourceProject = getProjectFromGeneratedPayload(payload);
-  const now = new Date().toISOString();
-  const project = normalizeProject({
-    ...sourceProject,
-    id: createId("typemap-project"),
-    createdAt: now,
-    updatedAt: now,
-  });
-  applyDocumentStylePreset(project, project.metadata.textKind);
-  state.projects.push(project);
-  state.activeProjectId = project.id;
-  state.activeSourceRange = null;
-  state.editorDataView = "json";
-  state.jsonEditorDraft = "";
-  state.jsonEditorDraftProjectId = null;
-  setProjectExpanded(project.id, true);
-  renderApp();
-  scheduleAutosave();
-}
-
 function applyJsonEditorDraft() {
   const activeProject = getActiveProject();
   if (!activeProject || state.jsonEditorDraftProjectId !== activeProject.id) return;
+  if (!state.jsonEditorDraft.trim()) {
+    ui.textInput?.removeAttribute("aria-invalid");
+    return;
+  }
   try {
     const sourceProject = getProjectFromGeneratedPayload(parseGeneratedJson(state.jsonEditorDraft));
     const normalized = normalizeProject({
@@ -3521,9 +3549,25 @@ function escapeHtml(value) {
 }
 
 function buildMarkdownExport(project) {
-  const lines = [];
-  lines.push(project.source.rawText || "");
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n");
+  const rawText = String(project.source.rawText || "");
+  if (!hasCitationObject(project)) {
+    return rawText.replace(/\n{3,}/g, "\n\n");
+  }
+
+  const body = removeCitationObjectBlock(rawText).trimEnd();
+  const citation = normalizeCitationSource(project.citationSource, project);
+  const formatted = formatSourceCitation(citation);
+  let citationMarkdown = formatted.full;
+  if (formatted.italicTitle) {
+    const titleIndex = citationMarkdown.indexOf(formatted.italicTitle);
+    if (titleIndex >= 0) {
+      citationMarkdown = `${citationMarkdown.slice(0, titleIndex)}_${formatted.italicTitle}_${citationMarkdown.slice(titleIndex + formatted.italicTitle.length)}`;
+    }
+  }
+
+  // Zwei bewusst erhaltene Leerzeilen trennen den bibliografischen Nachweis
+  // vom Dokumenttext; der interne Objektmarker gehört nicht in die Exportdatei.
+  return body ? `${body}\n\n\n${citationMarkdown}\n` : `${citationMarkdown}\n`;
 }
 
 function exportMarkdown() {
@@ -3671,8 +3715,8 @@ ${buildHtmlFontFaceCss(project)}
     p { margin: 0 0 ${paragraphSpacing}em; white-space: pre-wrap; overflow-wrap: break-word; text-indent: 0; }
     .typemap-text > p { text-indent: ${firstLineIndent}; }
     .typemap-text > p:first-of-type, .typemap-text > .preview-heading + p { text-indent: 0; }
-    em { font-style: italic; }
-    strong { font-weight: 700; }
+    em { font-family: inherit; font-style: italic; }
+    p strong, li strong, blockquote strong { font-family: inherit; font-weight: 600; }
     mark { background: transparent; text-decoration: underline; color: inherit; }
     a { color: #70531c; text-decoration: underline; text-underline-offset: .12em; }
     h1, h2, h3, h4, h5, h6 { margin: ${Number(project.style.headingSpacingBefore ?? getDocumentStylePreset(metadata.textKind)?.style?.headingSpacingBefore) || 1.2}em 0 .38em; font-family: ${project.style.headingFontFamily || project.style.fontFamily}; line-height: 1.12; font-weight: ${Number(project.style.headingWeight) || 700}; }
@@ -3960,7 +4004,8 @@ async function exportPng() {
       pushSpacer(fontSize * (Number(project.style.headingSpacingBefore ?? getDocumentStylePreset(metadata.textKind)?.style?.headingSpacingBefore) || 1.2));
     }
     const countAsBodyLine = block.chapterRole === "main" && !isSourceTitleHeading;
-    const smallCaps = isUppercasePassage(paragraph);
+    const isHeading = /^#{1,7}\s+/.test(trimmedParagraph);
+    const smallCaps = !isHeading && isUppercasePassage(paragraph);
     wrapText(paragraph, fontSize, 400, smallCaps).forEach((line) => pushLine(line, {
       countLine: Boolean(line.trim()) && countAsBodyLine,
       smallCaps,
@@ -4319,23 +4364,18 @@ function bindEditor() {
       setGenerateDialogStatus("Der Prompt konnte nicht kopiert werden.", true);
     }
   });
-  ui.pasteGeneratedJsonButton?.addEventListener("click", async () => {
+  ui.openGeneratedJsonEditorButton?.addEventListener("click", async () => {
     try {
-      const clipboardText = await navigator.clipboard?.readText();
-      if (!clipboardText) throw new Error("empty-clipboard");
-      addGeneratedProject(parseGeneratedJson(clipboardText));
+      if (!navigator.clipboard?.readText) throw new Error("clipboard-unavailable");
+      const jsonText = await navigator.clipboard.readText();
+      if (!jsonText.trim()) throw new Error("empty-clipboard");
+      addGeneratedProject(jsonText);
       setGenerateDialogOpen(false);
     } catch (error) {
-      // Falls der Browser das Lesen der Zwischenablage sperrt, steht trotzdem
-      // sofort eine ausgewählte JSON-Vorlage für manuelles Strg+V bereit.
-      addProject("Neues Dokument");
-      state.editorDataView = "json";
-      renderEditor();
-      setGenerateDialogOpen(false);
-      window.setTimeout(() => {
-        ui.textInput?.focus();
-        ui.textInput?.select();
-      }, 0);
+      setGenerateDialogStatus(
+        "Noch kein gültiger TypeMap-JSON-Code gefunden. Bitte kopieren Sie zunächst den von der KI erzeugten JSON-Code.",
+        true,
+      );
     }
   });
   ui.themeToggleButton?.addEventListener("click", toggleTheme);

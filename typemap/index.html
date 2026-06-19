@@ -10,8 +10,8 @@
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260619bq">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="typemap.css?v=20260619cc">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -33,19 +33,19 @@
             <button type="button" id="exportProjectButton" aria-expanded="false" aria-controls="exportMenu">Export</button>
             <div id="exportMenu" class="export-menu" hidden>
               <button type="button" data-export-format="md">
-                <img src="https://api.iconify.design/material-symbols/markdown.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span class="file-format-icon file-format-icon-markdown" aria-hidden="true"></span>
                 <span>MD</span>
               </button>
               <button type="button" data-export-format="html">
-                <img src="https://api.iconify.design/material-symbols/html.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span class="file-format-icon file-format-icon-html" aria-hidden="true"></span>
                 <span>HTML</span>
               </button>
               <button type="button" data-export-format="png">
-                <img src="https://api.iconify.design/material-symbols/file-png.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span class="file-format-icon file-format-icon-png" aria-hidden="true"></span>
                 <span>PNG</span>
               </button>
               <button type="button" data-export-format="json">
-                <img src="https://api.iconify.design/devicon/json.svg" alt="" aria-hidden="true">
+                <span class="file-format-icon file-format-icon-json" aria-hidden="true"></span>
                 <span>JSON</span>
               </button>
             </div>
@@ -255,10 +255,13 @@
             </details>
           </div>
           <div class="editor-view-controls">
-            <select id="editorDataViewSelect" class="toolbar-select editor-data-view-select" aria-label="Dokumentansicht">
-              <option value="markdown">Markdown</option>
-              <option value="json">JSON</option>
-            </select>
+            <div class="editor-data-view-picker">
+              <span id="editorDataViewIcon" class="file-format-icon file-format-icon-markdown" aria-hidden="true"></span>
+              <select id="editorDataViewSelect" class="toolbar-select editor-data-view-select" aria-label="Dokumentansicht">
+                <option value="markdown">Markdown</option>
+                <option value="json">JSON</option>
+              </select>
+            </div>
             <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
               <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
             </button>
@@ -349,7 +352,7 @@
     <div class="property-dialog-actions generate-dialog-actions">
       <button type="button" id="generatePromptButton" class="secondary-button primary-action">Prompt generieren</button>
       <button type="button" id="copyGeneratePromptButton" class="secondary-button" disabled>Prompt kopieren</button>
-      <button type="button" id="pasteGeneratedJsonButton" class="secondary-button">Prompt einfügen</button>
+      <button type="button" id="openGeneratedJsonEditorButton" class="secondary-button">JSON-Code einfügen</button>
     </div>
   </section>
 
@@ -431,6 +434,7 @@
               </div>
             </div>
             <label class="property-row"><span>Institutioneller Urheber</span><input id="sourceCitationInstitutionalAuthorInput" type="text" autocomplete="off" placeholder="z. B. Bundesarchiv"></label>
+            <label class="property-row"><span>Nachrichtenagentur(en)</span><input id="sourceCitationNewsAgenciesInput" type="text" autocomplete="off" placeholder="z. B. dpa; Reuters"></label>
             <label class="property-row"><span>Herausgegeben von</span><input id="sourceCitationEditorsInput" type="text" autocomplete="off"></label>
             <label class="property-row"><span>Weitere Mitwirkende</span><input id="sourceCitationContributorsInput" type="text" autocomplete="off"></label>
             <div id="sourceCitationTranslatorsField" class="property-row property-row-stack" hidden>
@@ -441,7 +445,7 @@
               </div>
             </div>
           </div>
-          <p id="sourceCitationAuthorHint" class="property-hint" role="status" hidden>Für eine vollständige Quellenangabe empfiehlt sich mindestens eine Person oder Institution als verantwortliche Stelle.</p>
+          <p id="sourceCitationAuthorHint" class="property-hint" role="status" hidden>Für eine vollständige Quellenangabe empfiehlt sich eine genannte Person, verantwortliche Institution oder ausgewiesene Agentur.</p>
         </section>
 
         <section class="property-section">
@@ -726,7 +730,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260619v"></script>
-  <script src="typemap.js?v=20260619bq"></script>
+  <script src="typemap.js?v=20260619cc"></script>
 </body>
 </html>
 

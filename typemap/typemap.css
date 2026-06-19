@@ -85,6 +85,40 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Die Artikelschrift wird lokal gebündelt, damit Browser für Fett und Kursiv
+ * nicht auf eine ähnlich wirkende Ersatzschrift ausweichen. */
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../assets/fonts/eb-garamond/EBGaramond-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../assets/fonts/eb-garamond/EBGaramond-Italic-Variable.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TypeMap EB Garamond Semibold";
+  src: url("../assets/fonts/eb-garamond/EBGaramond-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "TypeMap EB Garamond Semibold";
+  src: url("../assets/fonts/eb-garamond/EBGaramond-Italic-Variable.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+}
+
 button,
 input,
 select,
@@ -389,10 +423,30 @@ body.typemap-theme-light .type-menu-button[aria-expanded="true"] {
   text-align: left;
 }
 
-.export-menu button img {
+.file-format-icon {
+  display: inline-block;
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+  background-color: currentColor;
+  -webkit-mask: var(--file-format-icon) center / contain no-repeat;
+  mask: var(--file-format-icon) center / contain no-repeat;
+}
+
+.file-format-icon-markdown {
+  --file-format-icon: url("https://api.iconify.design/material-symbols/markdown.svg");
+}
+
+.file-format-icon-html {
+  --file-format-icon: url("https://api.iconify.design/material-symbols/html.svg");
+}
+
+.file-format-icon-png {
+  --file-format-icon: url("https://api.iconify.design/material-symbols/file-png.svg");
+}
+
+.file-format-icon-json {
+  --file-format-icon: url("https://api.iconify.design/devicon/json.svg");
 }
 
 .export-menu button:hover {
@@ -632,6 +686,7 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
   overflow-wrap: break-word;
   text-wrap: pretty;
   font-synthesis-style: none;
+  font-synthesis-weight: none;
   scroll-margin-top: 28px;
 }
 
@@ -661,9 +716,21 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
   margin-bottom: 0;
 }
 
+.preview-text strong,
+.preview-text em {
+  font-family: inherit;
+}
+
 .preview-text em {
   font-style: italic;
   font-synthesis-style: none;
+}
+
+.preview-text p strong,
+.preview-text li strong,
+.preview-text blockquote strong {
+  font-family: var(--preview-strong-font, inherit);
+  font-weight: 600;
 }
 
 .preview-document-head {
@@ -1506,10 +1573,28 @@ body.typemap-theme-light .document-tree-row.is-active .document-tree-label {
   gap: 7px;
 }
 
-.editor-data-view-select {
+.editor-data-view-picker .editor-data-view-select {
   width: auto;
-  min-width: 106px;
+  min-width: 132px;
   min-height: 34px;
+  padding-left: 34px;
+}
+
+.editor-data-view-picker {
+  position: relative;
+  display: inline-flex;
+  color: var(--text);
+}
+
+.editor-data-view-picker > .file-format-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 9px;
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .editor-panel.editor-json-mode .editor-toolbar-primary,
