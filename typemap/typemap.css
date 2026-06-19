@@ -904,6 +904,39 @@ body.typemap-theme-light .preview-object-capsule {
   line-height: 1.42;
 }
 
+.preview-footnote-reference {
+  margin-inline: 0.08em;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 0.72em;
+  font-weight: 600;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.preview-footnote-definition {
+  display: flex;
+  align-items: baseline;
+  gap: 0.48em;
+  margin: 0.16em 0 0.9em;
+  padding-left: 0.9em;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.84em;
+  font-style: normal;
+  line-height: 1.38;
+  white-space: pre-wrap;
+}
+
+.preview-footnote-definition-label {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.82em;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: super;
+}
+
 .preview-text blockquote {
   margin: 0 0 0.8em;
   padding-left: 1em;
@@ -2129,6 +2162,14 @@ body.typemap-theme-light .text-editor-field .markdown-editor-frame {
   line-height: inherit;
 }
 
+.markdown-editor-inline-object {
+  display: inline-block !important;
+  width: max-content;
+  max-width: none;
+  white-space: pre !important;
+  overflow-wrap: normal !important;
+}
+
 .markdown-editor-paratext {
   padding: 0 0.34em;
   margin-inline: -0.34em;
@@ -2326,7 +2367,53 @@ input[type="range"] {
 }
 
 .generate-dialog {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   width: min(900px, calc(100vw - 44px));
+}
+
+.generate-source-tabs {
+  padding-top: 10px;
+}
+
+.generate-source-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.generate-source-panel[hidden] {
+  display: none;
+}
+
+.generate-pdf-chunk-fields {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.generate-pdf-chunk-fields[hidden] {
+  display: none;
+}
+
+.generate-pdf-target-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.generate-pdf-range-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.65fr) repeat(2, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .generate-pdf-range-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .generate-url-field,

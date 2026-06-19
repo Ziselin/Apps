@@ -9,6 +9,7 @@ const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
 const CITATION_OBJECT_MARKER = "{{citation}}";
 const LEGACY_CITATION_OBJECT_HEADING = "## Quellenangabe";
 const ORIGINAL_PAGE_MARKER_SOURCE = "\\[(?:\\d+|(?=[ivxlcdm]+\\])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\]";
+const FOOTNOTE_REFERENCE_SOURCE = "\\[\\^([^\\]\\r\\n]+)\\]";
 const CHAPTER_ROLES = new Set(["foreword", "main", "afterword"]);
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
 const PARATEXT_END_PATTERN = /^:::\s*$/;
@@ -39,7 +40,18 @@ const ui = {
   generateDialogOverlay: document.getElementById("generateDialogOverlay"),
   generateDialog: document.getElementById("generateDialog"),
   generateDialogCloseButton: document.getElementById("generateDialogCloseButton"),
+  generateWebTab: document.getElementById("generateWebTab"),
+  generatePdfTab: document.getElementById("generatePdfTab"),
+  generateWebPanel: document.getElementById("generateWebPanel"),
+  generatePdfPanel: document.getElementById("generatePdfPanel"),
   generateSourceUrlInput: document.getElementById("generateSourceUrlInput"),
+  generatePdfSourceInput: document.getElementById("generatePdfSourceInput"),
+  generatePdfTaskInput: document.getElementById("generatePdfTaskInput"),
+  generatePdfChunkFields: document.getElementById("generatePdfChunkFields"),
+  generatePdfTargetSummary: document.getElementById("generatePdfTargetSummary"),
+  generatePdfChunkIndexInput: document.getElementById("generatePdfChunkIndexInput"),
+  generatePdfPageFromInput: document.getElementById("generatePdfPageFromInput"),
+  generatePdfPageToInput: document.getElementById("generatePdfPageToInput"),
   generatePromptOutput: document.getElementById("generatePromptOutput"),
   generateDialogStatus: document.getElementById("generateDialogStatus"),
   generatePromptButton: document.getElementById("generatePromptButton"),
@@ -187,8 +199,21 @@ function getPlainDocumentLabel(value, fallback = "") {
   return stripInlineMarkdownSyntax(value) || fallback;
 }
 
+function findOriginalPageMarkers(value) {
+  const source = String(value || "");
+  const pattern = new RegExp(ORIGINAL_PAGE_MARKER_SOURCE, "gi");
+  return Array.from(source.matchAll(pattern), (match) => ({
+    raw: match[0],
+    label: match[0].slice(1, -1),
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+
 function isOriginalPageMarker(value) {
-  return new RegExp(`^\\s*${ORIGINAL_PAGE_MARKER_SOURCE}\\s*$`, "i").test(String(value || ""));
+  const trimmed = String(value || "").trim();
+  const markers = findOriginalPageMarkers(trimmed);
+  return markers.length === 1 && markers[0].start === 0 && markers[0].end === trimmed.length;
 }
 
 function stripOriginalPageMarkers(value) {
@@ -197,13 +222,30 @@ function stripOriginalPageMarkers(value) {
   return source.replace(pattern, (match, offset) => {
     const before = source[offset - 1] || "";
     const after = source[offset + match.length] || "";
-    const markerSeparatedWords = /^[ \t]/.test(match) || /[ \t]$/.test(match);
-    return markerSeparatedWords
-      && /[\p{L}\p{N}]/u.test(before)
-      && /[\p{L}\p{N}]/u.test(after)
-      ? " "
-      : "";
+    const hadWhitespace = /^[ \t]/.test(match) || /[ \t]$/.test(match);
+    if (!hadWhitespace || !before || !after) return "";
+    // Nach schließenden Satzzeichen bleibt der Abstand erhalten; vor ihnen
+    // dagegen nicht. So wird etwa "Text, [42] weiter" zu "Text, weiter".
+    if (/^[,.;:!?…%)\]}]/u.test(after)) return "";
+    if (/^[([{„‚«‹]/u.test(before)) return "";
+    return " ";
   });
+}
+
+function findFootnoteReferences(value) {
+  const source = String(value || "");
+  const pattern = new RegExp(FOOTNOTE_REFERENCE_SOURCE, "g");
+  return Array.from(source.matchAll(pattern), (match) => ({
+    raw: match[0],
+    label: match[1],
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+
+function getFootnoteDefinition(value) {
+  const match = String(value || "").match(/^\s*\[\^([^\]\r\n]+)\]:[ \t]*(.*)$/s);
+  return match ? { label: match[1], content: match[2] } : null;
 }
 
 function getOpeningTitleHeading(rawText) {
@@ -347,6 +389,7 @@ const state = {
   detailsLayoutStep: 0,
   editorZoom: 1,
   editorDataView: "markdown",
+  generateSourceMode: "web",
   jsonEditorDraft: "",
   jsonEditorDraftProjectId: null,
   jsonEditorApplyTimer: 0,
@@ -354,6 +397,7 @@ const state = {
   editorGeometryFrame: 0,
   editorResizeObserver: null,
   editorMeasurementInput: null,
+  editorInlineMeasurement: null,
 };
 
 function createId(prefix) {
@@ -363,6 +407,33 @@ function createId(prefix) {
 function createDefaultMetadata() {
   return {
     textKind: "paper",
+  };
+}
+
+function normalizeTranscriptionMetadata(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const chunks = Array.isArray(source.chunks) ? source.chunks : [];
+  return {
+    source_kind: source.source_kind === "pdf" ? "pdf" : String(source.source_kind || "pdf"),
+    source_reference: String(source.source_reference || ""),
+    extraction_basis: ["embedded_text", "ocr", "mixed", "manual", "unknown"].includes(source.extraction_basis)
+      ? source.extraction_basis
+      : "unknown",
+    status: ["prepared", "in_progress", "complete"].includes(source.status) ? source.status : "prepared",
+    chunks: chunks.map((chunk, index) => ({
+      chunk_id: String(chunk?.chunk_id || `chunk-${Number(chunk?.index) || index + 1}`),
+      index: Math.max(1, Number(chunk?.index) || index + 1),
+      print_page_from: String(chunk?.print_page_from || ""),
+      print_page_to: String(chunk?.print_page_to || ""),
+      continues_previous: chunk?.continues_previous === true,
+      continues_next: chunk?.continues_next === true,
+      content_hash: String(chunk?.content_hash || ""),
+      imported_at: String(chunk?.imported_at || ""),
+    })).sort((left, right) => left.index - right.index),
+    notes: Array.isArray(source.notes) ? source.notes.map(String) : [],
+    uncertain_passages: Array.isArray(source.uncertain_passages)
+      ? source.uncertain_passages.filter((entry) => entry && typeof entry === "object").map((entry) => ({ ...entry }))
+      : [],
   };
 }
 
@@ -721,6 +792,9 @@ function normalizeProject(project) {
       ...(project?.chapterRoles || {}),
     },
   };
+  if (project?.metadata?.transcription || normalized.metadata.transcription) {
+    normalized.metadata.transcription = normalizeTranscriptionMetadata(normalized.metadata.transcription);
+  }
   normalized.id = String(normalized.id || createId("typemap-project"));
   normalized.title = String(normalized.title || "Unbenanntes Dokument");
   normalized.source.rawText = removeLegacyCitationHeading(String(normalized.source.rawText || ""));
@@ -1306,7 +1380,7 @@ function appendTextNode(parent, text, options = {}) {
 
 function appendInlineMarkdown(parent, text, options = {}) {
   text = stripOriginalPageMarkers(text);
-  const pattern = /(`[^`\n]+`|==[^=\n]+==|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[[^\]]+\]\([^)]+\))/g;
+  const pattern = /(`[^`\n]+`|==[^=\n]+==|\*\*[^*]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|\[\^[^\]\n]+\]|\[[^\]]+\]\([^)]+\))/g;
   let cursor = 0;
   String(text).replace(pattern, (match, _token, offset) => {
     if (offset > cursor) appendTextNode(parent, text.slice(cursor, offset), options);
@@ -1329,6 +1403,11 @@ function appendInlineMarkdown(parent, text, options = {}) {
     } else if (match.startsWith("_")) {
       node = document.createElement("em");
       appendTextNode(node, match.slice(1, -1), options);
+    } else if (match.startsWith("[^")) {
+      node = document.createElement("sup");
+      node.className = "preview-footnote-reference";
+      node.textContent = match.slice(2, -1);
+      node.setAttribute("aria-label", `Fußnote ${match.slice(2, -1)}`);
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       node = document.createElement("a");
@@ -1380,6 +1459,18 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     }
     object.appendChild(citationText);
     return object;
+  }
+  const footnoteDefinition = getFootnoteDefinition(text);
+  if (footnoteDefinition) {
+    const footnote = document.createElement("aside");
+    footnote.className = "preview-footnote-definition";
+    const label = document.createElement("sup");
+    label.className = "preview-footnote-definition-label";
+    label.textContent = footnoteDefinition.label;
+    const content = document.createElement("span");
+    appendInlineMarkdown(content, footnoteDefinition.content);
+    footnote.append(label, content);
+    return footnote;
   }
   if (textType === "lyric" && !text.trim()) {
     const blankLine = document.createElement("p");
@@ -1931,6 +2022,31 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;");
 }
 
+function appendOriginalPageMarkerCapsules(line, sourceOffset) {
+  findOriginalPageMarkers(line).forEach((marker) => {
+    const capsule = document.createElement("span");
+    capsule.className = "markdown-editor-object markdown-editor-inline-object";
+    capsule.dataset.inlineObject = "true";
+    capsule.dataset.sourceStart = String(sourceOffset + marker.start);
+    capsule.dataset.sourceEnd = String(sourceOffset + marker.end);
+    capsule.dataset.pageLabel = marker.label;
+    capsule.textContent = marker.raw;
+    ui.textInputHighlight.appendChild(capsule);
+  });
+}
+
+function appendFootnoteReferenceCapsules(line, sourceOffset) {
+  findFootnoteReferences(line).forEach((reference) => {
+    const capsule = document.createElement("span");
+    capsule.className = "markdown-editor-object markdown-editor-inline-object markdown-editor-footnote-reference";
+    capsule.dataset.inlineObject = "true";
+    capsule.dataset.sourceStart = String(sourceOffset + reference.start);
+    capsule.dataset.sourceEnd = String(sourceOffset + reference.end);
+    capsule.textContent = reference.raw;
+    ui.textInputHighlight.appendChild(capsule);
+  });
+}
+
 function renderEditorHighlight(rawText, project = getActiveProject()) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
@@ -1944,8 +2060,11 @@ function renderEditorHighlight(rawText, project = getActiveProject()) {
   let sourceOffset = 0;
   text.split("\n").forEach((rawLine) => {
     const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
+    const footnoteDefinition = getFootnoteDefinition(line);
+    appendOriginalPageMarkerCapsules(line, sourceOffset);
+    if (!footnoteDefinition) appendFootnoteReferenceCapsules(line, sourceOffset);
     let className = "";
-    if (isTableOfContentsText(line) || isCitationObjectText(line) || isOriginalPageMarker(line)) {
+    if (isTableOfContentsText(line) || isCitationObjectText(line) || footnoteDefinition) {
       className = "markdown-editor-object";
     } else if (isParatextMarker(line)) {
       className = "markdown-editor-paratext";
@@ -2011,11 +2130,22 @@ function getEditorLineAtSelection() {
   };
 }
 
-function openOriginalPageInfo(event) {
-  const line = getEditorLineAtSelection();
-  if (!line || !isOriginalPageMarker(line.text)) return false;
+function getOriginalPageMarkerAtEditorSelection() {
+  if (!ui.textInput) return null;
+  const text = ui.textInput.value;
+  const selectionStart = Math.max(0, Math.min(ui.textInput.selectionStart || 0, text.length));
+  const selectionEnd = Math.max(selectionStart, Math.min(ui.textInput.selectionEnd || selectionStart, text.length));
+  return findOriginalPageMarkers(text).find((marker) => (
+    marker.start <= selectionStart && marker.end >= selectionStart
+  ) || (
+    selectionEnd > selectionStart && marker.start < selectionEnd && marker.end > selectionStart
+  )) || null;
+}
 
-  const pageLabel = line.text.trim().slice(1, -1);
+function openOriginalPageInfo(event) {
+  const marker = getOriginalPageMarkerAtEditorSelection();
+  if (!marker) return false;
+
   event.preventDefault();
   closeChapterRoleMenu();
   closeOriginalPageInfo();
@@ -2029,7 +2159,7 @@ function openOriginalPageInfo(event) {
   const label = document.createElement("span");
   label.textContent = "Originalpaginierung";
   const message = document.createElement("strong");
-  message.textContent = `Seite ${pageLabel} der Originalausgabe.`;
+  message.textContent = `Seite ${marker.label} der Originalausgabe.`;
   info.append(label, message);
   document.body.appendChild(info);
   return true;
@@ -2177,6 +2307,49 @@ function syncEditorHighlightScroll() {
   measurement.style.width = `${textareaRect.width}px`;
   measurement.wrap = textarea.wrap || "soft";
 
+  let inlineMeasurement = state.editorInlineMeasurement;
+  if (!inlineMeasurement) {
+    inlineMeasurement = document.createElement("div");
+    inlineMeasurement.setAttribute("aria-hidden", "true");
+    Object.assign(inlineMeasurement.style, {
+      position: "fixed",
+      left: "-100000px",
+      top: "0",
+      height: "auto",
+      overflow: "hidden",
+      visibility: "hidden",
+      pointerEvents: "none",
+      border: "0",
+      margin: "0",
+    });
+    document.body.appendChild(inlineMeasurement);
+    state.editorInlineMeasurement = inlineMeasurement;
+  }
+  [
+    "padding",
+    "font",
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "fontStyle",
+    "fontStretch",
+    "lineHeight",
+    "letterSpacing",
+    "wordSpacing",
+    "textAlign",
+    "textIndent",
+    "textTransform",
+    "whiteSpace",
+    "overflowWrap",
+    "wordBreak",
+    "tabSize",
+    "direction",
+    "boxSizing",
+  ].forEach((property) => {
+    inlineMeasurement.style[property] = style[property];
+  });
+  inlineMeasurement.style.width = `${layoutWidth}px`;
+
   const paddingTop = Number.parseFloat(style.paddingTop) || 0;
   const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
   const paddingRight = Number.parseFloat(style.paddingRight) || 0;
@@ -2185,6 +2358,19 @@ function syncEditorHighlightScroll() {
   const emptyScrollHeight = measurement.scrollHeight;
   highlight.querySelectorAll("[data-source-start]").forEach((capsule) => {
     const start = Number(capsule.dataset.sourceStart) || 0;
+    if (capsule.dataset.inlineObject === "true") {
+      clearElement(inlineMeasurement);
+      inlineMeasurement.appendChild(document.createTextNode(sourceText.slice(0, start)));
+      const markerProbe = document.createElement("span");
+      markerProbe.textContent = capsule.textContent;
+      markerProbe.style.font = "inherit";
+      markerProbe.style.whiteSpace = "pre";
+      inlineMeasurement.appendChild(markerProbe);
+      capsule.style.top = `${markerProbe.offsetTop}px`;
+      capsule.style.left = `${markerProbe.offsetLeft}px`;
+      capsule.style.maxWidth = "none";
+      return;
+    }
     measurement.value = sourceText.slice(0, start);
     const lineTop = paddingTop + Math.max(0, measurement.scrollHeight - emptyScrollHeight);
     capsule.style.top = `${lineTop}px`;
@@ -3280,8 +3466,9 @@ function addProject(title = "Neues Dokument") {
   scheduleAutosave();
 }
 
-function addGeneratedProject(jsonText) {
-  const sourceProject = getProjectFromGeneratedPayload(parseGeneratedJson(jsonText));
+function addGeneratedProject(jsonInput) {
+  const payload = typeof jsonInput === "string" ? parseGeneratedJson(jsonInput) : jsonInput;
+  const sourceProject = getProjectFromGeneratedPayload(payload);
   const now = new Date().toISOString();
   const project = normalizeProject({
     ...sourceProject,
@@ -3307,7 +3494,50 @@ function addGeneratedProject(jsonText) {
 function setGenerateDialogOpen(isOpen) {
   if (ui.generateDialogOverlay) ui.generateDialogOverlay.hidden = !isOpen;
   if (ui.generateDialog) ui.generateDialog.hidden = !isOpen;
-  if (isOpen) window.setTimeout(() => ui.generateSourceUrlInput?.focus(), 0);
+  if (isOpen) {
+    setGenerateSourceMode(state.generateSourceMode, { resetPrompt: false });
+    const target = state.generateSourceMode === "pdf" ? ui.generatePdfSourceInput : ui.generateSourceUrlInput;
+    window.setTimeout(() => target?.focus(), 0);
+  }
+}
+
+function setGenerateSourceMode(mode, options = {}) {
+  state.generateSourceMode = mode === "pdf" ? "pdf" : "web";
+  const isPdf = state.generateSourceMode === "pdf";
+  ui.generateWebTab?.classList.toggle("is-active", !isPdf);
+  ui.generatePdfTab?.classList.toggle("is-active", isPdf);
+  ui.generateWebTab?.setAttribute("aria-selected", String(!isPdf));
+  ui.generatePdfTab?.setAttribute("aria-selected", String(isPdf));
+  if (ui.generateWebTab) ui.generateWebTab.tabIndex = isPdf ? -1 : 0;
+  if (ui.generatePdfTab) ui.generatePdfTab.tabIndex = isPdf ? 0 : -1;
+  if (ui.generateWebPanel) ui.generateWebPanel.hidden = isPdf;
+  if (ui.generatePdfPanel) ui.generatePdfPanel.hidden = !isPdf;
+  if (isPdf) updatePdfGenerationControls({ resetChunkIndex: options.resetPrompt !== false });
+  if (options.resetPrompt !== false) {
+    if (ui.generatePromptOutput) ui.generatePromptOutput.value = "";
+    if (ui.copyGeneratePromptButton) ui.copyGeneratePromptButton.disabled = true;
+    setGenerateDialogStatus("");
+  }
+}
+
+function updatePdfGenerationControls(options = {}) {
+  const isChunk = ui.generatePdfTaskInput?.value === "chunk";
+  if (ui.generatePdfChunkFields) ui.generatePdfChunkFields.hidden = !isChunk;
+  if (!isChunk) return;
+  const project = getActiveProject();
+  const transcription = getProjectTranscription(project);
+  const isPdfProject = transcription?.source_kind === "pdf";
+  if (ui.generatePdfTargetSummary) {
+    ui.generatePdfTargetSummary.textContent = isPdfProject
+      ? `Zieldokument: ${project.title} · ${project.id} · ${transcription.chunks.length} Abschnitt(e) importiert`
+      : "Kein PDF-Grunddokument geöffnet. Importieren Sie zuerst das JSON aus dem Arbeitsgang „Grunddokument analysieren und anlegen“.";
+  }
+  if (isPdfProject && options.resetChunkIndex !== false && ui.generatePdfChunkIndexInput) {
+    ui.generatePdfChunkIndexInput.value = String(getNextTranscriptionChunkIndex(project));
+  }
+  if (isPdfProject && !ui.generatePdfSourceInput?.value && transcription.source_reference) {
+    ui.generatePdfSourceInput.value = transcription.source_reference;
+  }
 }
 
 function setGenerateDialogStatus(message = "", isError = false) {
@@ -3343,12 +3573,13 @@ AUFGABE
 TYPEMAP-MARKDOWN IN source.rawText
 - Die erste Zeile ist genau eine H1: "# Titel". Sie muss mit dem Feld title übereinstimmen.
 - Gliedere echte Zwischenüberschriften hierarchisch mit ## bis #######. Erzeuge keine neuen Überschriften.
-- Trenne Absätze durch eine Leerzeile.
+- Trenne jeden Absatz durch genau eine Leerzeile. Schreibe niemals zwei selbständige Absätze ohne freie Markdown-Zeile unmittelbar untereinander.
 - Verwende __fett__, _kursiv_, ==markiert==, > Zitat, - Listenpunkt, 1. nummerierter Punkt, übliche Markdown-Tabellen und dreifache Backticks für Code.
+- Verwende für Fußnoten ausschließlich Standard-Markdown: [^1] als Verweis und [^1]: Inhalt der Fußnote als Definition. Setze die Definition nach einer Leerzeile unmittelbar hinter den Absatz, in dem der Verweis vorkommt, und danach wieder eine Leerzeile.
 - Ein Inhaltsverzeichnis wird nur bei Bedarf mit {{toc}} markiert.
 - Sichtbare Originalpaginierung wird an ihrer Textposition ausschließlich als [12] beziehungsweise [iv] notiert; niemals als [p. 12]. Füge keine Seitenzahlen hinzu, die auf der Webseite nicht belegt sind.
 - Vorder- oder Nachtexte können mit ::: front beziehungsweise ::: back beginnen und mit ::: beendet werden. Nutze diese Marker nur, wenn die Quelle diese Bereiche tatsächlich besitzt.
-- Behalte relevante Bildunterschriften und Fußnoten als Text bei. Erfinde keine Bild-URLs oder fehlenden Inhalte.
+- Behalte relevante Bildunterschriften und Fußnoten vollständig bei. Erfinde keine Bild-URLs oder fehlenden Inhalte.
 
 BIBLIOGRAFISCHE REGELN
 - source_type ist einer dieser Werte: book, book_chapter, journal_article, newspaper_article, webpage, blog_post, report, legal_text, court_decision, manuscript, letter, email, other.
@@ -3369,6 +3600,184 @@ EXAKTE JSON-GRUNDFORM
 ${JSON.stringify(template, null, 2)}`;
 }
 
+function buildPdfTranscriptionPrompt(sourceReference = "") {
+  const reference = String(sourceReference || "").trim();
+  const sourceLabel = reference || "die zusammen mit diesem Prompt bereitgestellte PDF-Datei";
+  const sourceUrl = isPlausibleHttpUrl(reference) && reference ? reference : "";
+  const template = createDefaultProject("Titel der Quelle");
+  template.id = "";
+  template.createdAt = "";
+  template.updatedAt = "";
+  template.source.rawText = "# Titel der Quelle\n";
+  template.metadata.transcription = {
+    source_kind: "pdf",
+    source_reference: reference,
+    extraction_basis: "unknown",
+    status: "prepared",
+    chunks: [],
+    notes: [],
+    uncertain_passages: [],
+  };
+  template.citationSource = {
+    ...createDefaultCitationSource("Titel der Quelle"),
+    source_type: "other",
+    url: sourceUrl,
+    accessed_date: sourceUrl ? new Date().toISOString().slice(0, 10) : "",
+  };
+
+  return `Du bereitest eine PDF-Quelle für die Anwendung TypeMap auf.
+
+Quelle: ${sourceLabel}
+
+ZIEL DIESES ERSTEN ARBEITSGANGS
+Analysiere das Gesamtwerk und erstelle sein TypeMap-Grunddokument mit stabilen bibliografischen Angaben, Dokumentstruktur und Transkriptionsprotokoll. Transkribiere in diesem Arbeitsgang noch nicht den vollständigen Haupttext. source.rawText enthält nur die H1 des Werktitels und gegebenenfalls eindeutig abgrenzbare, kurze Angaben, die zum Dokumentkopf gehören. Der Haupttext wird anschließend in nummerierten Transkriptionsabschnitten ergänzt.
+
+ARBEITSWEISE
+1. Untersuche zuerst, ob das PDF born-digital ist, eine eingebettete Textebene besitzt oder aus Scans mit OCR besteht. Trage das Ergebnis unter metadata.transcription.extraction_basis als "embedded_text", "ocr", "mixed", "manual" oder "unknown" ein.
+2. Ermittle die erkennbare Gesamtgliederung, Druckpaginierung und Lesereihenfolge. Beachte mehrspaltigen Satz, Textkästen, Marginalien, Fußnoten, Tabellen, Bildunterschriften sowie Vorder- und Nachtexte. Halte relevante Besonderheiten knapp unter metadata.transcription.notes fest.
+3. Entferne technische Artefakte: zufällige PDF-Zeilenumbrüche, wiederholte Zeichen, Scanrauschen, unmotivierte Leerzeichen, OCR-Steuerzeichen sowie wiederkehrende Kolumnentitel, Kopf- und Fußzeilen. Inhaltlich bedeutsame Kopftexte bleiben erhalten.
+4. Prüfe semantische und grammatische Unstimmigkeiten darauf, ob sie durch eine Fehlinterpretation der grafischen Seite entstanden sind. Korrigiere ausschließlich eindeutige Erkennungsfehler anhand des sichtbaren Originals.
+5. Modernisiere oder verbessere niemals historische Orthografie, Grammatik, Zeichensetzung, Stil, sachliche Aussagen oder ungewöhnliche Formulierungen des Originals.
+6. Löse Trennstriche am Zeilen- oder Seitenende nur auf, wenn sie nachweislich durch den Drucksatz entstanden sind. Echte Bindestriche und zusammengesetzte Schreibungen bleiben erhalten.
+7. Prüfe besonders Ligaturen, Lang-s, beschädigte Lettern und typische OCR-Verwechslungen wie rn/m, l/I/1, O/0, c/e sowie Satzzeichen. Entscheide stets anhand von Bild und Kontext.
+8. Erfinde keine unlesbaren Zeichen oder fehlenden Passagen. Kennzeichne unleserliche Stellen im Text als ⟦unleserlich⟧ und unsichere Lesarten als ⟦unklar: vermutete Lesart⟧. Erfasse diese zusätzlich unter metadata.transcription.uncertain_passages.
+9. Lasse bei der späteren Transkription keine Passage aus, nur weil sie doppelt, ungewöhnlich, widersprüchlich oder mutmaßlich fehlerhaft wirkt.
+10. Gib ausschließlich ein gültiges JSON-Objekt aus: kein Markdown-Codezaun, keine Einleitung und keine Erläuterung.
+
+DRUCKPAGINIERUNG
+- Maßgeblich sind ausschließlich die im gedruckten Werk sichtbaren Seitenzahlen, niemals die Seitenzahl des PDF-Viewers, die Scanblattnummer oder die Position innerhalb der Datei.
+- Setze am Beginn jeder nachweisbar paginierten Druckseite einen TypeMap-Marker: [12] für arabische beziehungsweise [iv] für römische Seitenzahlen. Verwende niemals [p. 12].
+- Liegt der Seitenwechsel mitten im Satz oder Wortlaut, steht der Marker exakt an dieser Stelle innerhalb des Absatzes. Verschiebe ihn nicht in eine eigene Zeile.
+- Römisch paginierte Vorder- oder Nachtexte behalten ihre römischen Seitenzahlen.
+- Erfinde keine Seitenzahl für unpaginierte, abgeschnittene oder nicht sicher lesbare Seiten. Aus einer bloßen Zahlenfolge darf keine unsichtbare Seitenzahl ergänzt werden.
+- Gedruckte Seitenzahlen selbst werden nicht zusätzlich als normaler Text transkribiert; der TypeMap-Marker repräsentiert sie.
+
+TYPEMAP-MARKDOWN IN source.rawText
+- Die erste Zeile ist genau eine H1: "# Titel". Sie muss mit citationSource.title übereinstimmen.
+- Übernimm echte Überschriften hierarchisch mit ## bis #######. Erzeuge keine neuen Überschriften und leite keine Gliederung allein aus Schriftgröße ab.
+- Rekonstruiere Absätze nach Inhalt und Satzbild, nicht nach den technischen Zeilenumbrüchen der Textebene. Trenne jeden Absatz durch genau eine Leerzeile.
+- Verwende __fett__, _kursiv_, ==markiert==, > Zitat, - Listenpunkt, 1. nummerierter Punkt, übliche Markdown-Tabellen und dreifache Backticks für tatsächlichen Code.
+- Bewahre Hervorhebungen, Zitate, Listen und Tabellen. Verwende für Fußnoten ausschließlich Standard-Markdown: [^1] als Verweis und [^1]: Inhalt der Fußnote als Definition.
+- Setze jede Fußnotendefinition nach einer Leerzeile unmittelbar hinter den Absatz, in dem ihr Verweis vorkommt. Nach der Definition folgt wieder eine Leerzeile. Vermische den Fußnotentext nicht mit dem Hauptabsatz.
+- Übernimm relevante Bildunterschriften. Beschreibe Abbildungen nicht aus eigener Interpretation und erfinde keine Bild-URLs.
+- Vorder- oder Nachtexte können mit ::: front beziehungsweise ::: back beginnen und mit ::: beendet werden. Nutze diese Marker nur bei tatsächlich erkennbaren Bereichen.
+- Ein Inhaltsverzeichnis wird nur dann mit {{toc}} markiert, wenn es im erzeugten TypeMap-Dokument ausdrücklich eingebunden werden soll.
+
+BIBLIOGRAFISCHE REGELN
+- Ermittle bibliografische Angaben vorrangig aus Titelblatt, Impressum und dem Werk selbst. Dateiname und PDF-Metadaten sind nur Hilfsquellen und müssen am sichtbaren Dokument überprüft werden.
+- source_type ist einer dieser Werte: book, book_chapter, journal_article, newspaper_article, webpage, blog_post, report, legal_text, court_decision, manuscript, letter, email, other.
+- title ist Pflicht. subtitle enthält nur einen ausdrücklich ausgewiesenen Untertitel.
+- authors enthält Personen als "NACHNAME, Vorname; NACHNAME, Vorname". institutional_author bezeichnet eine tatsächlich als Urheber verantwortliche Organisation; news_agencies enthält nur ausdrücklich genannte Agenturcredits.
+- Erfasse Herausgeber, Mitwirkende, Übersetzer, Originaltitel, Originalsprache, Verlag, Erscheinungsort, Ausgabe, Band, Heft, Seitenbereich, DOI und URL nur, wenn sie im Werk oder einer verlässlichen Fundstelle belegt sind.
+- issued_date verwendet nach Möglichkeit YYYY-MM-DD; issued_year nur das vierstellige Erscheinungsjahr. Erfinde keine Datumsangaben.
+- text_version ist "translation" nur bei einer erkennbaren Übersetzung. Dann original_title, original_language und translators ausfüllen; andernfalls "original".
+- citation_style bleibt "Hausstil"; short_citation und full_citation bleiben leer, da TypeMap sie berechnet.
+- Setze metadata.textKind für wissenschaftliche Werke auf "paper", für redaktionelle Artikel und Berichte auf "report" und für universelle Transkriptionen auf "notebook".
+- Behalte die vorgegebenen Darstellungswerte unter style, typography, paratextVisibility, chapterRoles und tocVisible unverändert. Verwende leere id-/Zeitfelder; TypeMap vergibt diese lokal.
+
+TRANSKRIPTIONSPROTOKOLL
+- metadata.transcription.notes enthält nur knappe Hinweise zu relevanten technischen Besonderheiten, ausgelassenen nichttextlichen Bestandteilen oder begründeten Eingriffen.
+- metadata.transcription.uncertain_passages enthält für jede echte Unsicherheit ein Objekt mit "page", "reading" und "reason". Verwende die gedruckte Seitenangabe, soweit vorhanden.
+- Das Protokoll ersetzt keine Textpassage und darf keine stillen Korrekturen rechtfertigen.
+
+EXAKTE JSON-GRUNDFORM
+${JSON.stringify(template, null, 2)}`;
+}
+
+function getProjectTranscription(project) {
+  return project?.metadata?.transcription
+    ? normalizeTranscriptionMetadata(project.metadata.transcription)
+    : null;
+}
+
+function getNextTranscriptionChunkIndex(project) {
+  const chunks = getProjectTranscription(project)?.chunks || [];
+  return chunks.length ? Math.max(...chunks.map((chunk) => chunk.index)) + 1 : 1;
+}
+
+function buildPdfChunkPrompt(project, options = {}) {
+  const transcription = getProjectTranscription(project);
+  if (!project || transcription?.source_kind !== "pdf") throw new Error("missing-pdf-project");
+  const expectedIndex = getNextTranscriptionChunkIndex(project);
+  const chunkIndex = Math.max(1, Number(options.chunkIndex) || expectedIndex);
+  if (chunkIndex !== expectedIndex) throw new Error("chunk-index-gap");
+  const pageFrom = String(options.pageFrom || "").trim();
+  const pageTo = String(options.pageTo || "").trim();
+  const parsedPageFrom = parsePrintedPageLabel(pageFrom);
+  const parsedPageTo = parsePrintedPageLabel(pageTo);
+  if ((pageFrom && !parsedPageFrom) || (pageTo && !parsedPageTo)) throw new Error("invalid-page-label");
+  if (parsedPageFrom && parsedPageTo && parsedPageFrom.scheme === parsedPageTo.scheme && parsedPageTo.value < parsedPageFrom.value) {
+    throw new Error("invalid-page-range");
+  }
+  const sourceReference = String(options.sourceReference || transcription.source_reference || "bereitgestellte PDF-Datei").trim();
+  const previousChunk = transcription.chunks.find((chunk) => chunk.index === chunkIndex - 1) || null;
+  const previousTail = String(project.source?.rawText || "").slice(-1400);
+  const chunkTemplate = {
+    type: "typemap-transcription-chunk",
+    version: 1,
+    document_id: project.id,
+    chunk_id: `${project.id}-chunk-${chunkIndex}`,
+    chunk_index: chunkIndex,
+    print_page_from: pageFrom,
+    print_page_to: pageTo,
+    continues_previous: previousChunk?.continues_next === true,
+    continues_next: false,
+    source_raw_markdown: "",
+    transcription_notes: [],
+    uncertain_passages: [],
+  };
+
+  return `Du transkribierst einen nummerierten Abschnitt einer PDF-Quelle für TypeMap.
+
+Quelle: ${sourceReference}
+Zieldokument: ${project.title}
+Stabile Dokument-ID: ${project.id}
+Abschnittsnummer: ${chunkIndex}
+Vorgesehener Druckseitenbereich: ${pageFrom || "nicht vorgegeben"} bis ${pageTo || "nicht vorgegeben"}
+
+AUFGABE
+1. Transkribiere ausschließlich den angegebenen Abschnitt vollständig und werkgetreu. Nutze die eingebettete Textebene oder OCR nur als Ausgangspunkt und prüfe jedes Ergebnis gegen die sichtbaren PDF-Seiten.
+2. Rekonstruiere Lesereihenfolge, Absätze, Spalten, Fußnoten, Marginalien, Tabellen und Bildunterschriften. Entferne Scanrauschen, wiederkehrende Kolumnentitel sowie technische Kopf- und Fußzeilen.
+3. Korrigiere nur eindeutige OCR-Fehler. Historische Orthografie, Grammatik, Zeichensetzung, Stil, sachliche Fehler und ungewöhnliche Formulierungen bleiben unverändert.
+4. Löse druckbedingte Zeilen- und Seitentrennungen nur bei eindeutiger Wortkontinuität auf. Echte Bindestriche bleiben erhalten.
+5. Prüfe Ligaturen, Lang-s und typische Verwechslungen wie rn/m, l/I/1, O/0 und c/e anhand von Bild und Kontext.
+6. Erfinde nichts. Verwende ⟦unleserlich⟧ beziehungsweise ⟦unklar: vermutete Lesart⟧ und protokolliere diese Stellen zusätzlich unter uncertain_passages.
+7. Gib ausschließlich das unten beschriebene gültige JSON-Objekt aus. Gib weder das vollständige TypeMap-Dokument noch Markdown-Codezäune oder Erläuterungen außerhalb des JSON aus.
+
+ANSCHLUSS UND VOLLSTÄNDIGKEIT
+- source_raw_markdown enthält nur das neue Markdown-Fragment, niemals die H1 des Gesamtwerks und niemals bereits importierten Text.
+- Vergleiche den Beginn mit dem unten angegebenen Ende des vorhandenen TypeMap-Texts. Wiederhole keine Passage und lasse am Übergang nichts aus.
+- Setze continues_previous genau dann auf true, wenn der erste Satz, das erste Wort oder eine strukturelle Einheit bereits im vorherigen Abschnitt begonnen hat.
+- Setze continues_next genau dann auf true, wenn der letzte Satz, das letzte Wort, eine Fußnote oder eine andere Einheit auf der folgenden Seite fortgesetzt wird.
+- Beginnt der Abschnitt nicht als unmittelbare Fortsetzung, beginnt source_raw_markdown mit einem neuen Absatz oder Strukturelement. TypeMap fügt dann automatisch eine Leerzeile ein.
+
+ENDE DES BEREITS IMPORTIERTEN TEXTES
+---
+${previousTail || "Noch kein Haupttext importiert."}
+---
+
+DRUCKPAGINIERUNG
+- Verwende ausschließlich sichtbare Seitenzahlen der Druckausgabe: [12] oder [iv], niemals PDF-Seitenzahlen und niemals [p. 12].
+- Setze den Marker am exakten Beginn des Inhalts der betreffenden Druckseite. Bei einem Seitenwechsel mitten im Satz bleibt er inline an dieser Position.
+- Erfinde keine fehlenden oder unlesbaren Druckseitenzahlen. Gedruckte Seitenzahlen werden nicht zusätzlich als normaler Text wiederholt.
+
+MARKDOWNREGELN
+- Trenne jeden Absatz durch genau eine Leerzeile.
+- Verwende echte Überschriften mit ## bis #######; keine H1 im Abschnitt.
+- Bewahre __fett__, _kursiv_, ==markiert==, Zitate, Listen, Tabellen und Code nur entsprechend der Vorlage.
+- Fußnoten verwenden ausschließlich [^1] als Verweis und [^1]: Inhalt als Definition. Die Definition folgt nach einer Leerzeile unmittelbar auf den zugehörigen Absatz; danach folgt wieder eine Leerzeile.
+- Vermische Fußnotentext nicht mit dem Hauptabsatz. Erhalte Bildunterschriften, ohne Bildinhalte zu erfinden.
+
+SEITENBEREICH UND PROTOKOLL
+- print_page_from und print_page_to enthalten die erste und letzte tatsächlich transkribierte sichtbare Druckseite. Verwende leere Zeichenfolgen, wenn der Abschnitt unpaginiert ist.
+- transcription_notes enthält nur abschnittsspezifische technische Hinweise.
+- uncertain_passages enthält Objekte mit "page", "reading" und "reason".
+- Ändere document_id, chunk_id und chunk_index nicht.
+
+EXAKTES AUSGABEFORMAT
+${JSON.stringify(chunkTemplate, null, 2)}`;
+}
+
 function parseGeneratedJson(text) {
   let candidate = String(text || "").trim();
   candidate = candidate.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -3387,6 +3796,142 @@ function getProjectFromGeneratedPayload(payload) {
   if (Array.isArray(payload?.state?.projects) && payload.state.projects[0]) return payload.state.projects[0];
   if (Array.isArray(payload?.projects) && payload.projects[0]) return payload.projects[0];
   throw new Error("missing-project");
+}
+
+function isTranscriptionChunkPayload(payload) {
+  return payload?.type === "typemap-transcription-chunk";
+}
+
+function hashTranscriptionContent(value) {
+  let hash = 2166136261;
+  for (const character of String(value || "")) {
+    hash ^= character.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function parsePrintedPageLabel(value) {
+  const label = String(value || "").trim().toLowerCase();
+  if (!label) return null;
+  if (/^\d+$/.test(label)) return { label, scheme: "arabic", value: Number(label) };
+  if (!isOriginalPageMarker(`[${label}]`)) return null;
+  const romanValues = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+  let total = 0;
+  let previous = 0;
+  for (let index = label.length - 1; index >= 0; index -= 1) {
+    const current = romanValues[label[index]] || 0;
+    total += current < previous ? -current : current;
+    previous = Math.max(previous, current);
+  }
+  return { label, scheme: "roman", value: total };
+}
+
+function normalizeTranscriptionChunk(payload) {
+  const fragment = String(payload?.source_raw_markdown || "").replace(/^\n+/, "").trimEnd();
+  const chunkIndex = Number(payload?.chunk_index);
+  if (!Number.isInteger(chunkIndex) || chunkIndex < 1) throw new Error("invalid-chunk-index");
+  if (!fragment) throw new Error("empty-chunk");
+  if (/^#\s+/m.test(fragment)) throw new Error("chunk-has-title");
+  return {
+    type: "typemap-transcription-chunk",
+    version: 1,
+    document_id: String(payload?.document_id || ""),
+    chunk_id: String(payload?.chunk_id || `chunk-${chunkIndex}`),
+    chunk_index: chunkIndex,
+    print_page_from: String(payload?.print_page_from || "").trim(),
+    print_page_to: String(payload?.print_page_to || "").trim(),
+    continues_previous: payload?.continues_previous === true,
+    continues_next: payload?.continues_next === true,
+    source_raw_markdown: fragment,
+    transcription_notes: Array.isArray(payload?.transcription_notes) ? payload.transcription_notes.map(String) : [],
+    uncertain_passages: Array.isArray(payload?.uncertain_passages)
+      ? payload.uncertain_passages.filter((entry) => entry && typeof entry === "object").map((entry) => ({ ...entry }))
+      : [],
+  };
+}
+
+function appendTranscriptionChunk(payload) {
+  const project = getActiveProject();
+  const transcription = getProjectTranscription(project);
+  if (!project || transcription?.source_kind !== "pdf") throw new Error("missing-pdf-project");
+  const chunk = normalizeTranscriptionChunk(payload);
+  if (chunk.document_id !== project.id) throw new Error("chunk-document-mismatch");
+  const chunkPageFrom = parsePrintedPageLabel(chunk.print_page_from);
+  const chunkPageTo = parsePrintedPageLabel(chunk.print_page_to);
+  if ((chunk.print_page_from && !chunkPageFrom) || (chunk.print_page_to && !chunkPageTo)) throw new Error("invalid-page-label");
+  if (chunkPageFrom && chunkPageTo && chunkPageFrom.scheme === chunkPageTo.scheme && chunkPageTo.value < chunkPageFrom.value) {
+    throw new Error("invalid-page-range");
+  }
+
+  const expectedIndex = getNextTranscriptionChunkIndex(project);
+  if (chunk.chunk_index !== expectedIndex) {
+    throw new Error(transcription.chunks.some((entry) => entry.index === chunk.chunk_index)
+      ? "duplicate-chunk-index"
+      : "chunk-index-gap");
+  }
+  if (transcription.chunks.some((entry) => entry.chunk_id === chunk.chunk_id)) throw new Error("duplicate-chunk-id");
+  const contentHash = hashTranscriptionContent(chunk.source_raw_markdown);
+  if (transcription.chunks.some((entry) => entry.content_hash === contentHash)) throw new Error("duplicate-chunk-content");
+
+  const previousChunk = transcription.chunks[transcription.chunks.length - 1] || null;
+  if (previousChunk && previousChunk.continues_next !== chunk.continues_previous) {
+    throw new Error("chunk-continuity-mismatch");
+  }
+  if (!previousChunk && chunk.continues_previous) throw new Error("chunk-continuity-mismatch");
+
+  const previousPage = parsePrintedPageLabel(previousChunk?.print_page_to);
+  const currentPage = chunkPageFrom;
+  if (previousPage && currentPage && previousPage.scheme === currentPage.scheme) {
+    if (currentPage.value <= previousPage.value) throw new Error("chunk-page-overlap");
+    if (currentPage.value > previousPage.value + 1) throw new Error("chunk-page-gap");
+  }
+
+  const existingText = String(project.source?.rawText || "").trimEnd();
+  const separator = existingText && !chunk.continues_previous ? "\n\n" : "";
+  project.source.rawText = `${existingText}${separator}${chunk.source_raw_markdown}\n`;
+  project.metadata.transcription = {
+    ...transcription,
+    status: "in_progress",
+    chunks: [...transcription.chunks, {
+      chunk_id: chunk.chunk_id,
+      index: chunk.chunk_index,
+      print_page_from: chunk.print_page_from,
+      print_page_to: chunk.print_page_to,
+      continues_previous: chunk.continues_previous,
+      continues_next: chunk.continues_next,
+      content_hash: contentHash,
+      imported_at: new Date().toISOString(),
+    }],
+    notes: [...transcription.notes, ...chunk.transcription_notes],
+    uncertain_passages: [...transcription.uncertain_passages, ...chunk.uncertain_passages],
+  };
+  markProjectChanged(project);
+  state.activeSourceRange = null;
+  state.editorDataView = "json";
+  renderApp();
+  scheduleAutosave();
+}
+
+function getGeneratedImportErrorMessage(error) {
+  const messages = {
+    "missing-pdf-project": "Öffnen Sie zuerst das zugehörige PDF-Grunddokument.",
+    "chunk-document-mismatch": "Der Abschnitt gehört nicht zum aktuell geöffneten Dokument.",
+    "invalid-chunk-index": "Die Abschnittsnummer im JSON ist ungültig.",
+    "duplicate-chunk-index": "Diese Abschnittsnummer wurde bereits importiert.",
+    "duplicate-chunk-id": "Diese Abschnitts-ID wurde bereits importiert.",
+    "duplicate-chunk-content": "Dieser Transkriptionsabschnitt wurde bereits importiert.",
+    "chunk-index-gap": "Die Abschnittsnummer schließt nicht unmittelbar an den letzten Import an.",
+    "chunk-page-overlap": "Der Druckseitenbereich überschneidet sich mit dem vorherigen Abschnitt.",
+    "chunk-page-gap": "Zwischen den Druckseitenbereichen wurde eine Lücke erkannt.",
+    "chunk-continuity-mismatch": "Die Angaben zur Fortsetzung passen nicht zum vorherigen Abschnitt.",
+    "empty-chunk": "Der Transkriptionsabschnitt enthält keinen Text.",
+    "chunk-has-title": "Ein Transkriptionsabschnitt darf keine neue H1-Dokumentüberschrift enthalten.",
+    "invalid-page-label": "Druckseiten müssen arabisch oder römisch angegeben werden, beispielsweise 21 oder iv.",
+    "invalid-page-range": "Die letzte Druckseite liegt vor der ersten Druckseite.",
+  };
+  return messages[error?.message]
+    || "Noch kein gültiger TypeMap-JSON-Code gefunden. Bitte kopieren Sie zunächst den von der KI erzeugten JSON-Code.";
 }
 
 function applyJsonEditorDraft() {
@@ -3707,6 +4252,9 @@ ${buildHtmlFontFaceCss(project)}
     .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${project.style.fontFamily}; font-synthesis-style: none; text-wrap: pretty;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     .preview-small-caps { font-size: inherit; font-variant-caps: small-caps; font-feature-settings: "smcp" 1; letter-spacing: .01em; text-transform: none; hyphens: inherit; -webkit-hyphens: inherit; overflow-wrap: inherit; word-break: normal; }
+    .preview-footnote-reference { margin-inline: .08em; color: #8f5d14; font-family: inherit; font-size: .72em; font-weight: 600; line-height: 0; vertical-align: super; }
+    .preview-footnote-definition { display: flex; align-items: baseline; gap: .48em; margin: .16em 0 .9em; padding-left: .9em; color: #66716c; font-family: inherit; font-size: .84em; font-style: normal; line-height: 1.38; white-space: pre-wrap; }
+    .preview-footnote-definition-label { flex: 0 0 auto; color: #8f5d14; font-family: inherit; font-size: .82em; font-weight: 600; line-height: 1; vertical-align: super; }
     .html-side-toc { position: sticky; top: 24px; display: grid; gap: 2px; max-height: calc(100vh - 80px); overflow: auto; color: #6b746f; font-family: "Source Sans 3", Arial, sans-serif; font-size: 11.5pt; line-height: 1.28; text-align: left; }
     .html-side-toc-title { margin-bottom: .55em; color: #8f5d14; font-size: 8.5pt; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
     .html-side-toc-item { display: block; min-height: 24px; padding: 3px 6px 3px calc(4px + var(--toc-level, 0) * 13px); border-radius: 6px; color: inherit; text-decoration: none; }
@@ -3873,6 +4421,8 @@ async function exportPng() {
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/\*([^*]+)\*/g, "$1")
       .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[\^([^\]]+)\]:\s*/g, "$1. ")
+      .replace(/\[\^([^\]]+)\]/g, "[$1]")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
   }
 
@@ -4345,7 +4895,44 @@ function bindEditor() {
   });
   ui.generateDialogOverlay?.addEventListener("click", () => setGenerateDialogOpen(false));
   ui.generateDialogCloseButton?.addEventListener("click", () => setGenerateDialogOpen(false));
+  ui.generateWebTab?.addEventListener("click", () => setGenerateSourceMode("web"));
+  ui.generatePdfTab?.addEventListener("click", () => setGenerateSourceMode("pdf"));
+  ui.generatePdfTaskInput?.addEventListener("change", () => {
+    updatePdfGenerationControls({ resetChunkIndex: true });
+    if (ui.generatePromptOutput) ui.generatePromptOutput.value = "";
+    if (ui.copyGeneratePromptButton) ui.copyGeneratePromptButton.disabled = true;
+    setGenerateDialogStatus("");
+  });
+  [ui.generateWebTab, ui.generatePdfTab].forEach((tab) => {
+    tab?.addEventListener("keydown", (event) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const nextMode = state.generateSourceMode === "web" ? "pdf" : "web";
+      setGenerateSourceMode(nextMode);
+      (nextMode === "pdf" ? ui.generatePdfTab : ui.generateWebTab)?.focus();
+    });
+  });
   ui.generatePromptButton?.addEventListener("click", () => {
+    if (state.generateSourceMode === "pdf") {
+      try {
+        const isChunk = ui.generatePdfTaskInput?.value === "chunk";
+        ui.generatePromptOutput.value = isChunk
+          ? buildPdfChunkPrompt(getActiveProject(), {
+            sourceReference: ui.generatePdfSourceInput?.value || "",
+            chunkIndex: ui.generatePdfChunkIndexInput?.value,
+            pageFrom: ui.generatePdfPageFromInput?.value,
+            pageTo: ui.generatePdfPageToInput?.value,
+          })
+          : buildPdfTranscriptionPrompt(ui.generatePdfSourceInput?.value || "");
+        ui.copyGeneratePromptButton.disabled = false;
+        setGenerateDialogStatus(isChunk
+          ? "Der Prompt für den nächsten Transkriptionsabschnitt ist bereit."
+          : "Der Prompt für das PDF-Grunddokument ist bereit.");
+      } catch (error) {
+        setGenerateDialogStatus(getGeneratedImportErrorMessage(error), true);
+      }
+      return;
+    }
     const url = ui.generateSourceUrlInput?.value.trim() || "";
     if (!url || !isPlausibleHttpUrl(url)) {
       setGenerateDialogStatus("Bitte eine vollständige URL mit http:// oder https:// eingeben.", true);
@@ -4369,13 +4956,12 @@ function bindEditor() {
       if (!navigator.clipboard?.readText) throw new Error("clipboard-unavailable");
       const jsonText = await navigator.clipboard.readText();
       if (!jsonText.trim()) throw new Error("empty-clipboard");
-      addGeneratedProject(jsonText);
+      const payload = parseGeneratedJson(jsonText);
+      if (isTranscriptionChunkPayload(payload)) appendTranscriptionChunk(payload);
+      else addGeneratedProject(payload);
       setGenerateDialogOpen(false);
     } catch (error) {
-      setGenerateDialogStatus(
-        "Noch kein gültiger TypeMap-JSON-Code gefunden. Bitte kopieren Sie zunächst den von der KI erzeugten JSON-Code.",
-        true,
-      );
+      setGenerateDialogStatus(getGeneratedImportErrorMessage(error), true);
     }
   });
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
