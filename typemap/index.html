@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260619cg">
+  <link rel="stylesheet" href="typemap.css?v=20260619ch">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -349,37 +349,30 @@
         </label>
       </section>
       <section id="generatePdfPanel" class="generate-source-panel" role="tabpanel" aria-labelledby="generatePdfTab" hidden>
-        <p class="event-description">Erzeuge einen Arbeitsauftrag für die werkgetreue Transkription einer PDF-Quelle. Stellen Sie der KI das PDF zusammen mit dem erzeugten Prompt bereit.</p>
-        <label class="generate-url-field">
-          <span>Arbeitsgang</span>
-          <select id="generatePdfTaskInput">
-            <option value="document">Grunddokument analysieren und anlegen</option>
-            <option value="chunk">Transkriptionsabschnitt erstellen</option>
-          </select>
-        </label>
-        <label class="generate-url-field">
-          <span>Bezeichnung oder URL der PDF-Quelle (optional)</span>
-          <input id="generatePdfSourceInput" type="text" autocomplete="off" placeholder="Dateiname, Werktitel oder https://…">
-        </label>
-        <div id="generatePdfChunkFields" class="generate-pdf-chunk-fields" hidden>
-          <p id="generatePdfTargetSummary" class="generate-pdf-target-summary"></p>
-          <div class="generate-pdf-range-grid">
-            <label class="generate-url-field">
-              <span>Abschnittsnummer</span>
-              <input id="generatePdfChunkIndexInput" type="number" min="1" step="1" inputmode="numeric" value="1">
-            </label>
-            <label class="generate-url-field">
-              <span>Erste Druckseite (optional)</span>
-              <input id="generatePdfPageFromInput" type="text" autocomplete="off" placeholder="z. B. iv oder 21">
-            </label>
-            <label class="generate-url-field">
-              <span>Letzte Druckseite (optional)</span>
-              <input id="generatePdfPageToInput" type="text" autocomplete="off" placeholder="z. B. xii oder 40">
-            </label>
-          </div>
+        <p class="event-description">Lassen Sie eine PDF-Quelle direkt durch ein KI-Modell transkribieren und als vollständiges TypeMap-JSON anlegen.</p>
+        <div class="generate-pdf-api-grid">
+          <label class="generate-url-field">
+            <span>API-Anbieter</span>
+            <select id="generatePdfProviderInput">
+              <option value="openai">OpenAI</option>
+            </select>
+          </label>
+          <label class="generate-url-field">
+            <span>Modell</span>
+            <input id="generatePdfModelInput" type="text" autocomplete="off" spellcheck="false" value="gpt-5.5">
+          </label>
         </div>
+        <label class="generate-url-field">
+          <span>API-Key</span>
+          <input id="generatePdfApiKeyInput" type="password" autocomplete="new-password" spellcheck="false" placeholder="sk-…">
+        </label>
+        <label class="generate-url-field">
+          <span>PDF-Datei</span>
+          <input id="generatePdfFileInput" type="file" accept="application/pdf,.pdf">
+        </label>
+        <p class="generate-api-note">Starten Sie TypeMap dafür über <code>start-typemap-api.ps1</code>. Der Schlüssel wird nicht gespeichert und nach der Anfrage aus dem Formular entfernt; die Verarbeitung läuft über den lokalen Helfer auf diesem Rechner.</p>
       </section>
-      <label class="generate-prompt-field">
+      <label id="generatePromptField" class="generate-prompt-field">
         <span>Prompt</span>
         <textarea id="generatePromptOutput" rows="15" readonly placeholder="Nach „Prompt generieren“ erscheint hier der vollständige Arbeitsauftrag."></textarea>
       </label>
@@ -767,7 +760,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260619v"></script>
-  <script src="typemap.js?v=20260619cg"></script>
+  <script src="typemap.js?v=20260619ch"></script>
 </body>
 </html>
 

@@ -2384,34 +2384,21 @@ input[type="range"] {
   display: none;
 }
 
-.generate-pdf-chunk-fields {
+.generate-pdf-api-grid {
   display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(220px, 1fr);
   gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.025);
 }
 
-.generate-pdf-chunk-fields[hidden] {
-  display: none;
-}
-
-.generate-pdf-target-summary {
+.generate-api-note {
   margin: 0;
   color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-.generate-pdf-range-grid {
-  display: grid;
-  grid-template-columns: minmax(130px, 0.65fr) repeat(2, minmax(170px, 1fr));
-  gap: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 720px) {
-  .generate-pdf-range-grid {
+  .generate-pdf-api-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2422,6 +2409,10 @@ input[type="range"] {
   gap: 7px;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.generate-prompt-field[hidden] {
+  display: none;
 }
 
 .generate-url-field input,
