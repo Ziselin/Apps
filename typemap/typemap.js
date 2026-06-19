@@ -6,6 +6,8 @@ const PROJECT_FILE_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
 const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
+const CITATION_OBJECT_MARKER = "{{citation}}";
+const CITATION_OBJECT_HEADING = "## Quellenangabe";
 const ORIGINAL_PAGE_MARKER_SOURCE = "\\[(?:\\d+|(?=[ivxlcdm]+\\])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\]";
 const CHAPTER_ROLES = new Set(["foreword", "main", "afterword"]);
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
@@ -31,9 +33,25 @@ const ui = {
   importProjectButton: document.getElementById("importProjectButton"),
   createProjectButton: document.getElementById("createProjectButton"),
   openImportButton: document.getElementById("openImportButton"),
+  openGenerateDialogButton: document.getElementById("openGenerateDialogButton"),
   projectFileInput: document.getElementById("projectFileInput"),
+  generateDialogOverlay: document.getElementById("generateDialogOverlay"),
+  generateDialog: document.getElementById("generateDialog"),
+  generateDialogCloseButton: document.getElementById("generateDialogCloseButton"),
+  generateSourceUrlInput: document.getElementById("generateSourceUrlInput"),
+  generatePromptOutput: document.getElementById("generatePromptOutput"),
+  generateDialogStatus: document.getElementById("generateDialogStatus"),
+  generatePromptButton: document.getElementById("generatePromptButton"),
+  copyGeneratePromptButton: document.getElementById("copyGeneratePromptButton"),
+  pasteGeneratedJsonButton: document.getElementById("pasteGeneratedJsonButton"),
   projectList: document.getElementById("projectList"),
   projectInfo: document.getElementById("projectInfo"),
+  editorPanel: document.querySelector(".editor-panel"),
+  editorToolbarPrimary: document.querySelector(".editor-toolbar-primary"),
+  editorToolbarFormat: document.querySelector(".editor-toolbar-format"),
+  editorDataViewSelect: document.getElementById("editorDataViewSelect"),
+  insertCitationObjectButton: document.getElementById("insertCitationObjectButton"),
+  insertCitationObjectCheck: document.getElementById("insertCitationObjectCheck"),
   documentPropertiesButton: document.getElementById("documentPropertiesButton"),
   toolbarTextKindSelect: document.getElementById("toolbarTextKindSelect"),
   editorZoomSelect: document.getElementById("editorZoomSelect"),
@@ -337,6 +355,10 @@ const state = {
   detailsLayoutMode: "normal",
   detailsLayoutStep: 0,
   editorZoom: 1,
+  editorDataView: "markdown",
+  jsonEditorDraft: "",
+  jsonEditorDraftProjectId: null,
+  jsonEditorApplyTimer: 0,
   sideTocUpdateTimer: 0,
   editorGeometryFrame: 0,
   editorResizeObserver: null,
@@ -867,9 +889,18 @@ function isTableOfContentsText(text) {
   return value === TOC_OBJECT_MARKER || value.toLowerCase() === TOC_OBJECT_HEADING.toLowerCase();
 }
 
+function isCitationObjectText(text) {
+  return String(text || "").trim().toLowerCase() === CITATION_OBJECT_MARKER;
+}
+
+function hasCitationObject(project) {
+  return String(project?.source?.rawText || "").split(/\r?\n/).some(isCitationObjectText);
+}
+
 function getMarkdownBlockType(text) {
   const value = String(text || "");
   if (isTableOfContentsText(value)) return "toc";
+  if (isCitationObjectText(value)) return "citation";
   if (isParatextMarker(value)) return "paratext-marker";
   if (/^#{1,7}\s+/.test(value)) return "heading";
   if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
@@ -893,6 +924,8 @@ function createMarkdownBlockNode(block, index) {
     ? getPlainDocumentLabel(headingMatch[2], "Ohne Titel")
     : type === "toc"
       ? "Inhaltsverzeichnis"
+      : type === "citation"
+        ? "Quellenangabe"
       : type === "table"
       ? "Tabelle"
       : type === "code"
@@ -1077,6 +1110,13 @@ function buildSourceModel(project) {
     }
 
     if (isTableOfContentsText(text)) {
+      flushParagraph(startOffset);
+      pushSingleLineBlock(line);
+      cursor = endOffset + 1;
+      return;
+    }
+
+    if (isCitationObjectText(text)) {
       flushParagraph(startOffset);
       pushSingleLineBlock(line);
       cursor = endOffset + 1;
@@ -1294,6 +1334,27 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     capsule.className = "preview-object-capsule";
     capsule.textContent = "Inhaltsverzeichnis";
     object.appendChild(capsule);
+    return object;
+  }
+  if (isCitationObjectText(text)) {
+    const object = document.createElement("div");
+    object.className = "preview-embedded-object preview-citation-object";
+    const citationText = document.createElement("p");
+    citationText.className = "preview-citation-text";
+    const project = options.project || getActiveProject();
+    const citation = normalizeCitationSource(project?.citationSource, project, project?.sourceCitation);
+    const formatted = formatSourceCitation(citation);
+    const titleIndex = formatted.italicTitle ? formatted.full.indexOf(formatted.italicTitle) : -1;
+    if (titleIndex < 0) {
+      appendTextNode(citationText, formatted.full);
+    } else {
+      appendTextNode(citationText, formatted.full.slice(0, titleIndex));
+      const title = document.createElement("em");
+      appendTextNode(title, formatted.italicTitle);
+      citationText.appendChild(title);
+      appendTextNode(citationText, formatted.full.slice(titleIndex + formatted.italicTitle.length));
+    }
+    object.appendChild(citationText);
     return object;
   }
   if (textType === "lyric" && !text.trim()) {
@@ -1753,6 +1814,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
       && getPlainDocumentLabel(blockText.replace(/^#\s+/, "")) === project.title) return;
     const element = createMarkdownBlockElement(block, textType, {
       chapterNumbers: project.style.chapterNumbers === true,
+      project,
     });
     element.classList.add("preview-body-block");
     if (getMarkdownHeadingLevel(block.text)) {
@@ -1849,7 +1911,7 @@ function renderEditorHighlight(rawText, project = getActiveProject()) {
   text.split("\n").forEach((rawLine) => {
     const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
     let className = "";
-    if (isTableOfContentsText(line) || isOriginalPageMarker(line)) {
+    if (isTableOfContentsText(line) || isCitationObjectText(line) || isOriginalPageMarker(line)) {
       className = "markdown-editor-object";
     } else if (isParatextMarker(line)) {
       className = "markdown-editor-paratext";
@@ -2218,6 +2280,7 @@ function getTreeNodeIcon(type) {
   if (type === "document") return "▣";
   if (type === "matter") return "";
   if (type === "toc") return "";
+  if (type === "citation") return "§";
   if (type === "heading") return "#";
   if (type === "table") return "▤";
   if (type === "code") return "{}";
@@ -2304,7 +2367,7 @@ function createTreeNodeButton(project, node, depth, ancestorHidden = false) {
   title.className = "document-tree-title";
   title.textContent = node.title || node.type;
   copy.appendChild(title);
-  if (node.type !== "document" && node.type !== "section" && node.type !== "toc") {
+  if (node.type !== "document" && node.type !== "section" && node.type !== "toc" && node.type !== "citation") {
     const meta = document.createElement("span");
     meta.className = "document-tree-meta";
     meta.textContent = node.type === "paragraph"
@@ -2452,19 +2515,36 @@ function renderEditor() {
   if (ui.projectInfo) ui.projectInfo.textContent = `${state.projects.length} Dokument${state.projects.length === 1 ? "" : "e"}`;
   loadProjectFonts([project]);
   renderFontOptions(project);
-  const editorText = getEditorSourceText(project);
+  const isJsonView = state.editorDataView === "json";
+  // Die JSON-Ansicht bildet bewusst das vollständige Projektobjekt ab, damit
+  // Text, Quellenangaben, Metadaten und Satzinformationen gemeinsam prüfbar sind.
+  const hasJsonDraft = isJsonView && state.jsonEditorDraftProjectId === project.id;
+  const editorText = isJsonView
+    ? (hasJsonDraft ? state.jsonEditorDraft : JSON.stringify(project, null, 2))
+    : getEditorSourceText(project);
+  ui.editorPanel?.classList.toggle("editor-json-mode", isJsonView);
+  if (ui.editorDataViewSelect) ui.editorDataViewSelect.value = state.editorDataView;
+  if (ui.editorToolbarPrimary) ui.editorToolbarPrimary.inert = isJsonView;
+  if (ui.editorToolbarFormat) ui.editorToolbarFormat.inert = isJsonView;
   if (ui.textInput) {
     const spellcheckEnabled = project.style.spellcheck !== false;
     ui.textInput.value = editorText;
-    ui.textInput.spellcheck = spellcheckEnabled;
-    ui.textInput.setAttribute("spellcheck", String(spellcheckEnabled));
+    if (!hasJsonDraft) ui.textInput.removeAttribute("aria-invalid");
+    ui.textInput.readOnly = false;
+    ui.textInput.setAttribute("aria-label", isJsonView ? "Dokumentdaten als JSON" : "Text");
+    ui.textInput.spellcheck = !isJsonView && spellcheckEnabled;
+    ui.textInput.setAttribute("spellcheck", String(!isJsonView && spellcheckEnabled));
     ui.spellcheckToggleButton?.setAttribute("aria-pressed", String(spellcheckEnabled));
     if (ui.spellcheckToggleCheck) ui.spellcheckToggleCheck.hidden = !spellcheckEnabled;
   }
   const chapterNumbersEnabled = project.style.chapterNumbers === true;
   ui.chapterNumbersToggleButton?.setAttribute("aria-pressed", String(chapterNumbersEnabled));
   if (ui.chapterNumbersToggleCheck) ui.chapterNumbersToggleCheck.hidden = !chapterNumbersEnabled;
-  renderEditorHighlight(editorText, project);
+  const citationObjectEnabled = hasCitationObject(project);
+  ui.insertCitationObjectButton?.setAttribute("aria-pressed", String(citationObjectEnabled));
+  if (ui.insertCitationObjectCheck) ui.insertCitationObjectCheck.hidden = !citationObjectEnabled;
+  if (isJsonView) clearElement(ui.textInputHighlight);
+  else renderEditorHighlight(editorText, project);
   syncEditorHighlightScroll();
   scheduleEditorGeometrySync();
   if (ui.fontFamilySelect) ui.fontFamilySelect.value = project.style.fontFamily;
@@ -3026,6 +3106,35 @@ function insertTableOfContentsObject() {
   renderEditor();
 }
 
+function removeCitationObjectBlock(rawText) {
+  const lines = String(rawText || "").split(/\r?\n/);
+  const removedIndexes = new Set();
+  lines.forEach((line, index) => {
+    if (!isCitationObjectText(line)) return;
+    removedIndexes.add(index);
+    let headingIndex = index - 1;
+    while (headingIndex >= 0 && !lines[headingIndex].trim()) headingIndex -= 1;
+    if (lines[headingIndex]?.trim().toLowerCase() === CITATION_OBJECT_HEADING.toLowerCase()) {
+      removedIndexes.add(headingIndex);
+      for (let blankIndex = headingIndex + 1; blankIndex < index; blankIndex += 1) removedIndexes.add(blankIndex);
+    }
+  });
+  return lines.filter((_, index) => !removedIndexes.has(index)).join("\n").trimEnd();
+}
+
+function toggleCitationObject() {
+  updateActiveProject((project) => {
+    const rawText = String(project.source.rawText || "");
+    const withoutCitation = removeCitationObjectBlock(rawText);
+    project.source.rawText = hasCitationObject(project)
+      ? `${withoutCitation}\n`
+      : `${withoutCitation}\n\n${CITATION_OBJECT_HEADING}\n\n${CITATION_OBJECT_MARKER}\n`;
+    delete project.chapterRoles?.[createChapterRoleKey(2, "Quellenangabe")];
+    state.activeSourceRange = null;
+  });
+  renderEditor();
+}
+
 function renderApp() {
   renderProjectList();
   loadProjectFonts();
@@ -3059,6 +3168,132 @@ function addProject(title = "Neues Dokument") {
   setProjectExpanded(project.id, true);
   renderApp();
   scheduleAutosave();
+}
+
+function setGenerateDialogOpen(isOpen) {
+  if (ui.generateDialogOverlay) ui.generateDialogOverlay.hidden = !isOpen;
+  if (ui.generateDialog) ui.generateDialog.hidden = !isOpen;
+  if (isOpen) window.setTimeout(() => ui.generateSourceUrlInput?.focus(), 0);
+}
+
+function setGenerateDialogStatus(message = "", isError = false) {
+  if (!ui.generateDialogStatus) return;
+  ui.generateDialogStatus.textContent = message;
+  ui.generateDialogStatus.classList.toggle("is-error", isError);
+}
+
+function buildWebExtractionPrompt(sourceUrl) {
+  const template = createDefaultProject("Titel der Quelle");
+  template.id = "";
+  template.createdAt = "";
+  template.updatedAt = "";
+  template.source.rawText = "# Titel der Quelle\n\nVollständiger Haupttext der Quelle …";
+  template.citationSource = {
+    ...createDefaultCitationSource("Titel der Quelle"),
+    source_type: "webpage",
+    url: sourceUrl,
+    accessed_date: new Date().toISOString().slice(0, 10),
+  };
+
+  return `Du bereitest eine Webquelle für die Anwendung TypeMap auf.
+
+Quelle: ${sourceUrl}
+
+AUFGABE
+1. Rufe die Quelle auf und extrahiere den vollständigen redaktionellen Haupttext. Entferne Navigation, Werbung, Cookie-Hinweise, Empfehlungen, Kommentare und sonstige Seitenelemente.
+2. Bewahre Wortlaut, Reihenfolge, Absätze, Zwischenüberschriften, Zitate, Listen, Tabellen und Code. Fasse nichts zusammen, übersetze nichts und ergänze keine inhaltlichen Aussagen.
+3. Ermittle die bibliografischen Angaben aus der sichtbaren Seite und – soweit eindeutig – aus strukturierten Metadaten. Erfinde keine Angaben; unbekannte Werte bleiben als leere Zeichenfolge erhalten.
+4. Gib ausschließlich ein gültiges JSON-Objekt aus: kein Markdown-Codezaun, keine Einleitung und keine Erläuterung.
+
+TYPEMAP-MARKDOWN IN source.rawText
+- Die erste Zeile ist genau eine H1: "# Titel". Sie muss mit dem Feld title übereinstimmen.
+- Gliedere echte Zwischenüberschriften hierarchisch mit ## bis #######. Erzeuge keine neuen Überschriften.
+- Trenne Absätze durch eine Leerzeile.
+- Verwende __fett__, _kursiv_, ==markiert==, > Zitat, - Listenpunkt, 1. nummerierter Punkt, übliche Markdown-Tabellen und dreifache Backticks für Code.
+- Ein Inhaltsverzeichnis wird nur bei Bedarf mit {{toc}} markiert.
+- Sichtbare Originalpaginierung wird an ihrer Textposition ausschließlich als [12] beziehungsweise [iv] notiert; niemals als [p. 12]. Füge keine Seitenzahlen hinzu, die auf der Webseite nicht belegt sind.
+- Vorder- oder Nachtexte können mit ::: front beziehungsweise ::: back beginnen und mit ::: beendet werden. Nutze diese Marker nur, wenn die Quelle diese Bereiche tatsächlich besitzt.
+- Behalte relevante Bildunterschriften und Fußnoten als Text bei. Erfinde keine Bild-URLs oder fehlenden Inhalte.
+
+BIBLIOGRAFISCHE REGELN
+- source_type ist einer dieser Werte: book, book_chapter, journal_article, newspaper_article, webpage, blog_post, report, legal_text, court_decision, manuscript, letter, email, other.
+- Wähle journal_article nur bei einer erkennbaren Fachzeitschrift, newspaper_article bei einer Zeitung, blog_post bei einem Blog und report bei einem formal herausgegebenen Bericht; sonst webpage.
+- title ist Pflicht. subtitle enthält nur einen ausdrücklich ausgewiesenen Untertitel.
+- authors enthält Personen als "NACHNAME, Vorname; NACHNAME, Vorname". Bei mehreren Personen dient das Semikolon als Trennzeichen. institutional_author enthält die verantwortliche Organisation, wenn keine Person verantwortlich zeichnet.
+- container_title bezeichnet Website, Zeitung, Zeitschrift oder übergeordnetes Werk. publisher und publisher_place werden nur bei belegten Angaben gesetzt.
+- issued_date verwendet nach Möglichkeit YYYY-MM-DD; issued_year nur das vierstellige Erscheinungsjahr. Verwende nicht das Abrufdatum als Erscheinungsdatum.
+- url enthält die kanonische Artikel-URL, archive_url nur eine belegte Archivfassung und accessed_date das vorgegebene Abrufdatum.
+- doi enthält nur einen tatsächlich angegebenen DOI. citation_style bleibt "Hausstil"; short_citation und full_citation bleiben leer, da TypeMap sie berechnet.
+- text_version ist "translation" nur bei einer erkennbaren Übersetzung. Dann original_title, original_language und translators ausfüllen; andernfalls "original".
+- metadata.language und style.language verwenden de, en, fr oder la. metadata.authors enthält dieselben Personen als Array; wenn nur eine Institution vorliegt, bleibt es [""].
+- Behalte die vorgegebenen Darstellungswerte unter style, typography, paratextVisibility, chapterRoles und tocVisible unverändert. Verwende leere id-/Zeitfelder; TypeMap vergibt diese lokal.
+
+EXAKTE JSON-GRUNDFORM
+${JSON.stringify(template, null, 2)}`;
+}
+
+function parseGeneratedJson(text) {
+  let candidate = String(text || "").trim();
+  candidate = candidate.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  try {
+    return JSON.parse(candidate);
+  } catch (initialError) {
+    const firstBrace = candidate.indexOf("{");
+    const lastBrace = candidate.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) throw initialError;
+    return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
+  }
+}
+
+function getProjectFromGeneratedPayload(payload) {
+  if (payload?.source && typeof payload.source.rawText === "string") return payload;
+  if (Array.isArray(payload?.state?.projects) && payload.state.projects[0]) return payload.state.projects[0];
+  if (Array.isArray(payload?.projects) && payload.projects[0]) return payload.projects[0];
+  throw new Error("missing-project");
+}
+
+function addGeneratedProject(payload) {
+  const sourceProject = getProjectFromGeneratedPayload(payload);
+  const now = new Date().toISOString();
+  const project = normalizeProject({
+    ...sourceProject,
+    id: createId("typemap-project"),
+    createdAt: now,
+    updatedAt: now,
+  });
+  state.projects.push(project);
+  state.activeProjectId = project.id;
+  state.activeSourceRange = null;
+  state.editorDataView = "json";
+  state.jsonEditorDraft = "";
+  state.jsonEditorDraftProjectId = null;
+  setProjectExpanded(project.id, true);
+  renderApp();
+  scheduleAutosave();
+}
+
+function applyJsonEditorDraft() {
+  const activeProject = getActiveProject();
+  if (!activeProject || state.jsonEditorDraftProjectId !== activeProject.id) return;
+  try {
+    const sourceProject = getProjectFromGeneratedPayload(parseGeneratedJson(state.jsonEditorDraft));
+    const normalized = normalizeProject({
+      ...sourceProject,
+      id: activeProject.id,
+      createdAt: activeProject.createdAt,
+      updatedAt: new Date().toISOString(),
+    });
+    const projectIndex = state.projects.findIndex((project) => project.id === activeProject.id);
+    if (projectIndex < 0) return;
+    state.projects[projectIndex] = normalized;
+    state.jsonEditorDraft = "";
+    state.jsonEditorDraftProjectId = null;
+    ui.textInput?.removeAttribute("aria-invalid");
+    renderApp();
+    scheduleAutosave();
+  } catch (error) {
+    ui.textInput?.setAttribute("aria-invalid", "true");
+  }
 }
 
 function deleteProject(projectId) {
@@ -3193,11 +3428,11 @@ function escapeScriptJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function buildHtmlBlockMarkup(block, textType, chapterNumbers = false) {
+function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project = null) {
   if (isTableOfContentsBlock(block)) return "";
   if (isOriginalPageMarkerBlock(block)) return "";
   if (isParatextMarkerBlock(block)) return "";
-  const element = createMarkdownBlockElement(block, textType, { chapterNumbers });
+  const element = createMarkdownBlockElement(block, textType, { chapterNumbers, project });
   element.classList.add("preview-body-block");
   if (getMarkdownHeadingLevel(block.text)) {
     element.id = getPreviewHeadingId(block.sourceStartOffset);
@@ -3272,7 +3507,7 @@ function buildHtmlExport(project) {
     : visibleExportBlocks;
   const hasTocObject = project.tocVisible !== false && visibleExportBlocks.some(isTableOfContentsBlock);
   const blocks = contentExportBlocks
-    .map((block) => buildHtmlBlockMarkup(block, textType, project.style.chapterNumbers === true))
+    .map((block) => buildHtmlBlockMarkup(block, textType, project.style.chapterNumbers === true, project))
     .join("\n");
   const tocHtml = hasTocObject && sourceModel.sections.length
     ? `<nav class="html-side-toc" aria-label="Inhaltsverzeichnis">
@@ -3927,6 +4162,50 @@ function bindEditor() {
   document.fonts?.ready?.then(scheduleEditorGeometrySync);
   ui.newProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
   ui.createProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
+  ui.openGenerateDialogButton?.addEventListener("click", () => {
+    setGenerateDialogStatus("");
+    setGenerateDialogOpen(true);
+  });
+  ui.generateDialogOverlay?.addEventListener("click", () => setGenerateDialogOpen(false));
+  ui.generateDialogCloseButton?.addEventListener("click", () => setGenerateDialogOpen(false));
+  ui.generatePromptButton?.addEventListener("click", () => {
+    const url = ui.generateSourceUrlInput?.value.trim() || "";
+    if (!url || !isPlausibleHttpUrl(url)) {
+      setGenerateDialogStatus("Bitte eine vollständige URL mit http:// oder https:// eingeben.", true);
+      ui.generateSourceUrlInput?.focus();
+      return;
+    }
+    ui.generatePromptOutput.value = buildWebExtractionPrompt(url);
+    ui.copyGeneratePromptButton.disabled = false;
+    setGenerateDialogStatus("Der Prompt ist bereit.");
+  });
+  ui.copyGeneratePromptButton?.addEventListener("click", async () => {
+    try {
+      await copyCitationOutput(ui.generatePromptOutput, ui.copyGeneratePromptButton);
+      setGenerateDialogStatus("Prompt in die Zwischenablage kopiert.");
+    } catch (error) {
+      setGenerateDialogStatus("Der Prompt konnte nicht kopiert werden.", true);
+    }
+  });
+  ui.pasteGeneratedJsonButton?.addEventListener("click", async () => {
+    try {
+      const clipboardText = await navigator.clipboard?.readText();
+      if (!clipboardText) throw new Error("empty-clipboard");
+      addGeneratedProject(parseGeneratedJson(clipboardText));
+      setGenerateDialogOpen(false);
+    } catch (error) {
+      // Falls der Browser das Lesen der Zwischenablage sperrt, steht trotzdem
+      // sofort eine ausgewählte JSON-Vorlage für manuelles Strg+V bereit.
+      addProject("Neues Dokument");
+      state.editorDataView = "json";
+      renderEditor();
+      setGenerateDialogOpen(false);
+      window.setTimeout(() => {
+        ui.textInput?.focus();
+        ui.textInput?.select();
+      }, 0);
+    }
+  });
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
   ui.exportProjectButton?.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -4008,6 +4287,8 @@ function bindEditor() {
       event.stopPropagation();
       if (button.dataset.insertObject === "toc") {
         insertTableOfContentsObject();
+      } else if (button.dataset.insertObject === "citation") {
+        toggleCitationObject();
       }
       closeEditorMenus();
     });
@@ -4083,13 +4364,31 @@ function bindEditor() {
   ui.hyphenationDialogCloseButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
   ui.hyphenationDialogCancelButton?.addEventListener("click", () => setHyphenationDialogOpen(false));
   ui.hyphenationDialogSaveButton?.addEventListener("click", saveHyphenationDialog);
+  ui.editorDataViewSelect?.addEventListener("change", () => {
+    state.editorDataView = ui.editorDataViewSelect.value === "json" ? "json" : "markdown";
+    closeEditorMenus();
+    renderEditor();
+  });
   ui.textInput?.addEventListener("input", () => {
+    if (state.editorDataView === "json") {
+      state.jsonEditorDraft = ui.textInput.value;
+      state.jsonEditorDraftProjectId = state.activeProjectId;
+      ui.textInput.removeAttribute("aria-invalid");
+      window.clearTimeout(state.jsonEditorApplyTimer);
+      state.jsonEditorApplyTimer = window.setTimeout(applyJsonEditorDraft, 600);
+      return;
+    }
     updateActiveProjectTextFromEditor(ui.textInput.value);
     renderEditorHighlight(ui.textInput.value, getActiveProject());
     syncEditorHighlightScroll();
     scheduleProjectBrowserRender();
   });
   ui.textInput?.addEventListener("blur", () => {
+    if (state.editorDataView === "json") {
+      window.clearTimeout(state.jsonEditorApplyTimer);
+      applyJsonEditorDraft();
+      return;
+    }
     const project = getActiveProject();
     if (!project || state.activeSourceRange) return;
     const normalized = ensureDocumentStructure(project.source.rawText, project.title);

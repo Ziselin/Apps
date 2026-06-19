@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260618av">
+  <link rel="stylesheet" href="typemap.css?v=20260618az">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -133,6 +133,7 @@
           <div class="library-actions">
             <button type="button" id="createProjectButton" class="secondary-button">Neues Dokument</button>
             <button type="button" id="openImportButton" class="secondary-button">Importieren</button>
+            <button type="button" id="openGenerateDialogButton" class="secondary-button">Generieren</button>
           </div>
           <input id="projectFileInput" type="file" accept=".json,application/json" hidden>
           <div id="projectList" class="project-list"></div>
@@ -176,6 +177,11 @@
                 <button type="button" class="editor-menu-action" data-insert-object="toc">
                   <img src="https://api.iconify.design/material-symbols/toc-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Inhaltsverzeichnis</span>
+                </button>
+                <button type="button" id="insertCitationObjectButton" class="editor-menu-action" data-insert-object="citation" aria-pressed="false">
+                  <img src="https://api.iconify.design/material-symbols/menu-book-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
+                  <span>Quellenangabe</span>
+                  <img id="insertCitationObjectCheck" class="editor-menu-check" src="https://api.iconify.design/ic/round-check.svg?color=%23ffb347" alt="" aria-hidden="true" hidden>
                 </button>
               </div>
             </details>
@@ -255,9 +261,15 @@
               </div>
             </details>
           </div>
-          <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
-            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
-          </button>
+          <div class="editor-view-controls">
+            <select id="editorDataViewSelect" class="toolbar-select editor-data-view-select" aria-label="Dokumentansicht">
+              <option value="markdown">Markdown</option>
+              <option value="json">JSON</option>
+            </select>
+            <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+              <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+            </button>
+          </div>
           </div>
           <div class="editor-toolbar editor-toolbar-format" role="toolbar" aria-label="Schnellformatierung">
             <select id="toolbarTextKindSelect" class="toolbar-select" aria-label="Textart"></select>
@@ -318,6 +330,34 @@
       </article>
     </section>
   </main>
+
+  <div id="generateDialogOverlay" class="modal-overlay" hidden></div>
+  <section id="generateDialog" class="property-dialog generate-dialog" role="dialog" aria-modal="true" aria-labelledby="generateDialogTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Webquelle</span>
+        <h2 id="generateDialogTitle">Dokument generieren</h2>
+      </div>
+      <button type="button" id="generateDialogCloseButton" class="dialog-icon-button" aria-label="Dialog schließen">X</button>
+    </div>
+    <div class="property-dialog-body">
+      <p class="event-description">Erzeuge einen Arbeitsauftrag für eine KI, die den Haupttext und die Quellenangaben der Webseite als TypeMap-JSON aufbereitet.</p>
+      <label class="generate-url-field">
+        <span>URL der Quelle</span>
+        <input id="generateSourceUrlInput" type="url" inputmode="url" autocomplete="url" placeholder="https://…">
+      </label>
+      <label class="generate-prompt-field">
+        <span>Prompt</span>
+        <textarea id="generatePromptOutput" rows="15" readonly placeholder="Nach „Prompt generieren“ erscheint hier der vollständige Arbeitsauftrag."></textarea>
+      </label>
+      <p id="generateDialogStatus" class="generate-dialog-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="property-dialog-actions generate-dialog-actions">
+      <button type="button" id="generatePromptButton" class="secondary-button primary-action">Prompt generieren</button>
+      <button type="button" id="copyGeneratePromptButton" class="secondary-button" disabled>Prompt kopieren</button>
+      <button type="button" id="pasteGeneratedJsonButton" class="secondary-button">Prompt einfügen</button>
+    </div>
+  </section>
 
   <div id="documentPropertiesOverlay" class="modal-overlay" hidden></div>
   <section id="documentPropertiesDialog" class="property-dialog" role="dialog" aria-modal="true" aria-labelledby="documentPropertiesTitle" hidden>
@@ -688,7 +728,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260618u"></script>
-  <script src="typemap.js?v=20260618av"></script>
+  <script src="typemap.js?v=20260618az"></script>
 </body>
 </html>
 

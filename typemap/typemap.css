@@ -792,6 +792,19 @@ body.typemap-theme-light .preview-object-capsule {
   color: #8f5d14;
 }
 
+.preview-citation-object {
+  display: grid;
+  justify-items: start;
+}
+
+.preview-citation-text {
+  margin: 0;
+  max-width: 72ch;
+  color: inherit;
+  font-size: 0.9em;
+  line-height: 1.42;
+}
+
 .preview-text blockquote {
   margin: 0 0 0.8em;
   padding-left: 1em;
@@ -1444,6 +1457,28 @@ body.typemap-theme-light .document-tree-row.is-active .document-tree-label {
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
+}
+
+.editor-view-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.editor-data-view-select {
+  width: auto;
+  min-width: 106px;
+  min-height: 34px;
+}
+
+.editor-panel.editor-json-mode .editor-toolbar-primary,
+.editor-panel.editor-json-mode .editor-toolbar-format {
+  opacity: 0.42;
+}
+
+.editor-panel.editor-json-mode .text-editor-field textarea[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 112, 96, 0.72);
 }
 
 .editor-toolbar {
@@ -2190,6 +2225,45 @@ input[type="range"] {
 
 .settings-dialog {
   width: min(680px, calc(100vw - 44px));
+}
+
+.generate-dialog {
+  width: min(900px, calc(100vw - 44px));
+}
+
+.generate-url-field,
+.generate-prompt-field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.generate-url-field input,
+.generate-prompt-field textarea {
+  width: 100%;
+}
+
+.generate-prompt-field textarea {
+  min-height: 300px;
+  resize: vertical;
+  font-family: "Source Code Pro", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.48;
+}
+
+.generate-dialog-status {
+  min-height: 1.35em;
+  margin: 0;
+  color: var(--muted);
+}
+
+.generate-dialog-status.is-error {
+  color: #ff9f91;
+}
+
+.generate-dialog-actions {
+  flex-wrap: wrap;
 }
 
 .property-dialog-head {
