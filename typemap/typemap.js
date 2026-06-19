@@ -7,7 +7,7 @@ const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
 const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
 const CITATION_OBJECT_MARKER = "{{citation}}";
-const CITATION_OBJECT_HEADING = "## Quellenangabe";
+const LEGACY_CITATION_OBJECT_HEADING = "## Quellenangabe";
 const ORIGINAL_PAGE_MARKER_SOURCE = "\\[(?:\\d+|(?=[ivxlcdm]+\\])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\]";
 const CHAPTER_ROLES = new Set(["foreword", "main", "afterword"]);
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
@@ -25,15 +25,16 @@ const ui = {
   returnPreviewStrip: document.getElementById("returnPreviewStrip"),
   layoutCycleButton: document.getElementById("layoutCycleButton"),
   layoutCycleButtons: Array.from(document.querySelectorAll("[data-layout-cycle-button]")),
-  newProjectButton: document.getElementById("newProjectButton"),
   exportProjectButton: document.getElementById("exportProjectButton"),
   exportMenu: document.getElementById("exportMenu"),
   themeToggleButton: document.getElementById("themeToggleButton"),
   themeToggleIcon: document.getElementById("themeToggleIcon"),
-  importProjectButton: document.getElementById("importProjectButton"),
   createProjectButton: document.getElementById("createProjectButton"),
   openImportButton: document.getElementById("openImportButton"),
   openGenerateDialogButton: document.getElementById("openGenerateDialogButton"),
+  browserActionsMenuButton: document.getElementById("browserActionsMenuButton"),
+  browserActionsMenu: document.getElementById("browserActionsMenu"),
+  browserExportJsonButton: document.getElementById("browserExportJsonButton"),
   projectFileInput: document.getElementById("projectFileInput"),
   generateDialogOverlay: document.getElementById("generateDialogOverlay"),
   generateDialog: document.getElementById("generateDialog"),
@@ -45,7 +46,6 @@ const ui = {
   copyGeneratePromptButton: document.getElementById("copyGeneratePromptButton"),
   pasteGeneratedJsonButton: document.getElementById("pasteGeneratedJsonButton"),
   projectList: document.getElementById("projectList"),
-  projectInfo: document.getElementById("projectInfo"),
   editorPanel: document.querySelector(".editor-panel"),
   editorToolbarPrimary: document.querySelector(".editor-toolbar-primary"),
   editorToolbarFormat: document.querySelector(".editor-toolbar-format"),
@@ -68,6 +68,7 @@ const ui = {
   sourceCitationTypeInput: document.getElementById("sourceCitationTypeInput"),
   sourceCitationTitleInput: document.getElementById("sourceCitationTitleInput"),
   sourceCitationSubtitleInput: document.getElementById("sourceCitationSubtitleInput"),
+  sourceCitationLeadInput: document.getElementById("sourceCitationLeadInput"),
   sourceCitationLanguageInput: document.getElementById("sourceCitationLanguageInput"),
   sourceCitationTextVersionInput: document.getElementById("sourceCitationTextVersionInput"),
   sourceCitationTranslationFields: document.getElementById("sourceCitationTranslationFields"),
@@ -154,16 +155,8 @@ const ui = {
   previewPage: document.querySelector(".preview-page"),
   typeStage: document.querySelector(".type-stage"),
   previewText: document.getElementById("previewText"),
-  sidePreviewPage: document.querySelector(".side-preview-page"),
-  sidePreviewText: document.getElementById("sidePreviewText"),
   textInputHighlight: document.getElementById("textInputHighlight"),
 };
-
-const defaultProjectText = [
-  "TypeMap ist eine Werkbank für gesetzten Text.",
-  "",
-  "Der Text bleibt als strukturierte Quelle erhalten. Die Vorschau oben zeigt das gerenderte Ergebnis, ohne den Inhalt in ein Bild zu verwandeln.",
-].join("\n");
 
 function normalizeMarkdownHeadingText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -256,9 +249,7 @@ function ensureDocumentStructure(rawText, fallbackTitle = "Unbenanntes Dokument"
   let titleLine = "";
   const content = [];
   source.split(/\r?\n/).forEach((line) => {
-    if (getParatextHeadingKind(line) || PARATEXT_START_PATTERN.test(line) || PARATEXT_END_PATTERN.test(line)) return;
-    if (isTableOfContentsText(line)) return;
-    if (!titleLine && /^#\s+/.test(line)) {
+    if (!titleLine && /^#\s+/.test(line) && !getParatextHeadingKind(line)) {
       titleLine = line.trim();
       return;
     }
@@ -268,7 +259,6 @@ function ensureDocumentStructure(rawText, fallbackTitle = "Unbenanntes Dokument"
   const body = content.join("\n").trim();
   return [
     titleLine,
-    TOC_OBJECT_HEADING,
     body,
   ].filter((part) => part !== "").join("\n\n") + "\n";
 }
@@ -345,7 +335,6 @@ const state = {
   sourceModel: null,
   layoutModel: null,
   activeWorkspaceSection: "preview",
-  activeProjectEditorTab: "browser",
   activeSourceRange: null,
   expandedProjectIds: [],
   expandedTreeNodeIds: [],
@@ -372,18 +361,6 @@ function createId(prefix) {
 function createDefaultMetadata() {
   return {
     textKind: "paper",
-    subtitle: "",
-    authors: [""],
-    showAuthors: true,
-    contributors: [""],
-    createdDate: "",
-    modifiedDate: "",
-    status: "draft",
-    version: "0.1",
-    publishedDate: "",
-    language: "de",
-    tags: "",
-    description: "",
   };
 }
 
@@ -393,6 +370,7 @@ function createDefaultCitationSource(title = "") {
     source_type: "other",
     title,
     subtitle: "",
+    lead: "",
     language: "de",
     text_version: "original",
     original_title: "",
@@ -436,6 +414,7 @@ function normalizeCitationSource(value, project, legacySource = null) {
   if (!["book", "book_chapter", "journal_article", "newspaper_article", "webpage", "blog_post", "report", "legal_text", "court_decision", "manuscript", "letter", "email", "other"].includes(normalized.source_type)) normalized.source_type = "other";
   normalized.title = String(normalized.title || "");
   normalized.subtitle = String(normalized.subtitle || "");
+  normalized.lead = String(normalized.lead || "");
   normalized.language = String(normalized.language || "de");
   [
     "authors", "institutional_author", "editors", "contributors", "translators", "original_title",
@@ -494,6 +473,17 @@ const LEGACY_DOCUMENT_STYLE_MAP = {
 
 function getDocumentStylePreset(textKind) {
   return DOCUMENT_STYLE_PRESETS[textKind] || null;
+}
+
+function getLeadPresentation(project, titleScale = {}) {
+  const preset = getDocumentStylePreset(project?.metadata?.textKind);
+  const style = project?.style || {};
+  return {
+    fontFamily: style.leadFontFamily || preset?.style?.leadFontFamily || style.fontFamily,
+    fontWeight: Number(style.leadWeight ?? preset?.style?.leadWeight) || 400,
+    fontSize: Number(titleScale.lead ?? preset?.titleScale?.lead) || 1,
+    lineHeight: Number(titleScale.leadLineHeight ?? preset?.titleScale?.leadLineHeight) || 1.42,
+  };
 }
 
 function normalizeDocumentStyleId(value) {
@@ -646,9 +636,13 @@ function normalizePersonList(value) {
   return normalized.length ? normalized : [""];
 }
 
-function getDisplayedAuthors(metadata) {
-  if (metadata?.showAuthors === false) return [];
-  return normalizePersonList(metadata?.authors).filter(Boolean);
+function getDisplayedAuthors(project) {
+  const citationAuthors = splitCitationAuthors(project?.citationSource?.authors).filter(Boolean);
+  if (citationAuthors.length) return citationAuthors;
+  // Nicht normalisierte Altdokumente dürfen ihren früheren Autorennamen einmalig
+  // anzeigen; aktuelle Dokumente beziehen die Autorenzeile ausschließlich aus citationSource.
+  if (!project?.citationSource) return normalizePersonList(project?.metadata?.authors).filter(Boolean);
+  return [];
 }
 
 function normalizeProjectFonts(value) {
@@ -662,7 +656,7 @@ function createDefaultProject(title = "Neues Dokument") {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     source: {
-      rawText: ensureDocumentStructure(`# ${normalizeMarkdownHeadingText(title)}\n\n${defaultProjectText}`, title),
+      rawText: ensureDocumentStructure(`# ${normalizeMarkdownHeadingText(title)}\n`, title),
       textType: "prose",
     },
     style: {
@@ -682,7 +676,6 @@ function createDefaultProject(title = "Neues Dokument") {
     },
     metadata: createDefaultMetadata(),
     citationSource: null,
-    citationLegacy: {},
     typography: createDefaultTypography(),
     paratextVisibility: {},
     chapterRoles: {},
@@ -727,7 +720,8 @@ function normalizeProject(project) {
   };
   normalized.id = String(normalized.id || createId("typemap-project"));
   normalized.title = String(normalized.title || "Unbenanntes Dokument");
-  normalized.source.rawText = String(normalized.source.rawText || "");
+  normalized.source.rawText = removeLegacyCitationHeading(String(normalized.source.rawText || ""));
+  delete normalized.chapterRoles?.[createChapterRoleKey(2, "Quellenangabe")];
   migrateLegacyChapterRoles(normalized);
   syncProjectTitleHeading(normalized);
   normalized.tocVisible = normalized.tocVisible !== false;
@@ -768,23 +762,34 @@ function normalizeProject(project) {
   if (preset && (!normalized.typography.titleScale || !Object.keys(normalized.typography.titleScale).length)) {
     normalized.typography.titleScale = { ...preset.titleScale };
   }
-  normalized.metadata.authors = normalizePersonList(normalized.metadata.authors);
-  normalized.metadata.showAuthors = normalized.metadata.showAuthors !== false;
-  normalized.metadata.contributors = normalizePersonList(normalized.metadata.contributors);
+  // Einweg-Migration aus dem früheren Dokumentkopf-Modell; das alte Feld wird
+  // nicht in den normalisierten Projektzustand übernommen.
+  const legacyMetadataAuthors = normalizePersonList(project?.metadata?.authors).filter(Boolean);
+  const legacyMetadataContributors = normalizePersonList(project?.metadata?.contributors).filter(Boolean);
   normalized.source.textType = sourceTextTypeFromDocumentKind(normalized.metadata.textKind);
   ["rightsHolder", "copyrightYear", "license", "allowUse", "allowEdit", "allowShare", "attribution"]
     .forEach((legacyRightField) => delete normalized.metadata[legacyRightField]);
-  normalized.metadata.status = ["draft", "working", "final", "published"].includes(normalized.metadata.status)
-    ? normalized.metadata.status
-    : fallback.metadata.status;
-  normalized.metadata.language = String(normalized.metadata.language || fallback.metadata.language);
+  const hadCitationRecord = Boolean(project?.citationSource && typeof project.citationSource === "object")
+    || Boolean(project?.sourceCitation && typeof project.sourceCitation === "object");
   normalized.citationSource = normalizeCitationSource(project?.citationSource, normalized, project?.sourceCitation);
+  if (!hadCitationRecord && !normalized.citationSource.authors) {
+    normalized.citationSource.authors = legacyMetadataAuthors.join("; ");
+  }
+  if (!hadCitationRecord && !normalized.citationSource.contributors) {
+    normalized.citationSource.contributors = legacyMetadataContributors.join("; ");
+  }
+  [
+    "authors", "showAuthors", "subtitle", "language", "contributors", "createdDate", "modifiedDate",
+    "status", "version", "publishedDate", "tags", "description",
+  ].forEach((legacyMetadataField) => delete normalized.metadata[legacyMetadataField]);
   normalized.title = normalized.citationSource.title || normalized.title;
   normalized.citationSource.title = normalized.title;
-  normalized.citationLegacy = {
+  const citationLegacy = {
     ...(project?.citationLegacy || {}),
     ...(project?.sourceCitation?.working_title ? { working_title: project.sourceCitation.working_title } : {}),
   };
+  if (Object.keys(citationLegacy).length) normalized.citationLegacy = citationLegacy;
+  else delete normalized.citationLegacy;
   delete normalized.sourceCitation;
   delete normalized.textObject;
   syncProjectTitleHeading(normalized);
@@ -919,7 +924,14 @@ function createParatextVisibilityKey(node) {
 function createMarkdownBlockNode(block, index) {
   const headingMatch = String(block.text || "").match(/^(#{1,7})\s+(.+)$/);
   const blockType = getMarkdownBlockType(block.text);
-  const type = blockType === "paratext-marker" ? blockType : headingMatch ? "heading" : blockType;
+  // Eingebettete Strukturhilfen bleiben eigenständige Objekte. Würde etwa
+  // das Inhaltsverzeichnis als Überschrift behandelt, würde der folgende
+  // Haupttext im Dokumentbaum fälschlich zu seinem untergeordneten Inhalt.
+  const type = ["paratext-marker", "toc", "citation"].includes(blockType)
+    ? blockType
+    : headingMatch
+      ? "heading"
+      : blockType;
   const title = type === "heading" && headingMatch
     ? getPlainDocumentLabel(headingMatch[2], "Ohne Titel")
     : type === "toc"
@@ -1342,17 +1354,22 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     const citationText = document.createElement("p");
     citationText.className = "preview-citation-text";
     const project = options.project || getActiveProject();
-    const citation = normalizeCitationSource(project?.citationSource, project, project?.sourceCitation);
+    const citation = normalizeCitationSource(project?.citationSource, project);
     const formatted = formatSourceCitation(citation);
     const titleIndex = formatted.italicTitle ? formatted.full.indexOf(formatted.italicTitle) : -1;
+    // Bibliografische Großschreibung ist bedeutungstragend und bleibt deshalb
+    // außerhalb der Kapitälchen-Transformation des Fließtexts.
+    const appendCitationText = (target, value) => {
+      if (value) target.appendChild(document.createTextNode(value));
+    };
     if (titleIndex < 0) {
-      appendTextNode(citationText, formatted.full);
+      appendCitationText(citationText, formatted.full);
     } else {
-      appendTextNode(citationText, formatted.full.slice(0, titleIndex));
+      appendCitationText(citationText, formatted.full.slice(0, titleIndex));
       const title = document.createElement("em");
-      appendTextNode(title, formatted.italicTitle);
+      appendCitationText(title, formatted.italicTitle);
       citationText.appendChild(title);
-      appendTextNode(citationText, formatted.full.slice(titleIndex + formatted.italicTitle.length));
+      appendCitationText(citationText, formatted.full.slice(titleIndex + formatted.italicTitle.length));
     }
     object.appendChild(citationText);
     return object;
@@ -1684,10 +1701,11 @@ function createPreviewDocumentHead(project, options = {}) {
   const { includeTitle = true, align = getDocumentTitleAlignment(project) } = options;
   const metadata = project.metadata || {};
   const title = String(project.title || "").trim();
-  const subtitle = String(metadata.subtitle || "").trim();
-  const authors = getDisplayedAuthors(metadata);
+  const subtitle = String(project.citationSource?.subtitle || "").trim();
+  const lead = String(project.citationSource?.lead || "").trim();
+  const authors = getDisplayedAuthors(project);
   const authorsFirst = metadata.textKind === "paper";
-  if ((!includeTitle || !title) && !subtitle && !authors.length) return null;
+  if ((!includeTitle || !title) && !subtitle && !lead && !authors.length) return null;
 
   const head = document.createElement("header");
   head.className = "preview-document-head";
@@ -1697,7 +1715,7 @@ function createPreviewDocumentHead(project, options = {}) {
     if (!authors.length) return;
     const authorElement = document.createElement("p");
     authorElement.className = "preview-document-authors";
-    authorElement.textContent = authors.join(", ");
+    authorElement.textContent = authors.join("; ");
     head.appendChild(authorElement);
   };
   if (authorsFirst) appendAuthors();
@@ -1714,6 +1732,12 @@ function createPreviewDocumentHead(project, options = {}) {
     head.appendChild(subtitleElement);
   }
   if (!authorsFirst) appendAuthors();
+  if (lead) {
+    const leadElement = document.createElement("p");
+    leadElement.className = "preview-document-lead";
+    leadElement.textContent = lead;
+    head.appendChild(leadElement);
+  }
   return head;
 }
 
@@ -1732,6 +1756,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     titleScale.authors = 1;
     titleScale.authorsLineHeight = 1.3;
   }
+  const leadPresentation = getLeadPresentation(project, titleScale);
   const textType = project.source.textType || "prose";
   const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
   const documentTitleAlign = getDocumentTitleAlignment(project);
@@ -1743,6 +1768,8 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-title-weight", String(Number(style.titleWeight) || 700));
   targetPage.style.setProperty("--preview-subtitle-font", style.subtitleFontFamily || style.titleFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-subtitle-weight", String(Number(style.subtitleWeight) || 400));
+  targetPage.style.setProperty("--preview-lead-font", leadPresentation.fontFamily);
+  targetPage.style.setProperty("--preview-lead-weight", String(leadPresentation.fontWeight));
   targetPage.style.setProperty("--preview-meta-font", style.metaFontFamily || style.subtitleFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-meta-weight", String(Number(style.metaWeight) || 400));
   targetPage.style.setProperty("--preview-heading-font", style.headingFontFamily || style.fontFamily);
@@ -1758,9 +1785,11 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   }
   targetPage.style.setProperty("--preview-title-size", `${Number(titleScale.title) || 1.48}em`);
   targetPage.style.setProperty("--preview-subtitle-size", `${Number(titleScale.subtitle) || 0.86}em`);
+  targetPage.style.setProperty("--preview-lead-size", `${leadPresentation.fontSize}em`);
   targetPage.style.setProperty("--preview-authors-size", `${Number(titleScale.authors) || 0.76}em`);
   targetPage.style.setProperty("--preview-title-line-height", String(Number(titleScale.titleLineHeight) || 1.12));
   targetPage.style.setProperty("--preview-subtitle-line-height", String(Number(titleScale.subtitleLineHeight) || 1.28));
+  targetPage.style.setProperty("--preview-lead-line-height", String(leadPresentation.lineHeight));
   targetPage.style.setProperty("--preview-authors-line-height", String(Number(titleScale.authorsLineHeight) || 1.28));
   targetText.style.fontFamily = style.fontFamily;
   targetText.classList.toggle("has-first-line-indent", style.firstLineIndent === true);
@@ -1845,12 +1874,6 @@ function renderViewLayer(project, sourceModel, layoutModel) {
     ui.previewPage.style.setProperty("--preview-font-size", `${ptToPx(project.style.fontSize)}px`);
   }
   renderTextView(ui.previewPage, ui.previewText, project, layoutModel);
-
-  if (ui.sidePreviewPage) {
-    const compactFontSize = Math.max(10, Math.round(ptToPx(project.style.fontSize) * 0.72));
-    ui.sidePreviewPage.style.setProperty("--preview-font-size", `${compactFontSize}px`);
-  }
-  renderTextView(ui.sidePreviewPage, ui.sidePreviewText, project, layoutModel);
 }
 
 function rebuildModelsAndPreview() {
@@ -2512,7 +2535,6 @@ function renderProjectList() {
 function renderEditor() {
   const project = getActiveProject();
   if (!project) return;
-  if (ui.projectInfo) ui.projectInfo.textContent = `${state.projects.length} Dokument${state.projects.length === 1 ? "" : "e"}`;
   loadProjectFonts([project]);
   renderFontOptions(project);
   const isJsonView = state.editorDataView === "json";
@@ -2624,6 +2646,7 @@ function readSourceCitationForm() {
     source_type: ui.sourceCitationTypeInput.value,
     title: ui.sourceCitationTitleInput.value.trim(),
     subtitle: ui.sourceCitationSubtitleInput.value.trim(),
+    lead: ui.sourceCitationLeadInput.value.trim(),
     language: ui.sourceCitationLanguageInput.value.trim() || "de",
     authors: getCitationPeople(ui.sourceCitationAuthorsList).join("; "),
     institutional_author: ui.sourceCitationInstitutionalAuthorInput.value.trim(),
@@ -2707,6 +2730,7 @@ function isPlausibleHttpUrl(value) {
  * eine externe Zitationsbibliothek ersetzt werden, ohne das Formularmodell erneut umzubauen.
  */
 function formatSourceCitation(citation) {
+  citation = getCitationForFieldProfile(citation);
   const author = citation.authors || citation.institutional_author || "o. V.";
   const dinAuthor = formatDinResponsibility(citation);
   const title = [citation.title || "Ohne Titel", citation.subtitle]
@@ -2793,8 +2817,66 @@ function renderFullCitationOutput(formatted) {
   output.append(emphasis, document.createTextNode(text.slice(titleIndex + italicTitle.length)));
 }
 
+const CITATION_OPTIONAL_FIELDS = [
+  "lead", "editors", "contributors", "container_title", "publisher", "publisher_place", "volume", "issue",
+  "page_range", "edition", "version_statement", "doi", "url", "archive_url", "accessed_date",
+];
+
+const CITATION_FIELD_PROFILES = {
+  book: ["editors", "contributors", "publisher", "publisher_place", "edition", "version_statement", "doi", "url", "archive_url", "accessed_date"],
+  book_chapter: ["editors", "contributors", "container_title", "publisher", "publisher_place", "volume", "page_range", "edition", "doi", "url", "archive_url", "accessed_date"],
+  journal_article: ["container_title", "volume", "issue", "page_range", "version_statement", "doi", "url", "archive_url", "accessed_date"],
+  newspaper_article: ["lead", "contributors", "container_title", "issue", "page_range", "version_statement", "url", "archive_url", "accessed_date"],
+  webpage: ["contributors", "container_title", "publisher", "version_statement", "doi", "url", "archive_url", "accessed_date"],
+  report: ["contributors", "publisher", "publisher_place", "version_statement", "doi", "url", "archive_url", "accessed_date"],
+};
+
+function getCitationForFieldProfile(citation) {
+  const profile = CITATION_FIELD_PROFILES[citation?.source_type];
+  if (!profile) return { ...citation };
+  const visibleFields = new Set(profile);
+  const effectiveCitation = { ...citation };
+  CITATION_OPTIONAL_FIELDS.forEach((field) => {
+    if (!visibleFields.has(field)) effectiveCitation[field] = "";
+  });
+  return effectiveCitation;
+}
+
+function getCitationOptionalFieldControls() {
+  return {
+    lead: ui.sourceCitationLeadInput,
+    editors: ui.sourceCitationEditorsInput,
+    contributors: ui.sourceCitationContributorsInput,
+    container_title: ui.sourceCitationContainerTitleInput,
+    publisher: ui.sourceCitationPublisherInput,
+    publisher_place: ui.sourceCitationPublisherPlaceInput,
+    volume: ui.sourceCitationVolumeInput,
+    issue: ui.sourceCitationIssueInput,
+    page_range: ui.sourceCitationPageRangeInput,
+    edition: ui.sourceCitationEditionInput,
+    version_statement: ui.sourceCitationVersionStatementInput,
+    doi: ui.sourceCitationDoiInput,
+    url: ui.sourceCitationUrlInput,
+    archive_url: ui.sourceCitationArchiveUrlInput,
+    accessed_date: ui.sourceCitationAccessedDateInput,
+  };
+}
+
+function applyCitationFieldProfile(sourceType) {
+  const controls = getCitationOptionalFieldControls();
+  // Nicht konfigurierte Quellentypen sind der vollständige Fallback. Verborgene
+  // Werte bleiben im Formularmodell erhalten und werden beim Typwechsel nie gelöscht.
+  const visibleFields = new Set(CITATION_FIELD_PROFILES[sourceType] || CITATION_OPTIONAL_FIELDS);
+  Object.entries(controls).forEach(([field, control]) => {
+    const row = control?.closest(".property-row");
+    if (row) row.hidden = !visibleFields.has(field);
+  });
+  return visibleFields;
+}
+
 function updateSourceCitationForm() {
   const citation = readSourceCitationForm();
+  const visibleFields = applyCitationFieldProfile(citation.source_type);
   const containerLabels = {
     journal_article: "Zeitschrift",
     book_chapter: "Sammelband",
@@ -2811,9 +2893,9 @@ function updateSourceCitationForm() {
   const isOnlineSource = citation.source_type === "webpage"
     || citation.source_type === "blog_post"
     || (citation.source_type === "report" && Boolean(citation.url));
-  ui.sourceCitationAccessedHint.hidden = !(isOnlineSource && citation.url && !citation.accessed_date);
-  ui.sourceCitationDoiHint.hidden = !citation.doi || isPlausibleDoi(citation.doi);
-  ui.sourceCitationUrlHint.hidden = isPlausibleHttpUrl(citation.url) && isPlausibleHttpUrl(citation.archive_url);
+  ui.sourceCitationAccessedHint.hidden = !visibleFields.has("accessed_date") || !(isOnlineSource && citation.url && !citation.accessed_date);
+  ui.sourceCitationDoiHint.hidden = !visibleFields.has("doi") || !citation.doi || isPlausibleDoi(citation.doi);
+  ui.sourceCitationUrlHint.hidden = !visibleFields.has("url") || (isPlausibleHttpUrl(citation.url) && isPlausibleHttpUrl(citation.archive_url));
   if (citation.title) ui.sourceCitationTitleInput.setCustomValidity("");
   const formatted = formatSourceCitation(citation);
   ui.sourceCitationShortOutput.value = formatted.short;
@@ -2940,10 +3022,11 @@ function changeActiveFontSize(delta) {
 function openDocumentPropertiesDialog() {
   const project = getActiveProject();
   if (!project) return;
-  const citation = normalizeCitationSource(project.citationSource, project, project.sourceCitation);
+  const citation = normalizeCitationSource(project.citationSource, project);
   ui.sourceCitationTypeInput.value = citation.source_type;
   ui.sourceCitationTitleInput.value = citation.title;
   ui.sourceCitationSubtitleInput.value = citation.subtitle;
+  ui.sourceCitationLeadInput.value = citation.lead;
   ui.sourceCitationLanguageInput.value = citation.language;
   ui.sourceCitationTextVersionInput.value = citation.text_version;
   ui.sourceCitationOriginalTitleInput.value = citation.original_title;
@@ -2990,15 +3073,6 @@ async function saveDocumentPropertiesDialog() {
     project.title = title;
     syncProjectTitleHeading(project, previousTitle);
     project.citationSource = readSourceCitationForm();
-    project.citationLegacy = {
-      ...(project.citationLegacy || {}),
-      ...(project.sourceCitation?.working_title ? { working_title: project.sourceCitation.working_title } : {}),
-    };
-    delete project.sourceCitation;
-    delete project.textObject;
-    // Preview and current exports still consume these two legacy metadata values.
-    project.metadata.subtitle = project.citationSource.subtitle;
-    project.metadata.language = project.citationSource.language;
   });
   await flushAutosave();
   renderEditor();
@@ -3099,7 +3173,13 @@ function insertTableOfContentsObject() {
       .split(/\r?\n/)
       .filter((line) => !isTableOfContentsText(line))
       .join("\n");
-    project.source.rawText = ensureDocumentStructure(withoutExistingToc, project.title);
+    const normalized = ensureDocumentStructure(withoutExistingToc, project.title).trimEnd();
+    const lines = normalized.split("\n");
+    const titleIndex = lines.findIndex((line) => /^#\s+/.test(line) && !getParatextHeadingKind(line));
+    const insertionIndex = titleIndex >= 0 ? titleIndex + 1 : lines.length;
+    lines.splice(insertionIndex, 0, "", TOC_OBJECT_HEADING);
+    project.source.rawText = `${lines.join("\n").replace(/\n{3,}/g, "\n\n")}\n`;
+    project.tocVisible = true;
     syncProjectTitleFromHeading(project, { normalizeStructure: true });
     state.activeSourceRange = null;
   });
@@ -3107,19 +3187,29 @@ function insertTableOfContentsObject() {
 }
 
 function removeCitationObjectBlock(rawText) {
+  return removeLegacyCitationHeading(rawText)
+    .split(/\r?\n/)
+    .filter((line) => !isCitationObjectText(line))
+    .join("\n")
+    .trimEnd();
+}
+
+function removeLegacyCitationHeading(rawText) {
   const lines = String(rawText || "").split(/\r?\n/);
   const removedIndexes = new Set();
   lines.forEach((line, index) => {
     if (!isCitationObjectText(line)) return;
-    removedIndexes.add(index);
     let headingIndex = index - 1;
     while (headingIndex >= 0 && !lines[headingIndex].trim()) headingIndex -= 1;
-    if (lines[headingIndex]?.trim().toLowerCase() === CITATION_OBJECT_HEADING.toLowerCase()) {
+    if (lines[headingIndex]?.trim().toLowerCase() === LEGACY_CITATION_OBJECT_HEADING.toLowerCase()) {
       removedIndexes.add(headingIndex);
       for (let blankIndex = headingIndex + 1; blankIndex < index; blankIndex += 1) removedIndexes.add(blankIndex);
     }
   });
-  return lines.filter((_, index) => !removedIndexes.has(index)).join("\n").trimEnd();
+  return lines
+    .filter((_, index) => !removedIndexes.has(index))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 function toggleCitationObject() {
@@ -3128,7 +3218,7 @@ function toggleCitationObject() {
     const withoutCitation = removeCitationObjectBlock(rawText);
     project.source.rawText = hasCitationObject(project)
       ? `${withoutCitation}\n`
-      : `${withoutCitation}\n\n${CITATION_OBJECT_HEADING}\n\n${CITATION_OBJECT_MARKER}\n`;
+      : `${withoutCitation}\n\n${CITATION_OBJECT_MARKER}\n`;
     delete project.chapterRoles?.[createChapterRoleKey(2, "Quellenangabe")];
     state.activeSourceRange = null;
   });
@@ -3201,9 +3291,10 @@ Quelle: ${sourceUrl}
 
 AUFGABE
 1. Rufe die Quelle auf und extrahiere den vollständigen redaktionellen Haupttext. Entferne Navigation, Werbung, Cookie-Hinweise, Empfehlungen, Kommentare und sonstige Seitenelemente.
-2. Bewahre Wortlaut, Reihenfolge, Absätze, Zwischenüberschriften, Zitate, Listen, Tabellen und Code. Fasse nichts zusammen, übersetze nichts und ergänze keine inhaltlichen Aussagen.
-3. Ermittle die bibliografischen Angaben aus der sichtbaren Seite und – soweit eindeutig – aus strukturierten Metadaten. Erfinde keine Angaben; unbekannte Werte bleiben als leere Zeichenfolge erhalten.
-4. Gib ausschließlich ein gültiges JSON-Objekt aus: kein Markdown-Codezaun, keine Einleitung und keine Erläuterung.
+2. Erfasse einen ausdrücklich ausgewiesenen journalistischen Lead oder Teaser separat in citationSource.lead. Übernimm ihn nicht zusätzlich als ersten Absatz in source.rawText. Ist kein Lead eindeutig erkennbar, bleibt das Feld leer.
+3. Bewahre Wortlaut, Reihenfolge, Absätze, Zwischenüberschriften, Zitate, Listen, Tabellen und Code. Fasse nichts zusammen, übersetze nichts und ergänze keine inhaltlichen Aussagen.
+4. Ermittle die bibliografischen Angaben aus der sichtbaren Seite und – soweit eindeutig – aus strukturierten Metadaten. Erfinde keine Angaben; unbekannte Werte bleiben als leere Zeichenfolge erhalten.
+5. Gib ausschließlich ein gültiges JSON-Objekt aus: kein Markdown-Codezaun, keine Einleitung und keine Erläuterung.
 
 TYPEMAP-MARKDOWN IN source.rawText
 - Die erste Zeile ist genau eine H1: "# Titel". Sie muss mit dem Feld title übereinstimmen.
@@ -3218,14 +3309,15 @@ TYPEMAP-MARKDOWN IN source.rawText
 BIBLIOGRAFISCHE REGELN
 - source_type ist einer dieser Werte: book, book_chapter, journal_article, newspaper_article, webpage, blog_post, report, legal_text, court_decision, manuscript, letter, email, other.
 - Wähle journal_article nur bei einer erkennbaren Fachzeitschrift, newspaper_article bei einer Zeitung, blog_post bei einem Blog und report bei einem formal herausgegebenen Bericht; sonst webpage.
-- title ist Pflicht. subtitle enthält nur einen ausdrücklich ausgewiesenen Untertitel.
+- title ist Pflicht. subtitle enthält nur einen ausdrücklich ausgewiesenen Untertitel. lead enthält ausschließlich einen redaktionell erkennbaren Lead oder Teaser, niemals eine selbst erzeugte Zusammenfassung.
 - authors enthält Personen als "NACHNAME, Vorname; NACHNAME, Vorname". Bei mehreren Personen dient das Semikolon als Trennzeichen. institutional_author enthält die verantwortliche Organisation, wenn keine Person verantwortlich zeichnet.
 - container_title bezeichnet Website, Zeitung, Zeitschrift oder übergeordnetes Werk. publisher und publisher_place werden nur bei belegten Angaben gesetzt.
 - issued_date verwendet nach Möglichkeit YYYY-MM-DD; issued_year nur das vierstellige Erscheinungsjahr. Verwende nicht das Abrufdatum als Erscheinungsdatum.
 - url enthält die kanonische Artikel-URL, archive_url nur eine belegte Archivfassung und accessed_date das vorgegebene Abrufdatum.
 - doi enthält nur einen tatsächlich angegebenen DOI. citation_style bleibt "Hausstil"; short_citation und full_citation bleiben leer, da TypeMap sie berechnet.
 - text_version ist "translation" nur bei einer erkennbaren Übersetzung. Dann original_title, original_language und translators ausfüllen; andernfalls "original".
-- metadata.language und style.language verwenden de, en, fr oder la. metadata.authors enthält dieselben Personen als Array; wenn nur eine Institution vorliegt, bleibt es [""].
+- citationSource.language und style.language verwenden de, en, fr oder la. Autorenname, Untertitel und Lead stehen ausschließlich unter citationSource; lege dafür keine parallelen Felder unter metadata an.
+- Setze metadata.textKind bei journalistischen Artikeln, Zeitungstexten und redaktionellen Webbeiträgen auf "report", bei wissenschaftlichen Artikeln auf "paper" und bei universellen Rohtexten auf "notebook".
 - Behalte die vorgegebenen Darstellungswerte unter style, typography, paratextVisibility, chapterRoles und tocVisible unverändert. Verwende leere id-/Zeitfelder; TypeMap vergibt diese lokal.
 
 EXAKTE JSON-GRUNDFORM
@@ -3261,6 +3353,7 @@ function addGeneratedProject(payload) {
     createdAt: now,
     updatedAt: now,
   });
+  applyDocumentStylePreset(project, project.metadata.textKind);
   state.projects.push(project);
   state.activeProjectId = project.id;
   state.activeSourceRange = null;
@@ -3381,6 +3474,22 @@ function exportProjects() {
   downloadBlob(blob, "typemap-dokument.json");
 }
 
+function exportActiveProjectJson() {
+  const project = getActiveProject();
+  if (!project) return;
+  const payload = {
+    type: "typemap-project-export",
+    version: PROJECT_FILE_VERSION,
+    exportedAt: new Date().toISOString(),
+    state: {
+      activeProjectId: project.id,
+      projects: [project],
+    },
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  downloadBlob(blob, `${slugifyFilename(project.title, "typemap-dokument")}.json`);
+}
+
 function slugifyFilename(value, fallback = "typemap") {
   const slug = String(value || "")
     .normalize("NFKD")
@@ -3474,7 +3583,8 @@ function buildHtmlAppFontLinks() {
 
 function buildHtmlExport(project) {
   const metadata = project.metadata || {};
-  const authors = getDisplayedAuthors(metadata);
+  const citationSource = project.citationSource || {};
+  const authors = getDisplayedAuthors(project);
   const sourceModel = buildSourceModel(project);
   const layoutModel = buildBrowserLayoutModel(sourceModel, project.style);
   const hasSourceTitleHeading = projectStartsWithTitleHeading(project);
@@ -3492,6 +3602,7 @@ function buildHtmlExport(project) {
     titleScale.authors = 1;
     titleScale.authorsLineHeight = 1.3;
   }
+  const leadPresentation = getLeadPresentation(project, titleScale);
   const lineNumbering = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
   const hyphenationSettings = normalizeHyphenationSettings(project.style.hyphenationSettings, project.style.hyphenation, project.style.language);
   const exportBlocks = lineNumbering.mode === "source-lines" && textType === "lyric"
@@ -3523,13 +3634,14 @@ function buildHtmlExport(project) {
   const ligatureCss = project.style.ligatures !== false
     ? ' font-variant-ligatures: common-ligatures contextual; font-feature-settings: "liga" 1, "clig" 1, "calt" 1; text-rendering: optimizeLegibility;'
     : "";
-  const paragraphSpacing = Number(project.style.paragraphSpacing) || 0.72;
+  const paragraphSpacingValue = Number(project.style.paragraphSpacing);
+  const paragraphSpacing = Number.isFinite(paragraphSpacingValue) ? paragraphSpacingValue : 0.72;
   const firstLineIndent = project.style.firstLineIndent ? "1.3em" : "0";
   const quoteStyle = project.style.quoteStyle === "italic" ? "italic" : "normal";
   const codeFontSize = Math.max(8, (Number(project.style.fontSize) || 14) - 2);
   const authorsFirst = metadata.textKind === "paper";
   return `<!DOCTYPE html>
-<html lang="${escapeHtml(metadata.language || project.style.language || "de")}">
+<html lang="${escapeHtml(citationSource.language || project.style.language || "de")}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3538,22 +3650,24 @@ function buildHtmlExport(project) {
   <style>
 ${buildHtmlFontFaceCss(project)}
     * { box-sizing: border-box; }
-    body { margin: 0; background: #fff; color: #111; font-family: ${project.style.fontFamily}; }
-    main { max-width: ${hasTocObject ? `calc(${project.style.measure}ch + 250px)` : `${project.style.measure}ch`}; margin: 0 auto; padding: 56px; font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; -webkit-hyphens: ${hyphenationSettings.mode}; hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; hyphenate-limit-chars: ${hyphenationSettings.minWordLength} ${hyphenationSettings.before} ${hyphenationSettings.after}; -webkit-hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; -webkit-hyphenate-limit-before: ${hyphenationSettings.before}; -webkit-hyphenate-limit-after: ${hyphenationSettings.after}; overflow-wrap: break-word; }
-    main.has-side-toc { display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, ${project.style.measure}ch); gap: 30px; align-items: start; }
+    body { margin: 0; padding: 16px 40px 54px; background: #fff; color: #213633; font-family: ${project.style.fontFamily}; }
+    main { width: min(920px, 100%); max-width: none; margin: 0 auto; padding: clamp(34px, 5vw, 72px); font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; -webkit-hyphens: ${hyphenationSettings.mode}; hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; hyphenate-limit-chars: ${hyphenationSettings.minWordLength} ${hyphenationSettings.before} ${hyphenationSettings.after}; -webkit-hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; -webkit-hyphenate-limit-before: ${hyphenationSettings.before}; -webkit-hyphenate-limit-after: ${hyphenationSettings.after}; overflow-wrap: break-word; }
+    main.has-side-toc { width: min(1180px, 100%); display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, ${project.style.measure}ch); gap: 30px; align-items: start; }
+    .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; min-width: 0; }
     header { margin: 0 0 1.55em; text-align: ${documentTitleAlign}; }
-    header h1 { margin: 0; font-family: ${project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.title) || 1.48}em; font-weight: ${Number(project.style.titleWeight) || 700}; line-height: ${Number(titleScale.titleLineHeight) || 1.12}; }
-    .subtitle { margin: .34em 0 0; color: #555; font-family: ${project.style.subtitleFontFamily || project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.subtitle) || 0.86}em; font-weight: ${Number(project.style.subtitleWeight) || 400}; line-height: ${Number(titleScale.subtitleLineHeight) || 1.28}; }
-    .authors { margin: .68em 0 0; color: #333; font-family: ${project.style.metaFontFamily || project.style.subtitleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: ${Number(project.style.metaWeight) || 400}; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
+    header h1 { margin: 0; color: #213633; font-family: ${project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.title) || 1.48}em; font-weight: ${Number(project.style.titleWeight) || 700}; line-height: ${Number(titleScale.titleLineHeight) || 1.12}; }
+    .subtitle { margin: .34em 0 0; color: rgba(33, 54, 51, .72); font-family: ${project.style.subtitleFontFamily || project.style.titleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.subtitle) || 0.86}em; font-weight: ${Number(project.style.subtitleWeight) || 400}; line-height: ${Number(titleScale.subtitleLineHeight) || 1.28}; }
+    .authors { margin: .68em 0 0; color: #213633; font-family: ${project.style.metaFontFamily || project.style.subtitleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: ${Number(project.style.metaWeight) || 400}; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
     header.authors-first .authors { margin: 0 0 .68em; }
-    .typemap-text { position: relative; font-family: ${project.style.fontFamily};${ligatureCss} }
+    .lead { margin: 1.1em 0 0; color: #213633; font-family: ${leadPresentation.fontFamily}; font-size: ${leadPresentation.fontSize}em; font-weight: ${leadPresentation.fontWeight}; line-height: ${leadPresentation.lineHeight}; white-space: pre-wrap; font-synthesis-style: none; }
+    .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${project.style.fontFamily}; font-synthesis-style: none; text-wrap: pretty;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     .preview-small-caps { font-size: inherit; font-variant-caps: small-caps; font-feature-settings: "smcp" 1; letter-spacing: .01em; text-transform: none; hyphens: inherit; -webkit-hyphens: inherit; overflow-wrap: inherit; word-break: normal; }
     .html-side-toc { position: sticky; top: 24px; display: grid; gap: 2px; max-height: calc(100vh - 80px); overflow: auto; color: #6b746f; font-family: "Source Sans 3", Arial, sans-serif; font-size: 11.5pt; line-height: 1.28; text-align: left; }
     .html-side-toc-title { margin-bottom: .55em; color: #8f5d14; font-size: 8.5pt; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
     .html-side-toc-item { display: block; min-height: 24px; padding: 3px 6px 3px calc(4px + var(--toc-level, 0) * 13px); border-radius: 6px; color: inherit; text-decoration: none; }
     .html-side-toc-item:hover { background: rgba(196, 136, 47, .1); color: #8f5d14; }
-    @media (max-width: 860px) { main.has-side-toc { display: block; max-width: ${project.style.measure}ch; } .html-side-toc { position: static; max-height: none; margin-bottom: 1.2em; } }
+    @media (max-width: 1060px) { main.has-side-toc { width: min(920px, 100%); display: block; } .html-side-toc { display: none; } }
     p { margin: 0 0 ${paragraphSpacing}em; white-space: pre-wrap; overflow-wrap: break-word; text-indent: 0; }
     .typemap-text > p { text-indent: ${firstLineIndent}; }
     .typemap-text > p:first-of-type, .typemap-text > .preview-heading + p { text-indent: 0; }
@@ -3571,7 +3685,8 @@ ${buildHtmlFontFaceCss(project)}
     .preview-heading-level-6 { font-size: ${Number(headingScale[6]) || 0.94}em; font-weight: 600; font-style: italic; }
     .preview-heading-level-7 { font-size: ${Number(headingScale[7]) || 0.9}em; font-weight: 600; font-style: italic; }
     .preview-embedded-object { margin: 0 0 .8em; line-height: inherit; }
-    .preview-object-capsule { display: inline-flex; align-items: center; max-height: 1.45em; padding: 0 .58em; border: 1px solid rgba(196, 136, 47, .42); border-radius: 999px; background: rgba(196, 136, 47, .13); color: #8f5d14; font-family: "Source Sans 3", Arial, sans-serif; font-size: .72em; font-weight: 700; line-height: 1.25; vertical-align: baseline; }
+    .preview-citation-object { display: grid; width: 100%; margin-top: 2em; justify-items: start; }
+    .preview-citation-text { width: 100%; margin: 0; font-family: "Source Sans 3", Arial, sans-serif; font-size: ${Math.min(Number(titleScale.authors) || 0.76, 1)}em; line-height: 1.42; }
     blockquote { margin: .9em 0; padding-left: 1.1em; border-left: 2px solid rgba(61, 75, 69, .42); color: rgba(38, 54, 50, .86); font-family: ${project.style.quoteFontFamily || project.style.fontFamily}; font-style: ${quoteStyle}; }
     ul, ol { margin: 0 0 .85em 1.4em; padding: 0; }
     li { margin: .18em 0; }
@@ -3588,10 +3703,11 @@ ${buildHtmlFontFaceCss(project)}
     ${tocHtml}
     <div class="html-document-flow">
     <header${authorsFirst ? ' class="authors-first"' : ""}>
-      ${authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join(", "))}</p>` : ""}
+      ${authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join("; "))}</p>` : ""}
       <h1>${escapeHtml(project.title || "")}</h1>
-      ${metadata.subtitle ? `<p class="subtitle">${escapeHtml(metadata.subtitle)}</p>` : ""}
-      ${!authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join(", "))}</p>` : ""}
+      ${citationSource.subtitle ? `<p class="subtitle">${escapeHtml(citationSource.subtitle)}</p>` : ""}
+      ${!authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join("; "))}</p>` : ""}
+      ${citationSource.lead ? `<p class="lead">${escapeHtml(citationSource.lead)}</p>` : ""}
     </header>
     <section id="typemapText" class="typemap-text${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">
       ${blocks}
@@ -3765,12 +3881,14 @@ async function exportPng() {
     return uppercaseLetters.length >= 2 && !/\p{Ll}/u.test(plain);
   }
 
-  const authors = getDisplayedAuthors(metadata);
+  const authors = getDisplayedAuthors(project);
+  const subtitle = String(project.citationSource?.subtitle || "").trim();
+  const lead = String(project.citationSource?.lead || "").trim();
   const authorsFirst = metadata.textKind === "paper";
   const pushAuthors = () => {
     if (!authors.length) return;
     const authorsSize = authorsFirst ? fontSize : fontSize * (Number(titleScale.authors) || 0.76);
-    wrapText(authors.join(", "), authorsSize, 400).forEach((line) => pushLine(line, {
+    wrapText(authors.join("; "), authorsSize, 400).forEach((line) => pushLine(line, {
       size: authorsSize,
       weight: 400,
       align: documentTitleAlign,
@@ -3791,10 +3909,10 @@ async function exportPng() {
       lineHeight: titleSize * (Number(titleScale.titleLineHeight) || 1.12),
     }));
   }
-  if (metadata.subtitle) {
+  if (subtitle) {
     pushSpacer(fontSize * 0.34);
     const subtitleSize = fontSize * (Number(titleScale.subtitle) || 0.86);
-    wrapText(metadata.subtitle, subtitleSize, 400).forEach((line) => pushLine(line, {
+    wrapText(subtitle, subtitleSize, 400).forEach((line) => pushLine(line, {
       size: subtitleSize,
       align: documentTitleAlign,
       color: "#444",
@@ -3805,7 +3923,18 @@ async function exportPng() {
     pushSpacer(fontSize * 0.68);
     pushAuthors();
   }
-  if (project.title || metadata.subtitle || authors.length) pushSpacer(fontSize * 1.55);
+  if (lead) {
+    pushSpacer(fontSize * 0.9);
+    const leadSize = fontSize * (Number(titleScale.lead) || 1);
+    wrapText(lead, leadSize, Number(style.leadWeight) || 400).forEach((line) => pushLine(line, {
+      size: leadSize,
+      weight: Number(style.leadWeight) || 400,
+      align: documentTitleAlign,
+      color: "#26332f",
+      lineHeight: leadSize * (Number(titleScale.leadLineHeight) || 1.42),
+    }));
+  }
+  if (project.title || subtitle || authors.length || lead) pushSpacer(fontSize * 1.55);
 
   const sourceModel = buildSourceModel(project);
   const layoutModel = buildBrowserLayoutModel(sourceModel, project.style);
@@ -3881,6 +4010,11 @@ async function exportPng() {
 function setExportMenuOpen(isOpen) {
   if (ui.exportMenu) ui.exportMenu.hidden = !isOpen;
   ui.exportProjectButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setBrowserActionsMenuOpen(isOpen) {
+  if (ui.browserActionsMenu) ui.browserActionsMenu.hidden = !isOpen;
+  ui.browserActionsMenuButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
 }
 
 function handleExportFormat(format) {
@@ -4072,19 +4206,6 @@ function setWorkspaceSection(section) {
   }
 }
 
-function setProjectEditorTab(tab) {
-  const activeTab = tab === "preview" ? "preview" : "browser";
-  state.activeProjectEditorTab = activeTab;
-  document.querySelectorAll("[data-type-tab]").forEach((button) => {
-    const isActive = button.dataset.typeTab === activeTab;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
-  document.querySelectorAll("[data-type-tab-panel]").forEach((panel) => {
-    panel.hidden = panel.dataset.typeTabPanel !== activeTab;
-  });
-}
-
 function handleWorkspaceToggle(event, section) {
   event?.preventDefault?.();
   setWorkspaceSection(section);
@@ -4115,6 +4236,7 @@ function bindMenu() {
       setLineNumberDialogOpen(false);
       setHyphenationDialogOpen(false);
       setExportMenuOpen(false);
+      setBrowserActionsMenuOpen(false);
     }
   });
 }
@@ -4131,11 +4253,6 @@ function bindEditor() {
   document.addEventListener("click", (event) => {
     if (event.target instanceof Element && event.target.closest(".editor-menu, .toolbar-popover")) return;
     closeEditorMenus();
-  });
-  document.querySelectorAll("[data-type-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setProjectEditorTab(button.dataset.typeTab);
-    });
   });
   ui.openWorkspaceStrip?.addEventListener("click", (event) => handleWorkspaceToggle(event, "details"));
   ui.openWorkspaceStrip?.addEventListener("keydown", (event) => {
@@ -4160,8 +4277,23 @@ function bindEditor() {
     if (editorFrame) state.editorResizeObserver.observe(editorFrame);
   }
   document.fonts?.ready?.then(scheduleEditorGeometrySync);
-  ui.newProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
+  ui.browserActionsMenuButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const shouldOpen = ui.browserActionsMenuButton.getAttribute("aria-expanded") !== "true";
+    setBrowserActionsMenuOpen(shouldOpen);
+  });
+  ui.browserActionsMenu?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (event.target instanceof Element && event.target.closest("button")) {
+      setBrowserActionsMenuOpen(false);
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".browser-actions-menu-shell")) return;
+    setBrowserActionsMenuOpen(false);
+  });
   ui.createProjectButton?.addEventListener("click", () => addProject("Neues Dokument"));
+  ui.browserExportJsonButton?.addEventListener("click", exportActiveProjectJson);
   ui.openGenerateDialogButton?.addEventListener("click", () => {
     setGenerateDialogStatus("");
     setGenerateDialogOpen(true);
@@ -4221,7 +4353,6 @@ function bindEditor() {
     if (event.target instanceof Element && event.target.closest(".export-control")) return;
     setExportMenuOpen(false);
   });
-  ui.importProjectButton?.addEventListener("click", () => ui.projectFileInput?.click());
   ui.openImportButton?.addEventListener("click", () => ui.projectFileInput?.click());
   ui.projectFileInput?.addEventListener("change", async () => {
     const file = ui.projectFileInput.files?.[0];
@@ -4297,7 +4428,7 @@ function bindEditor() {
   ui.documentPropertiesCloseButton?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesCancelButton?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesSaveButton?.addEventListener("click", saveDocumentPropertiesDialog);
-  document.querySelectorAll("#propertyPanelSourceCitation input, #propertyPanelSourceCitation select")
+  document.querySelectorAll("#propertyPanelSourceCitation input, #propertyPanelSourceCitation select, #propertyPanelSourceCitation textarea")
     .forEach((control) => {
       control.addEventListener("input", updateSourceCitationForm);
       control.addEventListener("change", updateSourceCitationForm);
@@ -4486,7 +4617,6 @@ async function init() {
     scheduleAutosave();
   }
   setWorkspaceSection("preview");
-  setProjectEditorTab(state.activeProjectEditorTab);
 }
 
 init().catch((error) => {

@@ -11,24 +11,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260618az">
+  <link rel="stylesheet" href="typemap.css?v=20260619bq">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
     <section class="preview-view" id="previewView">
       <header class="topbar">
-        <div class="brand-row">
-          <button type="button" id="typeMenuButton" class="type-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="typeSideMenu">
+        <div class="brand-plate">
+          <button type="button" id="typeMenuButton" class="type-menu-button home-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="typeSideMenu">
             <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23d28a05" alt="" aria-hidden="true">
           </button>
           <div class="brand-mark">
             <a class="brand-home-link" href="../index.html" aria-label="Zur Ziselin-Startseite">
               <img class="brand-bird" src="../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
             </a>
-            <span class="brand-wordmark-text">type map</span>
+            <span class="brand-wordmark-text brand-name">type map</span>
           </div>
         </div>
-        <div class="control-grid">
+        <div class="control-grid topbar-search">
           <div class="export-control">
             <button type="button" id="exportProjectButton" aria-expanded="false" aria-controls="exportMenu">Export</button>
             <div id="exportMenu" class="export-menu" hidden>
@@ -118,32 +118,25 @@
       <article class="details-inline browser-panel">
         <div class="panel-header panel-header-with-action">
           <span class="label">Dokumentbrowser</span>
-          <button type="button" id="layoutCycleButton" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
-            <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
-          </button>
-        </div>
-
-        <div class="project-tabs" role="tablist" aria-label="Dokumentbrowser">
-          <button type="button" class="project-tab is-active" data-type-tab="browser" role="tab" aria-selected="true">Browser</button>
-          <button type="button" class="project-tab" data-type-tab="preview" role="tab" aria-selected="false">Vorschau</button>
-        </div>
-
-        <div class="project-tab-panel" data-type-tab-panel="browser">
-          <p id="projectInfo" class="event-description"></p>
-          <div class="library-actions">
-            <button type="button" id="createProjectButton" class="secondary-button">Neues Dokument</button>
-            <button type="button" id="openImportButton" class="secondary-button">Importieren</button>
-            <button type="button" id="openGenerateDialogButton" class="secondary-button">Generieren</button>
-          </div>
-          <input id="projectFileInput" type="file" accept=".json,application/json" hidden>
-          <div id="projectList" class="project-list"></div>
-        </div>
-
-        <div class="project-tab-panel" data-type-tab-panel="preview" hidden>
-          <div class="side-preview-page" style="--preview-font-size: 22px; --preview-line-height: 1.38; --preview-measure: 44ch;">
-            <div id="sidePreviewText" class="preview-text side-preview-text"></div>
+          <div class="browser-header-actions">
+            <div class="browser-actions-menu-shell">
+              <button type="button" id="browserActionsMenuButton" class="browser-actions-menu-trigger" aria-label="Dokumentaktionen" aria-expanded="false" aria-controls="browserActionsMenu">
+                <span class="browser-actions-menu-dots" aria-hidden="true"></span>
+              </button>
+              <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
+                <button type="button" id="createProjectButton" role="menuitem">Neues Dokument</button>
+                <button type="button" id="openImportButton" role="menuitem">Importieren</button>
+                <button type="button" id="openGenerateDialogButton" role="menuitem">Generieren</button>
+                <button type="button" id="browserExportJsonButton" role="menuitem">Exportieren</button>
+              </div>
+            </div>
+            <button type="button" id="layoutCycleButton" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+              <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+            </button>
           </div>
         </div>
+        <input id="projectFileInput" type="file" accept=".json,application/json" hidden>
+        <div id="projectList" class="project-list browser-project-list"></div>
       </article>
 
       <article class="details-inline editor-panel">
@@ -350,6 +343,7 @@
         <span>Prompt</span>
         <textarea id="generatePromptOutput" rows="15" readonly placeholder="Nach „Prompt generieren“ erscheint hier der vollständige Arbeitsauftrag."></textarea>
       </label>
+      <p class="generate-rights-note">Externe KI-Dienste können die Verarbeitung geschützter Inhalte unterschiedlich einschränken; lehnt ein Dienst die Verarbeitung ab, kann ein anderer sie ermöglichen. Voraussetzung bleibt in jedem Fall, dass Sie zur Nutzung und Verarbeitung des Quelltexts berechtigt sind.</p>
       <p id="generateDialogStatus" class="generate-dialog-status" role="status" aria-live="polite"></p>
     </div>
     <div class="property-dialog-actions generate-dialog-actions">
@@ -403,6 +397,10 @@
             <label class="property-row">
               <span>Untertitel</span>
               <input id="sourceCitationSubtitleInput" type="text" autocomplete="off">
+            </label>
+            <label class="property-row property-row-stack">
+              <span>Lead / Teaser</span>
+              <textarea id="sourceCitationLeadInput" rows="3" placeholder="Einleitender Vorspann des Artikels"></textarea>
             </label>
             <label class="property-row">
               <span>Sprache</span>
@@ -727,8 +725,8 @@
       <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
     </div>
   </section>
-  <script src="styles/document-styles.js?v=20260618u"></script>
-  <script src="typemap.js?v=20260618az"></script>
+  <script src="styles/document-styles.js?v=20260619v"></script>
+  <script src="typemap.js?v=20260619bq"></script>
 </body>
 </html>
 

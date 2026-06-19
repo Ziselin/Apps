@@ -23,6 +23,8 @@ window.TypeMapDocumentStyles = (() => {
         titleWeight: 400,
         subtitleFontFamily: fonts.modern,
         subtitleWeight: 400,
+        leadFontFamily: fonts.modern,
+        leadWeight: 400,
         metaFontFamily: fonts.modern,
         metaWeight: 400,
         headingFontFamily: fonts.modern,
@@ -35,7 +37,7 @@ window.TypeMapDocumentStyles = (() => {
         quoteStyle: "regular",
       },
       headingScale: { 1: 1.63, 2: 1.12, 3: 1, 4: 0.94, 5: 0.9, 6: 0.86, 7: 0.82 },
-      titleScale: { title: 1.63, subtitle: 1.08, authors: 1, titleLineHeight: 1.15, subtitleLineHeight: 1.25, authorsLineHeight: 1.3 },
+      titleScale: { title: 1.63, subtitle: 1.08, lead: 0.98, authors: 1, titleLineHeight: 1.15, subtitleLineHeight: 1.25, leadLineHeight: 1.42, authorsLineHeight: 1.3 },
     },
     report: {
       label: "Artikel",
@@ -53,6 +55,8 @@ window.TypeMapDocumentStyles = (() => {
         titleWeight: 700,
         subtitleFontFamily: fonts.sans,
         subtitleWeight: 400,
+        leadFontFamily: fonts.garamond,
+        leadWeight: 500,
         metaFontFamily: fonts.sans,
         metaWeight: 400,
         headingFontFamily: fonts.sans,
@@ -65,7 +69,7 @@ window.TypeMapDocumentStyles = (() => {
         quoteStyle: "italic",
       },
       headingScale: { 1: 1.68, 2: 1.23, 3: 1.06, 4: 1, 5: 0.94, 6: 0.9, 7: 0.86 },
-      titleScale: { title: 1.68, subtitle: 1.1, authors: 0.74, titleLineHeight: 1.15, subtitleLineHeight: 1.25, authorsLineHeight: 1.25 },
+      titleScale: { title: 1.68, subtitle: 1.1, lead: 1.08, authors: 0.74, titleLineHeight: 1.15, subtitleLineHeight: 1.25, leadLineHeight: 1.38, authorsLineHeight: 1.25 },
     },
     notebook: {
       label: "Notebook",
@@ -83,6 +87,8 @@ window.TypeMapDocumentStyles = (() => {
         titleWeight: 600,
         subtitleFontFamily: fonts.sans,
         subtitleWeight: 400,
+        leadFontFamily: fonts.sans,
+        leadWeight: 400,
         metaFontFamily: fonts.sans,
         metaWeight: 400,
         headingFontFamily: fonts.sans,
@@ -95,7 +101,7 @@ window.TypeMapDocumentStyles = (() => {
         quoteStyle: "italic",
       },
       headingScale: { 1: 1.41, 2: 1.12, 3: 1, 4: 0.94, 5: 0.9, 6: 0.86, 7: 0.82 },
-      titleScale: { title: 1.41, subtitle: 0.94, authors: 0.65, titleLineHeight: 1.15, subtitleLineHeight: 1.25, authorsLineHeight: 1.25 },
+      titleScale: { title: 1.41, subtitle: 0.94, lead: 1, authors: 0.65, titleLineHeight: 1.15, subtitleLineHeight: 1.25, leadLineHeight: 1.45, authorsLineHeight: 1.25 },
     },
   };
 
