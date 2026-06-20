@@ -3,6 +3,7 @@ const LOCAL_DB_VERSION = 1;
 const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
+const DOCUMENT_STYLE_PRESET_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
 const TOC_OBJECT_MARKER = "{{toc}}";
 const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
@@ -27,6 +28,7 @@ const ui = {
   layoutCycleButton: document.getElementById("layoutCycleButton"),
   layoutCycleButtons: Array.from(document.querySelectorAll("[data-layout-cycle-button]")),
   exportProjectButton: document.getElementById("exportProjectButton"),
+  printProjectButton: document.getElementById("printProjectButton"),
   exportMenu: document.getElementById("exportMenu"),
   themeToggleButton: document.getElementById("themeToggleButton"),
   themeToggleIcon: document.getElementById("themeToggleIcon"),
@@ -42,13 +44,16 @@ const ui = {
   generateDialogCloseButton: document.getElementById("generateDialogCloseButton"),
   generateWebTab: document.getElementById("generateWebTab"),
   generatePdfTab: document.getElementById("generatePdfTab"),
+  generateEpubTab: document.getElementById("generateEpubTab"),
   generateWebPanel: document.getElementById("generateWebPanel"),
   generatePdfPanel: document.getElementById("generatePdfPanel"),
+  generateEpubPanel: document.getElementById("generateEpubPanel"),
   generateSourceUrlInput: document.getElementById("generateSourceUrlInput"),
   generatePdfProviderInput: document.getElementById("generatePdfProviderInput"),
   generatePdfModelInput: document.getElementById("generatePdfModelInput"),
   generatePdfApiKeyInput: document.getElementById("generatePdfApiKeyInput"),
   generatePdfFileInput: document.getElementById("generatePdfFileInput"),
+  generateEpubFileInput: document.getElementById("generateEpubFileInput"),
   generatePromptField: document.getElementById("generatePromptField"),
   generatePromptOutput: document.getElementById("generatePromptOutput"),
   generateDialogStatus: document.getElementById("generateDialogStatus"),
@@ -150,6 +155,7 @@ const ui = {
   hyphenationAfterInput: document.getElementById("hyphenationAfterInput"),
   languageSelect: document.getElementById("languageSelect"),
   lineNumberSettingsButton: document.getElementById("lineNumberSettingsButton"),
+  lineNumberToggleCheck: document.getElementById("lineNumberToggleCheck"),
   lineNumberDialogOverlay: document.getElementById("lineNumberDialogOverlay"),
   lineNumberDialog: document.getElementById("lineNumberDialog"),
   lineNumberDialogCloseButton: document.getElementById("lineNumberDialogCloseButton"),
@@ -158,6 +164,7 @@ const ui = {
   lineNumberEnabledInput: document.getElementById("lineNumberEnabledInput"),
   lineNumberModeInput: document.getElementById("lineNumberModeInput"),
   lineNumberIncludeBlankInput: document.getElementById("lineNumberIncludeBlankInput"),
+  lineNumberFromInput: document.getElementById("lineNumberFromInput"),
   lineNumberIntervalInput: document.getElementById("lineNumberIntervalInput"),
   lineNumberStartInput: document.getElementById("lineNumberStartInput"),
   spellcheckToggleButton: document.getElementById("spellcheckToggleButton"),
@@ -365,7 +372,7 @@ function syncProjectTitleFromHeading(project, options = {}) {
 const APP_FONTS = [
   { label: "Univers Modern", family: "CMU Serif", css: "'CMU Serif', 'Computer Modern Serif', Georgia, serif", source: "app" },
   { label: "Roboto", family: "Roboto", css: "'Roboto', Arial, Helvetica, sans-serif", source: "app" },
-  { label: "Garamond", family: "EB Garamond", css: "'EB Garamond', Georgia, serif", source: "app" },
+  { label: "Garamond", family: "EB Garamond", css: "'EB Garamond', Garamond, Georgia, serif", source: "app" },
   { label: "Source Sans 3", family: "Source Sans 3", css: "'Source Sans 3', Arial, sans-serif", source: "app" },
   { label: "Source Code Pro", family: "Source Code Pro", css: "'Source Code Pro', 'Courier New', monospace", source: "app" },
 ];
@@ -396,6 +403,8 @@ const state = {
   editorResizeObserver: null,
   editorMeasurementInput: null,
   editorInlineMeasurement: null,
+  projectActivationToken: 0,
+  lineNumberStartIsAutomatic: true,
 };
 
 function createId(prefix) {
@@ -405,6 +414,7 @@ function createId(prefix) {
 function createDefaultMetadata() {
   return {
     textKind: "paper",
+    stylePresetVersion: DOCUMENT_STYLE_PRESET_VERSION,
   };
 }
 
@@ -535,6 +545,16 @@ function getDocumentStylePreset(textKind) {
   return DOCUMENT_STYLE_PRESETS[textKind] || null;
 }
 
+function getEffectiveBodyFontFamily(project) {
+  const preset = getDocumentStylePreset(project?.metadata?.textKind);
+  // „Artikel“ besitzt eine definierte Satzschrift. Diese fachliche Stilregel
+  // hat Vorrang vor veralteten Einzelwerten aus früher gespeicherten Dateien.
+  if (project?.metadata?.textKind === "report" && preset?.style?.fontFamily) {
+    return preset.style.fontFamily;
+  }
+  return project?.style?.fontFamily || preset?.style?.fontFamily || "serif";
+}
+
 function getLeadPresentation(project, titleScale = {}) {
   const preset = getDocumentStylePreset(project?.metadata?.textKind);
   const style = project?.style || {};
@@ -598,6 +618,7 @@ function applyDocumentStylePreset(project, textKind, options = {}) {
     ...createDefaultMetadata(),
     ...(project.metadata || {}),
     textKind: normalizedTextKind,
+    stylePresetVersion: DOCUMENT_STYLE_PRESET_VERSION,
   };
   project.source.textType = sourceTextTypeFromDocumentKind(normalizedTextKind);
 }
@@ -615,6 +636,7 @@ function createDefaultLineNumbering() {
     enabled: false,
     mode: "source-lines",
     includeBlankLines: false,
+    fromLine: 1,
     interval: 1,
     start: 1,
   };
@@ -648,9 +670,23 @@ function normalizeLineNumbering(value, legacyEnabled = false) {
     enabled: source.enabled === true || legacyEnabled === true,
     mode: ["paragraphs", "source-lines"].includes(source.mode) ? source.mode : fallback.mode,
     includeBlankLines: source.includeBlankLines === true,
+    fromLine: clampInteger(source.fromLine, fallback.fromLine, 1, 99999),
     interval: clampInteger(source.interval, fallback.interval, 1, 100),
     start: clampInteger(source.start, fallback.start, 0, 99999),
   };
+}
+
+function getProjectLineNumbering(project) {
+  return normalizeLineNumbering(
+    project?.source?.lineNumbering || project?.style?.lineNumbering,
+    project?.style?.lineNumbers,
+  );
+}
+
+function getDisplayedLineNumber(countedLine, lineNumbering) {
+  const relativeLine = countedLine - lineNumbering.fromLine + 1;
+  if (relativeLine < 1 || relativeLine % lineNumbering.interval !== 0) return null;
+  return lineNumbering.start + (relativeLine / lineNumbering.interval - 1) * lineNumbering.interval;
 }
 
 function normalizeHyphenationSettings(value, legacyMode = "manual", legacyLanguage = "de") {
@@ -718,6 +754,7 @@ function createDefaultProject(title = "Neues Dokument") {
     source: {
       rawText: ensureDocumentStructure(`# ${normalizeMarkdownHeadingText(title)}\n`, title),
       textType: "prose",
+      lineNumbering: createDefaultLineNumbering(),
     },
     style: {
       fontFamily: "'CMU Serif', 'Computer Modern Serif', Georgia, serif",
@@ -728,10 +765,8 @@ function createDefaultProject(title = "Neues Dokument") {
       ligatures: true,
       hyphenation: "manual",
       language: "de",
-      lineNumbers: false,
       spellcheck: false,
       chapterNumbers: false,
-      lineNumbering: createDefaultLineNumbering(),
       hyphenationSettings: createDefaultHyphenationSettings(),
     },
     metadata: createDefaultMetadata(),
@@ -801,10 +836,14 @@ function normalizeProject(project) {
   normalized.style.language = ["de", "en", "fr", "la"].includes(normalized.style.language)
     ? normalized.style.language
     : fallback.style.language;
-  normalized.style.lineNumbers = normalized.style.lineNumbers === true;
   normalized.style.spellcheck = normalized.style.spellcheck === true;
   normalized.style.chapterNumbers = normalized.style.chapterNumbers === true;
-  normalized.style.lineNumbering = normalizeLineNumbering(normalized.style.lineNumbering, normalized.style.lineNumbers);
+  normalized.source.lineNumbering = normalizeLineNumbering(
+    project?.source?.lineNumbering || project?.style?.lineNumbering,
+    project?.style?.lineNumbers,
+  );
+  delete normalized.style.lineNumbering;
+  delete normalized.style.lineNumbers;
   normalized.style.hyphenationSettings = normalizeHyphenationSettings(
     normalized.style.hyphenationSettings,
     normalized.style.hyphenation,
@@ -814,11 +853,19 @@ function normalizeProject(project) {
   normalized.style.language = normalized.style.hyphenationSettings.language;
   const rawTextKind = String(normalized.metadata.textKind || fallback.metadata.textKind);
   const wasLegacyTextKind = Boolean(LEGACY_DOCUMENT_STYLE_MAP[rawTextKind]);
+  const storedPresetVersion = Number(project?.metadata?.stylePresetVersion) || 0;
   normalized.metadata.textKind = normalizeDocumentStyleId(rawTextKind);
   const preset = getDocumentStylePreset(normalized.metadata.textKind);
-  if (preset && (wasLegacyTextKind || !normalized.style.titleFontFamily)) {
+  // Frühere Dokumente speicherten Stilname und konkrete Schriftwerte getrennt.
+  // Die einmalige Migration bringt beide wieder zusammen; danach schützt die
+  // Versionsnummer bewusste individuelle Anpassungen vor erneutem Überschreiben.
+  if (preset && (storedPresetVersion < DOCUMENT_STYLE_PRESET_VERSION || wasLegacyTextKind || !normalized.style.titleFontFamily)) {
     applyDocumentStylePreset(normalized, normalized.metadata.textKind);
   }
+  if (normalized.metadata.textKind === "report" && preset?.style?.fontFamily) {
+    normalized.style.fontFamily = preset.style.fontFamily;
+  }
+  normalized.metadata.stylePresetVersion = DOCUMENT_STYLE_PRESET_VERSION;
   if (preset && (!normalized.typography.headingScale || !Object.keys(normalized.typography.headingScale).length)) {
     normalized.typography.headingScale = { ...preset.headingScale };
   }
@@ -1726,10 +1773,41 @@ function getVisualLineRects(element) {
   return grouped;
 }
 
+function getLastTextContentBottom(element) {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  let lastNode = null;
+  let lastCharacterIndex = -1;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = String(node.nodeValue || "");
+    for (let index = text.length - 1; index >= 0; index -= 1) {
+      if (!/\s/.test(text[index])) {
+        lastNode = node;
+        lastCharacterIndex = index;
+        break;
+      }
+    }
+  }
+  if (!lastNode || lastCharacterIndex < 0) return null;
+  const range = document.createRange();
+  range.setStart(lastNode, lastCharacterIndex);
+  range.setEnd(lastNode, lastCharacterIndex + 1);
+  const rects = Array.from(range.getClientRects()).filter((rect) => rect.height > 0);
+  range.detach();
+  return rects.at(-1)?.bottom ?? null;
+}
+
 function shouldExcludeBlockFromLineNumbering(block) {
-  return block?.dataset?.chapterRole !== "main"
+  const chapterRole = block?.dataset?.chapterRole || "";
+  return block?.dataset?.matter !== "body"
+    || (chapterRole && chapterRole !== "main")
     || block?.classList?.contains("preview-heading-level-1") === true
     || block?.classList?.contains("preview-embedded-object") === true;
+}
+
+function isNumberedBodyBlock(block) {
+  const chapterRole = block?.chapterRole || "";
+  return (block?.matter || "body") === "body"
+    && (!chapterRole || chapterRole === "main");
 }
 
 function renderLineNumberLayer(targetText, lineNumbering) {
@@ -1742,21 +1820,31 @@ function renderLineNumberLayer(targetText, lineNumbering) {
 
   const targetRect = targetText.getBoundingClientRect();
   const blocks = Array.from(targetText.querySelectorAll(".preview-body-block"));
+  let lastContentIndex = -1;
+  blocks.forEach((block, index) => {
+    if (!shouldExcludeBlockFromLineNumbering(block)
+      && block.dataset.sourceBlankLine !== "true"
+      && block.textContent.trim()) lastContentIndex = index;
+  });
   let lineIndex = 0;
 
-  blocks.forEach((block) => {
-    if (shouldExcludeBlockFromLineNumbering(block)) return;
+  blocks.forEach((block, blockIndex) => {
+    if (blockIndex > lastContentIndex || shouldExcludeBlockFromLineNumbering(block)) return;
     if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) {
       return;
     }
-    const visualRects = lineNumbering.mode === "source-lines"
+    let visualRects = lineNumbering.mode === "source-lines"
       ? getVisualLineRects(block)
       : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
+    if (blockIndex === lastContentIndex) {
+      const lastTextBottom = getLastTextContentBottom(block);
+      if (lastTextBottom !== null) visualRects = visualRects.filter((rect) => rect.top < lastTextBottom + 1);
+    }
 
     visualRects.forEach((rect) => {
       lineIndex += 1;
-      const lineNumber = lineNumbering.start + lineIndex - 1;
-      if (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0) return;
+      const lineNumber = getDisplayedLineNumber(lineIndex, lineNumbering);
+      if (lineNumber === null) return;
       const label = document.createElement("span");
       label.className = "preview-line-number";
       label.textContent = String(lineNumber);
@@ -1828,6 +1916,7 @@ function createPreviewDocumentHead(project, options = {}) {
 function renderTextView(targetPage, targetText, project, layoutModel) {
   if (!targetPage || !targetText) return;
   const style = project.style;
+  const bodyFontFamily = getEffectiveBodyFontFamily(project);
   const headingScale = {
     ...(getDocumentStylePreset(project.metadata?.textKind)?.headingScale || {}),
     ...(project.typography?.headingScale || {}),
@@ -1842,15 +1931,15 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   }
   const leadPresentation = getLeadPresentation(project, titleScale);
   const textType = project.source.textType || "prose";
-  const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
+  const lineNumbering = getProjectLineNumbering(project);
   const documentTitleAlign = getDocumentTitleAlignment(project);
   const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
   targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
   targetPage.style.setProperty("--preview-measure", `${style.measure}ch`);
-  targetPage.style.setProperty("--preview-body-font", style.fontFamily);
+  targetPage.style.setProperty("--preview-body-font", bodyFontFamily);
   targetPage.style.setProperty(
     "--preview-strong-font",
-    project.metadata?.textKind === "report" ? '"TypeMap EB Garamond Semibold", serif' : style.fontFamily,
+    project.metadata?.textKind === "report" ? '"TypeMap EB Garamond Semibold", serif' : bodyFontFamily,
   );
   targetPage.style.setProperty("--preview-title-font", style.titleFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-title-weight", String(Number(style.titleWeight) || 700));
@@ -1879,7 +1968,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-subtitle-line-height", String(Number(titleScale.subtitleLineHeight) || 1.28));
   targetPage.style.setProperty("--preview-lead-line-height", String(leadPresentation.lineHeight));
   targetPage.style.setProperty("--preview-authors-line-height", String(Number(titleScale.authorsLineHeight) || 1.28));
-  targetText.style.fontFamily = style.fontFamily;
+  targetText.style.fontFamily = bodyFontFamily;
   targetText.classList.toggle("has-first-line-indent", style.firstLineIndent === true);
   targetText.classList.toggle("has-italic-quotes", style.quoteStyle === "italic");
   targetText.style.textAlign = textType === "lyric" ? "left" : style.textAlign;
@@ -1973,8 +2062,49 @@ function rebuildModelsAndPreview() {
   renderViewLayer(project, state.sourceModel, state.layoutModel);
 }
 
-function loadProjectFonts(projects = state.projects) {
-  return;
+function getPrimaryFontFamily(fontStack) {
+  const match = String(fontStack || "").match(/^\s*(?:"([^"]+)"|'([^']+)'|([^,]+))/);
+  const family = String(match?.[1] || match?.[2] || match?.[3] || "").trim();
+  return family ? `"${family.replace(/"/g, "\\\"")}"` : "";
+}
+
+function getProjectFontDescriptors(project) {
+  const style = project?.style || {};
+  const bodyFontFamily = getEffectiveBodyFontFamily(project);
+  const lead = getLeadPresentation(project, project?.typography?.titleScale || {});
+  const descriptors = [
+    [bodyFontFamily, 400, "normal"],
+    [bodyFontFamily, 400, "italic"],
+    [bodyFontFamily, 700, "normal"],
+    [style.titleFontFamily || style.fontFamily, Number(style.titleWeight) || 700, "normal"],
+    [style.subtitleFontFamily || style.titleFontFamily || style.fontFamily, Number(style.subtitleWeight) || 400, "normal"],
+    [lead.fontFamily, lead.fontWeight, "normal"],
+    [style.metaFontFamily || style.subtitleFontFamily || style.fontFamily, Number(style.metaWeight) || 400, "normal"],
+    [style.headingFontFamily || style.fontFamily, Number(style.headingWeight) || 700, "normal"],
+    [style.quoteFontFamily || style.fontFamily, 400, "italic"],
+    [style.codeFontFamily || "'Source Code Pro', monospace", 400, "normal"],
+    [style.codeFontFamily || "'Source Code Pro', monospace", 700, "normal"],
+  ];
+  if (project?.metadata?.textKind === "report") {
+    descriptors.push(['"TypeMap EB Garamond Semibold", serif', 600, "normal"]);
+  }
+  return Array.from(new Set(descriptors
+    .map(([family, weight, fontStyle]) => {
+      const primaryFamily = getPrimaryFontFamily(family);
+      return primaryFamily ? `${fontStyle} ${weight} 16px ${primaryFamily}` : "";
+    })
+    .filter(Boolean)));
+}
+
+async function loadProjectFonts(project) {
+  if (!project || !document.fonts?.load) return;
+  const descriptors = getProjectFontDescriptors(project);
+  const results = await Promise.allSettled(descriptors.map((descriptor) => document.fonts.load(descriptor)));
+  const failedDescriptors = descriptors.filter((_, index) => results[index].status === "rejected");
+  if (failedDescriptors.length) {
+    console.warn("TypeMap konnte einzelne Schriftschnitte nicht vorladen", failedDescriptors);
+  }
+  await document.fonts.ready;
 }
 
 function renderFontOptions(project) {
@@ -2718,7 +2848,6 @@ function renderProjectList() {
 function renderEditor() {
   const project = getActiveProject();
   if (!project) return;
-  loadProjectFonts([project]);
   renderFontOptions(project);
   const isJsonView = state.editorDataView === "json";
   // Die JSON-Ansicht bildet bewusst das vollständige Projektobjekt ab, damit
@@ -2747,6 +2876,9 @@ function renderEditor() {
   const chapterNumbersEnabled = project.style.chapterNumbers === true;
   ui.chapterNumbersToggleButton?.setAttribute("aria-pressed", String(chapterNumbersEnabled));
   if (ui.chapterNumbersToggleCheck) ui.chapterNumbersToggleCheck.hidden = !chapterNumbersEnabled;
+  const lineNumbersEnabled = getProjectLineNumbering(project).enabled;
+  ui.lineNumberSettingsButton?.setAttribute("aria-pressed", String(lineNumbersEnabled));
+  if (ui.lineNumberToggleCheck) ui.lineNumberToggleCheck.hidden = !lineNumbersEnabled;
   const citationObjectEnabled = hasCitationObject(project);
   ui.insertCitationObjectButton?.setAttribute("aria-pressed", String(citationObjectEnabled));
   if (ui.insertCitationObjectCheck) ui.insertCitationObjectCheck.hidden = !citationObjectEnabled;
@@ -3147,7 +3279,7 @@ function closeEditorMenus() {
   });
 }
 
-function setActiveTextKind(textKind) {
+async function setActiveTextKind(textKind) {
   const normalizedTextKind = normalizeDocumentStyleId(textKind);
   updateActiveProject((project) => {
     const previousTextKind = project.metadata?.textKind || createDefaultMetadata().textKind;
@@ -3164,8 +3296,15 @@ function setActiveTextKind(textKind) {
       project.style.textAlign = "left";
       project.style.lineHeight = 1.5;
     }
-  });
-  renderEditor();
+  }, { renderPreview: false });
+  const project = getActiveProject();
+  if (!project) return;
+  const token = ++state.projectActivationToken;
+  renderProjectList();
+  renderNoActiveProjectState("Schriften werden geladen …");
+  await loadProjectFonts(project);
+  if (token !== state.projectActivationToken || state.activeProjectId !== project.id) return;
+  renderApp();
 }
 
 function replaceEditorSelection(transform) {
@@ -3294,12 +3433,14 @@ function openTextFormatDialog() {
 function openLineNumberDialog() {
   const project = getActiveProject();
   if (!project) return;
-  const settings = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
+  const settings = getProjectLineNumbering(project);
   if (ui.lineNumberEnabledInput) ui.lineNumberEnabledInput.checked = settings.enabled;
   if (ui.lineNumberModeInput) ui.lineNumberModeInput.value = settings.mode;
   if (ui.lineNumberIncludeBlankInput) ui.lineNumberIncludeBlankInput.checked = settings.includeBlankLines;
+  if (ui.lineNumberFromInput) ui.lineNumberFromInput.value = String(settings.fromLine);
   if (ui.lineNumberIntervalInput) ui.lineNumberIntervalInput.value = String(settings.interval);
   if (ui.lineNumberStartInput) ui.lineNumberStartInput.value = String(settings.start);
+  state.lineNumberStartIsAutomatic = settings.start === settings.interval;
   setLineNumberDialogOpen(true);
   ui.lineNumberEnabledInput?.focus();
   document.querySelectorAll(".editor-menu[open]").forEach((menu) => {
@@ -3311,13 +3452,15 @@ function saveLineNumberDialog() {
   updateActiveProject((project) => {
     const settings = {
       enabled: ui.lineNumberEnabledInput?.checked === true,
-      mode: ui.lineNumberModeInput?.value || "paragraphs",
+      mode: ui.lineNumberModeInput?.value || "source-lines",
       includeBlankLines: ui.lineNumberIncludeBlankInput?.checked === true,
+      fromLine: clampInteger(ui.lineNumberFromInput?.value, 1, 1, 99999),
       interval: clampInteger(ui.lineNumberIntervalInput?.value, 1, 1, 100),
       start: clampInteger(ui.lineNumberStartInput?.value, 1, 0, 99999),
     };
-    project.style.lineNumbering = normalizeLineNumbering(settings);
-    project.style.lineNumbers = project.style.lineNumbering.enabled;
+    project.source.lineNumbering = normalizeLineNumbering(settings);
+    delete project.style.lineNumbering;
+    delete project.style.lineNumbers;
   });
   renderEditor();
   setLineNumberDialogOpen(false);
@@ -3417,9 +3560,41 @@ function toggleCitationObject() {
   renderEditor();
 }
 
+function renderNoActiveProjectState(message = "Wählen Sie im Browser ein Dokument aus.") {
+  state.sourceModel = null;
+  state.layoutModel = null;
+  ui.previewPage?.classList.add("is-empty");
+  ui.previewPage?.classList.remove("has-side-toc");
+  clearElement(ui.previewText);
+  if (ui.previewText) {
+    const empty = document.createElement("p");
+    empty.className = "preview-empty-state";
+    empty.textContent = message;
+    ui.previewText.appendChild(empty);
+  }
+  ui.editorPanel?.classList.add("is-empty");
+  if (ui.editorPanel) ui.editorPanel.inert = true;
+  if (ui.textInput) {
+    ui.textInput.value = "";
+    ui.textInput.readOnly = true;
+    ui.textInput.setAttribute("aria-label", "Kein Dokument geöffnet");
+  }
+  clearElement(ui.textInputHighlight);
+  if (ui.exportProjectButton) ui.exportProjectButton.disabled = true;
+  if (ui.printProjectButton) ui.printProjectButton.disabled = true;
+}
+
 function renderApp() {
   renderProjectList();
-  loadProjectFonts();
+  if (!getActiveProject()) {
+    renderNoActiveProjectState();
+    return;
+  }
+  ui.previewPage?.classList.remove("is-empty");
+  ui.editorPanel?.classList.remove("is-empty");
+  if (ui.editorPanel) ui.editorPanel.inert = false;
+  if (ui.exportProjectButton) ui.exportProjectButton.disabled = false;
+  if (ui.printProjectButton) ui.printProjectButton.disabled = false;
   renderEditor();
   rebuildModelsAndPreview();
 }
@@ -3430,7 +3605,9 @@ function markProjectChanged(project) {
   scheduleAutosave();
 }
 
-function activateProject(projectId, options = {}) {
+async function activateProject(projectId, options = {}) {
+  const project = state.projects.find((candidate) => candidate.id === projectId);
+  if (!project) return;
   if (options.resetSourceRange || (!options.preserveSourceRange && state.activeProjectId !== projectId)) {
     state.activeSourceRange = null;
   }
@@ -3438,6 +3615,11 @@ function activateProject(projectId, options = {}) {
   if (!options.preserveExpandedState) {
     setProjectExpanded(projectId, true);
   }
+  const token = ++state.projectActivationToken;
+  renderProjectList();
+  renderNoActiveProjectState("Dokument wird gesetzt …");
+  await loadProjectFonts(project);
+  if (token !== state.projectActivationToken || state.activeProjectId !== projectId) return;
   renderApp();
   scheduleAutosave();
 }
@@ -3445,11 +3627,8 @@ function activateProject(projectId, options = {}) {
 function addProject(title = "Neues Dokument") {
   const project = createDefaultProject(title);
   state.projects.push(project);
-  state.activeProjectId = project.id;
   state.activeSourceRange = null;
-  setProjectExpanded(project.id, true);
-  renderApp();
-  scheduleAutosave();
+  void activateProject(project.id, { resetSourceRange: true });
 }
 
 function addGeneratedProject(jsonInput) {
@@ -3466,15 +3645,11 @@ function addGeneratedProject(jsonInput) {
   // gehörenden Ausgangsstil; danach bleiben individuelle Anpassungen erhalten.
   applyDocumentStylePreset(project, project.metadata.textKind);
   state.projects.push(project);
-  state.activeProjectId = project.id;
   state.activeSourceRange = null;
   state.editorDataView = "json";
   state.jsonEditorDraft = "";
   state.jsonEditorDraftProjectId = null;
-  setProjectExpanded(project.id, true);
-  renderApp();
-  scheduleAutosave();
-  window.setTimeout(() => ui.textInput?.focus(), 0);
+  void activateProject(project.id, { resetSourceRange: true }).then(() => ui.textInput?.focus());
 }
 
 function setGenerateDialogOpen(isOpen) {
@@ -3484,7 +3659,9 @@ function setGenerateDialogOpen(isOpen) {
     setGenerateSourceMode(state.generateSourceMode, { resetPrompt: false });
     const target = state.generateSourceMode === "pdf"
       ? (ui.generatePdfApiKeyInput?.value ? ui.generatePdfFileInput : ui.generatePdfApiKeyInput)
-      : ui.generateSourceUrlInput;
+      : state.generateSourceMode === "epub"
+        ? ui.generateEpubFileInput
+        : ui.generateSourceUrlInput;
     window.setTimeout(() => target?.focus(), 0);
   } else if (ui.generatePdfApiKeyInput) {
     ui.generatePdfApiKeyInput.value = "";
@@ -3492,20 +3669,30 @@ function setGenerateDialogOpen(isOpen) {
 }
 
 function setGenerateSourceMode(mode, options = {}) {
-  state.generateSourceMode = mode === "pdf" ? "pdf" : "web";
+  state.generateSourceMode = ["pdf", "epub"].includes(mode) ? mode : "web";
   const isPdf = state.generateSourceMode === "pdf";
-  ui.generateWebTab?.classList.toggle("is-active", !isPdf);
+  const isEpub = state.generateSourceMode === "epub";
+  const isWeb = state.generateSourceMode === "web";
+  ui.generateWebTab?.classList.toggle("is-active", isWeb);
   ui.generatePdfTab?.classList.toggle("is-active", isPdf);
-  ui.generateWebTab?.setAttribute("aria-selected", String(!isPdf));
+  ui.generateEpubTab?.classList.toggle("is-active", isEpub);
+  ui.generateWebTab?.setAttribute("aria-selected", String(isWeb));
   ui.generatePdfTab?.setAttribute("aria-selected", String(isPdf));
-  if (ui.generateWebTab) ui.generateWebTab.tabIndex = isPdf ? -1 : 0;
+  ui.generateEpubTab?.setAttribute("aria-selected", String(isEpub));
+  if (ui.generateWebTab) ui.generateWebTab.tabIndex = isWeb ? 0 : -1;
   if (ui.generatePdfTab) ui.generatePdfTab.tabIndex = isPdf ? 0 : -1;
-  if (ui.generateWebPanel) ui.generateWebPanel.hidden = isPdf;
+  if (ui.generateEpubTab) ui.generateEpubTab.tabIndex = isEpub ? 0 : -1;
+  if (ui.generateWebPanel) ui.generateWebPanel.hidden = !isWeb;
   if (ui.generatePdfPanel) ui.generatePdfPanel.hidden = !isPdf;
-  if (ui.generatePromptField) ui.generatePromptField.hidden = isPdf;
-  if (ui.copyGeneratePromptButton) ui.copyGeneratePromptButton.hidden = isPdf;
-  if (ui.openGeneratedJsonEditorButton) ui.openGeneratedJsonEditorButton.hidden = isPdf;
-  if (ui.generatePromptButton) ui.generatePromptButton.textContent = isPdf ? "PDF verarbeiten" : "Prompt generieren";
+  if (ui.generateEpubPanel) ui.generateEpubPanel.hidden = !isEpub;
+  if (ui.generatePromptField) ui.generatePromptField.hidden = !isWeb;
+  if (ui.copyGeneratePromptButton) ui.copyGeneratePromptButton.hidden = !isWeb;
+  if (ui.openGeneratedJsonEditorButton) ui.openGeneratedJsonEditorButton.hidden = !isWeb;
+  if (ui.generatePromptButton) {
+    ui.generatePromptButton.textContent = isPdf
+      ? "PDF verarbeiten"
+      : isEpub ? "E-Book importieren" : "Prompt generieren";
+  }
   if (options.resetPrompt !== false) {
     if (ui.generatePromptOutput) ui.generatePromptOutput.value = "";
     if (ui.copyGeneratePromptButton) ui.copyGeneratePromptButton.disabled = true;
@@ -3614,41 +3801,52 @@ Quelle: ${filename}
 Gib ausschließlich die durch das vorgegebene JSON-Schema verlangten Daten zurück.`;
 }
 
-function readFileAsBase64(file) {
+function readFileAsDataUrl(file, expectedPrefix = "data:application/pdf;base64,") {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => {
       const dataUrl = String(reader.result || "");
-      const separator = dataUrl.indexOf(",");
-      if (separator < 0) reject(new Error("pdf-read-failed"));
-      else resolve(dataUrl.slice(separator + 1));
+      if (!/^data:[^;]*;base64,/.test(dataUrl) || (expectedPrefix && !dataUrl.startsWith(expectedPrefix))) {
+        reject(new Error("source-read-failed"));
+      }
+      else resolve(dataUrl);
     });
-    reader.addEventListener("error", () => reject(new Error("pdf-read-failed")));
+    reader.addEventListener("error", () => reject(new Error("source-read-failed")));
     reader.readAsDataURL(file);
   });
 }
 
-function addGeneratedPdfDocument(documentData, filename) {
+function addGeneratedSourceDocument(documentData, filename, sourceKind) {
   if (!documentData || typeof documentData !== "object") throw new Error("invalid-ai-result");
   const rawText = String(documentData.source_raw_markdown || "").trim();
   if (!rawText || !/^#\s+\S/m.test(rawText)) throw new Error("invalid-ai-result");
-  const title = String(documentData.citation_source?.title || documentData.title || "PDF-Quelle").trim();
-  const project = createDefaultProject(title || "PDF-Quelle");
+  const fallbackTitle = ["epub", "fb2", "mobi", "azw3"].includes(sourceKind)
+    ? "E-Book-Quelle"
+    : "PDF-Quelle";
+  const title = String(documentData.citation_source?.title || documentData.title || fallbackTitle).trim();
+  const project = createDefaultProject(title || fallbackTitle);
   project.source.rawText = rawText;
   project.metadata.textKind = normalizeDocumentStyleId(documentData.text_kind || "notebook");
   project.metadata.transcription = normalizeTranscriptionMetadata({
-    source_kind: "pdf",
+    source_kind: sourceKind,
     source_reference: filename,
     ...(documentData.transcription || {}),
   });
   project.citationSource = normalizeCitationSource(documentData.citation_source || {}, project);
-  project.title = project.citationSource.title || title || "PDF-Quelle";
+  project.title = project.citationSource.title || title || fallbackTitle;
+  if (documentData.source_metadata && typeof documentData.source_metadata === "object") {
+    // Formatnahe Metadaten bleiben getrennt von der Quellenangabe erhalten. Sie
+    // dienen später als belegte Eingangsdaten für Policy-/Kontor-Prüfungen.
+    project.sourceMetadata = structuredClone(documentData.source_metadata);
+  }
   addGeneratedProject(project);
 }
 
 async function processPdfSourceWithApi() {
   const apiKey = ui.generatePdfApiKeyInput?.value.trim() || "";
-  const model = ui.generatePdfModelInput?.value.trim() || "gpt-5.5";
+  const provider = ui.generatePdfProviderInput?.value || "google";
+  const model = ui.generatePdfModelInput?.value.trim()
+    || (provider === "google" ? "gemini-2.5-flash" : "gpt-5.5");
   const file = ui.generatePdfFileInput?.files?.[0] || null;
   if (!apiKey) {
     setGenerateDialogStatus("Bitte einen API-Key eingeben.", true);
@@ -3664,20 +3862,27 @@ async function processPdfSourceWithApi() {
     setGenerateDialogStatus("Die PDF-Datei überschreitet das API-Limit von 50 MB.", true);
     return;
   }
-  if (window.location.protocol === "file:") {
-    setGenerateDialogStatus("Die PDF-Verarbeitung benötigt den lokalen TypeMap-Helfer. Starten Sie TypeMap über start-typemap-api.ps1.", true);
-    return;
-  }
 
+  const startedAt = Date.now();
+  const updateElapsedTime = () => {
+    const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+    setGenerateDialogStatus(`PDF wird analysiert und abschnittsweise verarbeitet … ${minutes}:${seconds}`);
+  };
   ui.generatePromptButton.disabled = true;
-  setGenerateDialogStatus("PDF wird gelesen und durch die KI verarbeitet …");
+  ui.generatePromptButton.setAttribute("aria-busy", "true");
+  updateElapsedTime();
+  const elapsedTimer = window.setInterval(updateElapsedTime, 1000);
   try {
-    const fileData = await readFileAsBase64(file);
-    const response = await fetch("/api/typemap/transcribe-pdf", {
+    const fileData = await readFileAsDataUrl(file);
+    // Der Helfer hat eine feste lokale Adresse, damit TypeMap auch über file:, Live Server
+    // oder einen anderen Entwicklungsport geöffnet werden kann.
+    const response = await fetch("http://127.0.0.1:7319/api/typemap/transcribe-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        provider: ui.generatePdfProviderInput?.value || "openai",
+        provider,
         apiKey,
         model,
         filename: file.name,
@@ -3687,18 +3892,60 @@ async function processPdfSourceWithApi() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `api-error-${response.status}`);
-    addGeneratedPdfDocument(result.document, file.name);
+    addGeneratedSourceDocument(result.document, file.name, "pdf");
     setGenerateDialogOpen(false);
   } catch (error) {
     const message = error?.message === "Failed to fetch"
-      ? "Der lokale TypeMap-Helfer ist nicht erreichbar. Starten Sie start-typemap-api.ps1."
+      ? "Der lokale TypeMap-Helfer ist nicht erreichbar. Öffnen Sie TypeMap über TypeMap-starten.cmd."
       : error?.message === "invalid-ai-result"
         ? "Die KI-Antwort enthielt kein vollständiges TypeMap-Dokument. Versuchen Sie es erneut oder wählen Sie ein leistungsfähigeres Modell."
         : `PDF-Verarbeitung fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`;
     setGenerateDialogStatus(message, true);
   } finally {
+    window.clearInterval(elapsedTimer);
     if (ui.generatePdfApiKeyInput) ui.generatePdfApiKeyInput.value = "";
     ui.generatePromptButton.disabled = false;
+    ui.generatePromptButton.removeAttribute("aria-busy");
+  }
+}
+
+async function processEbookSource() {
+  const file = ui.generateEpubFileInput?.files?.[0] || null;
+  const format = file?.name.match(/\.([^.]+)$/)?.[1]?.toLowerCase() || "";
+  if (!file || !["epub", "fb2", "mobi", "azw3"].includes(format)) {
+    setGenerateDialogStatus("Bitte eine EPUB-, FB2-, MOBI- oder AZW3-Datei auswählen.", true);
+    ui.generateEpubFileInput?.focus();
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    setGenerateDialogStatus("Die E-Book-Datei überschreitet das Importlimit von 50 MB.", true);
+    return;
+  }
+
+  ui.generatePromptButton.disabled = true;
+  ui.generatePromptButton.setAttribute("aria-busy", "true");
+  setGenerateDialogStatus("E-Book-Struktur und Metadaten werden ausgewertet …");
+  try {
+    const fileData = await readFileAsDataUrl(file, "");
+    const response = await fetch("http://127.0.0.1:7319/api/typemap/import-ebook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, fileData }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `api-error-${response.status}`);
+    addGeneratedSourceDocument(result.document, file.name, result.document?.source_metadata?.format || format);
+    setGenerateDialogOpen(false);
+  } catch (error) {
+    const message = error?.message === "Failed to fetch"
+      ? "Der lokale TypeMap-Helfer ist nicht erreichbar. Öffnen Sie TypeMap über TypeMap-starten.cmd."
+      : error?.message === "invalid-ai-result"
+        ? "Das E-Book enthielt keinen als TypeMap-Dokument nutzbaren Haupttext."
+        : `E-Book-Import fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`;
+    setGenerateDialogStatus(message, true);
+  } finally {
+    ui.generatePromptButton.disabled = false;
+    ui.generatePromptButton.removeAttribute("aria-busy");
   }
 }
 
@@ -3753,11 +4000,11 @@ function applyJsonEditorDraft() {
 function deleteProject(projectId) {
   if (state.projects.length <= 1) {
     state.projects = [createDefaultProject("Neues Dokument")];
-    state.activeProjectId = state.projects[0].id;
+    state.activeProjectId = null;
   } else {
     state.projects = state.projects.filter((project) => project.id !== projectId);
     if (state.activeProjectId === projectId) {
-      state.activeProjectId = state.projects[0]?.id || null;
+      state.activeProjectId = null;
       state.activeSourceRange = null;
     }
   }
@@ -3774,7 +4021,7 @@ function updateActiveProject(mutator, options = {}) {
   if (options.renderBrowser !== false) {
     renderProjectList();
   }
-  rebuildModelsAndPreview();
+  if (options.renderPreview !== false) rebuildModelsAndPreview();
 }
 
 function updateActiveProjectTextFromEditor(nextText) {
@@ -3821,11 +4068,11 @@ function applySnapshot(snapshot) {
       : [];
   state.projects = rawProjects.map(normalizeProject);
   if (!state.projects.length) state.projects = [createDefaultProject("Neues Dokument")];
-  state.activeProjectId = state.projects.some((project) => project.id === snapshot?.state?.activeProjectId)
-    ? snapshot.state.activeProjectId
-    : state.projects[0].id;
+  // Ein gespeicherter Arbeitsstand enthält weiterhin alle Dokumente, öffnet
+  // nach Start oder Refresh aber bewusst keines davon automatisch.
+  state.activeProjectId = null;
   state.activeSourceRange = null;
-  setProjectExpanded(state.activeProjectId, true);
+  state.projectActivationToken += 1;
   renderApp();
   scheduleAutosave();
 }
@@ -3926,6 +4173,10 @@ function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project =
   if (textType === "lyric" && !String(block.text || "").trim()) {
     element.dataset.sourceBlankLine = "true";
   }
+  if (block.sourceLineId) {
+    element.dataset.sourceLineId = block.sourceLineId;
+    element.classList.add("preview-source-line-block");
+  }
   element.dataset.sourceStart = String(block.sourceStartOffset);
   element.dataset.sourceEnd = String(block.sourceEndOffset);
   element.dataset.matter = block.matter || "body";
@@ -3960,6 +4211,7 @@ function buildHtmlAppFontLinks() {
 
 function buildHtmlExport(project) {
   const metadata = project.metadata || {};
+  const bodyFontFamily = getEffectiveBodyFontFamily(project);
   const citationSource = project.citationSource || {};
   const authors = getDisplayedAuthors(project);
   const sourceModel = buildSourceModel(project);
@@ -3980,7 +4232,7 @@ function buildHtmlExport(project) {
     titleScale.authorsLineHeight = 1.3;
   }
   const leadPresentation = getLeadPresentation(project, titleScale);
-  const lineNumbering = normalizeLineNumbering(project.style.lineNumbering, project.style.lineNumbers);
+  const lineNumbering = getProjectLineNumbering(project);
   const hyphenationSettings = normalizeHyphenationSettings(project.style.hyphenationSettings, project.style.hyphenation, project.style.language);
   const exportBlocks = lineNumbering.mode === "source-lines" && textType === "lyric"
     ? layoutModel.sourceLineBlocks
@@ -3994,10 +4246,13 @@ function buildHtmlExport(project) {
     })
     : visibleExportBlocks;
   const hasTocObject = project.tocVisible !== false && visibleExportBlocks.some(isTableOfContentsBlock);
+  const hasRenderableSideToc = hasTocObject && sourceModel.sections.length > 0;
   const blocks = contentExportBlocks
     .map((block) => buildHtmlBlockMarkup(block, textType, project.style.chapterNumbers === true, project))
-    .join("\n");
-  const tocHtml = hasTocObject && sourceModel.sections.length
+    // Der Textcontainer nutzt pre-wrap. Trennende Quellcode-Zeilen zwischen
+    // Blockelementen würden daher als zusätzlicher sichtbarer Absatzraum erscheinen.
+    .join("");
+  const tocHtml = hasRenderableSideToc
     ? `<nav class="html-side-toc" aria-label="Inhaltsverzeichnis">
       <span class="html-side-toc-title">Inhaltsverzeichnis</span>
       ${sourceModel.sections
@@ -4012,7 +4267,7 @@ function buildHtmlExport(project) {
     ? ' font-variant-ligatures: common-ligatures contextual; font-feature-settings: "liga" 1, "clig" 1, "calt" 1; text-rendering: optimizeLegibility;'
     : "";
   const paragraphSpacingValue = Number(project.style.paragraphSpacing);
-  const paragraphSpacing = Number.isFinite(paragraphSpacingValue) ? paragraphSpacingValue : 0.72;
+  const paragraphSpacing = Number.isFinite(paragraphSpacingValue) ? paragraphSpacingValue : 0;
   const firstLineIndent = project.style.firstLineIndent ? "1.3em" : "0";
   const quoteStyle = project.style.quoteStyle === "italic" ? "italic" : "normal";
   const codeFontSize = Math.max(8, (Number(project.style.fontSize) || 14) - 2);
@@ -4027,7 +4282,7 @@ function buildHtmlExport(project) {
   <style>
 ${buildHtmlFontFaceCss(project)}
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 16px 40px 54px; background: #fff; color: #213633; font-family: ${project.style.fontFamily}; }
+    body { margin: 0; padding: 0; background: #fff; color: #213633; font-family: ${bodyFontFamily}; }
     main { width: min(920px, 100%); max-width: none; margin: 0 auto; padding: clamp(34px, 5vw, 72px); font-size: ${project.style.fontSize}pt; line-height: ${textType === "lyric" ? 1.5 : project.style.lineHeight}; text-align: ${textType === "lyric" ? "left" : project.style.textAlign}; hyphens: ${hyphenationSettings.mode}; -webkit-hyphens: ${hyphenationSettings.mode}; hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; hyphenate-limit-chars: ${hyphenationSettings.minWordLength} ${hyphenationSettings.before} ${hyphenationSettings.after}; -webkit-hyphenate-limit-lines: ${hyphenationSettings.consecutiveLines}; -webkit-hyphenate-limit-before: ${hyphenationSettings.before}; -webkit-hyphenate-limit-after: ${hyphenationSettings.after}; overflow-wrap: break-word; }
     main.has-side-toc { width: min(1180px, 100%); display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, ${project.style.measure}ch); gap: 30px; align-items: start; }
     .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; min-width: 0; }
@@ -4037,7 +4292,7 @@ ${buildHtmlFontFaceCss(project)}
     .authors { margin: .68em 0 0; color: #213633; font-family: ${project.style.metaFontFamily || project.style.subtitleFontFamily || project.style.fontFamily}; font-size: ${Number(titleScale.authors) || 0.76}em; font-weight: ${Number(project.style.metaWeight) || 400}; line-height: ${Number(titleScale.authorsLineHeight) || 1.28}; }
     header.authors-first .authors { margin: 0 0 .68em; }
     .lead { margin: 1.1em 0 0; color: #213633; font-family: ${leadPresentation.fontFamily}; font-size: ${leadPresentation.fontSize}em; font-weight: ${leadPresentation.fontWeight}; line-height: ${leadPresentation.lineHeight}; white-space: pre-wrap; font-synthesis-style: none; }
-    .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${project.style.fontFamily}; font-synthesis-style: none; text-wrap: pretty;${ligatureCss} }
+    .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${bodyFontFamily}; font-synthesis-style: none; white-space: pre-wrap; overflow-wrap: break-word; text-wrap: pretty;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     .preview-small-caps { font-size: inherit; font-variant-caps: small-caps; font-feature-settings: "smcp" 1; letter-spacing: .01em; text-transform: none; hyphens: inherit; -webkit-hyphens: inherit; overflow-wrap: inherit; word-break: normal; }
     .preview-footnote-reference { margin-inline: .08em; color: #8f5d14; font-family: inherit; font-size: .72em; font-weight: 600; line-height: 0; vertical-align: super; }
@@ -4074,12 +4329,24 @@ ${buildHtmlFontFaceCss(project)}
     pre { margin: .9em 0; padding: .9em 1em; border: 1px solid rgba(33, 54, 51, .14); border-radius: 6px; background: rgba(250, 247, 239, .78); color: #203431; overflow-x: auto; }
     pre code { background: transparent; color: inherit; padding: 0; }
     .preview-blank-line { min-height: 1.5em; margin: 0; }
+    .typemap-text.is-text-type-lyric p { white-space: pre-wrap; margin-bottom: 1.5em; }
+    .typemap-text.is-text-type-lyric .preview-source-line-block { margin-bottom: 0; }
+    .typemap-text.is-text-type-lyric .preview-blank-line { min-height: 1.5em; margin: 0; }
     .line-number-layer { position: absolute; inset: 0 auto 0 0; width: 0; pointer-events: none; }
-    .line-number { position: absolute; right: calc(100% + 1.1em); transform: translateY(calc(-100% - 0.1em)); color: #666; font-size: 0.72em; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+    .line-number { position: absolute; right: calc(100% + 1.1em); transform: translateY(calc(-100% - 0.22em)); color: #666; font-size: 0.72em; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+    @media print {
+      @page { margin: 18mm 20mm; }
+      body { padding: 0; }
+      main, main.has-side-toc { display: block; width: 100%; padding: 0 0 0 2.4em; overflow: visible; }
+      .html-side-toc { display: none; }
+      .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; }
+      .typemap-text, .line-number-layer { overflow: visible; }
+      .line-number { display: block !important; color: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
   </style>
 </head>
 <body>
-  <main${hasTocObject ? ' class="has-side-toc"' : ""}>
+  <main${hasRenderableSideToc ? ' class="has-side-toc"' : ""}>
     ${tocHtml}
     <div class="html-document-flow">
     <header${authorsFirst ? ' class="authors-first"' : ""}>
@@ -4089,9 +4356,7 @@ ${buildHtmlFontFaceCss(project)}
       ${!authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join("; "))}</p>` : ""}
       ${citationSource.lead ? `<p class="lead">${escapeHtml(citationSource.lead)}</p>` : ""}
     </header>
-    <section id="typemapText" class="typemap-text${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">
-      ${blocks}
-    </section>
+    <section id="typemapText" class="typemap-text is-text-type-${escapeHtml(textType)}${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">${blocks}</section>
     </div>
   </main>
   <script>
@@ -4122,6 +4387,28 @@ ${buildHtmlFontFaceCss(project)}
         return grouped;
       }, []);
     }
+    function getLastTextContentBottom(element) {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      let lastNode = null;
+      let lastCharacterIndex = -1;
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const value = String(node.nodeValue || "");
+        for (let index = value.length - 1; index >= 0; index -= 1) {
+          if (!/\\s/.test(value[index])) {
+            lastNode = node;
+            lastCharacterIndex = index;
+            break;
+          }
+        }
+      }
+      if (!lastNode || lastCharacterIndex < 0) return null;
+      const range = document.createRange();
+      range.setStart(lastNode, lastCharacterIndex);
+      range.setEnd(lastNode, lastCharacterIndex + 1);
+      const rects = Array.from(range.getClientRects()).filter((rect) => rect.height > 0);
+      range.detach();
+      return rects.length ? rects[rects.length - 1].bottom : null;
+    }
     function renderLineNumbers() {
       text.querySelector(".line-number-layer")?.remove();
       if (!lineNumbering.enabled) return;
@@ -4130,19 +4417,32 @@ ${buildHtmlFontFaceCss(project)}
       text.appendChild(layer);
       const targetRect = text.getBoundingClientRect();
       const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
+      const isNumberableBlock = (block) => block.dataset.matter === "body"
+        && (!block.dataset.chapterRole || block.dataset.chapterRole === "main")
+        && !block.classList.contains("preview-heading-level-1")
+        && !block.classList.contains("preview-embedded-object");
+      let lastContentIndex = -1;
+      blocks.forEach((block, index) => {
+        if (isNumberableBlock(block)
+          && block.dataset.sourceBlankLine !== "true"
+          && block.textContent.trim()) lastContentIndex = index;
+      });
       let lineIndex = 0;
-      blocks.forEach((block) => {
-        if (block.dataset.chapterRole !== "main") return;
-        if (block.classList.contains("preview-heading-level-1")) return;
-        if (block.classList.contains("preview-embedded-object")) return;
+      blocks.forEach((block, blockIndex) => {
+        if (blockIndex > lastContentIndex || !isNumberableBlock(block)) return;
         if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) return;
-        const rects = lineNumbering.mode === "source-lines"
+        let rects = lineNumbering.mode === "source-lines"
           ? getVisualLineRects(block)
           : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
+        if (blockIndex === lastContentIndex) {
+          const lastTextBottom = getLastTextContentBottom(block);
+          if (lastTextBottom !== null) rects = rects.filter((rect) => rect.top < lastTextBottom + 1);
+        }
         rects.forEach((rect) => {
           lineIndex += 1;
-          const lineNumber = lineNumbering.start + lineIndex - 1;
-          if (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0) return;
+          const relativeLine = lineIndex - lineNumbering.fromLine + 1;
+          if (relativeLine < 1 || relativeLine % lineNumbering.interval !== 0) return;
+          const lineNumber = lineNumbering.start + (relativeLine / lineNumbering.interval - 1) * lineNumbering.interval;
           const label = document.createElement("span");
           label.className = "line-number";
           label.textContent = String(lineNumber);
@@ -4153,6 +4453,8 @@ ${buildHtmlFontFaceCss(project)}
     }
     window.addEventListener("load", renderLineNumbers);
     window.addEventListener("resize", renderLineNumbers);
+    window.addEventListener("beforeprint", renderLineNumbers);
+    window.addEventListener("afterprint", renderLineNumbers);
     if (document.fonts?.ready) document.fonts.ready.then(renderLineNumbers);
     renderLineNumbers();
   </script>
@@ -4165,6 +4467,41 @@ function exportHtml() {
   if (!project) return;
   const blob = new Blob([buildHtmlExport(project)], { type: "text/html;charset=utf-8" });
   downloadBlob(blob, `${slugifyFilename(project.title)}.html`);
+}
+
+function printActiveProject() {
+  const project = getActiveProject();
+  if (!project) return;
+  setExportMenuOpen(false);
+
+  // Die Druckansicht verwendet bewusst exakt dieselbe vollständige HTML-Fassung
+  // wie der Export. So bleiben Satzbreite, Semantik und optionale Zeilennummern
+  // zwischen gespeicherter Datei und unmittelbarer Druckausgabe identisch.
+  const printWindow = window.open("", "_blank", "popup=yes,width=1100,height=800");
+  if (!printWindow) {
+    window.alert("Die Druckansicht konnte nicht geöffnet werden. Bitte erlauben Sie Pop-up-Fenster für TypeMap.");
+    return;
+  }
+
+  let printStarted = false;
+  const startPrint = async () => {
+    if (printStarted || printWindow.closed) return;
+    printStarted = true;
+    try {
+      await printWindow.document.fonts?.ready;
+    } catch (error) {
+      // Der Druck bleibt auch dann verfügbar, wenn ein Browser die Font-API nicht anbietet.
+    }
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  printWindow.addEventListener("load", startPrint, { once: true });
+  printWindow.addEventListener("afterprint", () => printWindow.close(), { once: true });
+  printWindow.document.open();
+  printWindow.document.write(buildHtmlExport(project));
+  printWindow.document.close();
+  window.setTimeout(startPrint, 1000);
 }
 
 async function exportPng() {
@@ -4184,7 +4521,7 @@ async function exportPng() {
     titleScale.authors = 1;
     titleScale.authorsLineHeight = 1.3;
   }
-  const lineNumbering = normalizeLineNumbering(style.lineNumbering, style.lineNumbers);
+  const lineNumbering = getProjectLineNumbering(project);
   const scale = Math.max(2, Math.ceil(window.devicePixelRatio || 1));
   const fontSize = ptToPx(style.fontSize);
   const lineHeightPx = fontSize * (Number(style.lineHeight) || 1.38);
@@ -4194,7 +4531,7 @@ async function exportPng() {
   const contentX = padding + numberGutter;
   const contentWidth = measureWidth;
   const canvasWidth = contentX + contentWidth + padding;
-  const family = style.fontFamily || "Arial, Helvetica, sans-serif";
+  const family = getEffectiveBodyFontFamily(project) || "Arial, Helvetica, sans-serif";
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   const rows = [];
@@ -4341,7 +4678,7 @@ async function exportPng() {
     if (/^#{2,7}\s+/.test(trimmedParagraph)) {
       pushSpacer(fontSize * (Number(project.style.headingSpacingBefore ?? getDocumentStylePreset(metadata.textKind)?.style?.headingSpacingBefore) || 1.2));
     }
-    const countAsBodyLine = block.chapterRole === "main" && !isSourceTitleHeading;
+    const countAsBodyLine = isNumberedBodyBlock(block) && !isSourceTitleHeading;
     const isHeading = /^#{1,7}\s+/.test(trimmedParagraph);
     const smallCaps = !isHeading && isUppercasePassage(paragraph);
     wrapText(paragraph, fontSize, 400, smallCaps).forEach((line) => pushLine(line, {
@@ -4376,8 +4713,8 @@ async function exportPng() {
     context.fillText(row.text, x, y);
     if (!row.countLine) return;
     countedLine += 1;
-    const lineNumber = lineNumbering.start + countedLine - 1;
-    if (!lineNumbering.enabled || (lineNumbering.interval > 1 && lineNumber % lineNumbering.interval !== 0)) return;
+    const lineNumber = getDisplayedLineNumber(countedLine, lineNumbering);
+    if (!lineNumbering.enabled || lineNumber === null) return;
     context.font = `${Math.round(fontSize * 0.62)}px ${family}`;
     context.fillStyle = "#5f6368";
     context.textAlign = "right";
@@ -4685,18 +5022,37 @@ function bindEditor() {
   ui.generateDialogCloseButton?.addEventListener("click", () => setGenerateDialogOpen(false));
   ui.generateWebTab?.addEventListener("click", () => setGenerateSourceMode("web"));
   ui.generatePdfTab?.addEventListener("click", () => setGenerateSourceMode("pdf"));
-  [ui.generateWebTab, ui.generatePdfTab].forEach((tab) => {
+  ui.generateEpubTab?.addEventListener("click", () => setGenerateSourceMode("epub"));
+  ui.generatePdfProviderInput?.addEventListener("change", () => {
+    const isGoogle = ui.generatePdfProviderInput.value === "google";
+    if (ui.generatePdfModelInput) {
+      ui.generatePdfModelInput.value = isGoogle ? "gemini-2.5-flash" : "gpt-5.5";
+    }
+    if (ui.generatePdfApiKeyInput) {
+      ui.generatePdfApiKeyInput.placeholder = isGoogle ? "AIza…" : "sk-…";
+      ui.generatePdfApiKeyInput.value = "";
+    }
+    setGenerateDialogStatus("");
+  });
+  [ui.generateWebTab, ui.generatePdfTab, ui.generateEpubTab].forEach((tab) => {
     tab?.addEventListener("keydown", (event) => {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       event.preventDefault();
-      const nextMode = state.generateSourceMode === "web" ? "pdf" : "web";
+      const modes = ["web", "pdf", "epub"];
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const currentIndex = modes.indexOf(state.generateSourceMode);
+      const nextMode = modes[(currentIndex + direction + modes.length) % modes.length];
       setGenerateSourceMode(nextMode);
-      (nextMode === "pdf" ? ui.generatePdfTab : ui.generateWebTab)?.focus();
+      ({ web: ui.generateWebTab, pdf: ui.generatePdfTab, epub: ui.generateEpubTab }[nextMode])?.focus();
     });
   });
   ui.generatePromptButton?.addEventListener("click", async () => {
     if (state.generateSourceMode === "pdf") {
       await processPdfSourceWithApi();
+      return;
+    }
+    if (state.generateSourceMode === "epub") {
+      await processEbookSource();
       return;
     }
     const url = ui.generateSourceUrlInput?.value.trim() || "";
@@ -4733,6 +5089,7 @@ function bindEditor() {
     }
   });
   ui.themeToggleButton?.addEventListener("click", toggleTheme);
+  ui.printProjectButton?.addEventListener("click", printActiveProject);
   ui.exportProjectButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     setExportMenuOpen(ui.exportProjectButton.getAttribute("aria-expanded") !== "true");
@@ -4865,6 +5222,13 @@ function bindEditor() {
   ui.lineNumberDialogCloseButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
   ui.lineNumberDialogCancelButton?.addEventListener("click", () => setLineNumberDialogOpen(false));
   ui.lineNumberDialogSaveButton?.addEventListener("click", saveLineNumberDialog);
+  ui.lineNumberIntervalInput?.addEventListener("input", () => {
+    if (!state.lineNumberStartIsAutomatic || !ui.lineNumberStartInput) return;
+    ui.lineNumberStartInput.value = String(clampInteger(ui.lineNumberIntervalInput.value, 1, 1, 100));
+  });
+  ui.lineNumberStartInput?.addEventListener("input", () => {
+    state.lineNumberStartIsAutomatic = false;
+  });
   ui.spellcheckToggleButton?.addEventListener("click", (event) => {
     event.stopPropagation();
     updateActiveProject((project) => {
@@ -4937,6 +5301,14 @@ function bindEditor() {
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.fontFamily = ui.fontFamilySelect.value;
+    }, { renderPreview: false });
+    const project = getActiveProject();
+    if (!project) return;
+    const token = ++state.projectActivationToken;
+    renderNoActiveProjectState("Schrift wird geladen …");
+    loadProjectFonts(project).then(() => {
+      if (token !== state.projectActivationToken || state.activeProjectId !== project.id) return;
+      renderApp();
     });
   });
   ui.fontLigaturesInput?.addEventListener("change", () => {
@@ -5005,8 +5377,7 @@ async function init() {
     applySnapshot(snapshot);
   } else {
     state.projects = [createDefaultProject("Erstes Dokument")];
-    state.activeProjectId = state.projects[0].id;
-    setProjectExpanded(state.activeProjectId, true);
+    state.activeProjectId = null;
     renderApp();
     scheduleAutosave();
   }

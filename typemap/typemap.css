@@ -17,6 +17,56 @@
   --shadow: rgba(0, 0, 0, 0.28);
 }
 
+/* Die UI- und Codeschriften liegen lokal vor. Damit hängt das erste saubere
+ * Rendering weder vom Netz noch vom Zeitpunkt einer externen Font-Antwort ab. */
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("../assets/fonts/source-sans-3/SourceSans3-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("../assets/fonts/source-sans-3/SourceSans3-Italic-Variable.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  src: url("../assets/fonts/source-code-pro/SourceCodePro-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  src: url("../assets/fonts/source-code-pro/SourceCodePro-Italic-Variable.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("../assets/fonts/roboto/Roboto-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url("../assets/fonts/roboto/Roboto-Italic-Variable.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+}
+
 @font-face {
   font-family: "CMU Serif";
   src: url("../assets/fonts/cmu/cmunrm.ttf") format("truetype");
@@ -347,6 +397,43 @@ body.typemap-theme-light .brand-bird {
   height: 23px;
 }
 
+.control-grid .topbar-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+
+.topbar-action-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+
+.topbar-export-icon {
+  mask-image: url("https://api.iconify.design/uil/export.svg");
+  -webkit-mask-image: url("https://api.iconify.design/uil/export.svg");
+}
+
+.topbar-print-icon {
+  mask-image: url("https://api.iconify.design/material-symbols/print-outline-rounded.svg");
+  -webkit-mask-image: url("https://api.iconify.design/material-symbols/print-outline-rounded.svg");
+}
+
 .type-menu-close-button:hover,
 .control-grid button:hover,
 .secondary-button:hover {
@@ -378,7 +465,26 @@ body.typemap-theme-light .type-menu-button[aria-expanded="true"] {
   display: flex;
   flex: 1 1 auto;
   justify-content: flex-end;
+  gap: 3px;
   padding: 0;
+}
+
+body.typemap-theme-light .topbar-search .topbar-icon-button {
+  color: #213633;
+}
+
+.topbar-search .topbar-icon-button:hover,
+.topbar-search .topbar-icon-button:focus-visible,
+.topbar-search .topbar-icon-button[aria-expanded="true"] {
+  border-color: var(--line-strong);
+  background: rgba(255, 179, 71, 0.08);
+}
+
+body.typemap-theme-light .topbar-search .topbar-icon-button:hover,
+body.typemap-theme-light .topbar-search .topbar-icon-button:focus-visible,
+body.typemap-theme-light .topbar-search .topbar-icon-button[aria-expanded="true"] {
+  border-color: rgba(33, 54, 51, 0.2);
+  background: rgba(33, 54, 51, 0.055);
 }
 
 .export-control {
@@ -601,6 +707,20 @@ body.typemap-theme-light .type-menu-popup {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.preview-page.is-empty {
+  display: grid;
+  place-items: center;
+}
+
+.preview-empty-state {
+  margin: 0;
+  color: var(--muted);
+  font-family: "Source Sans 3", Arial, sans-serif;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .preview-page.has-side-toc {
@@ -995,7 +1115,7 @@ body.typemap-theme-light .preview-text blockquote {
   font-size: 0.72em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  transform: translateY(calc(-100% - 0.1em));
+  transform: translateY(calc(-100% - 0.22em));
 }
 
 body.typemap-theme-light .preview-line-number {
@@ -1154,6 +1274,10 @@ body.typemap-theme-light .details-inline {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.editor-panel.is-empty {
+  opacity: 0.72;
 }
 
 .panel-header,
@@ -2760,6 +2884,29 @@ body.typemap-theme-light .citation-output textarea[readonly] {
   accent-color: var(--accent);
 }
 
+/* Im Nummerierungsdialog beginnen Checkboxen, Ziffern und Auswahllisten auf
+ * derselben Vertikalen; so lassen sich die zusammengehörigen Werte schneller lesen. */
+#lineNumberDialog .line-number-property-list .property-row,
+#lineNumberDialog .line-number-property-list .property-toggle-row {
+  grid-template-columns: minmax(190px, 1fr) 190px;
+}
+
+#lineNumberDialog .line-number-property-list .property-toggle-row input[type="checkbox"] {
+  justify-self: start;
+  margin: 0 0 0 9px;
+}
+
+@media (max-width: 560px) {
+  #lineNumberDialog .line-number-property-list .property-row,
+  #lineNumberDialog .line-number-property-list .property-toggle-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #lineNumberDialog .line-number-property-list .property-toggle-row input[type="checkbox"] {
+    margin-left: 9px;
+  }
+}
+
 .property-dialog-actions {
   display: flex;
   justify-content: end;
@@ -2771,6 +2918,15 @@ body.typemap-theme-light .citation-output textarea[readonly] {
 .primary-action {
   border-color: var(--line-strong);
   color: var(--accent);
+}
+
+#generatePromptButton:disabled {
+  border-color: var(--line);
+  background: rgba(128, 128, 128, 0.1);
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: wait;
+  box-shadow: none;
 }
 
 @container type-stage (max-width: 980px) {

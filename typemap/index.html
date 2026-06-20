@@ -8,10 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Code+Pro:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Source+Sans+3:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="typemap.css?v=20260619ch">
+  <link rel="stylesheet" href="typemap.css?v=20260620u">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -30,7 +27,9 @@
         </div>
         <div class="control-grid topbar-search">
           <div class="export-control">
-            <button type="button" id="exportProjectButton" aria-expanded="false" aria-controls="exportMenu">Export</button>
+            <button type="button" id="exportProjectButton" class="topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
+              <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
+            </button>
             <div id="exportMenu" class="export-menu" hidden>
               <button type="button" data-export-format="md">
                 <span class="file-format-icon file-format-icon-markdown" aria-hidden="true"></span>
@@ -50,7 +49,10 @@
               </button>
             </div>
           </div>
-          <button type="button" id="themeToggleButton" class="theme-toggle-button" aria-label="Hellen Modus aktivieren" aria-pressed="false">
+          <button type="button" id="printProjectButton" class="topbar-icon-button print-project-button" aria-label="Drucken" title="Drucken" disabled>
+            <span class="topbar-action-icon topbar-print-icon" aria-hidden="true"></span>
+          </button>
+          <button type="button" id="themeToggleButton" class="topbar-icon-button theme-toggle-button" aria-label="Hellen Modus aktivieren" aria-pressed="false">
             <img id="themeToggleIcon" src="https://api.iconify.design/boxicons/sun-bright.svg?color=%23ffb347" alt="" aria-hidden="true">
           </button>
         </div>
@@ -237,9 +239,10 @@
                   <img src="https://api.iconify.design/material-symbols/text-fields-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Worttrennung</span>
                 </button>
-                <button type="button" id="lineNumberSettingsButton" class="editor-menu-action">
+                <button type="button" id="lineNumberSettingsButton" class="editor-menu-action" aria-pressed="false">
                   <img src="https://api.iconify.design/material-symbols/format-list-numbered-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Zeilennummerierung</span>
+                  <img id="lineNumberToggleCheck" class="editor-menu-check" src="https://api.iconify.design/ic/round-check.svg?color=%23ffb347" alt="" aria-hidden="true" hidden>
                 </button>
                 <button type="button" id="chapterNumbersToggleButton" class="editor-menu-action" aria-pressed="false">
                   <img src="https://api.iconify.design/mdi/number-1-box-multiple-outline.svg?color=%23ffb347" alt="" aria-hidden="true">
@@ -339,6 +342,7 @@
     <div class="property-tabs generate-source-tabs" role="tablist" aria-label="Art der Quelle">
       <button type="button" id="generateWebTab" class="property-tab is-active" role="tab" aria-selected="true" aria-controls="generateWebPanel">Webquelle</button>
       <button type="button" id="generatePdfTab" class="property-tab" role="tab" aria-selected="false" aria-controls="generatePdfPanel" tabindex="-1">PDF-Quelle</button>
+      <button type="button" id="generateEpubTab" class="property-tab" role="tab" aria-selected="false" aria-controls="generateEpubPanel" tabindex="-1">E-Book-Quelle</button>
     </div>
     <div class="property-dialog-body">
       <section id="generateWebPanel" class="generate-source-panel" role="tabpanel" aria-labelledby="generateWebTab">
@@ -354,23 +358,32 @@
           <label class="generate-url-field">
             <span>API-Anbieter</span>
             <select id="generatePdfProviderInput">
+              <option value="google" selected>Google Gemini (Free Tier)</option>
               <option value="openai">OpenAI</option>
             </select>
           </label>
           <label class="generate-url-field">
             <span>Modell</span>
-            <input id="generatePdfModelInput" type="text" autocomplete="off" spellcheck="false" value="gpt-5.5">
+            <input id="generatePdfModelInput" type="text" autocomplete="off" spellcheck="false" value="gemini-2.5-flash">
           </label>
         </div>
         <label class="generate-url-field">
           <span>API-Key</span>
-          <input id="generatePdfApiKeyInput" type="password" autocomplete="new-password" spellcheck="false" placeholder="sk-…">
+          <input id="generatePdfApiKeyInput" type="password" autocomplete="new-password" spellcheck="false" placeholder="AIza…">
         </label>
         <label class="generate-url-field">
           <span>PDF-Datei</span>
           <input id="generatePdfFileInput" type="file" accept="application/pdf,.pdf">
         </label>
-        <p class="generate-api-note">Starten Sie TypeMap dafür über <code>start-typemap-api.ps1</code>. Der Schlüssel wird nicht gespeichert und nach der Anfrage aus dem Formular entfernt; die Verarbeitung läuft über den lokalen Helfer auf diesem Rechner.</p>
+        <p class="generate-api-note">Gemini 2.5 Flash bietet ein begrenztes kostenloses API-Kontingent. Google kann Inhalte der kostenlosen Stufe zur Produktverbesserung verwenden; übermitteln Sie dort nur dafür geeignete Quellen. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini-API-Key erstellen</a>. Öffnen Sie TypeMap über <code>TypeMap-starten.cmd</code>. Der Schlüssel wird nicht gespeichert und nach der Anfrage aus dem Formular entfernt; die Verarbeitung läuft über den lokalen Helfer auf diesem Rechner.</p>
+      </section>
+      <section id="generateEpubPanel" class="generate-source-panel" role="tabpanel" aria-labelledby="generateEpubTab" hidden>
+        <p class="event-description">Importieren Sie EPUB und FB2 direkt lokal. MOBI und AZW3 werden über eine vorhandene lokale Calibre-Installation in die gemeinsame E-Book-Struktur überführt.</p>
+        <label class="generate-url-field">
+          <span>E-Book-Datei</span>
+          <input id="generateEpubFileInput" type="file" accept="application/epub+zip,application/x-fictionbook+xml,.epub,.fb2,.mobi,.azw3">
+        </label>
+        <p class="generate-api-note">Der E-Book-Import benötigt keinen API-Key und übermittelt die Datei nicht an einen KI-Dienst. Quellenmetadaten und enthaltene Rechtehinweise werden getrennt vom Text für das spätere ATLAS-Modell erhalten.</p>
       </section>
       <label id="generatePromptField" class="generate-prompt-field">
         <span>Prompt</span>
@@ -672,7 +685,7 @@
     <div class="property-dialog-body">
       <section class="property-section">
         <h3>Nummerierung</h3>
-        <div class="property-list">
+        <div class="property-list line-number-property-list">
           <label class="property-row property-toggle-row">
             <span>Nummerierung anzeigen</span>
             <input id="lineNumberEnabledInput" type="checkbox">
@@ -689,12 +702,16 @@
             <input id="lineNumberIncludeBlankInput" type="checkbox">
           </label>
           <label class="property-row">
-            <span>Jede wievielte Zeile</span>
-            <input id="lineNumberIntervalInput" type="number" min="1" max="100" step="1">
+            <span>Nummerierung ab Zeile</span>
+            <input id="lineNumberFromInput" type="number" min="1" max="99999" step="1" value="1">
           </label>
           <label class="property-row">
-            <span>Startwert</span>
-            <input id="lineNumberStartInput" type="number" min="0" max="99999" step="1">
+            <span>Jede wievielte Zeile</span>
+            <input id="lineNumberIntervalInput" type="number" min="1" max="100" step="1" value="1">
+          </label>
+          <label class="property-row">
+            <span>Beginnen mit</span>
+            <input id="lineNumberStartInput" type="number" min="0" max="99999" step="1" value="1">
           </label>
         </div>
       </section>
@@ -760,7 +777,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260619v"></script>
-  <script src="typemap.js?v=20260619ch"></script>
+  <script src="typemap.js?v=20260620u"></script>
 </body>
 </html>
 
