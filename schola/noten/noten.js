@@ -1,5 +1,7 @@
-const STORAGE_KEY = "schola-grade-profiles-v2";
-const SESSION_KEY = "schola-grade-session-v2";
+const STORAGE_KEY = "schola-grade-profiles-v4";
+const SESSION_KEY = "schola-grade-session-v4";
+const LEGACY_STORAGE_KEYS = ["schola-grade-profiles-v3", "schola-grade-profiles-v2"];
+const LEGACY_SESSION_KEYS = ["schola-grade-session-v3", "schola-grade-session-v2"];
 
 // Die Bezeichnungen folgen dem Bildungsserver Mecklenburg-Vorpommern. Das
 // Bundesland ist Profilraum im Maschinenraum; die Brücke zeigt nur die drei
@@ -31,6 +33,10 @@ function makeThresholds(labels, percentages) {
   return labels.map(([level, note], index) => ({ level, note, minPercent: percentages[index] }));
 }
 
+function makeScope(id, schoolType, classes, assessmentType, qualification = "") {
+  return { id, schoolType, classes: [...classes], assessmentType, qualification };
+}
+
 function createDefaultProfiles() {
   const sourceNote = "Übernommen aus „Notenberechnung B M G.ods“; persönliche Arbeitsgrundlage, noch nicht amtlich verifiziert.";
   const gradeProfile = (id, name, schoolType, classes, assessmentType, percentages) => ({
@@ -58,11 +64,15 @@ function createDefaultProfiles() {
 
 const ui = Object.fromEntries([
   "gradeApp", "menuButton", "menuCloseButton", "menuOverlay", "sideMenu", "resetScoreButton",
-  "openEngineButton", "returnBridgeButton", "schoolTypeSelect", "classLevelSelect", "performanceSelect", "engineProfileSelect",
+  "openEngineButton", "returnBridgeButton", "schoolTypeMenuButton", "schoolTypeMenu",
+  "classLevelMenuButton", "classLevelMenu", "performanceMenuButton", "performanceMenu",
+  "selectionSummary", "engineProfileSelect",
   "earnedInput", "totalInput", "percentageOutput", "scoreTrackFill", "inputMessage", "resultPrimary",
-  "resultSecondary", "pointsNeededOutput", "pointsToWorseOutput", "boundaryList",
-  "newProfileButton", "duplicateProfileButton", "deleteProfileButton", "profileNameInput", "authorityInput",
-  "schoolTypeInput", "gradeBandInput", "assessmentTypeInput", "scaleTypeSelect", "profileStatusSelect",
+  "resultSecondary", "betterGradeOutput", "worseGradeOutput", "pointsNeededOutput", "pointsToWorseOutput", "boundaryList",
+  "newProfileButton", "duplicateProfileButton", "deleteProfileButton", "profileNameInput", "countryCodeInput",
+  "subdivisionCodeInput", "basisSelect", "addBasisButton", "duplicateBasisButton", "deleteBasisButton", "basisNameInput",
+  "profileVersionInput", "validFromInput", "validUntilInput", "scopeSelect", "addScopeButton",
+  "deleteScopeButton", "schoolTypeInput", "gradeBandInput", "assessmentTypeInput", "qualificationInput", "scaleTypeSelect", "profileStatusSelect",
   "sourceNoteInput", "sourceUrlInput", "thresholdEditor", "resetProfilesButton",
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -70,26 +80,98 @@ function clone(value) {
   return typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
 
-function loadProfiles() {
+// Vorhandene Profile werden beim Lesen verlustfrei in die Trennung aus
+// Rechtsraum, Berechnungsgrundlage und Geltungsbereichen überführt.
+function normalizeProfile(profile) {
+  const legacyParts = String(profile.assessmentType || "").split(/\s*·\s*/).filter(Boolean);
+  const scopes = Array.isArray(profile.scopes) && profile.scopes.length
+    ? profile.scopes.map((scope, index) => ({
+      id: scope.id || `${profile.id}-scope-${index + 1}`,
+      schoolType: scope.schoolType || "Regionale Schule",
+      classes: Array.isArray(scope.classes) ? scope.classes : [],
+      assessmentType: scope.assessmentType || "",
+      qualification: scope.qualification || "",
+    }))
+    : [makeScope(
+      `${profile.id}-scope-1`,
+      profile.schoolType || "Regionale Schule",
+      Array.isArray(profile.classes) && profile.classes.length ? profile.classes : ["7"],
+      legacyParts[0] || "",
+      legacyParts.slice(1).join(" · "),
+    )];
+  const normalized = {
+    ...profile,
+    countryCode: profile.countryCode || "DE",
+    subdivisionCode: profile.subdivisionCode || "DE-MV",
+    version: profile.version || "1",
+    validFrom: profile.validFrom || "",
+    validUntil: profile.validUntil || "",
+    scopes,
+  };
+  ["federalState", "authority", "schoolType", "classes", "assessmentType"].forEach((field) => delete normalized[field]);
+  if (normalized.collectionId) {
+    delete normalized.countryCode;
+    delete normalized.subdivisionCode;
+  }
+  return normalized;
+}
+
+function assignBasisToCollection(basis, collectionId) {
+  basis.collectionId = collectionId;
+  delete basis.countryCode;
+  delete basis.subdivisionCode;
+  return basis;
+}
+
+function loadWorkspaceData() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (Array.isArray(parsed) && parsed.length) return parsed;
+    const serialized = localStorage.getItem(STORAGE_KEY) || LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
+    const parsed = JSON.parse(serialized || "null");
+    if (parsed?.collections?.length && parsed?.bases?.length) {
+      return { collections: parsed.collections, bases: parsed.bases.map(normalizeProfile) };
+    }
+    if (Array.isArray(parsed) && parsed.length) {
+      const bases = parsed.map(normalizeProfile);
+      const collections = [];
+      bases.forEach((basis) => {
+        const collectionId = `${basis.countryCode || "DE"}-${basis.subdivisionCode || "DE-MV"}`.toLowerCase();
+        if (!collections.some((entry) => entry.id === collectionId)) collections.push({
+          id: collectionId,
+          name: basis.subdivisionCode === "DE-MV" ? "Mecklenburg-Vorpommern" : basis.subdivisionCode,
+          countryCode: basis.countryCode || "DE",
+          subdivisionCode: basis.subdivisionCode || "DE-MV",
+        });
+        basis.collectionId = collectionId;
+        delete basis.countryCode;
+        delete basis.subdivisionCode;
+      });
+      return { collections, bases };
+    }
   } catch (error) {
     console.warn("Gespeicherte Bewertungsprofile konnten nicht gelesen werden.", error);
   }
-  return createDefaultProfiles();
+  const bases = createDefaultProfiles().map(normalizeProfile).map((basis) => assignBasisToCollection(basis, "de-de-mv"));
+  return { collections: [{ id: "de-de-mv", name: "Mecklenburg-Vorpommern", countryCode: "DE", subdivisionCode: "DE-MV" }], bases };
 }
 
 function loadSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null") || {}; }
+  try {
+    const serialized = localStorage.getItem(SESSION_KEY) || LEGACY_SESSION_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
+    return JSON.parse(serialized || "null") || {};
+  }
   catch (error) { return {}; }
 }
 
 const storedSession = loadSession();
+const storedWorkspace = loadWorkspaceData();
 const state = {
-  profiles: loadProfiles(),
-  activeProfileId: storedSession.activeProfileId || "gym-sek1-test",
+  collections: storedWorkspace.collections,
+  profiles: storedWorkspace.bases,
+  activeProfileId: storedWorkspace.collections.some((entry) => entry.id === storedSession.activeProfileId) ? storedSession.activeProfileId : storedWorkspace.collections[0]?.id || "",
+  activeBasisId: storedSession.activeBasisId || (storedWorkspace.bases.some((entry) => entry.id === storedSession.activeProfileId) ? storedSession.activeProfileId : storedWorkspace.bases[0]?.id || ""),
   bridgeProfileId: storedSession.bridgeProfileId || "gym-sek1-test",
+  bridgeScopeId: storedSession.bridgeScopeId || "",
+  activeScopeId: storedSession.activeScopeId || "",
   schoolType: storedSession.schoolType || "Gymnasium",
   classLevel: storedSession.classLevel || "7",
   earned: storedSession.earned ?? "46",
@@ -97,19 +179,36 @@ const state = {
 };
 
 function getActiveProfile() {
-  return state.profiles.find((profile) => profile.id === state.activeProfileId) || state.profiles[0];
+  return state.collections.find((profile) => profile.id === state.activeProfileId) || state.collections[0];
+}
+
+function getActiveBasis() {
+  return state.profiles.find((basis) => basis.id === state.activeBasisId) || state.profiles.find((basis) => basis.collectionId === state.activeProfileId) || null;
 }
 
 function getBridgeProfile() {
   return state.profiles.find((profile) => profile.id === state.bridgeProfileId) || null;
 }
 
+function getActiveScope() {
+  const basis = getActiveBasis();
+  return basis?.scopes?.find((scope) => scope.id === state.activeScopeId) || basis?.scopes?.[0] || null;
+}
+
+function getBridgeScope() {
+  const profile = getBridgeProfile();
+  return profile?.scopes?.find((scope) => scope.id === state.bridgeScopeId) || profile?.scopes?.[0] || null;
+}
+
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.profiles));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ collections: state.collections, bases: state.profiles }));
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       activeProfileId: state.activeProfileId,
+      activeBasisId: state.activeBasisId,
       bridgeProfileId: state.bridgeProfileId,
+      bridgeScopeId: state.bridgeScopeId,
+      activeScopeId: state.activeScopeId,
       schoolType: state.schoolType,
       classLevel: state.classLevel,
       earned: state.earned,
@@ -150,37 +249,101 @@ function calculate(profile, earned, total) {
 }
 
 function renderProfileOptions() {
-  ui.engineProfileSelect.replaceChildren(...state.profiles.map((profile) => new Option(profile.name, profile.id)));
+  ui.engineProfileSelect.replaceChildren(...state.collections.map((profile) => new Option(profile.name, profile.id)));
   ui.engineProfileSelect.value = state.activeProfileId;
 }
 
 function profilesForBridgeSelection() {
-  return state.profiles.filter((profile) => (
-    (profile.federalState || "Mecklenburg-Vorpommern") === "Mecklenburg-Vorpommern"
-    && profile.schoolType === state.schoolType
-    && (profile.classes || []).includes(state.classLevel)
+  return state.profiles.flatMap((profile) => (
+    (() => {
+      const collection = state.collections.find((entry) => entry.id === profile.collectionId);
+      return collection?.countryCode === "DE" && collection?.subdivisionCode === "DE-MV";
+    })()
+      ? (profile.scopes || [])
+        .filter((scope) => scope.schoolType === state.schoolType && scope.classes.includes(state.classLevel))
+        .map((scope) => ({ profile, scope }))
+      : []
   ));
 }
 
-function renderBridgeSelectors() {
-  ui.schoolTypeSelect.replaceChildren(...MV_SCHOOL_TYPES.map((entry) => new Option(entry.name, entry.name)));
-  if (!MV_SCHOOL_TYPES.some((entry) => entry.name === state.schoolType)) state.schoolType = MV_SCHOOL_TYPES[0].name;
-  ui.schoolTypeSelect.value = state.schoolType;
-  const school = MV_SCHOOL_TYPES.find((entry) => entry.name === state.schoolType) || MV_SCHOOL_TYPES[0];
-  ui.classLevelSelect.replaceChildren(...school.classes.map((classLevel) => new Option(classLevel, classLevel)));
-  if (!school.classes.includes(state.classLevel)) state.classLevel = school.classes[0];
-  ui.classLevelSelect.value = state.classLevel;
+function formatClassLevel(classLevel) {
+  return /^\d+$/.test(classLevel) ? `${classLevel}. Klasse` : classLevel;
+}
 
+function closeSelectionMenus() {
+  [
+    [ui.schoolTypeMenuButton, ui.schoolTypeMenu],
+    [ui.classLevelMenuButton, ui.classLevelMenu],
+    [ui.performanceMenuButton, ui.performanceMenu],
+  ].forEach(([button, menu]) => {
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleSelectionMenu(button, menu) {
+  const shouldOpen = menu.hidden;
+  closeSelectionMenus();
+  menu.hidden = !shouldOpen;
+  button.setAttribute("aria-expanded", String(shouldOpen));
+}
+
+function renderSelectionMenu(menu, options, selectedValue, onSelect) {
+  menu.replaceChildren(...options.map(({ value, label }) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.role = "menuitem";
+    button.textContent = label;
+    button.classList.toggle("is-selected", value === selectedValue);
+    if (value === selectedValue) button.setAttribute("aria-current", "true");
+    button.addEventListener("click", () => {
+      closeSelectionMenus();
+      onSelect(value);
+    });
+    return button;
+  }));
+}
+
+function renderBridgeSelectors() {
+  if (!MV_SCHOOL_TYPES.some((entry) => entry.name === state.schoolType)) state.schoolType = MV_SCHOOL_TYPES[0].name;
+  const school = MV_SCHOOL_TYPES.find((entry) => entry.name === state.schoolType) || MV_SCHOOL_TYPES[0];
+  if (!school.classes.includes(state.classLevel)) state.classLevel = school.classes[0];
   const profiles = profilesForBridgeSelection();
-  if (!profiles.some((profile) => profile.id === state.bridgeProfileId)) state.bridgeProfileId = profiles[0]?.id || "";
-  if (profiles.length) {
-    ui.performanceSelect.replaceChildren(...profiles.map((profile) => new Option(profile.assessmentType || profile.name, profile.id)));
-    ui.performanceSelect.value = state.bridgeProfileId;
-    ui.performanceSelect.disabled = false;
-  } else {
-    ui.performanceSelect.replaceChildren(new Option("Noch kein Profil hinterlegt", ""));
-    ui.performanceSelect.disabled = true;
+  if (!profiles.some(({ profile, scope }) => profile.id === state.bridgeProfileId && scope.id === state.bridgeScopeId)) {
+    state.bridgeProfileId = profiles[0]?.profile.id || "";
+    state.bridgeScopeId = profiles[0]?.scope.id || "";
   }
+  const profile = getBridgeProfile();
+  const scope = getBridgeScope();
+
+  ui.performanceMenuButton.disabled = !profiles.length;
+
+  renderSelectionMenu(ui.schoolTypeMenu, MV_SCHOOL_TYPES.map((entry) => ({ value: entry.name, label: entry.name })), state.schoolType, (value) => {
+    state.schoolType = value;
+    state.classLevel = MV_SCHOOL_TYPES.find((entry) => entry.name === value)?.classes?.[0] || "";
+    state.bridgeProfileId = "";
+    state.bridgeScopeId = "";
+    renderAll();
+  });
+  renderSelectionMenu(ui.classLevelMenu, school.classes.map((value) => ({ value, label: formatClassLevel(value) })), state.classLevel, (value) => {
+    state.classLevel = value;
+    state.bridgeProfileId = "";
+    state.bridgeScopeId = "";
+    renderAll();
+  });
+  renderSelectionMenu(ui.performanceMenu, profiles.map(({ profile: entry, scope: entryScope }) => ({
+    value: `${entry.id}::${entryScope.id}`,
+    label: [entryScope.assessmentType || entry.name, entryScope.qualification].filter(Boolean).join(" · "),
+  })), `${state.bridgeProfileId}::${state.bridgeScopeId}`, (value) => {
+    [state.bridgeProfileId, state.bridgeScopeId] = value.split("::");
+    renderBridgeSelectors();
+    renderBridge();
+    persist();
+  });
+
+  const performanceParts = scope ? [scope.assessmentType, scope.qualification].filter(Boolean) : ["kein Bewertungsprofil"];
+  const collection = state.collections.find((entry) => entry.id === profile?.collectionId);
+  ui.selectionSummary.textContent = [collection?.subdivisionCode || "DE-MV", state.schoolType, formatClassLevel(state.classLevel), ...performanceParts].join(" - ");
 }
 
 function renderBridge() {
@@ -196,6 +359,8 @@ function renderBridge() {
     ui.percentageOutput.textContent = "– %";
     ui.resultPrimary.textContent = "–";
     ui.resultSecondary.textContent = profile ? "Bitte gültige Punktwerte eingeben." : "Kein Bewertungsprofil";
+    ui.betterGradeOutput.textContent = "–";
+    ui.worseGradeOutput.textContent = "–";
     ui.pointsNeededOutput.textContent = "–";
     ui.pointsToWorseOutput.textContent = "–";
     ui.scoreTrackFill.style.width = "0%";
@@ -220,8 +385,10 @@ function renderBridge() {
   ui.resultPrimary.textContent = result.current?.level || "–";
   const numericNote = String(pointScale ? result.current?.note : result.current?.level || "").match(/[1-6]/)?.[0] || "";
   ui.resultSecondary.textContent = grade6Labels.find(([grade]) => grade === numericNote)?.[1] || "";
-  ui.pointsNeededOutput.textContent = result.better ? `${formatNumber(result.pointsNeeded)} P. mehr` : "Beststufe";
-  ui.pointsToWorseOutput.textContent = result.worse ? `> ${formatNumber(result.pointsToWorse)} P. weniger` : "Endstufe";
+  ui.betterGradeOutput.textContent = result.better?.level || "–";
+  ui.worseGradeOutput.textContent = result.worse?.level || "–";
+  ui.pointsNeededOutput.textContent = result.better ? `+ ${formatNumber(result.pointsNeeded)} P.` : "Beststufe";
+  ui.pointsToWorseOutput.textContent = result.worse ? `− ${formatNumber(result.pointsToWorse)} P.` : "Endstufe";
 
   ui.boundaryList.replaceChildren(...result.thresholds.map((threshold) => {
     const item = document.createElement("div");
@@ -242,26 +409,49 @@ function renderBridge() {
 }
 
 function renderProfileEditor() {
-  const profile = getActiveProfile();
-  if (!profile) return;
-  ui.profileNameInput.value = profile.name || "";
-  ui.authorityInput.value = profile.federalState || "Mecklenburg-Vorpommern";
+  const collection = getActiveProfile();
+  const profile = getActiveBasis();
+  if (!collection || !profile) return;
+  const availableBases = state.profiles.filter((basis) => basis.collectionId === collection.id);
+  if (!availableBases.some((basis) => basis.id === state.activeBasisId)) state.activeBasisId = availableBases[0]?.id || "";
+  const activeBasis = getActiveBasis();
+  if (!activeBasis) return;
+  if (!activeBasis.scopes.some((scope) => scope.id === state.activeScopeId)) state.activeScopeId = activeBasis.scopes[0]?.id || "";
+  const scope = getActiveScope();
+  ui.profileNameInput.value = collection.name || "";
+  ui.countryCodeInput.value = collection.countryCode || "DE";
+  ui.subdivisionCodeInput.value = collection.subdivisionCode || "DE-MV";
+  ui.basisSelect.replaceChildren(...availableBases.map((basis) => new Option(basis.name, basis.id)));
+  ui.basisSelect.value = activeBasis.id;
+  ui.basisNameInput.value = activeBasis.name || "";
+  ui.profileVersionInput.value = activeBasis.version || "1";
+  ui.validFromInput.value = activeBasis.validFrom || "";
+  ui.validUntilInput.value = activeBasis.validUntil || "";
+  ui.scopeSelect.replaceChildren(...activeBasis.scopes.map((entry, index) => new Option(
+    [entry.schoolType, entry.assessmentType, entry.qualification].filter(Boolean).join(" · ") || `Geltungsbereich ${index + 1}`,
+    entry.id,
+  )));
+  ui.scopeSelect.value = state.activeScopeId;
   ui.schoolTypeInput.replaceChildren(...MV_SCHOOL_TYPES.map((entry) => new Option(entry.name, entry.name)));
-  ui.schoolTypeInput.value = profile.schoolType || "";
-  ui.gradeBandInput.value = (profile.classes || []).join(", ");
-  ui.assessmentTypeInput.value = profile.assessmentType || "";
-  ui.scaleTypeSelect.value = profile.scaleType || "grade6";
-  ui.profileStatusSelect.value = profile.status || "personal";
-  ui.sourceNoteInput.value = profile.sourceNote || "";
-  ui.sourceUrlInput.value = profile.sourceUrl || "";
+  ui.schoolTypeInput.value = scope?.schoolType || "";
+  ui.gradeBandInput.value = (scope?.classes || []).join(", ");
+  ui.assessmentTypeInput.value = scope?.assessmentType || "";
+  ui.qualificationInput.value = scope?.qualification || "";
+  ui.deleteScopeButton.disabled = activeBasis.scopes.length <= 1;
+  ui.deleteBasisButton.disabled = availableBases.length <= 1;
+  ui.deleteProfileButton.disabled = state.collections.length <= 1;
+  ui.scaleTypeSelect.value = activeBasis.scaleType || "grade6";
+  ui.profileStatusSelect.value = activeBasis.status || "personal";
+  ui.sourceNoteInput.value = activeBasis.sourceNote || "";
+  ui.sourceUrlInput.value = activeBasis.sourceUrl || "";
 
-  ui.thresholdEditor.replaceChildren(...getSortedThresholds(profile).map((threshold) => {
+  ui.thresholdEditor.replaceChildren(...getSortedThresholds(activeBasis).map((threshold) => {
     const row = document.createElement("label");
     row.className = "threshold-row";
     const level = document.createElement("output");
-    level.textContent = profile.scaleType === "points15" ? `${threshold.level} P.` : threshold.level;
+    level.textContent = activeBasis.scaleType === "points15" ? `${threshold.level} P.` : threshold.level;
     const note = document.createElement("output");
-    note.textContent = profile.scaleType === "points15" ? threshold.note : threshold.note;
+    note.textContent = threshold.note;
     const shell = document.createElement("span");
     shell.className = "percent-field";
     const input = document.createElement("input");
@@ -287,7 +477,9 @@ function renderProfileEditor() {
 }
 
 function renderAll() {
-  if (!state.profiles.some((profile) => profile.id === state.activeProfileId)) state.activeProfileId = state.profiles[0]?.id || "";
+  if (!state.collections.some((profile) => profile.id === state.activeProfileId)) state.activeProfileId = state.collections[0]?.id || "";
+  const availableBases = state.profiles.filter((basis) => basis.collectionId === state.activeProfileId);
+  if (!availableBases.some((basis) => basis.id === state.activeBasisId)) state.activeBasisId = availableBases[0]?.id || "";
   renderProfileOptions();
   renderBridgeSelectors();
   renderBridge();
@@ -296,12 +488,16 @@ function renderAll() {
 }
 
 function selectProfile(profileId) {
-  if (!state.profiles.some((profile) => profile.id === profileId)) return;
+  if (!state.collections.some((profile) => profile.id === profileId)) return;
   state.activeProfileId = profileId;
-  const profile = getActiveProfile();
+  const profile = state.profiles.find((basis) => basis.collectionId === profileId);
+  state.activeBasisId = profile?.id || "";
+  state.activeScopeId = profile?.scopes?.[0]?.id || "";
+  const scope = getActiveScope();
   state.bridgeProfileId = profile.id;
-  state.schoolType = profile.schoolType;
-  state.classLevel = profile.classes?.[0] || state.classLevel;
+  state.bridgeScopeId = scope?.id || "";
+  state.schoolType = scope?.schoolType || state.schoolType;
+  state.classLevel = scope?.classes?.[0] || state.classLevel;
   renderAll();
 }
 
@@ -309,14 +505,61 @@ function updateProfileField(field, value) {
   const profile = getActiveProfile();
   if (!profile) return;
   profile[field] = value;
-  if (profile.id === state.bridgeProfileId && field === "schoolType") {
-    state.schoolType = value;
-    state.classLevel = profile.classes?.[0] || state.classLevel;
-  }
   if (field === "name") renderProfileOptions();
   renderBridgeSelectors();
   renderBridge();
   persist();
+}
+
+function updateBasisField(field, value) {
+  const basis = getActiveBasis();
+  if (!basis) return;
+  basis[field] = value;
+  if (field === "name") {
+    const option = [...ui.basisSelect.options].find((entry) => entry.value === basis.id);
+    if (option) option.textContent = value || "Unbenannte Berechnungsgrundlage";
+  }
+  renderBridgeSelectors();
+  renderBridge();
+  persist();
+}
+
+function updateScopeField(field, value) {
+  const scope = getActiveScope();
+  if (!scope) return;
+  scope[field] = value;
+  if (scope.id === state.bridgeScopeId) {
+    if (field === "schoolType") state.schoolType = value;
+    if (field === "classes" && !value.includes(state.classLevel)) state.classLevel = value[0] || state.classLevel;
+  }
+  const option = [...ui.scopeSelect.options].find((entry) => entry.value === scope.id);
+  if (option) option.textContent = [scope.schoolType, scope.assessmentType, scope.qualification].filter(Boolean).join(" · ") || "Geltungsbereich";
+  renderBridgeSelectors();
+  renderBridge();
+  persist();
+}
+
+function createBlankBasis(collectionId) {
+  const id = `basis-${Date.now()}`;
+  return {
+    id,
+    collectionId,
+    name: "Neue Berechnungsgrundlage",
+    version: "1",
+    validFrom: "",
+    validUntil: "",
+    scaleType: "grade6",
+    status: "draft",
+    sourceNote: "",
+    sourceUrl: "",
+    scopes: [makeScope(`${id}-scope-1`, "Regionale Schule", ["7"], "", "")],
+    thresholds: makeThresholds(grade6Labels, [90, 75, 60, 45, 25, 0]),
+  };
+}
+
+function createBlankCollection() {
+  const id = `profile-${Date.now()}`;
+  return { id, name: "Neues Profil", countryCode: "DE", subdivisionCode: "DE-MV" };
 }
 
 function setWorkspaceMode(mode) {
@@ -341,22 +584,13 @@ document.addEventListener("keydown", (event) => { if (event.key === "Escape") se
 ui.openEngineButton.addEventListener("click", () => setWorkspaceMode("engine"));
 ui.returnBridgeButton.addEventListener("click", () => setWorkspaceMode("bridge"));
 ui.engineProfileSelect.addEventListener("change", () => selectProfile(ui.engineProfileSelect.value));
-ui.schoolTypeSelect.addEventListener("change", () => {
-  state.schoolType = ui.schoolTypeSelect.value;
-  state.classLevel = MV_SCHOOL_TYPES.find((entry) => entry.name === state.schoolType)?.classes?.[0] || "";
-  state.bridgeProfileId = "";
-  renderAll();
+ui.schoolTypeMenuButton.addEventListener("click", () => toggleSelectionMenu(ui.schoolTypeMenuButton, ui.schoolTypeMenu));
+ui.classLevelMenuButton.addEventListener("click", () => toggleSelectionMenu(ui.classLevelMenuButton, ui.classLevelMenu));
+ui.performanceMenuButton.addEventListener("click", () => toggleSelectionMenu(ui.performanceMenuButton, ui.performanceMenu));
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".selection-menu-shell")) closeSelectionMenus();
 });
-ui.classLevelSelect.addEventListener("change", () => {
-  state.classLevel = ui.classLevelSelect.value;
-  state.bridgeProfileId = "";
-  renderAll();
-});
-ui.performanceSelect.addEventListener("change", () => {
-  state.bridgeProfileId = ui.performanceSelect.value;
-  renderBridge();
-  persist();
-});
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeSelectionMenus(); });
 
 ui.earnedInput.addEventListener("input", () => { state.earned = ui.earnedInput.value; renderBridge(); persist(); });
 ui.totalInput.addEventListener("input", () => { state.total = ui.totalInput.value; renderBridge(); persist(); });
@@ -369,22 +603,37 @@ ui.resetScoreButton.addEventListener("click", () => {
 });
 
 [
-  [ui.profileNameInput, "name"], [ui.authorityInput, "federalState"], [ui.schoolTypeInput, "schoolType"],
-  [ui.assessmentTypeInput, "assessmentType"],
-  [ui.profileStatusSelect, "status"], [ui.sourceNoteInput, "sourceNote"], [ui.sourceUrlInput, "sourceUrl"],
+  [ui.profileNameInput, "name"], [ui.countryCodeInput, "countryCode"], [ui.subdivisionCodeInput, "subdivisionCode"],
 ].forEach(([element, field]) => element.addEventListener("input", () => updateProfileField(field, element.value)));
 
-ui.gradeBandInput.addEventListener("input", () => {
-  const profile = getActiveProfile();
-  if (!profile) return;
-  profile.classes = ui.gradeBandInput.value.split(/[,;]+/).map((value) => value.trim()).filter(Boolean);
-  renderBridgeSelectors();
-  renderBridge();
+[
+  [ui.basisNameInput, "name"], [ui.profileVersionInput, "version"], [ui.validFromInput, "validFrom"], [ui.validUntilInput, "validUntil"],
+  [ui.profileStatusSelect, "status"], [ui.sourceNoteInput, "sourceNote"], [ui.sourceUrlInput, "sourceUrl"],
+].forEach(([element, field]) => element.addEventListener("input", () => updateBasisField(field, element.value)));
+
+ui.basisSelect.addEventListener("change", () => {
+  state.activeBasisId = ui.basisSelect.value;
+  const basis = getActiveBasis();
+  state.activeScopeId = basis?.scopes?.[0]?.id || "";
+  renderAll();
+});
+
+ui.scopeSelect.addEventListener("change", () => {
+  state.activeScopeId = ui.scopeSelect.value;
+  renderProfileEditor();
   persist();
+});
+ui.schoolTypeInput.addEventListener("change", () => updateScopeField("schoolType", ui.schoolTypeInput.value));
+ui.assessmentTypeInput.addEventListener("input", () => updateScopeField("assessmentType", ui.assessmentTypeInput.value));
+ui.qualificationInput.addEventListener("input", () => updateScopeField("qualification", ui.qualificationInput.value));
+
+ui.gradeBandInput.addEventListener("input", () => {
+  const classes = ui.gradeBandInput.value.split(/[,;]+/).map((value) => value.trim()).filter(Boolean);
+  updateScopeField("classes", classes);
 });
 
 ui.scaleTypeSelect.addEventListener("change", () => {
-  const profile = getActiveProfile();
+  const profile = getActiveBasis();
   if (!profile || profile.scaleType === ui.scaleTypeSelect.value) return;
   const confirmed = window.confirm("Beim Wechsel des Notensystems werden die Prozentgrenzen dieses Profils auf eine neutrale Ausgangsskala gesetzt.");
   if (!confirmed) {
@@ -399,14 +648,13 @@ ui.scaleTypeSelect.addEventListener("change", () => {
 });
 
 ui.newProfileButton.addEventListener("click", () => {
-  const profile = clone(getActiveProfile() || createDefaultProfiles()[0]);
-  profile.id = `profile-${Date.now()}`;
-  profile.name = "Neues Bewertungsprofil";
-  profile.status = "draft";
-  profile.sourceNote = "";
-  profile.sourceUrl = "";
-  state.profiles.push(profile);
+  const profile = createBlankCollection();
+  const basis = createBlankBasis(profile.id);
+  state.collections.push(profile);
+  state.profiles.push(basis);
   state.activeProfileId = profile.id;
+  state.activeBasisId = basis.id;
+  state.activeScopeId = basis.scopes[0].id;
   renderAll();
   ui.profileNameInput.select();
 });
@@ -417,26 +665,107 @@ ui.duplicateProfileButton.addEventListener("click", () => {
   const profile = clone(source);
   profile.id = `profile-${Date.now()}`;
   profile.name = `${source.name} · Kopie`;
-  profile.status = "draft";
-  state.profiles.push(profile);
+  const bases = state.profiles.filter((basis) => basis.collectionId === source.id).map((basis, basisIndex) => {
+    const copy = clone(basis);
+    copy.id = `${profile.id}-basis-${basisIndex + 1}`;
+    copy.collectionId = profile.id;
+    copy.status = "draft";
+    copy.scopes = copy.scopes.map((scope, index) => ({ ...scope, id: `${copy.id}-scope-${index + 1}` }));
+    return copy;
+  });
+  state.collections.push(profile);
+  state.profiles.push(...bases);
   state.activeProfileId = profile.id;
+  state.activeBasisId = bases[0]?.id || "";
+  state.activeScopeId = bases[0]?.scopes?.[0]?.id || "";
+  renderAll();
+});
+
+ui.addBasisButton.addEventListener("click", () => {
+  const collection = getActiveProfile();
+  if (!collection) return;
+  const basis = createBlankBasis(collection.id);
+  state.profiles.push(basis);
+  state.activeBasisId = basis.id;
+  state.activeScopeId = basis.scopes[0].id;
+  renderAll();
+  ui.basisNameInput.select();
+});
+
+ui.duplicateBasisButton.addEventListener("click", () => {
+  const source = getActiveBasis();
+  if (!source) return;
+  const basis = clone(source);
+  basis.id = `basis-${Date.now()}`;
+  basis.name = `${source.name} · Kopie`;
+  basis.status = "draft";
+  basis.scopes = basis.scopes.map((scope, index) => ({ ...scope, id: `${basis.id}-scope-${index + 1}` }));
+  state.profiles.push(basis);
+  state.activeBasisId = basis.id;
+  state.activeScopeId = basis.scopes[0]?.id || "";
+  renderAll();
+});
+
+ui.deleteBasisButton.addEventListener("click", () => {
+  const basis = getActiveBasis();
+  const availableBases = state.profiles.filter((entry) => entry.collectionId === state.activeProfileId);
+  if (!basis || availableBases.length <= 1) return;
+  state.profiles = state.profiles.filter((entry) => entry.id !== basis.id);
+  const next = state.profiles.find((entry) => entry.collectionId === state.activeProfileId);
+  state.activeBasisId = next?.id || "";
+  state.activeScopeId = next?.scopes?.[0]?.id || "";
+  if (state.bridgeProfileId === basis.id) {
+    state.bridgeProfileId = "";
+    state.bridgeScopeId = "";
+  }
+  renderAll();
+});
+
+ui.addScopeButton.addEventListener("click", () => {
+  const profile = getActiveBasis();
+  if (!profile) return;
+  const scope = makeScope(`${profile.id}-scope-${Date.now()}`, "Regionale Schule", ["7"], "", "");
+  profile.scopes.push(scope);
+  state.activeScopeId = scope.id;
+  renderAll();
+  ui.assessmentTypeInput.focus();
+});
+
+ui.deleteScopeButton.addEventListener("click", () => {
+  const profile = getActiveBasis();
+  if (!profile || profile.scopes.length <= 1) return;
+  const scope = getActiveScope();
+  profile.scopes = profile.scopes.filter((entry) => entry.id !== scope?.id);
+  state.activeScopeId = profile.scopes[0]?.id || "";
+  if (state.bridgeScopeId === scope?.id) {
+    state.bridgeProfileId = "";
+    state.bridgeScopeId = "";
+  }
   renderAll();
 });
 
 ui.deleteProfileButton.addEventListener("click", () => {
-  if (state.profiles.length <= 1) return;
+  if (state.collections.length <= 1) return;
   const profile = getActiveProfile();
   if (!profile || !window.confirm(`Profil „${profile.name}“ löschen?`)) return;
-  state.profiles = state.profiles.filter((entry) => entry.id !== profile.id);
-  state.activeProfileId = state.profiles[0].id;
+  state.collections = state.collections.filter((entry) => entry.id !== profile.id);
+  state.profiles = state.profiles.filter((entry) => entry.collectionId !== profile.id);
+  state.activeProfileId = state.collections[0].id;
+  const next = state.profiles.find((entry) => entry.collectionId === state.activeProfileId);
+  state.activeBasisId = next?.id || "";
+  state.activeScopeId = next?.scopes?.[0]?.id || "";
   renderAll();
 });
 
 ui.resetProfilesButton.addEventListener("click", () => {
   if (!window.confirm("Alle lokal geänderten Profile durch die Ausgangsprofile aus der ODS-Datei ersetzen?")) return;
-  state.profiles = createDefaultProfiles();
-  state.activeProfileId = "gym-sek1-test";
+  state.collections = [{ id: "de-de-mv", name: "Mecklenburg-Vorpommern", countryCode: "DE", subdivisionCode: "DE-MV" }];
+  state.profiles = createDefaultProfiles().map(normalizeProfile).map((basis) => assignBasisToCollection(basis, "de-de-mv"));
+  state.activeProfileId = "de-de-mv";
+  state.activeBasisId = "gym-sek1-test";
+  state.activeScopeId = state.profiles.find((profile) => profile.id === state.activeBasisId)?.scopes?.[0]?.id || "";
   state.bridgeProfileId = "gym-sek1-test";
+  state.bridgeScopeId = state.activeScopeId;
   state.schoolType = "Gymnasium";
   state.classLevel = "7";
   renderAll();
