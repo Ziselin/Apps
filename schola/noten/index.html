@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Notenrechner · Schola</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/notenrechner-icon.svg?v=20260621b">
+  <link rel="stylesheet" href="noten.css?v=20260621a">
+</head>
+<body>
+  <div id="gradeApp" class="app-frame workspace-mode-bridge">
+    <section class="bridge-view" aria-label="Notenrechner">
+      <header class="topbar">
+        <div class="brand-plate">
+          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="menu-lines" aria-hidden="true"></span>
+          </button>
+          <div class="brand-mark">
+            <a class="brand-home-link" href="../../index.html?project=schola" aria-label="Zur Schola-Startseite">
+              <img class="brand-bird" src="../../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+            </a>
+            <span class="brand-name">noten</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="resetScoreButton" class="header-icon-button" aria-label="Eingabe zurücksetzen" title="Eingabe zurücksetzen">
+            <span class="reset-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <div id="menuOverlay" class="menu-overlay" hidden></div>
+      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+        <div class="side-menu-inner">
+          <div class="side-menu-head">
+            <div><span class="label">Menü</span><strong>Notenrechner</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          </div>
+          <div class="side-menu-list">
+            <details>
+              <summary>Funktionsweise</summary>
+              <p>Oben werden erreichte und mögliche Punkte eingegeben. Das gewählte Bewertungsprofil bestimmt Notenstufe, Prozentwert und Abstand zur nächstbesseren Stufe.</p>
+            </details>
+            <details>
+              <summary>Datenstand</summary>
+              <p>Die ersten Profile wurden aus „Notenberechnung B M G.ods“ übernommen. Sie sind persönliche Arbeitsgrundlagen und noch nicht als amtliche Bewertungsgrundlagen verifiziert.</p>
+            </details>
+            <details>
+              <summary>Appbeschreibung</summary>
+              <p>Der Notenrechner ist die erste App des Projekts Schola. Bewertungsprofile bleiben von einzelnen Berechnungen getrennt und können später um amtliche Quellen ergänzt werden.</p>
+            </details>
+          </div>
+        </div>
+      </aside>
+
+      <main class="bridge-stage">
+        <section class="bridge-shell">
+          <div class="profile-bar">
+            <label>
+              <span class="label">Bewertungsprofil</span>
+              <span class="select-shell"><select id="bridgeProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span>
+            </label>
+            <div id="profileContext" class="profile-context"></div>
+          </div>
+
+          <div class="bridge-grid">
+            <section class="score-card" aria-labelledby="scoreInputTitle">
+              <div class="section-head">
+                <div><span class="label">Eingabe</span><h1 id="scoreInputTitle">Punkte</h1></div>
+                <output id="percentageOutput" class="percentage-output">0,00 %</output>
+              </div>
+              <div class="score-inputs">
+                <label><span>Erreicht</span><input id="earnedInput" type="text" inputmode="decimal" autocomplete="off" value="46" aria-label="Erreichte Punkte"></label>
+                <span class="score-divider" aria-hidden="true">/</span>
+                <label><span>Gesamt</span><input id="totalInput" type="text" inputmode="decimal" autocomplete="off" value="54" aria-label="Gesamtpunkte"></label>
+              </div>
+              <div class="score-track" aria-hidden="true"><span id="scoreTrackFill"></span></div>
+              <p id="inputMessage" class="input-message" role="status" aria-live="polite"></p>
+            </section>
+
+            <section class="result-card" aria-labelledby="resultTitle">
+              <span class="label">Ergebnis</span>
+              <div class="result-main">
+                <output id="resultPrimary" class="result-primary" aria-labelledby="resultTitle">1</output>
+                <div><h2 id="resultTitle">Note</h2><output id="resultSecondary" class="result-secondary"></output></div>
+              </div>
+              <div class="result-facts">
+                <div><span>Nächstbesser</span><strong id="nextGradeOutput">–</strong></div>
+                <div><span>Noch nötig</span><strong id="pointsNeededOutput">–</strong></div>
+              </div>
+            </section>
+          </div>
+
+          <section class="boundaries-card" aria-labelledby="boundariesTitle">
+            <div class="section-head compact"><div><span class="label">Orientierung</span><h2 id="boundariesTitle">Notengrenzen</h2></div></div>
+            <div id="boundaryList" class="boundary-list"></div>
+          </section>
+        </section>
+      </main>
+
+      <button type="button" id="openEngineButton" class="workspace-strip" aria-label="Maschinenraum öffnen">
+        <span>Maschinenraum</span>
+      </button>
+    </section>
+
+    <section class="engine-view" aria-label="Maschinenraum">
+      <button type="button" id="returnBridgeButton" class="workspace-strip workspace-strip-top" aria-label="Zum Notenrechner zurückkehren">
+        <span>Notenrechner</span>
+      </button>
+      <main class="engine-stage">
+        <section class="engine-panel profile-manager">
+          <div class="panel-head"><div><span class="label">Maschinenraum</span><h2>Profile</h2></div></div>
+          <label class="field full"><span>Aktives Profil</span><span class="select-shell"><select id="engineProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+          <div class="button-row">
+            <button type="button" id="newProfileButton" class="secondary-button">Neu</button>
+            <button type="button" id="duplicateProfileButton" class="secondary-button">Duplizieren</button>
+            <button type="button" id="deleteProfileButton" class="secondary-button">Löschen</button>
+          </div>
+          <div class="profile-fields">
+            <label class="field full"><span>Profilname</span><input id="profileNameInput" type="text"></label>
+            <label class="field"><span>Bundesland / Grundlage</span><input id="authorityInput" type="text"></label>
+            <label class="field"><span>Schulart</span><input id="schoolTypeInput" type="text"></label>
+            <label class="field"><span>Jahrgang / Stufe</span><input id="gradeBandInput" type="text"></label>
+            <label class="field"><span>Leistungsart</span><input id="assessmentTypeInput" type="text"></label>
+            <label class="field"><span>Notensystem</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1–6</option><option value="points15">15–0 Punkte</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+            <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">Persönliche Arbeitsgrundlage</option><option value="verified">Amtlich geprüft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+            <label class="field full"><span>Quellenhinweis</span><textarea id="sourceNoteInput" rows="3"></textarea></label>
+            <label class="field full"><span>Quellen-URL</span><input id="sourceUrlInput" type="url" placeholder="https://…"></label>
+          </div>
+        </section>
+
+        <section class="engine-panel threshold-manager">
+          <div class="panel-head threshold-head">
+            <div><span class="label">Berechnungsgrundlage</span><h2>Prozentgrenzen</h2></div>
+            <button type="button" id="resetProfilesButton" class="text-button">Ausgangsprofile wiederherstellen</button>
+          </div>
+          <p class="panel-note">Jede Zeile bezeichnet den Mindestanteil für die jeweilige Stufe. Änderungen werden lokal im Browser gespeichert und wirken sofort auf der Brücke.</p>
+          <div class="threshold-table-head"><span>Stufe</span><span>Note</span><span>Ab Prozent</span></div>
+          <div id="thresholdEditor" class="threshold-editor"></div>
+          <div class="architecture-note"><strong>Architekturregel</strong><p>Bewertungsprofile enthalten Herkunft, Geltungsbereich und Grenzwerte. Einzelne Notenberechnungen verändern diese Profile nicht. Amtliche Profile werden später nur mit belastbarer Quelle und Gültigkeitsstand ergänzt.</p></div>
+        </section>
+      </main>
+    </section>
+  </div>
+  <script src="noten.js?v=20260621a"></script>
+</body>
+</html>

@@ -53,6 +53,42 @@
       pointer-events: none;
     }
 
+    html.project-schola,
+    body.project-schola {
+      --paper: #ecece5;
+      --paper-light: #f8f8f3;
+      --panel: rgba(248, 248, 242, 0.78);
+      --panel-solid: rgba(246, 246, 239, 0.94);
+      --muted: #747d78;
+      --quiet: rgba(33, 54, 51, 0.43);
+      --line: rgba(33, 54, 51, 0.12);
+      --line-strong: rgba(33, 54, 51, 0.24);
+    }
+
+    html.project-schola {
+      background: #ecece5;
+    }
+
+    body.project-schola {
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 252, 0.9), transparent 40%),
+        linear-gradient(145deg, #fafaf5 0%, #ecece5 58%, #deded5 100%);
+    }
+
+    body.project-schola::before {
+      opacity: 0.34;
+    }
+
+    body.project-schola .topbar,
+    body.project-schola .home-side-menu {
+      background: rgba(246, 246, 239, 0.92);
+    }
+
+    body.project-schola .page-shell::before {
+      opacity: 0.065;
+      filter: brightness(0) saturate(100%) invert(20%) sepia(18%) saturate(673%) hue-rotate(122deg) brightness(92%) contrast(90%);
+    }
+
     a {
       color: inherit;
     }
@@ -329,10 +365,50 @@
       line-height: 1.48;
     }
 
+    .project-choice-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .project-choice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .project-choice:hover,
+    .project-choice[aria-current="page"] {
+      border-color: var(--line);
+      background: rgba(255, 255, 252, 0.58);
+    }
+
+    .project-choice[aria-current="page"]::after {
+      content: "✓";
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
     .app-search:focus {
       border-color: var(--line-strong);
       outline: none;
       box-shadow: 0 0 0 3px rgba(33, 54, 51, 0.1), 0 12px 28px rgba(33, 54, 51, 0.075);
+    }
+
+    .app-search:disabled {
+      cursor: default;
+      opacity: 0.78;
+      background: rgba(249, 249, 244, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
     }
 
     .page-shell {
@@ -593,6 +669,7 @@
         <option value="TimeMap"></option>
         <option value="TypeMap"></option>
         <option value="Sourcerer"></option>
+        <option value="Notenrechner"></option>
       </datalist>
     </div>
   </header>
@@ -608,6 +685,16 @@
         <button type="button" id="homeMenuCloseButton" class="home-menu-close" aria-label="Menü schließen">×</button>
       </div>
       <div class="home-menu-list">
+        <button type="button" class="home-menu-item" data-home-menu-panel="projects" aria-expanded="false">
+          <img class="home-menu-icon" src="https://api.iconify.design/mdi/folder-multiple-outline.svg?color=%23213633" alt="" aria-hidden="true">
+          <span>Projekte</span>
+        </button>
+        <div class="home-menu-panel" data-home-menu-popup="projects" hidden>
+          <div class="project-choice-list" aria-label="Projekt auswählen">
+            <button type="button" class="project-choice" data-project-select="atlas">Atlas</button>
+            <button type="button" class="project-choice" data-project-select="schola">Schola</button>
+          </div>
+        </div>
         <button type="button" class="home-menu-item" data-home-menu-panel="imprint" aria-expanded="false">
           <img class="home-menu-icon" src="https://api.iconify.design/mdi/legal.svg?color=%23213633" alt="" aria-hidden="true">
           <span>Impressum</span>
@@ -629,6 +716,14 @@
             <strong>Verantwortlich für den Inhalt</strong>
             <p>Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland</p>
           </div>
+          <div class="home-menu-block" data-schola-only hidden>
+            <strong>Hinweis zu Bewertungsinformationen und Berechnungen</strong>
+            <p>Die in Schola bereitgestellten Bewertungsgrundlagen, Prozentgrenzen und Berechnungsergebnisse dienen als Arbeits- und Orientierungshilfe. Trotz sorgfältiger Erstellung wird keine Gewähr für ihre Richtigkeit, Vollständigkeit oder Aktualität übernommen. Maßgeblich bleiben die jeweils geltenden Rechts- und Verwaltungsvorschriften, schulischen Regelungen und verbindlichen Festlegungen. Ergebnisse sind vor ihrer Verwendung, insbesondere im Rahmen einer Leistungsbewertung, eigenständig zu prüfen.</p>
+          </div>
+          <div class="home-menu-block" data-schola-only hidden>
+            <strong>Haftungsausschluss</strong>
+            <p>Eine Haftung für Schäden, die aus der Nutzung fehlerhafter oder unvollständiger Informationen oder Berechnungen entstehen, ist soweit gesetzlich zulässig ausgeschlossen.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -636,32 +731,39 @@
 
   <main class="page-shell">
     <section class="hero">
-      <h1 class="claim-text">Digital Tools for Analogue People</h1>
+      <h1 class="claim-text" id="homeClaim">Digital Tools for Analogue People</h1>
     </section>
 
     <section class="app-section" aria-label="App-Sammlungen">
       <div class="collection-grid">
-        <a class="app-tile" href="./timemap/index.html" data-search-card data-app-link data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
+        <a class="app-tile" href="./timemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
           <img class="app-icon" src="./assets/timemap-favicon.svg" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">TimeMap</span>
             <span class="app-description">Interaktive Zeitstrahlen und Quellenräume</span>
           </span>
         </a>
-        <a class="app-tile" href="./typemap/index.html" data-search-card data-app-link data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
+        <a class="app-tile" href="./typemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
           <img class="app-icon" src="./assets/typemap-favicon.svg" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">TypeMap</span>
             <span class="app-description">Textsetzung (experimentell)</span>
           </span>
         </a>
-        <div class="app-tile app-placeholder" data-search-card data-search-text="sourcerer quellen recherche source">
+        <div class="app-tile app-placeholder" data-search-card data-atlas-app data-search-text="sourcerer quellen recherche source">
           <img class="app-icon" src="./assets/sourcerer-favicon.svg" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">Sourcerer</span>
             <span class="app-description">(in Vorbereitung)</span>
           </span>
         </div>
+        <a class="app-tile" href="./schola/noten/index.html" data-search-card data-app-link data-schola-app data-search-text="notenrechner schola noten punkte prozent bewertung" hidden>
+          <img class="app-icon" src="./assets/notenrechner-icon.svg?v=20260621b" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">Notenrechner</span>
+            <span class="app-description">(experimentell)</span>
+          </span>
+        </a>
         <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
       </div>
     </section>
@@ -675,6 +777,41 @@
     const appSearch = document.querySelector(".app-search");
     const collectionGrid = document.querySelector(".collection-grid");
     const collectionCards = [...document.querySelectorAll("[data-search-card]")];
+    const homeClaim = document.getElementById("homeClaim");
+    const emptyState = document.querySelector("[data-empty-state]");
+    let activeHomeProject = "atlas";
+
+    function setHomeProject(projectName, options = {}) {
+      activeHomeProject = projectName === "schola" ? "schola" : "atlas";
+      const isSchola = activeHomeProject === "schola";
+      document.documentElement.classList.toggle("project-schola", isSchola);
+      document.body.classList.toggle("project-schola", isSchola);
+      document.title = isSchola ? "Schola · Ziselin" : "Ziselin";
+      if (homeClaim) homeClaim.textContent = isSchola ? "Schola" : "Digital Tools for Analogue People";
+      if (appSearch) {
+        appSearch.value = "";
+        appSearch.disabled = false;
+        appSearch.placeholder = "Apps durchsuchen";
+      }
+      if (emptyState) {
+        emptyState.textContent = "Keine passende App gefunden.";
+      }
+      document.querySelectorAll("[data-project-select]").forEach((button) => {
+        const isCurrent = button.dataset.projectSelect === activeHomeProject;
+        if (isCurrent) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      document.querySelectorAll("[data-schola-only]").forEach((element) => {
+        element.hidden = !isSchola;
+      });
+      runSearch();
+      if (options.updateHistory !== false) {
+        const url = new URL(window.location.href);
+        if (isSchola) url.searchParams.set("project", "schola");
+        else url.searchParams.delete("project");
+        window.history.pushState({ project: activeHomeProject }, "", url);
+      }
+    }
 
     function setHomeMenuOpen(isOpen) {
       homeSideMenu?.classList.toggle("is-open", isOpen);
@@ -731,7 +868,8 @@
 
       collectionCards.forEach((card) => {
         const text = normalizeSearch(card.dataset.searchText ?? card.textContent ?? "");
-        const isVisible = !query || text.includes(query);
+        const belongsToProject = activeHomeProject === "schola" ? card.hasAttribute("data-schola-app") : card.hasAttribute("data-atlas-app");
+        const isVisible = belongsToProject && (!query || text.includes(query));
         card.hidden = !isVisible;
         if (isVisible) {
           visibleCount += 1;
@@ -742,6 +880,20 @@
     }
 
     appSearch?.addEventListener("input", runSearch);
+
+    document.querySelectorAll("[data-project-select]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setHomeProject(button.dataset.projectSelect);
+        setHomeMenuOpen(false);
+      });
+    });
+
+    window.addEventListener("popstate", () => {
+      const projectName = new URL(window.location.href).searchParams.get("project");
+      setHomeProject(projectName, { updateHistory: false });
+    });
+
+    setHomeProject(new URL(window.location.href).searchParams.get("project"), { updateHistory: false });
 
     function openApp(link) {
       const href = link?.getAttribute("href");
