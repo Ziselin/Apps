@@ -1,5 +1,20 @@
-const STORAGE_KEY = "schola-grade-profiles-v1";
-const SESSION_KEY = "schola-grade-session-v1";
+const STORAGE_KEY = "schola-grade-profiles-v2";
+const SESSION_KEY = "schola-grade-session-v2";
+
+// Die Bezeichnungen folgen dem Bildungsserver Mecklenburg-Vorpommern. Das
+// Bundesland ist Profilraum im Maschinenraum; die Brücke zeigt nur die drei
+// Entscheidungen, die für eine konkrete Berechnung nötig sind.
+const MV_SCHOOL_TYPES = [
+  { name: "Grundschule", classes: ["1", "2", "3", "4"] },
+  { name: "Schulartunabhängige Orientierungsstufe", classes: ["5", "6"] },
+  { name: "Regionale Schule", classes: ["5", "6", "7", "8", "9", "10"] },
+  { name: "Gymnasium", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
+  { name: "Förderschule", classes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] },
+  { name: "Gesamtschule", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
+  { name: "Berufliche Schulen", classes: ["Berufliche Bildung"] },
+  { name: "Schulen in freier Trägerschaft", classes: ["nach Schulart"] },
+  { name: "Abendgymnasium", classes: ["Einführungsphase", "Qualifikationsphase"] },
+];
 
 const grade6Labels = [
   ["1", "sehr gut"], ["2", "gut"], ["3", "befriedigend"],
@@ -18,24 +33,24 @@ function makeThresholds(labels, percentages) {
 
 function createDefaultProfiles() {
   const sourceNote = "Übernommen aus „Notenberechnung B M G.ods“; persönliche Arbeitsgrundlage, noch nicht amtlich verifiziert.";
-  const gradeProfile = (id, name, schoolType, gradeBand, assessmentType, percentages) => ({
-    id, name, authority: "Eigene Ausgangstabelle", schoolType, gradeBand, assessmentType,
+  const gradeProfile = (id, name, schoolType, classes, assessmentType, percentages) => ({
+    id, name, federalState: "Mecklenburg-Vorpommern", authority: "Eigene Ausgangstabelle", schoolType, classes, assessmentType,
     scaleType: "grade6", status: "personal", sourceNote, sourceUrl: "",
     thresholds: makeThresholds(grade6Labels, [...percentages, 0]),
   });
   const pointProfile = (id, name, assessmentType, percentages) => ({
-    id, name, authority: "Eigene Ausgangstabelle", schoolType: "Gymnasium",
-    gradeBand: "Sekundarstufe II / Qualifikationsphase", assessmentType,
+    id, name, federalState: "Mecklenburg-Vorpommern", authority: "Eigene Ausgangstabelle", schoolType: "Gymnasium",
+    classes: ["10", "11", "12"], assessmentType,
     scaleType: "points15", status: "personal", sourceNote, sourceUrl: "",
     thresholds: makeThresholds(point15Labels, percentages),
   });
   return [
-    gradeProfile("b-class-test", "B · Klassenarbeit", "B", "nicht festgelegt", "Klassenarbeit", [80, 60, 45, 25, 10]),
-    gradeProfile("m-class-test", "M · Klassenarbeit", "M", "nicht festgelegt", "Klassenarbeit", [96, 80, 60, 40, 20]),
-    gradeProfile("b-check", "B · Leistungskontrolle", "B", "nicht festgelegt", "Leistungskontrolle", [81, 62, 47, 29, 15]),
-    gradeProfile("m-check", "M · Leistungskontrolle", "M", "nicht festgelegt", "Leistungskontrolle", [97, 82, 62, 46, 30]),
-    gradeProfile("gym-sek1-simple", "Gymnasium · Sek. I · einfach", "Gymnasium", "Klassen 7–9", "einfache Leistung", [80, 60, 45, 25, 10]),
-    gradeProfile("gym-sek1-test", "Gymnasium · Sek. I · Klassenarbeit", "Gymnasium", "Klassen 7–9", "Klassenarbeit", [96, 80, 60, 40, 20]),
+    gradeProfile("b-class-test", "Regionale Schule · Berufsreife · Klassenarbeit", "Regionale Schule", ["7", "8", "9", "10"], "Klassenarbeit · Berufsreife", [80, 60, 45, 25, 10]),
+    gradeProfile("m-class-test", "Regionale Schule · Mittlere Reife · Klassenarbeit", "Regionale Schule", ["7", "8", "9", "10"], "Klassenarbeit · Mittlere Reife", [96, 80, 60, 40, 20]),
+    gradeProfile("b-check", "Regionale Schule · Berufsreife · Leistungskontrolle", "Regionale Schule", ["7", "8", "9", "10"], "Leistungskontrolle · Berufsreife", [81, 62, 47, 29, 15]),
+    gradeProfile("m-check", "Regionale Schule · Mittlere Reife · Leistungskontrolle", "Regionale Schule", ["7", "8", "9", "10"], "Leistungskontrolle · Mittlere Reife", [97, 82, 62, 46, 30]),
+    gradeProfile("gym-sek1-simple", "Gymnasium · Sek. I · einfach", "Gymnasium", ["7", "8", "9"], "einfache Leistung", [80, 60, 45, 25, 10]),
+    gradeProfile("gym-sek1-test", "Gymnasium · Sek. I · Klassenarbeit", "Gymnasium", ["7", "8", "9"], "Klassenarbeit", [96, 80, 60, 40, 20]),
     pointProfile("gym-sek2-simple", "Gymnasium · Sek. II · einfach", "einfache Leistung", [100, 98, 96, 91, 86, 80, 73, 66, 60, 53, 46, 40, 33, 26, 20, 0]),
     pointProfile("gym-sek2-exam", "Gymnasium · Sek. II · Klausur", "Klausur", [95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 33, 27, 20, 0]),
   ];
@@ -43,9 +58,9 @@ function createDefaultProfiles() {
 
 const ui = Object.fromEntries([
   "gradeApp", "menuButton", "menuCloseButton", "menuOverlay", "sideMenu", "resetScoreButton",
-  "openEngineButton", "returnBridgeButton", "bridgeProfileSelect", "engineProfileSelect", "profileContext",
+  "openEngineButton", "returnBridgeButton", "schoolTypeSelect", "classLevelSelect", "performanceSelect", "engineProfileSelect",
   "earnedInput", "totalInput", "percentageOutput", "scoreTrackFill", "inputMessage", "resultPrimary",
-  "resultTitle", "resultSecondary", "nextGradeOutput", "pointsNeededOutput", "boundaryList",
+  "resultSecondary", "pointsNeededOutput", "pointsToWorseOutput", "boundaryList",
   "newProfileButton", "duplicateProfileButton", "deleteProfileButton", "profileNameInput", "authorityInput",
   "schoolTypeInput", "gradeBandInput", "assessmentTypeInput", "scaleTypeSelect", "profileStatusSelect",
   "sourceNoteInput", "sourceUrlInput", "thresholdEditor", "resetProfilesButton",
@@ -74,6 +89,9 @@ const storedSession = loadSession();
 const state = {
   profiles: loadProfiles(),
   activeProfileId: storedSession.activeProfileId || "gym-sek1-test",
+  bridgeProfileId: storedSession.bridgeProfileId || "gym-sek1-test",
+  schoolType: storedSession.schoolType || "Gymnasium",
+  classLevel: storedSession.classLevel || "7",
   earned: storedSession.earned ?? "46",
   total: storedSession.total ?? "54",
 };
@@ -82,11 +100,18 @@ function getActiveProfile() {
   return state.profiles.find((profile) => profile.id === state.activeProfileId) || state.profiles[0];
 }
 
+function getBridgeProfile() {
+  return state.profiles.find((profile) => profile.id === state.bridgeProfileId) || null;
+}
+
 function persist() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.profiles));
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       activeProfileId: state.activeProfileId,
+      bridgeProfileId: state.bridgeProfileId,
+      schoolType: state.schoolType,
+      classLevel: state.classLevel,
       earned: state.earned,
       total: state.total,
     }));
@@ -118,42 +143,65 @@ function calculate(profile, earned, total) {
   const index = matchedIndex >= 0 ? matchedIndex : Math.max(0, thresholds.length - 1);
   const current = thresholds[index] || thresholds.at(-1);
   const better = index > 0 ? thresholds[index - 1] : null;
+  const worse = index < thresholds.length - 1 ? thresholds[index + 1] : null;
   const pointsNeeded = better ? Math.max(0, total * Number(better.minPercent) / 100 - earned) : 0;
-  return { percent, thresholds, current, better, pointsNeeded };
-}
-
-function profileStatusLabel(status) {
-  return { personal: "persönliche Arbeitsgrundlage", verified: "amtlich geprüft", draft: "Entwurf" }[status] || status;
+  const pointsToWorse = worse ? Math.max(0, earned - total * Number(current.minPercent) / 100) : 0;
+  return { percent, thresholds, current, better, worse, pointsNeeded, pointsToWorse };
 }
 
 function renderProfileOptions() {
-  [ui.bridgeProfileSelect, ui.engineProfileSelect].forEach((select) => {
-    const previous = state.activeProfileId;
-    select.replaceChildren(...state.profiles.map((profile) => new Option(profile.name, profile.id)));
-    select.value = previous;
-  });
+  ui.engineProfileSelect.replaceChildren(...state.profiles.map((profile) => new Option(profile.name, profile.id)));
+  ui.engineProfileSelect.value = state.activeProfileId;
+}
+
+function profilesForBridgeSelection() {
+  return state.profiles.filter((profile) => (
+    (profile.federalState || "Mecklenburg-Vorpommern") === "Mecklenburg-Vorpommern"
+    && profile.schoolType === state.schoolType
+    && (profile.classes || []).includes(state.classLevel)
+  ));
+}
+
+function renderBridgeSelectors() {
+  ui.schoolTypeSelect.replaceChildren(...MV_SCHOOL_TYPES.map((entry) => new Option(entry.name, entry.name)));
+  if (!MV_SCHOOL_TYPES.some((entry) => entry.name === state.schoolType)) state.schoolType = MV_SCHOOL_TYPES[0].name;
+  ui.schoolTypeSelect.value = state.schoolType;
+  const school = MV_SCHOOL_TYPES.find((entry) => entry.name === state.schoolType) || MV_SCHOOL_TYPES[0];
+  ui.classLevelSelect.replaceChildren(...school.classes.map((classLevel) => new Option(classLevel, classLevel)));
+  if (!school.classes.includes(state.classLevel)) state.classLevel = school.classes[0];
+  ui.classLevelSelect.value = state.classLevel;
+
+  const profiles = profilesForBridgeSelection();
+  if (!profiles.some((profile) => profile.id === state.bridgeProfileId)) state.bridgeProfileId = profiles[0]?.id || "";
+  if (profiles.length) {
+    ui.performanceSelect.replaceChildren(...profiles.map((profile) => new Option(profile.assessmentType || profile.name, profile.id)));
+    ui.performanceSelect.value = state.bridgeProfileId;
+    ui.performanceSelect.disabled = false;
+  } else {
+    ui.performanceSelect.replaceChildren(new Option("Noch kein Profil hinterlegt", ""));
+    ui.performanceSelect.disabled = true;
+  }
 }
 
 function renderBridge() {
-  const profile = getActiveProfile();
-  if (!profile) return;
+  const profile = getBridgeProfile();
   const earned = parseNumber(state.earned);
   const total = parseNumber(state.total);
-  const result = calculate(profile, earned, total);
+  const result = profile ? calculate(profile, earned, total) : null;
   ui.earnedInput.value = state.earned;
   ui.totalInput.value = state.total;
-  ui.profileContext.textContent = [profile.authority, profile.schoolType, profile.gradeBand, profile.assessmentType]
-    .filter(Boolean).join(" · ");
 
   ui.inputMessage.classList.remove("is-error");
   if (!result) {
     ui.percentageOutput.textContent = "– %";
     ui.resultPrimary.textContent = "–";
-    ui.resultSecondary.textContent = "Bitte gültige Punktwerte eingeben.";
-    ui.nextGradeOutput.textContent = "–";
+    ui.resultSecondary.textContent = profile ? "Bitte gültige Punktwerte eingeben." : "Kein Bewertungsprofil";
     ui.pointsNeededOutput.textContent = "–";
+    ui.pointsToWorseOutput.textContent = "–";
     ui.scoreTrackFill.style.width = "0%";
-    ui.inputMessage.textContent = total === 0 ? "Die Gesamtpunktzahl muss größer als null sein." : "Bitte Zahlen größer oder gleich null eingeben.";
+    ui.inputMessage.textContent = !profile
+      ? "Für diese Auswahl muss im Maschinenraum noch ein Profil angelegt werden."
+      : total === 0 ? "Die Gesamtpunktzahl muss größer als null sein." : "Bitte Zahlen größer oder gleich null eingeben.";
     ui.inputMessage.classList.add("is-error");
     ui.boundaryList.replaceChildren();
     return;
@@ -165,17 +213,15 @@ function renderBridge() {
     ui.inputMessage.textContent = "Die erreichte Punktzahl liegt über der Gesamtpunktzahl.";
     ui.inputMessage.classList.add("is-error");
   } else {
-    ui.inputMessage.textContent = profileStatusLabel(profile.status);
+    ui.inputMessage.textContent = "";
   }
 
   const pointScale = profile.scaleType === "points15";
   ui.resultPrimary.textContent = result.current?.level || "–";
-  ui.resultTitle.textContent = pointScale ? "Punkte" : "Note";
-  ui.resultSecondary.textContent = pointScale ? `Note ${result.current?.note || "–"}` : (result.current?.note || "");
-  ui.nextGradeOutput.textContent = result.better
-    ? (pointScale ? `${result.better.level} Punkte` : `Note ${result.better.level}`)
-    : "Beststufe";
-  ui.pointsNeededOutput.textContent = result.better ? `${formatNumber(result.pointsNeeded)} Punkte` : "0 Punkte";
+  const numericNote = String(pointScale ? result.current?.note : result.current?.level || "").match(/[1-6]/)?.[0] || "";
+  ui.resultSecondary.textContent = grade6Labels.find(([grade]) => grade === numericNote)?.[1] || "";
+  ui.pointsNeededOutput.textContent = result.better ? `${formatNumber(result.pointsNeeded)} P. mehr` : "Beststufe";
+  ui.pointsToWorseOutput.textContent = result.worse ? `> ${formatNumber(result.pointsToWorse)} P. weniger` : "Endstufe";
 
   ui.boundaryList.replaceChildren(...result.thresholds.map((threshold) => {
     const item = document.createElement("div");
@@ -183,9 +229,13 @@ function renderBridge() {
     if (threshold === result.current) item.classList.add("is-current");
     const minimumPoints = total * Number(threshold.minPercent) / 100;
     const title = document.createElement("strong");
-    title.textContent = pointScale ? `${threshold.level} P.` : `Note ${threshold.level}`;
+    title.textContent = threshold.level;
     const info = document.createElement("span");
-    info.textContent = `ab ${formatNumber(threshold.minPercent)} % · ${formatNumber(minimumPoints)} P.`;
+    const percentLine = document.createElement("span");
+    percentLine.textContent = `${formatNumber(threshold.minPercent)} %`;
+    const pointsLine = document.createElement("span");
+    pointsLine.textContent = `${formatNumber(minimumPoints)} P.`;
+    info.append(percentLine, pointsLine);
     item.append(title, info);
     return item;
   }));
@@ -195,9 +245,10 @@ function renderProfileEditor() {
   const profile = getActiveProfile();
   if (!profile) return;
   ui.profileNameInput.value = profile.name || "";
-  ui.authorityInput.value = profile.authority || "";
+  ui.authorityInput.value = profile.federalState || "Mecklenburg-Vorpommern";
+  ui.schoolTypeInput.replaceChildren(...MV_SCHOOL_TYPES.map((entry) => new Option(entry.name, entry.name)));
   ui.schoolTypeInput.value = profile.schoolType || "";
-  ui.gradeBandInput.value = profile.gradeBand || "";
+  ui.gradeBandInput.value = (profile.classes || []).join(", ");
   ui.assessmentTypeInput.value = profile.assessmentType || "";
   ui.scaleTypeSelect.value = profile.scaleType || "grade6";
   ui.profileStatusSelect.value = profile.status || "personal";
@@ -238,6 +289,7 @@ function renderProfileEditor() {
 function renderAll() {
   if (!state.profiles.some((profile) => profile.id === state.activeProfileId)) state.activeProfileId = state.profiles[0]?.id || "";
   renderProfileOptions();
+  renderBridgeSelectors();
   renderBridge();
   renderProfileEditor();
   persist();
@@ -246,6 +298,10 @@ function renderAll() {
 function selectProfile(profileId) {
   if (!state.profiles.some((profile) => profile.id === profileId)) return;
   state.activeProfileId = profileId;
+  const profile = getActiveProfile();
+  state.bridgeProfileId = profile.id;
+  state.schoolType = profile.schoolType;
+  state.classLevel = profile.classes?.[0] || state.classLevel;
   renderAll();
 }
 
@@ -253,7 +309,12 @@ function updateProfileField(field, value) {
   const profile = getActiveProfile();
   if (!profile) return;
   profile[field] = value;
+  if (profile.id === state.bridgeProfileId && field === "schoolType") {
+    state.schoolType = value;
+    state.classLevel = profile.classes?.[0] || state.classLevel;
+  }
   if (field === "name") renderProfileOptions();
+  renderBridgeSelectors();
   renderBridge();
   persist();
 }
@@ -279,8 +340,23 @@ ui.menuOverlay.addEventListener("click", () => setMenuOpen(false));
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenuOpen(false); });
 ui.openEngineButton.addEventListener("click", () => setWorkspaceMode("engine"));
 ui.returnBridgeButton.addEventListener("click", () => setWorkspaceMode("bridge"));
-ui.bridgeProfileSelect.addEventListener("change", () => selectProfile(ui.bridgeProfileSelect.value));
 ui.engineProfileSelect.addEventListener("change", () => selectProfile(ui.engineProfileSelect.value));
+ui.schoolTypeSelect.addEventListener("change", () => {
+  state.schoolType = ui.schoolTypeSelect.value;
+  state.classLevel = MV_SCHOOL_TYPES.find((entry) => entry.name === state.schoolType)?.classes?.[0] || "";
+  state.bridgeProfileId = "";
+  renderAll();
+});
+ui.classLevelSelect.addEventListener("change", () => {
+  state.classLevel = ui.classLevelSelect.value;
+  state.bridgeProfileId = "";
+  renderAll();
+});
+ui.performanceSelect.addEventListener("change", () => {
+  state.bridgeProfileId = ui.performanceSelect.value;
+  renderBridge();
+  persist();
+});
 
 ui.earnedInput.addEventListener("input", () => { state.earned = ui.earnedInput.value; renderBridge(); persist(); });
 ui.totalInput.addEventListener("input", () => { state.total = ui.totalInput.value; renderBridge(); persist(); });
@@ -293,10 +369,19 @@ ui.resetScoreButton.addEventListener("click", () => {
 });
 
 [
-  [ui.profileNameInput, "name"], [ui.authorityInput, "authority"], [ui.schoolTypeInput, "schoolType"],
-  [ui.gradeBandInput, "gradeBand"], [ui.assessmentTypeInput, "assessmentType"],
+  [ui.profileNameInput, "name"], [ui.authorityInput, "federalState"], [ui.schoolTypeInput, "schoolType"],
+  [ui.assessmentTypeInput, "assessmentType"],
   [ui.profileStatusSelect, "status"], [ui.sourceNoteInput, "sourceNote"], [ui.sourceUrlInput, "sourceUrl"],
 ].forEach(([element, field]) => element.addEventListener("input", () => updateProfileField(field, element.value)));
+
+ui.gradeBandInput.addEventListener("input", () => {
+  const profile = getActiveProfile();
+  if (!profile) return;
+  profile.classes = ui.gradeBandInput.value.split(/[,;]+/).map((value) => value.trim()).filter(Boolean);
+  renderBridgeSelectors();
+  renderBridge();
+  persist();
+});
 
 ui.scaleTypeSelect.addEventListener("change", () => {
   const profile = getActiveProfile();
@@ -351,6 +436,9 @@ ui.resetProfilesButton.addEventListener("click", () => {
   if (!window.confirm("Alle lokal geänderten Profile durch die Ausgangsprofile aus der ODS-Datei ersetzen?")) return;
   state.profiles = createDefaultProfiles();
   state.activeProfileId = "gym-sek1-test";
+  state.bridgeProfileId = "gym-sek1-test";
+  state.schoolType = "Gymnasium";
+  state.classLevel = "7";
   renderAll();
 });
 
