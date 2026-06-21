@@ -680,12 +680,13 @@ body.typemap-theme-light .type-menu-popup {
 }
 
 .type-stage {
+  --type-stage-inline-padding: 40px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   height: calc(100% - 82px);
   min-height: 0;
-  padding: 16px 40px 54px;
+  padding: 16px var(--type-stage-inline-padding) 54px;
   overflow: auto;
   container-type: inline-size;
   container-name: type-stage;
@@ -700,9 +701,13 @@ body.typemap-theme-light .type-menu-popup {
 }
 
 .preview-page {
+  --preview-page-padding: clamp(34px, 5vw, 72px);
+  --preview-side-gap: clamp(56px, 5.8vw, 66px);
+  --preview-side-min-width: 220px;
+  --preview-side-width: clamp(220px, 23vw, 310px);
   width: min(920px, 100%);
   min-height: min(560px, 100%);
-  padding: clamp(34px, 5vw, 72px);
+  padding: var(--preview-page-padding);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -723,26 +728,74 @@ body.typemap-theme-light .type-menu-popup {
   text-align: center;
 }
 
-.preview-page.has-side-toc {
+.preview-page.has-side-toc,
+.preview-page.has-side-rail {
   width: min(920px, 100%);
-  margin-left: clamp(190px, 20vw, 300px);
 }
 
 .preview-side-toc {
   position: fixed;
   top: clamp(145px, 21vh, 220px);
-  left: clamp(56px, 5.8vw, 66px);
-  width: clamp(220px, 23vw, 310px);
+  left: var(--preview-side-gap);
+  width: var(--preview-side-width);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 2px;
-  max-height: calc(100vh - clamp(210px, 30vh, 280px));
+  grid-template-rows: minmax(0, 1fr) 0;
+  gap: 0;
+  height: calc(100vh - clamp(210px, 30vh, 280px));
+  min-height: 260px;
   padding-top: 0.22em;
-  overflow: visible;
+  overflow: hidden;
   color: var(--muted);
   font-family: "Source Sans 3", Arial, sans-serif;
   font-size: 0.92rem;
   line-height: 1.28;
+}
+
+/* Randspalte und Satzspiegel verwenden dieselbe Lücke. Bei kleiner werdendem
+   Fenster wird deshalb die Textfläche schmaler, nicht der geometrische Bezug
+   zwischen Navigation und Text verschoben. */
+@container type-stage (min-width: 981px) {
+  .preview-canvas:has(.preview-page.has-side-rail) {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .preview-page.has-side-rail {
+    --preview-side-text-offset: calc(
+      var(--preview-side-gap) + var(--preview-side-gap) + var(--preview-side-width)
+      - var(--type-stage-inline-padding) - var(--preview-page-padding)
+    );
+    width: min(920px, calc(100% - var(--preview-side-text-offset)));
+    margin-left: var(--preview-side-text-offset);
+  }
+}
+
+.preview-side-toc.has-footnotes {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(16px, 2.6vh, 28px);
+}
+
+.preview-side-toc.has-footnotes.has-right-footnotes {
+  grid-template-rows: minmax(0, 1fr) 0;
+  gap: 0;
+}
+
+.preview-page.has-right-footnote-rail .preview-side-footnotes-section:not(.preview-side-footnotes-rail) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.preview-side-toc-section,
+.preview-side-footnotes-section {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.preview-side-toc-section.is-empty,
+.preview-side-footnotes-section.is-empty {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .preview-side-toc-title {
@@ -765,6 +818,71 @@ body.typemap-theme-light .type-menu-popup {
 .preview-side-toc-list::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.preview-side-footnotes-list {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.preview-side-footnotes-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.preview-side-footnotes-rail {
+  position: fixed;
+  top: clamp(145px, 21vh, 220px);
+  right: var(--preview-right-rail-right, var(--preview-side-gap));
+  left: var(--preview-right-rail-left, auto);
+  display: none;
+  height: calc(100vh - clamp(210px, 30vh, 280px));
+  min-width: var(--preview-side-min-width);
+  min-height: 260px;
+  padding-top: 0.22em;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: "Source Sans 3", Arial, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.28;
+}
+
+.preview-page.has-right-footnote-rail .preview-side-footnotes-rail {
+  display: grid;
+}
+
+.preview-side-footnotes-rail .preview-side-footnote {
+  font-size: 1em;
+}
+
+.preview-side-footnote {
+  display: grid;
+  grid-template-columns: 1.35em minmax(0, 1fr);
+  gap: 0.48em;
+  padding: 0.18em 0.35em 0.9em 0;
+  color: var(--muted);
+  font-size: 0.9em;
+  line-height: 1.38;
+}
+
+.preview-side-footnote[hidden] {
+  display: none;
+}
+
+.preview-side-footnote-label {
+  color: var(--accent);
+  font-size: 0.78em;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.preview-side-footnote-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .preview-side-toc-item {
@@ -1895,11 +2013,6 @@ body.typemap-theme-light .property-dialog {
   box-shadow: 0 18px 44px rgba(33, 54, 51, 0.13);
 }
 
-.editor-menu-panel-right {
-  right: 0;
-  left: auto;
-}
-
 .editor-menu-action {
   display: flex;
   align-items: center;
@@ -1913,6 +2026,10 @@ body.typemap-theme-light .property-dialog {
   color: var(--text);
   text-align: left;
   cursor: pointer;
+}
+
+.editor-menu-action[hidden] {
+  display: none;
 }
 
 .editor-menu-action:hover {
@@ -1949,6 +2066,34 @@ body.typemap-theme-light .property-dialog {
   padding: 5px 28px 5px 9px;
 }
 
+.toolbar-select-shell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbar-style-select-shell {
+  width: 184px;
+  max-width: 184px;
+}
+
+.toolbar-select-shell .toolbar-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.toolbar-select-shell > .toolbar-dropdown-caret {
+  position: absolute;
+  right: 9px;
+  pointer-events: none;
+}
+
+.toolbar-select-shell:hover > .toolbar-dropdown-caret,
+.toolbar-select-shell:focus-within > .toolbar-dropdown-caret {
+  color: var(--accent);
+}
+
 .toolbar-select-compact {
   max-width: 82px;
 }
@@ -1973,6 +2118,35 @@ body.typemap-theme-light .property-dialog {
 .toolbar-icon-button {
   width: 34px;
   padding: 0;
+}
+
+.toolbar-icon-button.toolbar-alignment-trigger {
+  width: 46px;
+  gap: 4px;
+  padding: 0 5px 0 7px;
+}
+
+.toolbar-icon-button.toolbar-zoom-trigger {
+  width: 46px;
+  gap: 4px;
+  padding: 0 5px 0 7px;
+}
+
+.toolbar-dropdown-caret {
+  width: 0;
+  height: 0;
+  margin-top: 2px;
+  border-top: 5px solid currentColor;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  color: var(--muted);
+}
+
+.toolbar-popover[open] .toolbar-alignment-trigger .toolbar-dropdown-caret,
+.toolbar-alignment-trigger:hover .toolbar-dropdown-caret,
+.toolbar-popover[open] .toolbar-zoom-trigger .toolbar-dropdown-caret,
+.toolbar-zoom-trigger:hover .toolbar-dropdown-caret {
+  color: var(--accent);
 }
 
 .toolbar-text-button {
@@ -2045,6 +2219,26 @@ body.typemap-theme-light .property-dialog {
 .toolbar-align-panel {
   grid-template-columns: repeat(4, 32px);
   min-width: max-content;
+}
+
+.toolbar-zoom-panel {
+  min-width: 112px;
+}
+
+.toolbar-zoom-panel button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.toolbar-zoom-panel button[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.toolbar-zoom-panel button[aria-pressed="true"]::after {
+  content: "✓";
+  margin-left: 12px;
 }
 
 .toolbar-align-panel button {
@@ -2930,7 +3124,8 @@ body.typemap-theme-light .citation-output textarea[readonly] {
 }
 
 @container type-stage (max-width: 980px) {
-  .preview-page.has-side-toc {
+  .preview-page.has-side-toc,
+  .preview-page.has-side-rail {
     width: min(920px, 100%);
     margin-left: 0;
   }
@@ -2938,10 +3133,15 @@ body.typemap-theme-light .citation-output textarea[readonly] {
   .preview-side-toc {
     display: none;
   }
+
+  .preview-side-footnotes-rail {
+    display: none !important;
+  }
 }
 
 @media (max-width: 920px) {
-  .preview-page.has-side-toc {
+  .preview-page.has-side-toc,
+  .preview-page.has-side-rail {
     width: min(920px, 100%);
     margin-left: 0;
     padding-left: clamp(34px, 5vw, 72px);
@@ -2969,6 +3169,10 @@ body.typemap-theme-light .citation-output textarea[readonly] {
 @media (max-width: 980px) {
   .preview-side-toc {
     display: none;
+  }
+
+  .preview-side-footnotes-rail {
+    display: none !important;
   }
 }
 

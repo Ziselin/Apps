@@ -8,8 +8,8 @@ window.TypeMapDocumentStyles = (() => {
 
   const styles = {
     paper: {
-      label: "Paper",
-      purpose: "Akademisches Paper, LaTeX-Clon und wissenschaftlicher Aufsatz",
+      label: "Aufsatz",
+      purpose: "Wissenschaftlicher Aufsatz, akademisches Paper und LaTeX-naher Satz",
       style: {
         fontFamily: fonts.modern,
         fontSize: 16,
@@ -39,7 +39,7 @@ window.TypeMapDocumentStyles = (() => {
       headingScale: { 1: 1.63, 2: 1.12, 3: 1, 4: 0.94, 5: 0.9, 6: 0.86, 7: 0.82 },
       titleScale: { title: 1.63, subtitle: 1.08, lead: 0.98, authors: 1, titleLineHeight: 1.15, subtitleLineHeight: 1.25, leadLineHeight: 1.42, authorsLineHeight: 1.3 },
     },
-    report: {
+    article: {
       label: "Artikel",
       purpose: "Redaktioneller Artikel, Essay und journalistischer Langtext",
       style: {
@@ -72,7 +72,7 @@ window.TypeMapDocumentStyles = (() => {
       titleScale: { title: 1.68, subtitle: 1.1, lead: 1.08, authors: 0.74, titleLineHeight: 1.15, subtitleLineHeight: 1.25, leadLineHeight: 1.38, authorsLineHeight: 1.25 },
     },
     notebook: {
-      label: "Notebook",
+      label: "Notizbuch",
       purpose: "Ablenkungsarmes Schreiben und universelle Rohfassung",
       style: {
         fontFamily: fonts.sans,
@@ -108,6 +108,6 @@ window.TypeMapDocumentStyles = (() => {
   return {
     fonts,
     styles,
-    order: ["paper", "report", "notebook"],
+    order: ["article", "paper", "notebook"],
   };
 })();

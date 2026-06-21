@@ -5,8 +5,14 @@ const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
 const DOCUMENT_STYLE_PRESET_VERSION = 1;
 const THEME_STORAGE_KEY = "typemap-theme";
+// ARCHITEKTURREGEL: TypeMap-spezifische Einfügungsobjekte, die im Editor als
+// grüne Kartusche erscheinen, verwenden bis auf Weiteres ausschließlich die
+// sprachunabhängige Syntax {{...}}. Ausnahmen sind die belegte Originalpaginierung
+// als [42] beziehungsweise [iv] sowie Fußnoten in kompatibler Markdown-Syntax:
+// [^1] als Verweis und [^1]: Inhalt als Definition. Übersetzte Objektüberschriften
+// sind Altdaten und werden auf die kanonischen Marker migriert.
 const TOC_OBJECT_MARKER = "{{toc}}";
-const TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
+const LEGACY_TOC_OBJECT_HEADING = "## Inhaltsverzeichnis";
 const CITATION_OBJECT_MARKER = "{{citation}}";
 const LEGACY_CITATION_OBJECT_HEADING = "## Quellenangabe";
 const ORIGINAL_PAGE_MARKER_SOURCE = "\\[(?:\\d+|(?=[ivxlcdm]+\\])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\]";
@@ -66,11 +72,14 @@ const ui = {
   editorToolbarFormat: document.querySelector(".editor-toolbar-format"),
   editorDataViewSelect: document.getElementById("editorDataViewSelect"),
   editorDataViewIcon: document.getElementById("editorDataViewIcon"),
+  insertTableOfContentsButton: document.getElementById("insertTableOfContentsButton"),
+  tableOfContentsVisibilityButton: document.getElementById("tableOfContentsVisibilityButton"),
+  tableOfContentsVisibilityCheck: document.getElementById("tableOfContentsVisibilityCheck"),
   insertCitationObjectButton: document.getElementById("insertCitationObjectButton"),
   insertCitationObjectCheck: document.getElementById("insertCitationObjectCheck"),
   documentPropertiesButton: document.getElementById("documentPropertiesButton"),
   toolbarTextKindSelect: document.getElementById("toolbarTextKindSelect"),
-  editorZoomSelect: document.getElementById("editorZoomSelect"),
+  editorZoomButtons: Array.from(document.querySelectorAll("[data-editor-zoom]")),
   decreaseFontSizeButton: document.getElementById("decreaseFontSizeButton"),
   increaseFontSizeButton: document.getElementById("increaseFontSizeButton"),
   toolbarFontSizeValue: document.getElementById("toolbarFontSizeValue"),
@@ -412,8 +421,13 @@ function createId(prefix) {
 }
 
 function createDefaultMetadata() {
+  /*
+   * ARCHITEKTURREGEL: metadata.textKind beschreibt ausschließlich den bewusst
+   * gewählten Darstellungsstil. Bibliografische Angaben – insbesondere
+   * citationSource.source_type – dürfen diesen Wert weder setzen noch ableiten.
+   */
   return {
-    textKind: "paper",
+    textKind: "article",
     stylePresetVersion: DOCUMENT_STYLE_PRESET_VERSION,
   };
 }
@@ -471,6 +485,11 @@ function createDefaultCitationSource(title = "") {
 }
 
 function normalizeCitationSource(value, project, legacySource = null) {
+  /*
+   * ARCHITEKTURREGEL: citationSource ist die bibliografische Ebene. Ihre
+   * Normalisierung darf keine Satz-, Schrift- oder Dokumentstilwerte verändern.
+   * Ein bibliografischer Quellentyp kann mit jedem Darstellungsstil kombiniert werden.
+   */
   const metadata = project?.metadata || {};
   const source = value && typeof value === "object" ? value : {};
   const legacy = legacySource && typeof legacySource === "object" ? legacySource : {};
@@ -522,20 +541,20 @@ const DOCUMENT_STYLE_ORDER = DOCUMENT_STYLE_REGISTRY.order?.length
   ? DOCUMENT_STYLE_REGISTRY.order
   : Object.keys(DOCUMENT_STYLE_PRESETS);
 const LEGACY_DOCUMENT_STYLE_MAP = {
-  artikel: "paper",
+  report: "article",
+  artikel: "article",
   buchkapitel: "paper",
   gedicht: "notebook",
   drama: "notebook",
   brief: "notebook",
   "wissenschaftlicher-text": "paper",
-  vertrag: "report",
+  vertrag: "article",
   notiz: "notebook",
-  article: "paper",
-  essay: "paper",
-  feature: "paper",
-  technical: "report",
-  notes: "report",
-  code: "report",
+  essay: "article",
+  feature: "article",
+  technical: "article",
+  notes: "article",
+  code: "article",
   manuscript: "notebook",
   letter: "notebook",
   minimal: "notebook",
@@ -549,7 +568,7 @@ function getEffectiveBodyFontFamily(project) {
   const preset = getDocumentStylePreset(project?.metadata?.textKind);
   // „Artikel“ besitzt eine definierte Satzschrift. Diese fachliche Stilregel
   // hat Vorrang vor veralteten Einzelwerten aus früher gespeicherten Dateien.
-  if (project?.metadata?.textKind === "report" && preset?.style?.fontFamily) {
+  if (project?.metadata?.textKind === "article" && preset?.style?.fontFamily) {
     return preset.style.fontFamily;
   }
   return project?.style?.fontFamily || preset?.style?.fontFamily || "serif";
@@ -569,7 +588,7 @@ function getLeadPresentation(project, titleScale = {}) {
 function normalizeDocumentStyleId(value) {
   const raw = String(value || "").trim();
   const mapped = LEGACY_DOCUMENT_STYLE_MAP[raw] || raw;
-  return DOCUMENT_STYLE_PRESETS[mapped] ? mapped : (DOCUMENT_STYLE_ORDER[0] || "paper");
+  return DOCUMENT_STYLE_PRESETS[mapped] ? mapped : (DOCUMENT_STYLE_ORDER[0] || "article");
 }
 
 function populateDocumentStyleSelect(select) {
@@ -587,6 +606,11 @@ function populateDocumentStyleSelect(select) {
 }
 
 function applyDocumentStylePreset(project, textKind, options = {}) {
+  /*
+   * Stilzuweisungen erfolgen nur über einen ausdrücklichen Nutzer-, Erstellungs-
+   * oder Migrationsvorgang. Diese Funktion darf niemals aufgrund eines
+   * citationSource-Feldes oder einer bibliografischen Quellenart aufgerufen werden.
+   */
   const normalizedTextKind = normalizeDocumentStyleId(textKind);
   const preset = getDocumentStylePreset(normalizedTextKind);
   if (!project || !preset) return;
@@ -818,8 +842,11 @@ function normalizeProject(project) {
   }
   normalized.id = String(normalized.id || createId("typemap-project"));
   normalized.title = String(normalized.title || "Unbenanntes Dokument");
-  normalized.source.rawText = removeLegacyCitationHeading(String(normalized.source.rawText || ""));
+  normalized.source.rawText = normalizeTocObjectMarkers(
+    removeLegacyCitationHeading(String(normalized.source.rawText || "")),
+  );
   delete normalized.chapterRoles?.[createChapterRoleKey(2, "Quellenangabe")];
+  delete normalized.chapterRoles?.[createChapterRoleKey(2, "Inhaltsverzeichnis")];
   migrateLegacyChapterRoles(normalized);
   syncProjectTitleHeading(normalized);
   normalized.tocVisible = normalized.tocVisible !== false;
@@ -862,7 +889,7 @@ function normalizeProject(project) {
   if (preset && (storedPresetVersion < DOCUMENT_STYLE_PRESET_VERSION || wasLegacyTextKind || !normalized.style.titleFontFamily)) {
     applyDocumentStylePreset(normalized, normalized.metadata.textKind);
   }
-  if (normalized.metadata.textKind === "report" && preset?.style?.fontFamily) {
+  if (normalized.metadata.textKind === "article" && preset?.style?.fontFamily) {
     normalized.style.fontFamily = preset.style.fontFamily;
   }
   normalized.metadata.stylePresetVersion = DOCUMENT_STYLE_PRESET_VERSION;
@@ -1001,7 +1028,20 @@ function isParatextMarker(text) {
 
 function isTableOfContentsText(text) {
   const value = String(text || "").trim();
-  return value === TOC_OBJECT_MARKER || value.toLowerCase() === TOC_OBJECT_HEADING.toLowerCase();
+  return value === TOC_OBJECT_MARKER || value.toLowerCase() === LEGACY_TOC_OBJECT_HEADING.toLowerCase();
+}
+
+function normalizeTocObjectMarkers(rawText) {
+  let markerWritten = false;
+  return String(rawText || "")
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      if (!isTableOfContentsText(line)) return [line];
+      if (markerWritten) return [];
+      markerWritten = true;
+      return [TOC_OBJECT_MARKER];
+    })
+    .join("\n");
 }
 
 function isCitationObjectText(text) {
@@ -1010,6 +1050,21 @@ function isCitationObjectText(text) {
 
 function hasCitationObject(project) {
   return String(project?.source?.rawText || "").split(/\r?\n/).some(isCitationObjectText);
+}
+
+function hasTableOfContentsObject(project) {
+  return String(project?.source?.rawText || "").split(/\r?\n/).some(isTableOfContentsText);
+}
+
+function syncTableOfContentsMenuState(project = getActiveProject()) {
+  const hasObject = hasTableOfContentsObject(project);
+  const isVisible = hasObject && project?.tocVisible !== false;
+  if (ui.insertTableOfContentsButton) ui.insertTableOfContentsButton.hidden = hasObject;
+  if (ui.tableOfContentsVisibilityButton) {
+    ui.tableOfContentsVisibilityButton.hidden = !hasObject;
+    ui.tableOfContentsVisibilityButton.setAttribute("aria-pressed", String(isVisible));
+  }
+  if (ui.tableOfContentsVisibilityCheck) ui.tableOfContentsVisibilityCheck.hidden = !isVisible;
 }
 
 function getMarkdownBlockType(text) {
@@ -1045,9 +1100,9 @@ function createMarkdownBlockNode(block, index) {
   const title = type === "heading" && headingMatch
     ? getPlainDocumentLabel(headingMatch[2], "Ohne Titel")
     : type === "toc"
-      ? "Inhaltsverzeichnis"
+      ? "Inhaltsverzeichnis (toc)"
       : type === "citation"
-        ? "Quellenangabe"
+        ? "Quellenangabe (citation)"
       : type === "table"
       ? "Tabelle"
       : type === "code"
@@ -1245,6 +1300,16 @@ function buildSourceModel(project) {
       return;
     }
 
+    if (getFootnoteDefinition(text)) {
+      // Eine direkt folgende Definitionszeile ist ein eigenständiges
+      // Markdown-Objekt, beendet aber ohne Freizeile nicht den laufenden Absatz.
+      // So bleibt der Textfluss semantisch erhalten, während die Definition
+      // unabhängig von ihrem Speicherort aufgelöst werden kann.
+      pushSingleLineBlock(line);
+      cursor = endOffset + 1;
+      return;
+    }
+
     if (/^#{1,7}\s+/.test(text.trim())) {
       flushParagraph(startOffset);
       pushSingleLineBlock(line);
@@ -1270,6 +1335,9 @@ function buildSourceModel(project) {
     cursor = endOffset + 1;
   });
   flushParagraph(rawText.length);
+  // Direkt eingeschobene Fußnotendefinitionen werden bereits beim Lesen
+  // angelegt; die Quellposition stellt anschließend die Dokumentreihenfolge her.
+  paragraphs.sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
   const documentTree = buildDocumentTree(paragraphs, rawText, project);
   const sections = collectDocumentSections(documentTree);
   const getSectionAtOffset = (offset) => {
@@ -1439,8 +1507,10 @@ function appendInlineMarkdown(parent, text, options = {}) {
     } else if (match.startsWith("[^")) {
       node = document.createElement("sup");
       node.className = "preview-footnote-reference";
-      node.textContent = match.slice(2, -1);
-      node.setAttribute("aria-label", `Fußnote ${match.slice(2, -1)}`);
+      const footnoteLabel = match.slice(2, -1);
+      node.textContent = footnoteLabel;
+      node.dataset.footnoteLabel = footnoteLabel;
+      node.setAttribute("aria-label", `Fußnote ${footnoteLabel}`);
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       node = document.createElement("a");
@@ -1668,16 +1738,105 @@ function updateSideTableOfContentsState(nav = null) {
 
 function scheduleSideTableOfContentsStateUpdate() {
   window.cancelAnimationFrame(state.sideTocUpdateTimer);
-  state.sideTocUpdateTimer = window.requestAnimationFrame(() => updateSideTableOfContentsState());
+  state.sideTocUpdateTimer = window.requestAnimationFrame(() => {
+    updateSideFootnotePlacement();
+    updateSideTableOfContentsState();
+    updateSideFootnotesState();
+  });
+}
+
+function collectReferencedFootnotes(blocks, hiddenParatextRanges = []) {
+  const definitions = new Map();
+  const referencedLabels = [];
+  const seenReferences = new Set();
+  blocks.forEach((block) => {
+    if (isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)) return;
+    const definition = getFootnoteDefinition(block.text);
+    if (definition) {
+      if (!definitions.has(definition.label)) definitions.set(definition.label, definition.content);
+      return;
+    }
+    findFootnoteReferences(block.text).forEach(({ label }) => {
+      if (seenReferences.has(label)) return;
+      seenReferences.add(label);
+      referencedLabels.push(label);
+    });
+  });
+  // Die Position und Reihenfolge der Darstellung folgen den Verweisen im
+  // Fließtext. Der Ablageort einer Markdown-Definition ist dafür unerheblich.
+  return referencedLabels
+    .filter((label) => definitions.has(label))
+    .map((label) => ({ label, content: definitions.get(label) }));
+}
+
+function getVisiblePreviewFootnoteLabels() {
+  if (!ui.typeStage || !ui.previewText) return [];
+  const viewport = ui.typeStage.getBoundingClientRect();
+  const labels = [];
+  const seen = new Set();
+  ui.previewText.querySelectorAll(".preview-footnote-reference[data-footnote-label]").forEach((reference) => {
+    const rect = reference.getBoundingClientRect();
+    const label = reference.dataset.footnoteLabel || "";
+    if (!label || seen.has(label) || rect.bottom < viewport.top || rect.top > viewport.bottom) return;
+    seen.add(label);
+    labels.push(label);
+  });
+  return labels;
+}
+
+function updateSideFootnotesState(rail = null) {
+  const hosts = rail
+    ? Array.from(rail.querySelectorAll(".preview-side-footnotes-host"))
+    : Array.from(document.querySelectorAll(".preview-side-footnotes-host"));
+  if (!hosts.length) return;
+  const visibleLabels = new Set(getVisiblePreviewFootnoteLabels());
+  hosts.forEach((host) => {
+    const list = host.querySelector(".preview-side-footnotes-list");
+    if (!(list instanceof HTMLElement)) return;
+    const signature = Array.from(visibleLabels).join("\u001f");
+    if (list.dataset.visibleSignature !== signature) {
+      list.dataset.visibleSignature = signature;
+      list.scrollTop = 0;
+    }
+    list.querySelectorAll(".preview-side-footnote").forEach((footnote) => {
+      footnote.hidden = !visibleLabels.has(footnote.dataset.footnoteLabel || "");
+    });
+  });
+}
+
+function updateSideFootnotePlacement() {
+  const page = ui.previewPage;
+  const rightRail = page?.querySelector(".preview-side-footnotes-rail");
+  const leftRail = page?.querySelector(".preview-side-rail");
+  if (!page || !rightRail || !leftRail || !ui.previewText || !ui.typeStage) return;
+
+  const textRect = ui.previewText.getBoundingClientRect();
+  const stageRect = ui.typeStage.getBoundingClientRect();
+  const styles = getComputedStyle(page);
+  const gap = Math.max(0, leftRail.getBoundingClientRect().left) || 56;
+  const minimumWidth = Number.parseFloat(styles.getPropertyValue("--preview-side-min-width")) || 220;
+  const rightEdge = stageRect.right - gap;
+  const leftEdge = textRect.right + gap;
+  const useRightRail = rightEdge - leftEdge >= minimumWidth;
+
+  page.classList.toggle("has-right-footnote-rail", useRightRail);
+  leftRail.classList.toggle("has-right-footnotes", useRightRail);
+  if (useRightRail) {
+    page.style.setProperty("--preview-right-rail-left", `${leftEdge}px`);
+    page.style.setProperty("--preview-right-rail-right", `${Math.max(0, window.innerWidth - rightEdge)}px`);
+  } else {
+    page.style.removeProperty("--preview-right-rail-left");
+    page.style.removeProperty("--preview-right-rail-right");
+  }
 }
 
 function renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks, hiddenParatextRanges = []) {
   targetPage.querySelector(".preview-side-toc")?.remove();
-  targetPage.classList.remove("has-side-toc");
-  if (targetText !== ui.previewText) return;
-  if (layoutModel.activeRange && layoutModel.activeRange.id !== "document-root") return;
-  if (project?.tocVisible === false) return;
-  if (!blocks.some((block) => isTableOfContentsBlock(block) && !isBlockHiddenByParatextVisibility(block, hiddenParatextRanges))) return;
+  targetPage.querySelector(".preview-side-footnotes-rail")?.remove();
+  targetPage.classList.remove("has-side-toc", "has-side-rail");
+  targetPage.classList.remove("has-right-footnote-rail");
+  if (targetText !== ui.previewText) return { hasFootnotes: false };
+  if (layoutModel.activeRange && layoutModel.activeRange.id !== "document-root") return { hasFootnotes: false };
 
   const sourceModel = buildSourceModel(project);
   const sections = (sourceModel.sections || []).filter((section) => (
@@ -1687,21 +1846,35 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
       sourceStartOffset: section.startOffset,
     }, hiddenParatextRanges)
   ));
-  if (!sections.length) return;
+  const hasTocMarker = blocks.some((block) => (
+    isTableOfContentsBlock(block) && !isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)
+  ));
+  const showToc = project?.tocVisible !== false && hasTocMarker && sections.length > 0;
+  const footnotes = collectReferencedFootnotes(blocks, hiddenParatextRanges);
+  if (!showToc && !footnotes.length) return { hasFootnotes: false };
 
-  const nav = document.createElement("nav");
-  nav.className = "preview-side-toc";
-  nav.setAttribute("aria-label", "Inhaltsverzeichnis");
-  const title = document.createElement("span");
-  title.className = "preview-side-toc-title";
-  title.textContent = "Inhaltsverzeichnis";
-  nav.appendChild(title);
+  // Die Randspalte ist eine reine Projektion der Dokumentstruktur. Fußnoten
+  // bleiben im Quelldokument erhalten und werden hier nur viewportbezogen angezeigt.
+  const rail = document.createElement("aside");
+  rail.className = "preview-side-toc preview-side-rail";
+  rail.classList.toggle("has-footnotes", footnotes.length > 0);
+  rail.setAttribute("aria-label", "Dokumentnavigation und Fußnoten");
+
+  const tocSection = document.createElement("nav");
+  tocSection.className = "preview-side-toc-section";
+  tocSection.setAttribute("aria-label", "Inhaltsverzeichnis");
+  if (!showToc) tocSection.classList.add("is-empty");
+  const tocTitle = document.createElement("span");
+  tocTitle.className = "preview-side-toc-title";
+  tocTitle.textContent = "Inhaltsverzeichnis";
+  tocSection.appendChild(tocTitle);
   const list = document.createElement("div");
   list.className = "preview-side-toc-list";
-  nav.appendChild(list);
+  tocSection.appendChild(list);
+  rail.appendChild(tocSection);
 
   const sectionStack = [];
-  sections.forEach((section) => {
+  (showToc ? sections : []).forEach((section) => {
     const level = Math.max(1, Number(section.level) || 1);
     while (sectionStack.length && sectionStack[sectionStack.length - 1].level >= level) {
       sectionStack.pop();
@@ -1720,16 +1893,52 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
       const heading = document.getElementById(getPreviewHeadingId(section.startOffset));
       if (heading && targetText.contains(heading)) {
         jumpPreviewStageToHeading(heading);
-        window.setTimeout(() => updateSideTableOfContentsState(nav), 0);
+        window.setTimeout(() => updateSideTableOfContentsState(rail), 0);
       }
     });
     list.appendChild(button);
     sectionStack.push({ id: section.id, level });
   });
 
-  targetPage.classList.add("has-side-toc");
-  targetPage.insertBefore(nav, targetText);
-  updateSideTableOfContentsState(nav);
+  const footnoteSection = document.createElement("section");
+  footnoteSection.className = "preview-side-footnotes-section preview-side-footnotes-host";
+  footnoteSection.setAttribute("aria-label", "Fußnoten im sichtbaren Textbereich");
+  if (!footnotes.length) footnoteSection.classList.add("is-empty");
+  const footnoteTitle = document.createElement("span");
+  footnoteTitle.className = "preview-side-toc-title";
+  footnoteTitle.textContent = "Fußnoten";
+  footnoteSection.appendChild(footnoteTitle);
+  const footnoteList = document.createElement("div");
+  footnoteList.className = "preview-side-footnotes-list";
+  footnotes.forEach(({ label, content }) => {
+    const item = document.createElement("article");
+    item.className = "preview-side-footnote";
+    item.dataset.footnoteLabel = label;
+    item.hidden = true;
+    const itemLabel = document.createElement("sup");
+    itemLabel.className = "preview-side-footnote-label";
+    itemLabel.textContent = label;
+    const itemContent = document.createElement("div");
+    itemContent.className = "preview-side-footnote-content";
+    appendInlineMarkdown(itemContent, content, { smallCaps: false });
+    item.append(itemLabel, itemContent);
+    footnoteList.appendChild(item);
+  });
+  footnoteSection.appendChild(footnoteList);
+  rail.appendChild(footnoteSection);
+
+  const rightFootnoteRail = footnotes.length ? footnoteSection.cloneNode(true) : null;
+  if (rightFootnoteRail) {
+    rightFootnoteRail.className = "preview-side-footnotes-section preview-side-footnotes-host preview-side-footnotes-rail";
+    rightFootnoteRail.setAttribute("aria-label", "Fußnoten im sichtbaren Textbereich");
+  }
+
+  targetPage.classList.add("has-side-rail");
+  if (showToc) targetPage.classList.add("has-side-toc");
+  targetPage.insertBefore(rail, targetText);
+  if (rightFootnoteRail) targetPage.insertBefore(rightFootnoteRail, targetText);
+  updateSideTableOfContentsState(rail);
+  return { hasFootnotes: footnotes.length > 0 };
 }
 
 function getVisualLineRects(element) {
@@ -1939,7 +2148,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetPage.style.setProperty("--preview-body-font", bodyFontFamily);
   targetPage.style.setProperty(
     "--preview-strong-font",
-    project.metadata?.textKind === "report" ? '"TypeMap EB Garamond Semibold", serif' : bodyFontFamily,
+    project.metadata?.textKind === "article" ? '"TypeMap EB Garamond Semibold", serif' : bodyFontFamily,
   );
   targetPage.style.setProperty("--preview-title-font", style.titleFontFamily || style.fontFamily);
   targetPage.style.setProperty("--preview-title-weight", String(Number(style.titleWeight) || 700));
@@ -2000,7 +2209,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     ? (layoutModel.sourceLineBlocks || [])
     : layoutModel.blocks;
   const hiddenParatextRanges = collectHiddenParatextRanges(project, state.sourceModel || null);
-  renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks, hiddenParatextRanges);
+  const sideRail = renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks, hiddenParatextRanges);
 
   if (!blocks.length) {
     const empty = document.createElement("p");
@@ -2014,6 +2223,9 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   blocks.forEach((block, index) => {
     if (isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)) return;
     if (isTableOfContentsBlock(block) || isOriginalPageMarkerBlock(block) || isParatextMarkerBlock(block)) return;
+    // In der interaktiven Gesamtansicht übernimmt die Randspalte die sichtbare
+    // Fußnotendarstellung; Export und Abschnittsansichten behalten den Block.
+    if (sideRail?.hasFootnotes && getFootnoteDefinition(block.text)) return;
     const blockText = String(block.text || "").trim();
     if (hasSourceTitleHeading
       && /^#\s+/.test(blockText)
@@ -2085,7 +2297,7 @@ function getProjectFontDescriptors(project) {
     [style.codeFontFamily || "'Source Code Pro', monospace", 400, "normal"],
     [style.codeFontFamily || "'Source Code Pro', monospace", 700, "normal"],
   ];
-  if (project?.metadata?.textKind === "report") {
+  if (project?.metadata?.textKind === "article") {
     descriptors.push(['"TypeMap EB Garamond Semibold", serif', 600, "normal"]);
   }
   return Array.from(new Set(descriptors
@@ -2882,6 +3094,7 @@ function renderEditor() {
   const citationObjectEnabled = hasCitationObject(project);
   ui.insertCitationObjectButton?.setAttribute("aria-pressed", String(citationObjectEnabled));
   if (ui.insertCitationObjectCheck) ui.insertCitationObjectCheck.hidden = !citationObjectEnabled;
+  syncTableOfContentsMenuState(project);
   if (isJsonView) clearElement(ui.textInputHighlight);
   else renderEditorHighlight(editorText, project);
   syncEditorHighlightScroll();
@@ -2890,7 +3103,9 @@ function renderEditor() {
   if (ui.fontLigaturesInput) ui.fontLigaturesInput.checked = project.style.ligatures !== false;
   populateDocumentStyleSelect(ui.toolbarTextKindSelect);
   if (ui.toolbarTextKindSelect) ui.toolbarTextKindSelect.value = normalizeDocumentStyleId(project.metadata?.textKind);
-  if (ui.editorZoomSelect) ui.editorZoomSelect.value = String(state.editorZoom);
+  ui.editorZoomButtons.forEach((button) => {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.editorZoom) === state.editorZoom));
+  });
   if (ui.toolbarFontSizeValue) ui.toolbarFontSizeValue.textContent = String(Number(project.style.fontSize) || 14);
   ensureSelectOption(ui.fontSizeInput, project.style.fontSize, "Aktuelle Schriftgröße");
   ensureSelectOption(ui.lineHeightInput, project.style.lineHeight, "Aktuelle Zeilenhöhe");
@@ -3512,9 +3727,10 @@ function insertTableOfContentsObject() {
     const lines = normalized.split("\n");
     const titleIndex = lines.findIndex((line) => /^#\s+/.test(line) && !getParatextHeadingKind(line));
     const insertionIndex = titleIndex >= 0 ? titleIndex + 1 : lines.length;
-    lines.splice(insertionIndex, 0, "", TOC_OBJECT_HEADING);
+    lines.splice(insertionIndex, 0, "", TOC_OBJECT_MARKER);
     project.source.rawText = `${lines.join("\n").replace(/\n{3,}/g, "\n\n")}\n`;
     project.tocVisible = true;
+    delete project.chapterRoles?.[createChapterRoleKey(2, "Inhaltsverzeichnis")];
     syncProjectTitleFromHeading(project, { normalizeStructure: true });
     state.activeSourceRange = null;
   });
@@ -3563,6 +3779,7 @@ function toggleCitationObject() {
 function renderNoActiveProjectState(message = "Wählen Sie im Browser ein Dokument aus.") {
   state.sourceModel = null;
   state.layoutModel = null;
+  syncTableOfContentsMenuState(null);
   ui.previewPage?.classList.add("is-empty");
   ui.previewPage?.classList.remove("has-side-toc");
   clearElement(ui.previewText);
@@ -3641,8 +3858,9 @@ function addGeneratedProject(jsonInput) {
     createdAt: now,
     updatedAt: now,
   });
-  // Generierte Dokumente erhalten einmalig den zur erkannten Textsorte
-  // gehörenden Ausgangsstil; danach bleiben individuelle Anpassungen erhalten.
+  project.metadata.textKind = "article";
+  // Generierte Dokumente beginnen einheitlich im Stil „Artikel“; danach
+  // bleiben individuelle Anpassungen des Nutzers erhalten.
   applyDocumentStylePreset(project, project.metadata.textKind);
   state.projects.push(project);
   state.activeSourceRange = null;
@@ -3735,7 +3953,7 @@ TYPEMAP-MARKDOWN IN source.rawText
 - Gliedere echte Zwischenüberschriften hierarchisch mit ## bis #######. Erzeuge keine neuen Überschriften.
 - Trenne jeden Absatz durch genau eine Leerzeile. Schreibe niemals zwei selbständige Absätze ohne freie Markdown-Zeile unmittelbar untereinander.
 - Verwende __fett__, _kursiv_, ==markiert==, > Zitat, - Listenpunkt, 1. nummerierter Punkt, übliche Markdown-Tabellen und dreifache Backticks für Code.
-- Verwende für Fußnoten ausschließlich Standard-Markdown: [^1] als Verweis und [^1]: Inhalt der Fußnote als Definition. Setze die Definition nach einer Leerzeile unmittelbar hinter den Absatz, in dem der Verweis vorkommt, und danach wieder eine Leerzeile.
+- Verwende für Fußnoten ausschließlich Standard-Markdown: [^1] als Verweis und [^1]: Inhalt der Fußnote als Definition. Setze eine automatisch erzeugte Definition ohne Freizeile direkt in die nächste Zeile nach dem Text mit dem zugehörigen Verweis. Eine Freizeile würde den laufenden Absatz beenden und darf hier nicht automatisch ergänzt werden. Bereits an anderer Stelle stehende Definitionen sind gültiges Markdown und dürfen nicht umsortiert werden; für die Renderposition ist allein der Verweis im Fließtext maßgeblich.
 - Ein Inhaltsverzeichnis wird nur bei Bedarf mit {{toc}} markiert.
 - Sichtbare Originalpaginierung wird an ihrer Textposition ausschließlich als [12] beziehungsweise [iv] notiert; niemals als [p. 12]. Füge keine Seitenzahlen hinzu, die auf der Webseite nicht belegt sind.
 - Vorder- oder Nachtexte können mit ::: front beziehungsweise ::: back beginnen und mit ::: beendet werden. Nutze diese Marker nur, wenn die Quelle diese Bereiche tatsächlich besitzt.
@@ -3753,7 +3971,7 @@ BIBLIOGRAFISCHE REGELN
 - doi enthält nur einen tatsächlich angegebenen DOI. citation_style bleibt "Hausstil"; short_citation und full_citation bleiben leer, da TypeMap sie berechnet.
 - text_version ist "translation" nur bei einer erkennbaren Übersetzung. Dann original_title, original_language und translators ausfüllen; andernfalls "original".
 - citationSource.language und style.language verwenden de, en, fr oder la. Autorenname, Agenturcredit, Untertitel und Lead stehen ausschließlich unter citationSource; lege dafür keine parallelen Felder unter metadata an.
-- Setze metadata.textKind bei journalistischen Artikeln, Zeitungstexten und redaktionellen Webbeiträgen auf "report", bei wissenschaftlichen Artikeln auf "paper" und bei universellen Rohtexten auf "notebook".
+- Setze metadata.textKind bei journalistischen Artikeln, Zeitungstexten und redaktionellen Webbeiträgen auf "article", bei wissenschaftlichen Aufsätzen auf "paper" und bei universellen Rohtexten auf "notebook".
 - Behalte die vorgegebenen Darstellungswerte unter style, typography, paratextVisibility, chapterRoles und tocVisible unverändert. Verwende leere id-/Zeitfelder; TypeMap vergibt diese lokal.
 
 EXAKTE JSON-GRUNDFORM
@@ -3786,7 +4004,7 @@ MARKDOWN IN source_raw_markdown
 - Verwende ## bis ####### nur für echte Überschriften.
 - Trenne jeden Absatz durch genau eine Leerzeile.
 - Erhalte Hervorhebungen mit __fett__, _kursiv_ und ==markiert== sowie Zitate, Listen, Tabellen und Code entsprechend der Vorlage.
-- Fußnoten verwenden [^1] als Verweis und [^1]: Inhalt als Definition. Die Definition folgt nach einer Leerzeile unmittelbar auf den zugehörigen Absatz; danach folgt wieder eine Leerzeile.
+- Fußnoten verwenden [^1] als Verweis und [^1]: Inhalt als Definition. Eine automatisch erzeugte Definition steht ohne Freizeile direkt in der nächsten Zeile nach dem Text mit dem zugehörigen Verweis; dadurch bleibt der laufende Absatz erhalten. Bereits abweichend platzierte Definitionen bleiben an ihrem belegten Ort; die Renderposition richtet sich ausschließlich nach dem Verweis im Fließtext.
 - Vorder- und Nachtexte können bei eindeutiger Abgrenzung mit ::: front beziehungsweise ::: back markiert werden.
 
 BIBLIOGRAFIE UND SEMANTIK
@@ -3826,7 +4044,7 @@ function addGeneratedSourceDocument(documentData, filename, sourceKind) {
   const title = String(documentData.citation_source?.title || documentData.title || fallbackTitle).trim();
   const project = createDefaultProject(title || fallbackTitle);
   project.source.rawText = rawText;
-  project.metadata.textKind = normalizeDocumentStyleId(documentData.text_kind || "notebook");
+  project.metadata.textKind = normalizeDocumentStyleId(documentData.text_kind || "article");
   project.metadata.transcription = normalizeTranscriptionMetadata({
     source_kind: sourceKind,
     source_reference: filename,
@@ -4018,6 +4236,7 @@ function updateActiveProject(mutator, options = {}) {
   if (!project) return;
   mutator(project);
   markProjectChanged(project);
+  syncTableOfContentsMenuState(project);
   if (options.renderBrowser !== false) {
     renderProjectList();
   }
@@ -4184,6 +4403,53 @@ function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project =
   return element.outerHTML;
 }
 
+function buildChapterGroupedHtmlMarkup(blocks, textType, chapterNumbers = false, project = null) {
+  const definitions = new Map();
+  blocks.forEach((block) => {
+    const definition = getFootnoteDefinition(block.text);
+    if (definition && !definitions.has(definition.label)) {
+      definitions.set(definition.label, block);
+    }
+  });
+
+  const markup = [];
+  let chapterFootnotes = [];
+  let chapterLabels = new Set();
+
+  const flushChapterFootnotes = () => {
+    if (!chapterFootnotes.length) return;
+    const notes = chapterFootnotes
+      .map((block) => buildHtmlBlockMarkup(block, textType, chapterNumbers, project))
+      .join("");
+    markup.push(`<section class="chapter-footnotes" aria-label="Fußnoten">${notes}</section>`);
+    chapterFootnotes = [];
+    chapterLabels = new Set();
+  };
+
+  blocks.forEach((block) => {
+    if (getFootnoteDefinition(block.text)) return;
+    const headingLevel = getMarkdownHeadingLevel(block.text);
+    const headingMatch = String(block.text || "").match(/^(#{1,7})\s+(.+)$/);
+    const explicitRole = headingMatch
+      ? getExplicitChapterRole(project, headingLevel, getPlainDocumentLabel(headingMatch[2]))
+      : "";
+    // H2 eröffnet regulär ein Kapitel; explizit als Hauptkapitel markierte
+    // Überschriften dürfen dieselbe Grenze auch auf anderer Ebene festlegen.
+    const startsChapter = headingLevel === 2 || explicitRole === "main";
+    const endsDocumentBody = isCitationObjectText(block.text);
+    if (startsChapter || endsDocumentBody) flushChapterFootnotes();
+
+    markup.push(buildHtmlBlockMarkup(block, textType, chapterNumbers, project));
+    findFootnoteReferences(block.text).forEach(({ label }) => {
+      if (chapterLabels.has(label) || !definitions.has(label)) return;
+      chapterLabels.add(label);
+      chapterFootnotes.push(definitions.get(label));
+    });
+  });
+  flushChapterFootnotes();
+  return markup.join("");
+}
+
 function buildHtmlFontFaceCss(project) {
   const style = project?.style || {};
   const families = [
@@ -4247,11 +4513,14 @@ function buildHtmlExport(project) {
     : visibleExportBlocks;
   const hasTocObject = project.tocVisible !== false && visibleExportBlocks.some(isTableOfContentsBlock);
   const hasRenderableSideToc = hasTocObject && sourceModel.sections.length > 0;
-  const blocks = contentExportBlocks
-    .map((block) => buildHtmlBlockMarkup(block, textType, project.style.chapterNumbers === true, project))
-    // Der Textcontainer nutzt pre-wrap. Trennende Quellcode-Zeilen zwischen
-    // Blockelementen würden daher als zusätzlicher sichtbarer Absatzraum erscheinen.
-    .join("");
+  // HTML und Druck gruppieren Definitionen am Ende des Kapitels. Die Quelle
+  // selbst bleibt unverändert und die Zuordnung folgt dem Fußnotenverweis.
+  const blocks = buildChapterGroupedHtmlMarkup(
+    contentExportBlocks,
+    textType,
+    project.style.chapterNumbers === true,
+    project,
+  );
   const tocHtml = hasRenderableSideToc
     ? `<nav class="html-side-toc" aria-label="Inhaltsverzeichnis">
       <span class="html-side-toc-title">Inhaltsverzeichnis</span>
@@ -4298,6 +4567,8 @@ ${buildHtmlFontFaceCss(project)}
     .preview-footnote-reference { margin-inline: .08em; color: #8f5d14; font-family: inherit; font-size: .72em; font-weight: 600; line-height: 0; vertical-align: super; }
     .preview-footnote-definition { display: flex; align-items: baseline; gap: .48em; margin: .16em 0 .9em; padding-left: .9em; color: #66716c; font-family: inherit; font-size: .84em; font-style: normal; line-height: 1.38; white-space: pre-wrap; }
     .preview-footnote-definition-label { flex: 0 0 auto; color: #8f5d14; font-family: inherit; font-size: .82em; font-weight: 600; line-height: 1; vertical-align: super; }
+    .chapter-footnotes { margin: 1.8em 0 2.2em; padding-top: .8em; border-top: 1px solid rgba(33, 54, 51, .2); }
+    .chapter-footnotes .preview-footnote-definition { break-inside: avoid; page-break-inside: avoid; }
     .html-side-toc { position: sticky; top: 24px; display: grid; gap: 2px; max-height: calc(100vh - 80px); overflow: auto; color: #6b746f; font-family: "Source Sans 3", Arial, sans-serif; font-size: 11.5pt; line-height: 1.28; text-align: left; }
     .html-side-toc-title { margin-bottom: .55em; color: #8f5d14; font-size: 8.5pt; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
     .html-side-toc-item { display: block; min-height: 24px; padding: 3px 6px 3px calc(4px + var(--toc-level, 0) * 13px); border-radius: 6px; color: inherit; text-decoration: none; }
@@ -5123,8 +5394,15 @@ function bindEditor() {
   ui.toolbarTextKindSelect?.addEventListener("change", () => {
     setActiveTextKind(ui.toolbarTextKindSelect.value || createDefaultMetadata().textKind);
   });
-  ui.editorZoomSelect?.addEventListener("change", () => {
-    updateEditorZoom(ui.editorZoomSelect.value);
+  ui.editorZoomButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      updateEditorZoom(button.dataset.editorZoom);
+      ui.editorZoomButtons.forEach((candidate) => {
+        candidate.setAttribute("aria-pressed", String(candidate === button));
+      });
+      closeEditorMenus();
+    });
   });
   ui.decreaseFontSizeButton?.addEventListener("click", () => changeActiveFontSize(-1));
   ui.increaseFontSizeButton?.addEventListener("click", () => changeActiveFontSize(1));
@@ -5171,6 +5449,11 @@ function bindEditor() {
         insertTableOfContentsObject();
       } else if (button.dataset.insertObject === "citation") {
         toggleCitationObject();
+      } else if (button.dataset.viewOption === "toc") {
+        updateActiveProject((project) => {
+          if (!hasTableOfContentsObject(project)) return;
+          project.tocVisible = project.tocVisible === false;
+        });
       }
       closeEditorMenus();
     });
@@ -5298,6 +5581,7 @@ function bindEditor() {
     if (!event.target.closest(".original-page-info-menu")) closeOriginalPageInfo();
   });
   ui.typeStage?.addEventListener("scroll", scheduleSideTableOfContentsStateUpdate, { passive: true });
+  window.addEventListener("resize", scheduleSideTableOfContentsStateUpdate, { passive: true });
   ui.fontFamilySelect?.addEventListener("change", () => {
     updateActiveProject((project) => {
       project.style.fontFamily = ui.fontFamilySelect.value;

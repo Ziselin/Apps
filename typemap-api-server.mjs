@@ -49,7 +49,7 @@ const TYPEMAP_DOCUMENT_SCHEMA = {
   required: ["source_raw_markdown", "text_kind", "citation_source", "transcription"],
   properties: {
     source_raw_markdown: { type: "string" },
-    text_kind: { type: "string", enum: ["paper", "report", "notebook"] },
+    text_kind: { type: "string", enum: ["article", "paper", "notebook"] },
     citation_source: {
       type: "object",
       additionalProperties: false,
@@ -88,7 +88,7 @@ const GEMINI_PDF_ANALYSIS_SCHEMA = {
   required: ["total_pages", "text_kind", "citation_source", "transcription"],
   properties: {
     total_pages: { type: "integer" },
-    text_kind: { type: "string", enum: ["paper", "report", "notebook"] },
+    text_kind: { type: "string", enum: ["article", "paper", "notebook"] },
     citation_source: TYPEMAP_DOCUMENT_SCHEMA.properties.citation_source,
     transcription: {
       type: "object",
@@ -345,7 +345,7 @@ function buildEpubDocument({ filename, fileData }) {
     || identifiers[0]?.value || "";
   return {
     source_raw_markdown: sourceRawMarkdown,
-    text_kind: "notebook",
+    text_kind: "article",
     citation_source: citationSource,
     transcription: {
       source_kind: "epub",
@@ -450,7 +450,7 @@ function buildFb2Document({ filename, fileData }) {
   });
   return {
     source_raw_markdown: sourceRawMarkdown,
-    text_kind: "notebook",
+    text_kind: "article",
     citation_source: citationSource,
     transcription: {
       source_kind: "fb2",

@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="typemap.css?v=20260620u">
+  <link rel="stylesheet" href="typemap.css?v=20260621i">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -169,7 +169,7 @@
                   <img src="https://api.iconify.design/material-symbols/format-quote-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Zitat</span>
                 </button>
-                <button type="button" class="editor-menu-action" data-insert-object="toc">
+                <button type="button" id="insertTableOfContentsButton" class="editor-menu-action" data-insert-object="toc">
                   <img src="https://api.iconify.design/material-symbols/toc-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Inhaltsverzeichnis</span>
                 </button>
@@ -226,10 +226,11 @@
             </details>
             <details class="editor-menu">
               <summary>Ansicht</summary>
-              <div class="editor-menu-panel editor-menu-panel-right">
-                <button type="button" class="editor-menu-action" data-view-option="toc">
+              <div class="editor-menu-panel">
+                <button type="button" id="tableOfContentsVisibilityButton" class="editor-menu-action" data-view-option="toc" aria-pressed="false" hidden>
                   <img src="https://api.iconify.design/material-symbols/toc-rounded.svg?color=%23ffb347" alt="" aria-hidden="true">
                   <span>Inhaltsverzeichnis</span>
+                  <img id="tableOfContentsVisibilityCheck" class="editor-menu-check" src="https://api.iconify.design/ic/round-check.svg?color=%23ffb347" alt="" aria-hidden="true" hidden>
                 </button>
                 <button type="button" id="textFormatWidthButton" class="editor-menu-action">
                   <img src="https://api.iconify.design/fluent/phone-span-out-16-regular.svg?color=%23ffb347" alt="" aria-hidden="true">
@@ -271,22 +272,32 @@
           </div>
           </div>
           <div class="editor-toolbar editor-toolbar-format" role="toolbar" aria-label="Schnellformatierung">
-            <select id="toolbarTextKindSelect" class="toolbar-select" aria-label="Textart"></select>
+            <div class="toolbar-select-shell toolbar-style-select-shell">
+              <select id="toolbarTextKindSelect" class="toolbar-select" aria-label="Textart"></select>
+              <span class="toolbar-dropdown-caret" aria-hidden="true"></span>
+            </div>
             <button type="button" id="documentPropertiesButton" class="toolbar-button">
               <img src="https://api.iconify.design/lucide/table-properties.svg?color=%23ffb347" alt="" aria-hidden="true">
               <span>Eigenschaften</span>
             </button>
-            <select id="editorZoomSelect" class="toolbar-select toolbar-select-compact" aria-label="Editor-Zoom">
-              <option value="0.75">75%</option>
-              <option value="0.9">90%</option>
-              <option value="1" selected>100%</option>
-              <option value="1.1">110%</option>
-              <option value="1.25">125%</option>
-              <option value="1.5">150%</option>
-            </select>
+            <details class="toolbar-popover toolbar-zoom-popover">
+              <summary class="toolbar-icon-button toolbar-zoom-trigger" aria-label="Editor-Zoom" title="Editor-Zoom">
+                <img src="https://api.iconify.design/mdi/glasses.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span class="toolbar-dropdown-caret" aria-hidden="true"></span>
+              </summary>
+              <div class="toolbar-popover-panel toolbar-zoom-panel" aria-label="Editor-Zoomstufe">
+                <button type="button" data-editor-zoom="0.75" aria-pressed="false">75%</button>
+                <button type="button" data-editor-zoom="0.9" aria-pressed="false">90%</button>
+                <button type="button" data-editor-zoom="1" aria-pressed="true">100%</button>
+                <button type="button" data-editor-zoom="1.1" aria-pressed="false">110%</button>
+                <button type="button" data-editor-zoom="1.25" aria-pressed="false">125%</button>
+                <button type="button" data-editor-zoom="1.5" aria-pressed="false">150%</button>
+              </div>
+            </details>
             <details class="toolbar-popover">
-              <summary class="toolbar-icon-button" aria-label="Textausrichtung">
+              <summary class="toolbar-icon-button toolbar-alignment-trigger" aria-label="Textausrichtung">
                 <img src="https://api.iconify.design/majesticons/text-align-left.svg?color=%23ffb347" alt="" aria-hidden="true">
+                <span class="toolbar-dropdown-caret" aria-hidden="true"></span>
               </summary>
               <div class="toolbar-popover-panel toolbar-align-panel">
                 <button type="button" data-toolbar-align="left" aria-label="Linksbündig"><img src="https://api.iconify.design/majesticons/text-align-left.svg?color=%23ffb347" alt=""></button>
@@ -776,8 +787,8 @@
       <button type="button" id="hyphenationDialogSaveButton" class="secondary-button primary-action">Übernehmen</button>
     </div>
   </section>
-  <script src="styles/document-styles.js?v=20260619v"></script>
-  <script src="typemap.js?v=20260620u"></script>
+  <script src="styles/document-styles.js?v=20260621b"></script>
+  <script src="typemap.js?v=20260621o"></script>
 </body>
 </html>
 
