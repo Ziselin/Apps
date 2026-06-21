@@ -61,6 +61,7 @@ const ui = {
   searchDialogCloseButton: document.getElementById("searchDialogCloseButton"),
   wikisourceSearchInput: document.getElementById("wikisourceSearchInput"),
   wikisourceSearchButton: document.getElementById("wikisourceSearchButton"),
+  wikisourceTextTypeFilter: document.getElementById("wikisourceTextTypeFilter"),
   wikisourceSearchResults: document.getElementById("wikisourceSearchResults"),
   searchDialogStatus: document.getElementById("searchDialogStatus"),
   importWikisourceButton: document.getElementById("importWikisourceButton"),
@@ -120,13 +121,16 @@ const ui = {
   provenanceProviderOutput: document.getElementById("provenanceProviderOutput"),
   provenanceSiteOutput: document.getElementById("provenanceSiteOutput"),
   provenanceFormatOutput: document.getElementById("provenanceFormatOutput"),
+  provenanceTextBasisOutput: document.getElementById("provenanceTextBasisOutput"),
   provenanceSourceLink: document.getElementById("provenanceSourceLink"),
   provenanceRevisionLink: document.getElementById("provenanceRevisionLink"),
+  provenanceEpubExportLink: document.getElementById("provenanceEpubExportLink"),
   provenanceWikidataLink: document.getElementById("provenanceWikidataLink"),
   provenancePageIdOutput: document.getElementById("provenancePageIdOutput"),
   provenanceRevisionIdOutput: document.getElementById("provenanceRevisionIdOutput"),
   provenanceParentRevisionIdOutput: document.getElementById("provenanceParentRevisionIdOutput"),
   provenanceRevisionTimestampOutput: document.getElementById("provenanceRevisionTimestampOutput"),
+  provenanceExportedAtOutput: document.getElementById("provenanceExportedAtOutput"),
   provenanceImportedAtOutput: document.getElementById("provenanceImportedAtOutput"),
   provenanceHashOutput: document.getElementById("provenanceHashOutput"),
   provenanceRelatedLinks: document.getElementById("provenanceRelatedLinks"),
@@ -291,6 +295,16 @@ function stripOriginalPageMarkers(value) {
   });
 }
 
+function normalizeImportedOriginalPageMarkers(value) {
+  const pageLabel = "([0-9]+|[ivxlcdm]+)";
+  return String(value || "")
+    // Wikisource/EPUB kann die sichtbare Seitenzahl innerhalb oder zusammen
+    // mit den Klammern hervorheben. Im TypeMap-Markdown ist Paginierung dagegen
+    // stets unformatiertes [42]/[iv], damit sie semantisch erkannt und ausgeblendet wird.
+    .replace(new RegExp(`\\[\\s*(?:\\*\\*|__)\\s*${pageLabel}\\s*(?:\\*\\*|__)\\s*\\]`, "gi"), "[$1]")
+    .replace(new RegExp(`(?:\\*\\*|__)\\s*\\[\\s*${pageLabel}\\s*\\]\\s*(?:\\*\\*|__)`, "gi"), "[$1]");
+}
+
 function findFootnoteReferences(value) {
   const source = String(value || "");
   const pattern = new RegExp(FOOTNOTE_REFERENCE_SOURCE, "g");
@@ -452,6 +466,7 @@ const state = {
   editorDataView: "markdown",
   generateSourceMode: "web",
   selectedWikisourcePage: null,
+  wikisourceSearchResults: [],
   jsonEditorDraft: "",
   jsonEditorDraftProjectId: null,
   jsonEditorApplyTimer: 0,
@@ -971,6 +986,10 @@ function normalizeProject(project) {
     if (normalized.metadata.transcription?.source_kind === "wikisource") {
       delete normalized.metadata.transcription;
     }
+    normalized.sourceMetadata.exported_at ||= getWikisourceEpubExportDate(normalized.source.rawText);
+    normalized.source.rawText = normalizeImportedOriginalPageMarkers(
+      cleanStoredWikisourceMarkdown(normalized.source.rawText, normalized.title),
+    );
     delete normalized.sourceMetadata.source_statement;
   }
   if (!hadCitationRecord && !normalized.citationSource.authors) {
@@ -1485,6 +1504,23 @@ function clearElement(element) {
   while (element?.firstChild) element.removeChild(element.firstChild);
 }
 
+function appendSmallCapsGlyphText(parent, value) {
+  const text = String(value || "");
+  let cursor = 0;
+  for (const match of text.matchAll(/f/g)) {
+    if (match.index > cursor) parent.appendChild(document.createTextNode(text.slice(cursor, match.index)));
+    const glyph = document.createElement("span");
+    glyph.className = "preview-small-caps-f";
+    // EB Garamonds smcp-Zuordnung lässt das f in einzelnen Browser-Shapern als
+    // Minuskel stehen. c2sc adressiert dieselbe entworfene Kapitälchenglyphe
+    // zuverlässig vom versalen F aus, ohne die übrigen Zeichen zu verändern.
+    glyph.textContent = "F";
+    parent.appendChild(glyph);
+    cursor = match.index + 1;
+  }
+  if (cursor < text.length) parent.appendChild(document.createTextNode(text.slice(cursor)));
+}
+
 function appendTextNode(parent, text, options = {}) {
   const source = String(text || "");
   if (!source) return;
@@ -1534,7 +1570,7 @@ function appendTextNode(parent, text, options = {}) {
     if (start > cursor) parent.appendChild(document.createTextNode(source.slice(cursor, start)));
     const span = document.createElement("span");
     span.className = "preview-small-caps";
-    span.textContent = source.slice(start, end).toLocaleLowerCase("de-DE");
+    appendSmallCapsGlyphText(span, source.slice(start, end).toLocaleLowerCase("de-DE"));
     parent.appendChild(span);
     cursor = end;
   });
@@ -2071,16 +2107,19 @@ function getLastTextContentBottom(element) {
 
 function shouldExcludeBlockFromLineNumbering(block) {
   const chapterRole = block?.dataset?.chapterRole || "";
+  const isHeading = block?.matches?.("h1,h2,h3,h4,h5,h6") === true
+    || Array.from(block?.classList || []).some((className) => /^preview-heading-level-/.test(className));
   return block?.dataset?.matter !== "body"
     || (chapterRole && chapterRole !== "main")
-    || block?.classList?.contains("preview-heading-level-1") === true
+    || isHeading
     || block?.classList?.contains("preview-embedded-object") === true;
 }
 
 function isNumberedBodyBlock(block) {
   const chapterRole = block?.chapterRole || "";
   return (block?.matter || "body") === "body"
-    && (!chapterRole || chapterRole === "main");
+    && (!chapterRole || chapterRole === "main")
+    && !getMarkdownHeadingLevel(block?.text);
 }
 
 function renderLineNumberLayer(targetText, lineNumbering) {
@@ -3717,7 +3756,9 @@ function updateProvenanceLicenseLink() {
 function formatProvenanceTimestamp(value) {
   const date = new Date(value);
   return value && Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "medium" }).format(date)
+    ? new Intl.DateTimeFormat("de-DE", /^\d{4}-\d{2}-\d{2}$/.test(String(value))
+      ? { dateStyle: "medium" }
+      : { dateStyle: "medium", timeStyle: "medium" }).format(date)
     : String(value || "");
 }
 
@@ -3755,16 +3796,26 @@ function renderDocumentProvenance(project) {
   ui.provenanceTypeSelect.value = getProvenanceType(provenance);
   ui.provenanceSiteOutput.value = String(provenance.site || "");
   ui.provenanceFormatOutput.value = String(provenance.format || "");
+  const textBasisLabels = {
+    "ws-export-epub-3": "Wikisource EPUB 3",
+    "ws-export-epub-3+mediawiki-footnotes": "Wikisource EPUB 3 + MediaWiki-Fußnoten",
+    "mediawiki-rendered-html": "Gerendertes MediaWiki-HTML",
+  };
+  const textBasis = String(provenance.extraction?.text_basis || "");
+  const footnoteCount = Number(provenance.extraction?.footnote_count) || 0;
+  ui.provenanceTextBasisOutput.value = `${textBasisLabels[textBasis] || textBasis}${footnoteCount ? ` · ${footnoteCount} Fußnoten` : ""}`;
   ui.provenancePageIdOutput.value = String(provenance.page_id || "");
   ui.provenanceRevisionIdOutput.value = String(provenance.revision_id || "");
   ui.provenanceParentRevisionIdOutput.value = String(provenance.revision_parent_id || "");
   ui.provenanceRevisionTimestampOutput.value = formatProvenanceTimestamp(provenance.revision_timestamp);
+  ui.provenanceExportedAtOutput.value = formatProvenanceTimestamp(provenance.exported_at);
   ui.provenanceImportedAtOutput.value = formatProvenanceTimestamp(provenance.imported_at);
   ui.provenanceHashOutput.value = String(provenance.content_hash_sha256 || "");
   ui.provenanceLicenseSelect.value = getProvenanceLicenseId(provenance.license);
 
   setProvenanceLink(ui.provenanceSourceLink, provenance.canonical_url, "Wikisource-Seite öffnen");
   setProvenanceLink(ui.provenanceRevisionLink, provenance.revision_url, provenance.revision_id ? `Revision ${provenance.revision_id} öffnen` : "");
+  setProvenanceLink(ui.provenanceEpubExportLink, provenance.extraction?.epub_export_url, "EPUB-Export öffnen");
   setProvenanceLink(ui.provenanceWikidataLink, provenance.wikidata?.url, provenance.wikidata?.id || "");
   updateProvenanceLicenseLink();
 
@@ -4145,17 +4196,90 @@ async function fetchWikisourceApi(parameters) {
   return payload;
 }
 
-function htmlFragmentToPlainText(value) {
-  const template = document.createElement("template");
-  template.innerHTML = String(value || "");
-  return String(template.content.textContent || "").replace(/\s+/g, " ").trim();
+const WIKISOURCE_TEXT_TYPES = [
+  "Roman", "Novelle", "Kurzgeschichte", "Erzählung", "Märchen", "Fabel",
+  "Drama", "Tragödie", "Komödie", "Gedicht", "Sonett", "Ballade", "Ode",
+  "Elegie", "Essay", "Brief", "Rede",
+];
+
+function getWikisourceResultTextTypes(textData, categories = []) {
+  const declaredType = String(textData.GATTUNG || textData.TEXTSORTE || "").trim();
+  const categoryText = categories.map((category) => String(category.title || "").replace(/^Kategorie:/i, "")).join("; ");
+  const classificationText = [declaredType, categoryText].filter(Boolean).join("; ");
+  const knownTypes = WIKISOURCE_TEXT_TYPES.filter((type) => new RegExp(`(?:^|[^\\p{L}])${type}(?:e|en|n)?(?:$|[^\\p{L}])`, "iu").test(classificationText));
+  return knownTypes.length ? knownTypes : (declaredType ? [declaredType] : []);
 }
 
-function renderWikisourceSearchResults(results) {
+function getWikisourceResultYear(textData) {
+  const source = String(textData.ERSCHEINUNGSJAHR || textData.JAHR || textData.ENTSTEHUNGSJAHR || "");
+  return source.match(/\b(?:1[0-9]{3}|20[0-9]{2})\b/)?.[0] || stripWikisourceMarkup(source);
+}
+
+async function enrichWikisourceSearchResults(results) {
+  const enriched = new Map();
+  // Die Such-API liefert Trefferrelevanz, aber keine bibliografischen Textdaten.
+  // Diese werden in kleinen Batches aus den Seitenrevisionen ergänzt, damit die
+  // Ergebnisliste fachliche Angaben statt redundanter Textausschnitte zeigt.
+  for (let index = 0; index < results.length; index += 10) {
+    const batch = results.slice(index, index + 10);
+    const payload = await fetchWikisourceApi({
+      action: "query",
+      prop: "revisions|categories",
+      rvprop: "content",
+      rvslots: "main",
+      cllimit: "max",
+      clshow: "!hidden",
+      redirects: "1",
+      titles: batch.map((result) => result.title).join("|"),
+    });
+    (payload.query?.pages || []).forEach((page) => {
+      const wikitext = page.revisions?.[0]?.slots?.main?.content || "";
+      const textData = parseWikisourceTextData(wikitext);
+      const metadata = { textData, categories: page.categories || [] };
+      enriched.set(Number(page.pageid), metadata);
+      enriched.set(String(page.title || "").toLocaleLowerCase("de"), metadata);
+    });
+  }
+  return results.map((result) => {
+    const metadata = enriched.get(Number(result.pageid))
+      || enriched.get(String(result.title || "").toLocaleLowerCase("de"))
+      || { textData: {}, categories: [] };
+    const textData = metadata.textData;
+    return {
+      ...result,
+      displayTitle: textData.TITEL || result.title,
+      author: stripWikisourceMarkup(textData.AUTOR || ""),
+      year: getWikisourceResultYear(textData),
+      textTypes: getWikisourceResultTextTypes(textData, metadata.categories),
+    };
+  });
+}
+
+function updateWikisourceTextTypeFilter(results) {
+  if (!ui.wikisourceTextTypeFilter) return;
+  const types = Array.from(new Set(results.flatMap((result) => result.textTypes || [])))
+    .sort((left, right) => left.localeCompare(right, "de"));
+  clearElement(ui.wikisourceTextTypeFilter);
+  ui.wikisourceTextTypeFilter.append(new Option("Alle Textsorten", "all"));
+  types.forEach((type) => ui.wikisourceTextTypeFilter.append(new Option(type, type)));
+  if (results.some((result) => !(result.textTypes || []).length)) {
+    ui.wikisourceTextTypeFilter.append(new Option("Nicht bestimmt", "unknown"));
+  }
+  ui.wikisourceTextTypeFilter.value = "all";
+  ui.wikisourceTextTypeFilter.disabled = results.length === 0;
+}
+
+function renderWikisourceSearchResults() {
   if (!ui.wikisourceSearchResults) return;
   clearElement(ui.wikisourceSearchResults);
   state.selectedWikisourcePage = null;
   if (ui.importWikisourceButton) ui.importWikisourceButton.disabled = true;
+  const selectedType = ui.wikisourceTextTypeFilter?.value || "all";
+  const results = state.wikisourceSearchResults.filter((result) => (
+    selectedType === "all"
+    || (selectedType === "unknown" && !(result.textTypes || []).length)
+    || (result.textTypes || []).includes(selectedType)
+  ));
   results.forEach((result) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -4164,11 +4288,11 @@ function renderWikisourceSearchResults(results) {
     button.setAttribute("aria-selected", "false");
     const title = document.createElement("span");
     title.className = "wikisource-result-title";
-    title.textContent = result.title;
-    const snippet = document.createElement("span");
-    snippet.className = "wikisource-result-snippet";
-    snippet.textContent = htmlFragmentToPlainText(result.snippet) || `Wikisource-Seite ${result.pageid}`;
-    button.append(title, snippet);
+    title.textContent = result.displayTitle || result.title;
+    const meta = document.createElement("span");
+    meta.className = "wikisource-result-meta";
+    meta.textContent = [result.author || "Autor nicht angegeben", result.year || "Jahr nicht angegeben"].join(" · ");
+    button.append(title, meta);
     button.addEventListener("click", () => {
       state.selectedWikisourcePage = { title: result.title, pageid: result.pageid };
       ui.wikisourceSearchResults.querySelectorAll(".wikisource-result").forEach((item) => {
@@ -4177,7 +4301,7 @@ function renderWikisourceSearchResults(results) {
         item.setAttribute("aria-selected", String(selected));
       });
       if (ui.importWikisourceButton) ui.importWikisourceButton.disabled = false;
-      setSearchDialogStatus(`„${result.title}“ ist ausgewählt.`);
+      setSearchDialogStatus(`„${result.displayTitle || result.title}“ ist ausgewählt.`);
     });
     ui.wikisourceSearchResults.appendChild(button);
   });
@@ -4199,11 +4323,21 @@ async function searchWikisource() {
       list: "search",
       srsearch: searchTerm,
       srnamespace: "0",
-      srlimit: "20",
+      srlimit: "50",
       srprop: "snippet|timestamp",
     });
-    const results = payload.query?.search || [];
-    renderWikisourceSearchResults(results);
+    const searchResults = payload.query?.search || [];
+    setSearchDialogStatus(searchResults.length ? "Bibliografische Angaben werden ergänzt …" : "Keine passenden Werke gefunden.");
+    let results = searchResults;
+    try {
+      results = await enrichWikisourceSearchResults(searchResults);
+    } catch (metadataError) {
+      results = searchResults.map((result) => ({ ...result, displayTitle: result.title, author: "", year: "", textTypes: [] }));
+      console.warn("Wikisource-Textdaten konnten nicht vollständig ergänzt werden", metadataError);
+    }
+    state.wikisourceSearchResults = results;
+    updateWikisourceTextTypeFilter(results);
+    renderWikisourceSearchResults();
     setSearchDialogStatus(results.length ? `${results.length} Treffer gefunden.` : "Keine passenden Werke gefunden.");
   } catch (error) {
     setSearchDialogStatus(`Wikisource-Suche fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`, true);
@@ -4377,6 +4511,59 @@ function removeRedundantWikisourceHeading(markdown, expectedTitle, options = {})
   return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+function stripWikisourceEpubExportMatter(markdown) {
+  let blocks = String(markdown || "").split(/\n{2,}/).filter((block) => block.trim());
+  const exportNoticeIndex = blocks.findIndex((block) => /^(?:#{1,6}\s*)?Exportiert aus Wikisource am\b/i.test(block.trim()));
+  if (exportNoticeIndex >= 0) {
+    // Der WS-Export setzt vor diesen eindeutigen Hinweis ausschließlich sein
+    // automatisch erzeugtes Titelblatt (Titel, Autor, Ort/Verlag und Jahr).
+    // TypeMap-Objekte aus schon bearbeiteten Importen müssen dabei erhalten bleiben.
+    const coverBlocks = blocks.slice(0, exportNoticeIndex + 1);
+    const retainedToc = coverBlocks.find((block) => isTableOfContentsText(block));
+    const retainedCitation = coverBlocks.find((block) => isCitationObjectText(block));
+    blocks = [
+      ...(retainedToc ? [TOC_OBJECT_MARKER] : []),
+      ...blocks.slice(exportNoticeIndex + 1),
+      ...(retainedCitation ? [CITATION_OBJECT_MARKER] : []),
+    ];
+  }
+
+  const aboutIndex = blocks.findIndex((block) => (
+    /^MediaWiki:Wsexport_about\s*$/i.test(block.trim())
+    || /^#{1,6}\s+Über diese digitale Edition\s*$/i.test(block.trim())
+  ));
+  if (aboutIndex >= 0) {
+    const exportAboutBlocks = blocks.slice(aboutIndex);
+    const retainedCitation = exportAboutBlocks.some((block) => isCitationObjectText(block));
+    blocks = [
+      ...blocks.slice(0, aboutIndex),
+      ...(retainedCitation ? [CITATION_OBJECT_MARKER] : []),
+    ];
+  }
+  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function getWikisourceEpubExportDate(markdown) {
+  const match = String(markdown || "").match(/Exportiert aus Wikisource am\s+(\d{1,2})\.\s*([\p{L}äöü]+)\s+(\d{4})/iu);
+  if (!match) return "";
+  const months = {
+    januar: 1, februar: 2, märz: 3, april: 4, mai: 5, juni: 6,
+    juli: 7, august: 8, september: 9, oktober: 10, november: 11, dezember: 12,
+  };
+  const month = months[match[2].toLocaleLowerCase("de-DE")];
+  return month ? `${match[3]}-${String(month).padStart(2, "0")}-${String(match[1]).padStart(2, "0")}` : "";
+}
+
+function cleanStoredWikisourceMarkdown(markdown, title) {
+  const source = String(markdown || "");
+  const openingTitle = source.match(/^#\s+[^\n]+\n*/);
+  const body = openingTitle ? source.slice(openingTitle[0].length).trim() : source.trim();
+  const cleanedBody = removeRedundantWikisourceHeading(stripWikisourceEpubExportMatter(body), title);
+  return openingTitle
+    ? `${openingTitle[0].trim()}\n\n${cleanedBody}`.trim()
+    : cleanedBody;
+}
+
 async function getWikisourceSubpages(title) {
   const pages = [];
   let continuation = "";
@@ -4401,8 +4588,31 @@ async function sha256Text(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+const TYPEMAP_HELPER_ORIGINS = ["http://127.0.0.1:7319", "http://localhost:7319"];
+
+async function fetchTypeMapHelper(path, options = {}) {
+  const connectionErrors = [];
+  // Browser und Windows lösen localhost nicht immer identisch auf. Beide lokalen
+  // Adressen werden deshalb versucht; fachliche Serverfehler werden unverändert
+  // zurückgegeben und nicht durch einen zweiten Request verdoppelt.
+  for (const origin of TYPEMAP_HELPER_ORIGINS) {
+    try {
+      return await fetch(`${origin}${path}`, { cache: "no-store", ...options });
+    } catch (error) {
+      connectionErrors.push(error);
+    }
+  }
+  const unavailable = new Error("typemap-helper-unreachable");
+  unavailable.cause = connectionErrors.at(-1);
+  throw unavailable;
+}
+
+function isTypeMapHelperUnavailable(error) {
+  return error?.message === "typemap-helper-unreachable";
+}
+
 async function fetchWikisourceEpubDocument(title) {
-  const response = await fetch("http://127.0.0.1:7319/api/typemap/import-wikisource-epub", {
+  const response = await fetchTypeMapHelper("/api/typemap/import-wikisource-epub", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, language: "de" }),
@@ -4421,7 +4631,61 @@ function prepareWikisourceEpubMarkdown(rawMarkdown, title) {
   // Einzelne EPUB-Spine-Dokumente beginnen häufig wieder mit H1. Im
   // zusammengeführten TypeMap-Werk sind diese Grenzen Kapitel (H2).
   markdown = markdown.replace(/^#\s+/gm, "## ");
-  return removeRedundantWikisourceHeading(markdown, title).trim();
+  markdown = stripWikisourceEpubExportMatter(markdown);
+  return normalizeImportedOriginalPageMarkers(removeRedundantWikisourceHeading(markdown, title)).trim();
+}
+
+function extractWikisourceFootnoteDefinitions(markdown) {
+  return String(markdown || "").split("\n").map((line) => {
+    const definition = getFootnoteDefinition(line);
+    return definition ? { ...definition, markdown: `[^${definition.label}]: ${definition.content}` } : null;
+  }).filter(Boolean);
+}
+
+function removeEpubFootnoteList(markdown) {
+  const lines = String(markdown || "").split("\n");
+  const headingIndex = lines.findIndex((line) => /^#{1,6}\s+Anmerkungen(?:\s+des Originals)?\s*$/i.test(line.trim()));
+  if (headingIndex < 0) return markdown;
+  const headingLevel = lines[headingIndex].match(/^#+/)?.[0].length || 2;
+  let sectionEnd = lines.length;
+  for (let index = headingIndex + 1; index < lines.length; index += 1) {
+    const nextHeading = lines[index].match(/^(#{1,6})\s+/);
+    if (nextHeading && nextHeading[1].length <= headingLevel) {
+      sectionEnd = index;
+      break;
+    }
+  }
+  const section = lines.slice(headingIndex, sectionEnd).join("\n");
+  // Nur die vom EPUB-Export erzeugte Rückverweisliste wird ersetzt. Eine echte,
+  // redaktionelle Anmerkungssektion ohne diese Pfeile bleibt Werktext.
+  if (!/(?:^|\n)\s*-\s*↑\s+/m.test(section)) return markdown;
+  return [...lines.slice(0, headingIndex), ...lines.slice(sectionEnd)].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function mergeWikisourceFootnoteSemantics(epubMarkdown, semanticMarkdown) {
+  const definitions = extractWikisourceFootnoteDefinitions(semanticMarkdown);
+  if (!definitions.length) return { markdown: epubMarkdown, footnoteCount: 0 };
+
+  // WS Export bewahrt die sichtbare Referenz häufig als "[^[ 1 ]]", verliert
+  // dabei aber ihre Zielbeziehung. Die MediaWiki-IDs liefern Label und Inhalt;
+  // der EPUB-Text bestimmt weiterhin die sichtbare Position im Werktext.
+  let markdown = String(epubMarkdown || "")
+    .replace(/\[\^\s*\[\s*([^\]\r\n]+?)\s*\]\s*\]/g, (match, label) => `[^${String(label).trim()}]`);
+  const semanticLabels = definitions.map((definition) => definition.label);
+  const epubReferences = findFootnoteReferences(markdown);
+  if (epubReferences.length === semanticLabels.length) {
+    let referenceIndex = 0;
+    markdown = markdown.replace(new RegExp(FOOTNOTE_REFERENCE_SOURCE, "g"), (match) => `[^${semanticLabels[referenceIndex++] || match.slice(2, -1)}]`);
+  }
+  const referencedLabels = new Set(findFootnoteReferences(markdown).map((reference) => reference.label.trim()));
+  const matchedDefinitions = definitions.filter((definition) => referencedLabels.has(definition.label.trim()));
+  if (!matchedDefinitions.length) return { markdown, footnoteCount: 0 };
+  markdown = removeEpubFootnoteList(markdown);
+  const definitionMarkdown = matchedDefinitions.map((definition) => definition.markdown).join("\n");
+  return {
+    markdown: `${markdown.trim()}\n\n${definitionMarkdown}`.trim(),
+    footnoteCount: matchedDefinitions.length,
+  };
 }
 
 async function importSelectedWikisourcePage() {
@@ -4474,11 +4738,18 @@ async function importSelectedWikisourcePage() {
     }
 
     const title = textData.TITEL || selection.title.replace(/_/g, " ");
+    const semanticMarkdown = bodyMarkdown;
     const epubMarkdown = epubImport.result
       ? prepareWikisourceEpubMarkdown(epubImport.result.document.source_raw_markdown, title)
       : "";
-    const textBasis = epubMarkdown.length > 100 ? "ws-export-epub-3" : "mediawiki-rendered-html";
-    if (epubMarkdown.length > 100) bodyMarkdown = epubMarkdown;
+    const mergedEpub = epubMarkdown.length > 100
+      ? mergeWikisourceFootnoteSemantics(epubMarkdown, semanticMarkdown)
+      : { markdown: "", footnoteCount: 0 };
+    const textBasis = epubMarkdown.length > 100
+      ? (mergedEpub.footnoteCount ? "ws-export-epub-3+mediawiki-footnotes" : "ws-export-epub-3")
+      : "mediawiki-rendered-html";
+    if (epubMarkdown.length > 100) bodyMarkdown = mergedEpub.markdown;
+    bodyMarkdown = normalizeImportedOriginalPageMarkers(bodyMarkdown);
     if (!bodyMarkdown.trim()) throw new Error("Kein nutzbarer Werktext gefunden.");
     const rawText = `# ${normalizeMarkdownHeadingText(title)}\n\n${bodyMarkdown.replace(/^#\s+[^\n]+\n*/i, "").trim()}\n`;
     const canonicalUrl = page.canonicalurl || `https://de.wikisource.org/wiki/${encodeURIComponent(selection.title.replace(/ /g, "_"))}`;
@@ -4527,6 +4798,7 @@ async function importSelectedWikisourcePage() {
       revision_timestamp: revision.timestamp || "",
       canonical_url: canonicalUrl,
       revision_url: revisionUrl,
+      exported_at: epubImport.result ? new Date().toISOString() : "",
       imported_at: new Date().toISOString(),
       imported_pages: importedPages,
       related_links: [
@@ -4541,6 +4813,8 @@ async function importSelectedWikisourcePage() {
       extraction: {
         structure_basis: "mediawiki-api",
         text_basis: textBasis,
+        footnote_basis: mergedEpub.footnoteCount ? "mediawiki-reference-ids" : "",
+        footnote_count: mergedEpub.footnoteCount,
         epub_export_url: epubImport.result?.export_url || "",
         epub_fallback_reason: epubImport.error?.message || "",
         api_chapters: subpages.map((subpage) => subpage.title),
@@ -4793,7 +5067,7 @@ async function processPdfSourceWithApi() {
     const fileData = await readFileAsDataUrl(file);
     // Der Helfer hat eine feste lokale Adresse, damit TypeMap auch über file:, Live Server
     // oder einen anderen Entwicklungsport geöffnet werden kann.
-    const response = await fetch("http://127.0.0.1:7319/api/typemap/transcribe-pdf", {
+    const response = await fetchTypeMapHelper("/api/typemap/transcribe-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -4810,7 +5084,7 @@ async function processPdfSourceWithApi() {
     addGeneratedSourceDocument(result.document, file.name, "pdf");
     setGenerateDialogOpen(false);
   } catch (error) {
-    const message = error?.message === "Failed to fetch"
+    const message = isTypeMapHelperUnavailable(error)
       ? "Der lokale TypeMap-Helfer ist nicht erreichbar. Öffnen Sie TypeMap über TypeMap-starten.cmd."
       : error?.message === "invalid-ai-result"
         ? "Die KI-Antwort enthielt kein vollständiges TypeMap-Dokument. Versuchen Sie es erneut oder wählen Sie ein leistungsfähigeres Modell."
@@ -4842,7 +5116,7 @@ async function processEbookSource() {
   setGenerateDialogStatus("E-Book-Struktur und Metadaten werden ausgewertet …");
   try {
     const fileData = await readFileAsDataUrl(file, "");
-    const response = await fetch("http://127.0.0.1:7319/api/typemap/import-ebook", {
+    const response = await fetchTypeMapHelper("/api/typemap/import-ebook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name, fileData }),
@@ -4852,7 +5126,7 @@ async function processEbookSource() {
     addGeneratedSourceDocument(result.document, file.name, result.document?.source_metadata?.format || format);
     setGenerateDialogOpen(false);
   } catch (error) {
-    const message = error?.message === "Failed to fetch"
+    const message = isTypeMapHelperUnavailable(error)
       ? "Der lokale TypeMap-Helfer ist nicht erreichbar. Öffnen Sie TypeMap über TypeMap-starten.cmd."
       : error?.message === "invalid-ai-result"
         ? "Das E-Book enthielt keinen als TypeMap-Dokument nutzbaren Haupttext."
@@ -5267,6 +5541,7 @@ ${buildHtmlFontFaceCss(project)}
     .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${bodyFontFamily}; font-synthesis-style: none; white-space: pre-wrap; overflow-wrap: break-word; text-wrap: pretty;${ligatureCss} }
     .typemap-text.has-line-numbers { position: relative; }
     .preview-small-caps { font-size: inherit; font-variant-caps: small-caps; font-feature-settings: "smcp" 1; letter-spacing: .01em; text-transform: none; hyphens: inherit; -webkit-hyphens: inherit; overflow-wrap: inherit; word-break: normal; }
+    .preview-small-caps-f { font-variant-caps: all-small-caps; font-feature-settings: "c2sc" 1; }
     .preview-footnote-reference { margin-inline: .08em; color: #8f5d14; font-family: inherit; font-size: .72em; font-weight: 600; line-height: 0; vertical-align: super; }
     .preview-footnote-definition { display: flex; align-items: baseline; gap: .48em; margin: .16em 0 .9em; padding-left: .9em; color: #66716c; font-family: inherit; font-size: .84em; font-style: normal; line-height: 1.38; white-space: pre-wrap; }
     .preview-footnote-definition-label { flex: 0 0 auto; color: #8f5d14; font-family: inherit; font-size: .82em; font-weight: 600; line-height: 1; vertical-align: super; }
@@ -5306,7 +5581,7 @@ ${buildHtmlFontFaceCss(project)}
     .typemap-text.is-text-type-lyric p { white-space: pre-wrap; margin-bottom: 1.5em; }
     .typemap-text.is-text-type-lyric .preview-source-line-block { margin-bottom: 0; }
     .typemap-text.is-text-type-lyric .preview-blank-line { min-height: 1.5em; margin: 0; }
-    .line-number-layer { position: absolute; inset: 0 auto 0 0; width: 0; pointer-events: none; }
+    .preview-body-block { position: relative; }
     .line-number { position: absolute; right: calc(100% + 1.1em); transform: translateY(calc(-100% - 0.22em)); color: #666; font-size: 0.72em; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
     @media print {
       @page { margin: 18mm 20mm; }
@@ -5314,8 +5589,8 @@ ${buildHtmlFontFaceCss(project)}
       main, main.has-side-toc { display: block; width: 100%; padding: 0 0 0 2.4em; overflow: visible; }
       .html-side-toc { display: none; }
       .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; }
-      .typemap-text, .line-number-layer { overflow: visible; }
-      .line-number { display: block !important; color: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .typemap-text, .preview-body-block { overflow: visible; }
+      .line-number { display: block !important; transform: translateY(calc(-100% - 0.42em)); color: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -5384,16 +5659,13 @@ ${buildHtmlFontFaceCss(project)}
       return rects.length ? rects[rects.length - 1].bottom : null;
     }
     function renderLineNumbers() {
-      text.querySelector(".line-number-layer")?.remove();
+      text.querySelectorAll(".line-number").forEach((label) => label.remove());
       if (!lineNumbering.enabled) return;
-      const layer = document.createElement("div");
-      layer.className = "line-number-layer";
-      text.appendChild(layer);
-      const targetRect = text.getBoundingClientRect();
       const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
       const isNumberableBlock = (block) => block.dataset.matter === "body"
         && (!block.dataset.chapterRole || block.dataset.chapterRole === "main")
-        && !block.classList.contains("preview-heading-level-1")
+        && !Array.from(block.classList).some((className) => /^preview-heading-level-/.test(className))
+        && !block.matches("h1,h2,h3,h4,h5,h6")
         && !block.classList.contains("preview-embedded-object");
       let lastContentIndex = -1;
       blocks.forEach((block, index) => {
@@ -5412,6 +5684,7 @@ ${buildHtmlFontFaceCss(project)}
           const lastTextBottom = getLastTextContentBottom(block);
           if (lastTextBottom !== null) rects = rects.filter((rect) => rect.top < lastTextBottom + 1);
         }
+        const blockRect = block.getBoundingClientRect();
         rects.forEach((rect) => {
           lineIndex += 1;
           const relativeLine = lineIndex - lineNumbering.fromLine + 1;
@@ -5420,8 +5693,9 @@ ${buildHtmlFontFaceCss(project)}
           const label = document.createElement("span");
           label.className = "line-number";
           label.textContent = String(lineNumber);
-          label.style.top = (rect.bottom - targetRect.top) + "px";
-          layer.appendChild(label);
+          label.setAttribute("aria-hidden", "true");
+          label.style.top = (rect.bottom - blockRect.top) + "px";
+          block.appendChild(label);
         });
       });
     }
@@ -6005,6 +6279,12 @@ function bindEditor() {
   ui.searchDialogOverlay?.addEventListener("click", () => setSearchDialogOpen(false));
   ui.searchDialogCloseButton?.addEventListener("click", () => setSearchDialogOpen(false));
   ui.wikisourceSearchButton?.addEventListener("click", searchWikisource);
+  ui.wikisourceTextTypeFilter?.addEventListener("change", () => {
+    renderWikisourceSearchResults();
+    const visibleCount = ui.wikisourceSearchResults?.childElementCount || 0;
+    const totalCount = state.wikisourceSearchResults.length;
+    setSearchDialogStatus(`${visibleCount} von ${totalCount} Treffern angezeigt.`);
+  });
   ui.wikisourceSearchInput?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();

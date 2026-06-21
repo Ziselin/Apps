@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="typemap.css?v=20260621o">
+  <link rel="stylesheet" href="typemap.css?v=20260621q">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -433,6 +433,12 @@
         </label>
         <button type="button" id="wikisourceSearchButton" class="secondary-button">Suchen</button>
       </div>
+      <label class="wikisource-filter-field">
+        <span>Textsorte</span>
+        <select id="wikisourceTextTypeFilter" disabled>
+          <option value="all">Alle Textsorten</option>
+        </select>
+      </label>
       <div id="wikisourceSearchResults" class="wikisource-results" role="listbox" aria-label="Wikisource-Suchergebnisse"></div>
       <p class="generate-api-note">TypeMap verwendet die öffentliche Wikimedia-API. Werktext, Originalpaginierung, Fußnoten, Quellenadresse und Revisionsstand werden ohne KI-Zugriff übernommen.</p>
       <p id="searchDialogStatus" class="generate-dialog-status" role="status" aria-live="polite"></p>
@@ -627,8 +633,10 @@
               <label class="property-row"><span>Quellsystem</span><input id="provenanceProviderOutput" type="text" readonly></label>
               <label class="property-row"><span>Website</span><input id="provenanceSiteOutput" type="text" readonly></label>
               <label class="property-row"><span>Importformat</span><input id="provenanceFormatOutput" type="text" readonly></label>
+              <label class="property-row" data-provenance-only="wikisource"><span>Textbasis</span><input id="provenanceTextBasisOutput" type="text" readonly></label>
               <div class="property-row" data-provenance-only="wikisource"><span>Wikisource</span><a id="provenanceSourceLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
               <div class="property-row" data-provenance-only="wikisource"><span>Importierte Fassung</span><a id="provenanceRevisionLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
+              <div class="property-row" data-provenance-only="wikisource"><span>EPUB-Export</span><a id="provenanceEpubExportLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
               <div class="property-row" data-provenance-only="wikisource"><span>Wikidata</span><a id="provenanceWikidataLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
             </div>
           </section>
@@ -639,6 +647,7 @@
               <label class="property-row" data-provenance-only="wikisource"><span>Revisions-ID</span><input id="provenanceRevisionIdOutput" type="text" readonly></label>
               <label class="property-row" data-provenance-only="wikisource"><span>Vorherige Revisions-ID</span><input id="provenanceParentRevisionIdOutput" type="text" readonly></label>
               <label class="property-row" data-provenance-only="wikisource"><span>Revisionszeitpunkt</span><input id="provenanceRevisionTimestampOutput" type="text" readonly></label>
+              <label class="property-row" data-provenance-only="wikisource"><span>Aus Wikisource exportiert am</span><input id="provenanceExportedAtOutput" type="text" readonly></label>
               <label class="property-row"><span>Importiert am</span><input id="provenanceImportedAtOutput" type="text" readonly></label>
               <label class="property-row property-row-stack"><span>SHA-256 der importierten Textfassung</span><textarea id="provenanceHashOutput" rows="2" readonly spellcheck="false"></textarea></label>
             </div>
@@ -894,7 +903,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260621b"></script>
-  <script src="typemap.js?v=20260621v"></script>
+  <script src="typemap.js?v=20260621zf"></script>
 </body>
 </html>
 

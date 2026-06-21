@@ -978,6 +978,11 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
   word-break: normal;
 }
 
+.preview-small-caps-f {
+  font-variant-caps: all-small-caps;
+  font-feature-settings: "c2sc" 1;
+}
+
 .preview-text p {
   margin: 0 0 var(--preview-paragraph-spacing, 0.72em);
 }
@@ -2746,6 +2751,19 @@ input[type="range"] {
   gap: 10px;
 }
 
+.wikisource-filter-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 250px);
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.wikisource-filter-field select {
+  width: 100%;
+}
+
 .wikisource-results {
   display: grid;
   gap: 6px;
@@ -2781,7 +2799,7 @@ input[type="range"] {
   font-weight: 650;
 }
 
-.wikisource-result-snippet {
+.wikisource-result-meta {
   color: var(--muted);
   font-size: 0.88em;
   line-height: 1.35;
