@@ -18,6 +18,16 @@ const LEGACY_CITATION_OBJECT_HEADING = "## Quellenangabe";
 const ORIGINAL_PAGE_MARKER_SOURCE = "\\[(?:\\d+|(?=[ivxlcdm]+\\])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\]";
 const FOOTNOTE_REFERENCE_SOURCE = "\\[\\^([^\\]\\r\\n]+)\\]";
 const CHAPTER_ROLES = new Set(["foreword", "main", "afterword"]);
+const PROVENANCE_LICENSES = {
+  unknown: { name: "Nicht bestimmt", url: "https://creativecommons.org/share-your-work/cclicenses/" },
+  "public-domain": { name: "Gemeinfrei / Public Domain", url: "https://creativecommons.org/publicdomain/mark/1.0/deed.de" },
+  "cc0-1.0": { name: "CC0 1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/deed.de" },
+  "cc-by-4.0": { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/deed.de" },
+  "cc-by-sa-4.0": { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/deed.de" },
+  "cc-by-nc-4.0": { name: "CC BY-NC 4.0", url: "https://creativecommons.org/licenses/by-nc/4.0/deed.de" },
+  "cc-by-nc-sa-4.0": { name: "CC BY-NC-SA 4.0", url: "https://creativecommons.org/licenses/by-nc-sa/4.0/deed.de" },
+  "all-rights-reserved": { name: "Alle Rechte vorbehalten", url: "https://rightsstatements.org/page/InC/1.0/?language=de" },
+};
 const PARATEXT_START_PATTERN = /^:::\s*(?:paratext\s+)?(front|back|frontmatter|backmatter)\s*$/i;
 const PARATEXT_END_PATTERN = /^:::\s*$/;
 const PARATEXT_HEADING_PATTERN = /^#\s*(.+)$/;
@@ -41,10 +51,19 @@ const ui = {
   createProjectButton: document.getElementById("createProjectButton"),
   openImportButton: document.getElementById("openImportButton"),
   openGenerateDialogButton: document.getElementById("openGenerateDialogButton"),
+  openSearchDialogButton: document.getElementById("openSearchDialogButton"),
   browserActionsMenuButton: document.getElementById("browserActionsMenuButton"),
   browserActionsMenu: document.getElementById("browserActionsMenu"),
   browserExportJsonButton: document.getElementById("browserExportJsonButton"),
   projectFileInput: document.getElementById("projectFileInput"),
+  searchDialogOverlay: document.getElementById("searchDialogOverlay"),
+  searchDialog: document.getElementById("searchDialog"),
+  searchDialogCloseButton: document.getElementById("searchDialogCloseButton"),
+  wikisourceSearchInput: document.getElementById("wikisourceSearchInput"),
+  wikisourceSearchButton: document.getElementById("wikisourceSearchButton"),
+  wikisourceSearchResults: document.getElementById("wikisourceSearchResults"),
+  searchDialogStatus: document.getElementById("searchDialogStatus"),
+  importWikisourceButton: document.getElementById("importWikisourceButton"),
   generateDialogOverlay: document.getElementById("generateDialogOverlay"),
   generateDialog: document.getElementById("generateDialog"),
   generateDialogCloseButton: document.getElementById("generateDialogCloseButton"),
@@ -87,9 +106,32 @@ const ui = {
   textFormatWidthButton: document.getElementById("textFormatWidthButton"),
   documentPropertiesOverlay: document.getElementById("documentPropertiesOverlay"),
   documentPropertiesDialog: document.getElementById("documentPropertiesDialog"),
+  documentPropertiesTitle: document.getElementById("documentPropertiesTitle"),
   documentPropertiesCloseButton: document.getElementById("documentPropertiesCloseButton"),
   documentPropertiesCancelButton: document.getElementById("documentPropertiesCancelButton"),
   documentPropertiesSaveButton: document.getElementById("documentPropertiesSaveButton"),
+  propertyTabSourceCitation: document.getElementById("propertyTabSourceCitation"),
+  propertyTabProvenance: document.getElementById("propertyTabProvenance"),
+  propertyPanelSourceCitation: document.getElementById("propertyPanelSourceCitation"),
+  propertyPanelProvenance: document.getElementById("propertyPanelProvenance"),
+  provenanceEmptyHint: document.getElementById("provenanceEmptyHint"),
+  provenanceContent: document.getElementById("provenanceContent"),
+  provenanceTypeSelect: document.getElementById("provenanceTypeSelect"),
+  provenanceProviderOutput: document.getElementById("provenanceProviderOutput"),
+  provenanceSiteOutput: document.getElementById("provenanceSiteOutput"),
+  provenanceFormatOutput: document.getElementById("provenanceFormatOutput"),
+  provenanceSourceLink: document.getElementById("provenanceSourceLink"),
+  provenanceRevisionLink: document.getElementById("provenanceRevisionLink"),
+  provenanceWikidataLink: document.getElementById("provenanceWikidataLink"),
+  provenancePageIdOutput: document.getElementById("provenancePageIdOutput"),
+  provenanceRevisionIdOutput: document.getElementById("provenanceRevisionIdOutput"),
+  provenanceParentRevisionIdOutput: document.getElementById("provenanceParentRevisionIdOutput"),
+  provenanceRevisionTimestampOutput: document.getElementById("provenanceRevisionTimestampOutput"),
+  provenanceImportedAtOutput: document.getElementById("provenanceImportedAtOutput"),
+  provenanceHashOutput: document.getElementById("provenanceHashOutput"),
+  provenanceRelatedLinks: document.getElementById("provenanceRelatedLinks"),
+  provenanceLicenseSelect: document.getElementById("provenanceLicenseSelect"),
+  provenanceLicenseLink: document.getElementById("provenanceLicenseLink"),
   sourceCitationTypeInput: document.getElementById("sourceCitationTypeInput"),
   sourceCitationTitleInput: document.getElementById("sourceCitationTitleInput"),
   sourceCitationSubtitleInput: document.getElementById("sourceCitationSubtitleInput"),
@@ -183,6 +225,9 @@ const ui = {
   previewPage: document.querySelector(".preview-page"),
   typeStage: document.querySelector(".type-stage"),
   previewText: document.getElementById("previewText"),
+  previewRenderProgress: document.getElementById("previewRenderProgress"),
+  previewRenderProgressLabel: document.getElementById("previewRenderProgressLabel"),
+  previewRenderProgressBar: document.getElementById("previewRenderProgressBar"),
   textInputHighlight: document.getElementById("textInputHighlight"),
 };
 
@@ -263,12 +308,14 @@ function getFootnoteDefinition(value) {
 }
 
 function getOpeningTitleHeading(rawText) {
-  const lines = String(rawText || "").split(/\r\n|\r|\n/);
-  for (const line of lines) {
-    const match = line.match(/^\s*#\s+([^\r\n]+)/);
-    if (!match) continue;
+  const source = String(rawText || "");
+  const lines = source.matchAll(/(?:^|\r\n|\r|\n)([^\r\n]*)/g);
+  for (const lineResult of lines) {
+    const line = lineResult[1];
+    const headingMatch = line.match(/^\s*#\s+([^\r\n]+)/);
+    if (!headingMatch) continue;
     if (getParatextHeadingKind(line)) continue;
-    return getPlainDocumentLabel(match[1]);
+    return getPlainDocumentLabel(headingMatch[1]);
   }
   return "";
 }
@@ -404,10 +451,14 @@ const state = {
   editorZoom: 1,
   editorDataView: "markdown",
   generateSourceMode: "web",
+  selectedWikisourcePage: null,
   jsonEditorDraft: "",
   jsonEditorDraftProjectId: null,
   jsonEditorApplyTimer: 0,
   sideTocUpdateTimer: 0,
+  previewDirty: true,
+  previewRenderedProjectId: null,
+  previewRenderToken: 0,
   editorGeometryFrame: 0,
   editorResizeObserver: null,
   editorMeasurementInput: null,
@@ -909,6 +960,19 @@ function normalizeProject(project) {
   const hadCitationRecord = Boolean(project?.citationSource && typeof project.citationSource === "object")
     || Boolean(project?.sourceCitation && typeof project.sourceCitation === "object");
   normalized.citationSource = normalizeCitationSource(project?.citationSource, normalized, project?.sourceCitation);
+  if (normalized.sourceMetadata?.format === "wikisource") {
+    // ARCHITEKTURREGEL: Die Quellenangabe beschreibt das Werk; URLs und
+    // Abrufstände der importierten Wikisource-Fassung gehören ausschließlich
+    // in den Provenienz-Snapshot und dürfen nicht parallel geführt werden.
+    if (normalized.citationSource.url === normalized.sourceMetadata.canonical_url) {
+      normalized.citationSource.url = "";
+      normalized.citationSource.accessed_date = "";
+    }
+    if (normalized.metadata.transcription?.source_kind === "wikisource") {
+      delete normalized.metadata.transcription;
+    }
+    delete normalized.sourceMetadata.source_statement;
+  }
   if (!hadCitationRecord && !normalized.citationSource.authors) {
     normalized.citationSource.authors = legacyMetadataAuthors.join("; ");
   }
@@ -1049,11 +1113,11 @@ function isCitationObjectText(text) {
 }
 
 function hasCitationObject(project) {
-  return String(project?.source?.rawText || "").split(/\r?\n/).some(isCitationObjectText);
+  return /(?:^|\r?\n)\s*\{\{citation\}\}\s*(?=\r?\n|$)/i.test(String(project?.source?.rawText || ""));
 }
 
 function hasTableOfContentsObject(project) {
-  return String(project?.source?.rawText || "").split(/\r?\n/).some(isTableOfContentsText);
+  return /(?:^|\r?\n)\s*(?:\{\{toc\}\}|##\s*Inhaltsverzeichnis)\s*(?=\r?\n|$)/i.test(String(project?.source?.rawText || ""));
 }
 
 function syncTableOfContentsMenuState(project = getActiveProject()) {
@@ -2265,13 +2329,51 @@ function renderViewLayer(project, sourceModel, layoutModel) {
   renderTextView(ui.previewPage, ui.previewText, project, layoutModel);
 }
 
-function rebuildModelsAndPreview() {
+function setPreviewRenderProgress(value, label) {
+  if (ui.previewRenderProgressBar) ui.previewRenderProgressBar.value = Math.max(0, Math.min(100, Number(value) || 0));
+  if (ui.previewRenderProgressLabel && label) ui.previewRenderProgressLabel.textContent = label;
+}
+
+function waitForPreviewPaint() {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+async function renderPreviewOnDemand() {
   const project = getActiveProject();
   if (!project) return;
-  state.sourceModel = buildSourceModel(project);
-  const activeRange = getActiveSourceRangeForProject(project, state.sourceModel);
-  state.layoutModel = buildBrowserLayoutModel(state.sourceModel, project.style, activeRange);
-  renderViewLayer(project, state.sourceModel, state.layoutModel);
+  if (!state.previewDirty && state.previewRenderedProjectId === project.id) return;
+  const token = ++state.previewRenderToken;
+  if (ui.previewRenderProgress) ui.previewRenderProgress.hidden = false;
+  ui.previewPage?.setAttribute("aria-busy", "true");
+  setPreviewRenderProgress(8, "TypeMap wird vorbereitet …");
+  await waitForPreviewPaint();
+
+  try {
+    setPreviewRenderProgress(28, "Dokumentstruktur wird gelesen …");
+    const sourceModel = buildSourceModel(project);
+    await waitForPreviewPaint();
+    if (token !== state.previewRenderToken || state.activeProjectId !== project.id) return;
+
+    setPreviewRenderProgress(52, "Satzmodell wird aufgebaut …");
+    const activeRange = getActiveSourceRangeForProject(project, sourceModel);
+    const layoutModel = buildBrowserLayoutModel(sourceModel, project.style, activeRange);
+    await waitForPreviewPaint();
+    if (token !== state.previewRenderToken || state.activeProjectId !== project.id) return;
+
+    setPreviewRenderProgress(76, "Text wird gesetzt …");
+    state.sourceModel = sourceModel;
+    state.layoutModel = layoutModel;
+    renderViewLayer(project, sourceModel, layoutModel);
+    state.previewDirty = false;
+    state.previewRenderedProjectId = project.id;
+    setPreviewRenderProgress(100, "TypeMap ist bereit.");
+    await waitForPreviewPaint();
+  } finally {
+    if (token === state.previewRenderToken) {
+      if (ui.previewRenderProgress) ui.previewRenderProgress.hidden = true;
+      ui.previewPage?.removeAttribute("aria-busy");
+    }
+  }
 }
 
 function getPrimaryFontFamily(fontStack) {
@@ -2378,6 +2480,15 @@ function appendFootnoteReferenceCapsules(line, sourceOffset) {
 function renderEditorHighlight(rawText, project = getActiveProject()) {
   if (!ui.textInputHighlight) return;
   const text = String(rawText || "");
+  if (text.length > 120000 && !state.activeSourceRange) {
+    // Bei sehr großen Gesamtwerken bleibt das Textarea flüssig, indem die
+    // geometrisch teure Kartuschenanalyse erst in einer Kapitelansicht erfolgt.
+    state.editorHeadingTargets = [];
+    clearElement(ui.textInputHighlight);
+    ui.textInputHighlight._sourceText = text;
+    ui.textInputHighlight.textContent = text;
+    return;
+  }
   const sourceModel = project ? buildSourceModel(project) : null;
   const activeRange = project && sourceModel ? getActiveSourceRangeForProject(project, sourceModel) : null;
   const baseOffset = activeRange && activeRange.id !== "document-root" ? activeRange.startOffset : 0;
@@ -2818,6 +2929,7 @@ function isBlockHiddenByParatextVisibility(block, hiddenRanges) {
 }
 
 function getEditorSourceText(project) {
+  if (!state.activeSourceRange) return project.source.rawText;
   const sourceModel = buildSourceModel(project);
   const range = getActiveSourceRangeForProject(project, sourceModel);
   if (!range || range.id === "document-root") return project.source.rawText;
@@ -2884,6 +2996,8 @@ function createTreeNodeButton(project, node, depth, ancestorHidden = false) {
       title: node.title,
       type: node.type,
     };
+    state.previewDirty = true;
+    state.previewRenderToken += 1;
     if (contentChildren.length) setContentNodeExpanded(node.id, nextContentState);
     renderApp();
   });
@@ -2971,11 +3085,11 @@ function renderDocumentTree(project) {
   return tree;
 }
 
-function scheduleProjectBrowserRender() {
+function scheduleProjectBrowserRender(delay = 260) {
   window.clearTimeout(state.projectBrowserRenderTimer);
   state.projectBrowserRenderTimer = window.setTimeout(() => {
     renderProjectList();
-  }, 260);
+  }, delay);
 }
 
 function renderProjectList() {
@@ -3564,6 +3678,123 @@ function changeActiveFontSize(delta) {
   renderEditor();
 }
 
+function setDocumentPropertiesTab(tabName = "citation") {
+  const showProvenance = tabName === "provenance";
+  ui.propertyPanelSourceCitation.hidden = showProvenance;
+  ui.propertyPanelProvenance.hidden = !showProvenance;
+  ui.propertyTabSourceCitation.classList.toggle("is-active", !showProvenance);
+  ui.propertyTabProvenance.classList.toggle("is-active", showProvenance);
+  ui.propertyTabSourceCitation.setAttribute("aria-selected", String(!showProvenance));
+  ui.propertyTabProvenance.setAttribute("aria-selected", String(showProvenance));
+  ui.propertyTabSourceCitation.tabIndex = showProvenance ? -1 : 0;
+  ui.propertyTabProvenance.tabIndex = showProvenance ? 0 : -1;
+  if (ui.documentPropertiesTitle) ui.documentPropertiesTitle.textContent = showProvenance ? "Provenienz" : "Quellenangabe";
+}
+
+function setProvenanceLink(element, url, label = "") {
+  if (!element) return;
+  const href = String(url || "").trim();
+  element.textContent = href ? (label || href) : "";
+  if (href) element.href = href;
+  else element.removeAttribute("href");
+}
+
+function getProvenanceLicenseId(license) {
+  const name = String(license?.name || "").toLowerCase();
+  const url = String(license?.url || "").toLowerCase();
+  return Object.entries(PROVENANCE_LICENSES).find(([id, candidate]) => (
+    id !== "unknown"
+    && (url.includes(candidate.url.toLowerCase()) || name === candidate.name.toLowerCase()
+      || (id === "cc-by-sa-4.0" && /attribution-share alike 4\.0|cc by-sa 4\.0/i.test(name)))
+  ))?.[0] || "unknown";
+}
+
+function updateProvenanceLicenseLink() {
+  const license = PROVENANCE_LICENSES[ui.provenanceLicenseSelect?.value] || PROVENANCE_LICENSES.unknown;
+  setProvenanceLink(ui.provenanceLicenseLink, license.url, license.name);
+}
+
+function formatProvenanceTimestamp(value) {
+  const date = new Date(value);
+  return value && Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "medium" }).format(date)
+    : String(value || "");
+}
+
+function getProvenanceType(provenance) {
+  const explicitType = String(provenance?.provenance_type || "");
+  if (["wikisource", "file-import", "web-source", "other"].includes(explicitType)) return explicitType;
+  const format = String(provenance?.format || "").toLowerCase();
+  if (format === "wikisource" || String(provenance?.site || "").includes("wikisource.org")) return "wikisource";
+  if (["pdf", "epub", "fb2", "mobi", "azw3"].includes(format)) return "file-import";
+  if (provenance?.canonical_url) return "web-source";
+  return "other";
+}
+
+function updateProvenanceFieldVisibility() {
+  const selectedType = ui.provenanceTypeSelect?.value || "other";
+  if (ui.provenanceEmptyHint && selectedType !== "other") ui.provenanceEmptyHint.hidden = true;
+  ui.propertyPanelProvenance?.querySelectorAll("[data-provenance-only]").forEach((element) => {
+    const allowedTypes = String(element.dataset.provenanceOnly || "").split(/\s+/);
+    element.hidden = !allowedTypes.includes(selectedType);
+  });
+}
+
+function renderDocumentProvenance(project) {
+  const storedProvenance = project?.sourceMetadata && typeof project.sourceMetadata === "object"
+    ? project.sourceMetadata
+    : null;
+  const provenance = storedProvenance || {};
+  const hasData = Boolean(storedProvenance && Object.keys(storedProvenance).length);
+  if (ui.provenanceEmptyHint) ui.provenanceEmptyHint.hidden = hasData;
+  if (ui.provenanceContent) ui.provenanceContent.hidden = false;
+
+  // Provenienz ist der Import-Snapshot und bleibt von der bibliografischen
+  // Ebene getrennt. Nur die bewusst lokale Lizenzklassifikation ist editierbar.
+  ui.provenanceProviderOutput.value = String(provenance.provider || "");
+  ui.provenanceTypeSelect.value = getProvenanceType(provenance);
+  ui.provenanceSiteOutput.value = String(provenance.site || "");
+  ui.provenanceFormatOutput.value = String(provenance.format || "");
+  ui.provenancePageIdOutput.value = String(provenance.page_id || "");
+  ui.provenanceRevisionIdOutput.value = String(provenance.revision_id || "");
+  ui.provenanceParentRevisionIdOutput.value = String(provenance.revision_parent_id || "");
+  ui.provenanceRevisionTimestampOutput.value = formatProvenanceTimestamp(provenance.revision_timestamp);
+  ui.provenanceImportedAtOutput.value = formatProvenanceTimestamp(provenance.imported_at);
+  ui.provenanceHashOutput.value = String(provenance.content_hash_sha256 || "");
+  ui.provenanceLicenseSelect.value = getProvenanceLicenseId(provenance.license);
+
+  setProvenanceLink(ui.provenanceSourceLink, provenance.canonical_url, "Wikisource-Seite öffnen");
+  setProvenanceLink(ui.provenanceRevisionLink, provenance.revision_url, provenance.revision_id ? `Revision ${provenance.revision_id} öffnen` : "");
+  setProvenanceLink(ui.provenanceWikidataLink, provenance.wikidata?.url, provenance.wikidata?.id || "");
+  updateProvenanceLicenseLink();
+
+  clearElement(ui.provenanceRelatedLinks);
+  const relatedLinks = Array.isArray(provenance.related_links) ? provenance.related_links : [];
+  const importedPages = Array.isArray(provenance.imported_pages) ? provenance.imported_pages : [];
+  const links = relatedLinks.length
+    ? relatedLinks
+    : importedPages.map((title) => ({
+      title,
+      url: `https://${provenance.site || "de.wikisource.org"}/wiki/${encodeURIComponent(String(title).replace(/ /g, "_"))}`,
+    }));
+  links.forEach((linkData) => {
+    const link = document.createElement("a");
+    link.className = "provenance-related-link";
+    link.href = linkData.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = linkData.title || linkData.url;
+    ui.provenanceRelatedLinks.appendChild(link);
+  });
+  if (!links.length) {
+    const empty = document.createElement("span");
+    empty.className = "property-hint";
+    empty.textContent = "Keine weiteren Wikisource-Seiten verknüpft.";
+    ui.provenanceRelatedLinks.appendChild(empty);
+  }
+  updateProvenanceFieldVisibility();
+}
+
 function openDocumentPropertiesDialog() {
   const project = getActiveProject();
   if (!project) return;
@@ -3597,6 +3828,8 @@ function openDocumentPropertiesDialog() {
   ui.sourceCitationArchiveUrlInput.value = citation.archive_url;
   ui.sourceCitationAccessedDateInput.value = citation.accessed_date;
   ui.sourceCitationStyleInput.value = citation.citation_style;
+  renderDocumentProvenance(project);
+  setDocumentPropertiesTab("citation");
   updateSourceCitationForm();
   setDialogOpen(true);
   ui.sourceCitationTitleInput?.focus();
@@ -3619,6 +3852,15 @@ async function saveDocumentPropertiesDialog() {
     project.title = title;
     syncProjectTitleHeading(project, previousTitle);
     project.citationSource = readSourceCitationForm();
+    const selectedProvenanceType = ui.provenanceTypeSelect?.value || "other";
+    if ((project.sourceMetadata && typeof project.sourceMetadata === "object") || selectedProvenanceType !== "other") {
+      project.sourceMetadata = project.sourceMetadata && typeof project.sourceMetadata === "object"
+        ? project.sourceMetadata
+        : {};
+      const selectedLicense = PROVENANCE_LICENSES[ui.provenanceLicenseSelect?.value] || PROVENANCE_LICENSES.unknown;
+      project.sourceMetadata.license = { ...selectedLicense };
+      project.sourceMetadata.provenance_type = selectedProvenanceType;
+    }
   });
   await flushAutosave();
   renderEditor();
@@ -3781,7 +4023,10 @@ function renderNoActiveProjectState(message = "Wählen Sie im Browser ein Dokume
   state.layoutModel = null;
   syncTableOfContentsMenuState(null);
   ui.previewPage?.classList.add("is-empty");
-  ui.previewPage?.classList.remove("has-side-toc");
+  ui.previewPage?.classList.remove("has-side-toc", "has-side-rail", "has-right-footnote-rail");
+  ui.previewPage?.querySelector(".preview-side-toc")?.remove();
+  ui.previewPage?.querySelector(".preview-side-footnotes-rail")?.remove();
+  if (ui.previewRenderProgress) ui.previewRenderProgress.hidden = true;
   clearElement(ui.previewText);
   if (ui.previewText) {
     const empty = document.createElement("p");
@@ -3813,12 +4058,13 @@ function renderApp() {
   if (ui.exportProjectButton) ui.exportProjectButton.disabled = false;
   if (ui.printProjectButton) ui.printProjectButton.disabled = false;
   renderEditor();
-  rebuildModelsAndPreview();
 }
 
 function markProjectChanged(project) {
   if (!project) return;
   project.updatedAt = new Date().toISOString();
+  state.previewDirty = true;
+  state.previewRenderToken += 1;
   scheduleAutosave();
 }
 
@@ -3829,6 +4075,8 @@ async function activateProject(projectId, options = {}) {
     state.activeSourceRange = null;
   }
   state.activeProjectId = projectId;
+  state.previewDirty = true;
+  state.previewRenderToken += 1;
   if (!options.preserveExpandedState) {
     setProjectExpanded(projectId, true);
   }
@@ -3868,6 +4116,455 @@ function addGeneratedProject(jsonInput) {
   state.jsonEditorDraft = "";
   state.jsonEditorDraftProjectId = null;
   void activateProject(project.id, { resetSourceRange: true }).then(() => ui.textInput?.focus());
+}
+
+const WIKISOURCE_API_URL = "https://de.wikisource.org/w/api.php";
+
+function setSearchDialogStatus(message = "", isError = false) {
+  if (!ui.searchDialogStatus) return;
+  ui.searchDialogStatus.textContent = message;
+  ui.searchDialogStatus.classList.toggle("is-error", isError);
+}
+
+function setSearchDialogOpen(isOpen) {
+  if (ui.searchDialogOverlay) ui.searchDialogOverlay.hidden = !isOpen;
+  if (ui.searchDialog) ui.searchDialog.hidden = !isOpen;
+  if (isOpen) window.setTimeout(() => ui.wikisourceSearchInput?.focus(), 0);
+}
+
+async function fetchWikisourceApi(parameters) {
+  const query = new URLSearchParams({
+    format: "json",
+    formatversion: "2",
+    origin: "*",
+    ...parameters,
+  });
+  const response = await fetch(`${WIKISOURCE_API_URL}?${query}`);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.error) throw new Error(payload.error?.info || `wikisource-${response.status}`);
+  return payload;
+}
+
+function htmlFragmentToPlainText(value) {
+  const template = document.createElement("template");
+  template.innerHTML = String(value || "");
+  return String(template.content.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function renderWikisourceSearchResults(results) {
+  if (!ui.wikisourceSearchResults) return;
+  clearElement(ui.wikisourceSearchResults);
+  state.selectedWikisourcePage = null;
+  if (ui.importWikisourceButton) ui.importWikisourceButton.disabled = true;
+  results.forEach((result) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "wikisource-result";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", "false");
+    const title = document.createElement("span");
+    title.className = "wikisource-result-title";
+    title.textContent = result.title;
+    const snippet = document.createElement("span");
+    snippet.className = "wikisource-result-snippet";
+    snippet.textContent = htmlFragmentToPlainText(result.snippet) || `Wikisource-Seite ${result.pageid}`;
+    button.append(title, snippet);
+    button.addEventListener("click", () => {
+      state.selectedWikisourcePage = { title: result.title, pageid: result.pageid };
+      ui.wikisourceSearchResults.querySelectorAll(".wikisource-result").forEach((item) => {
+        const selected = item === button;
+        item.classList.toggle("is-selected", selected);
+        item.setAttribute("aria-selected", String(selected));
+      });
+      if (ui.importWikisourceButton) ui.importWikisourceButton.disabled = false;
+      setSearchDialogStatus(`„${result.title}“ ist ausgewählt.`);
+    });
+    ui.wikisourceSearchResults.appendChild(button);
+  });
+}
+
+async function searchWikisource() {
+  const searchTerm = ui.wikisourceSearchInput?.value.trim() || "";
+  if (searchTerm.length < 2) {
+    setSearchDialogStatus("Bitte mindestens zwei Zeichen eingeben.", true);
+    ui.wikisourceSearchInput?.focus();
+    return;
+  }
+  ui.wikisourceSearchButton.disabled = true;
+  ui.wikisourceSearchButton.setAttribute("aria-busy", "true");
+  setSearchDialogStatus("Wikisource wird durchsucht …");
+  try {
+    const payload = await fetchWikisourceApi({
+      action: "query",
+      list: "search",
+      srsearch: searchTerm,
+      srnamespace: "0",
+      srlimit: "20",
+      srprop: "snippet|timestamp",
+    });
+    const results = payload.query?.search || [];
+    renderWikisourceSearchResults(results);
+    setSearchDialogStatus(results.length ? `${results.length} Treffer gefunden.` : "Keine passenden Werke gefunden.");
+  } catch (error) {
+    setSearchDialogStatus(`Wikisource-Suche fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`, true);
+  } finally {
+    ui.wikisourceSearchButton.disabled = false;
+    ui.wikisourceSearchButton.removeAttribute("aria-busy");
+  }
+}
+
+function stripWikisourceMarkup(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "; ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\[\[(?:[^|\]]+\|)?([^\]]+)\]\]/g, "$1")
+    .replace(/\[https?:\/\/[^\s\]]+\s+([^\]]+)\]/g, "$1")
+    .replace(/\{\{[^{}]*\}\}/g, "")
+    .replace(/'{2,}/g, "")
+    .replace(/\s*;\s*/g, "; ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseWikisourceTextData(wikitext) {
+  const start = String(wikitext || "").search(/\{\{\s*Textdaten\b/i);
+  if (start < 0) return {};
+  const lines = String(wikitext).slice(start).split(/\r?\n/);
+  const result = {};
+  for (const line of lines.slice(1)) {
+    if (/^\s*\}\}/.test(line)) break;
+    const match = line.match(/^\s*\|\s*([^=]+?)\s*=\s*(.*)$/);
+    if (!match) continue;
+    result[match[1].trim().toUpperCase()] = stripWikisourceMarkup(match[2]);
+  }
+  return result;
+}
+
+function formatImportedAuthorNames(value) {
+  return String(value || "").split(/\s*;\s*|\s+und\s+/i).map((name) => {
+    const cleaned = name.trim();
+    if (!cleaned || cleaned.includes(",")) return cleaned;
+    const parts = cleaned.split(/\s+/);
+    if (parts.length < 2) return cleaned;
+    let surnameStart = parts.length - 1;
+    while (surnameStart > 0 && /^(?:von|van|de|del|der|den|zu|zur|zum)$/i.test(parts[surnameStart - 1])) surnameStart -= 1;
+    return `${parts.slice(surnameStart).join(" ")}, ${parts.slice(0, surnameStart).join(" ")}`;
+  }).filter(Boolean).join("; ");
+}
+
+function getWikisourcePageMarker(node) {
+  if (!(node instanceof Element) || !/(?:^|\s)(?:PageNumber|seitennummer|ws-pagenum)(?:\s|$)/i.test(node.className)) return "";
+  const match = String(node.textContent || "").match(/(?:Seite\s*)?([0-9]+|[ivxlcdm]+)/i);
+  return match ? `[${match[1]}]` : "";
+}
+
+function wikisourceInlineToMarkdown(node, context) {
+  if (node.nodeType === Node.TEXT_NODE) return String(node.nodeValue || "").replace(/\u00a0/g, " ");
+  if (!(node instanceof Element)) return "";
+  const pageMarker = getWikisourcePageMarker(node);
+  if (pageMarker) return pageMarker;
+  if (node.matches("sup.reference")) {
+    const anchor = node.querySelector("a[href^='#cite_note-']");
+    const targetId = anchor?.getAttribute("href")?.slice(1) || "";
+    const label = String(node.textContent || "").replace(/[\[\]\s]/g, "") || String(context.nextFootnote++);
+    if (targetId) context.footnoteLabels.set(targetId, label);
+    return `[^${label}]`;
+  }
+  const content = Array.from(node.childNodes).map((child) => wikisourceInlineToMarkdown(child, context)).join("");
+  if (node.matches("br")) return "\n";
+  if (node.matches("strong,b")) return `__${content.trim()}__`;
+  if (node.matches("em,i")) return `_${content.trim()}_`;
+  if (node.matches("code")) return `\`${content.trim()}\``;
+  return content;
+}
+
+function normalizeWikisourceBlockText(value) {
+  return String(value || "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function wikisourceNodeToMarkdown(node, context, listDepth = 0) {
+  if (!(node instanceof Element)) return "";
+  if (node.matches("h1,h2,h3,h4,h5,h6")) {
+    const level = Math.min(7, Math.max(2, Number(node.tagName.slice(1))));
+    return `${"#".repeat(level)} ${normalizeWikisourceBlockText(wikisourceInlineToMarkdown(node, context))}`;
+  }
+  if (node.matches("p")) return normalizeWikisourceBlockText(wikisourceInlineToMarkdown(node, context));
+  if (node.matches("blockquote")) {
+    return normalizeWikisourceBlockText(wikisourceInlineToMarkdown(node, context)).split("\n").map((line) => `> ${line}`).join("\n");
+  }
+  if (node.matches("pre")) return `\`\`\`\n${String(node.textContent || "").trim()}\n\`\`\``;
+  if (node.matches("ol.references")) {
+    return Array.from(node.querySelectorAll(":scope > li")).map((item, index) => {
+      const idMatch = item.id.match(/cite_note-(.+)$/);
+      const label = context.footnoteLabels.get(item.id)
+        || idMatch?.[1]?.replace(/-\d+$/, "")
+        || String(index + 1);
+      item.querySelectorAll(".mw-cite-backlink").forEach((backlink) => backlink.remove());
+      return `[^${label}]: ${normalizeWikisourceBlockText(wikisourceInlineToMarkdown(item, context))}`;
+    }).join("\n");
+  }
+  if (node.matches("ul,ol")) {
+    return Array.from(node.children).filter((child) => child.matches("li")).map((item, index) => {
+      const marker = node.matches("ol") ? `${index + 1}.` : "-";
+      return `${"  ".repeat(listDepth)}${marker} ${normalizeWikisourceBlockText(wikisourceInlineToMarkdown(item, context))}`;
+    }).join("\n");
+  }
+  if (node.matches("table")) {
+    const tableText = normalizeWikisourceBlockText(node.textContent || "");
+    if (!tableText
+      || /\{\{\{\s*ANMERKUNG\s*\}\}\}/i.test(tableText)
+      || /Nach oben/i.test(tableText)
+      || /Dieser Text wurde .*Korrektur gelesen/i.test(tableText)) return "";
+    const rows = Array.from(node.querySelectorAll(":scope > tbody > tr, :scope > tr"));
+    if (!rows.length) return "";
+    const cells = rows.map((row) => Array.from(row.querySelectorAll(":scope > th, :scope > td"))
+      .map((cell) => normalizeWikisourceBlockText(wikisourceInlineToMarkdown(cell, context))));
+    const width = Math.max(...cells.map((row) => row.length));
+    if (!cells.some((row) => row.some(Boolean))) return "";
+    const isDataTable = rows.length > 1 && width > 1 && node.querySelector("th");
+    if (!isDataTable) return tableText;
+    return cells.map((row, index) => `| ${Array.from({ length: width }, (_, cell) => row[cell] || "").join(" | ")} |${index === 0 ? `\n| ${Array(width).fill("---").join(" | ")} |` : ""}`).join("\n");
+  }
+  const pageMarker = getWikisourcePageMarker(node);
+  if (pageMarker) return pageMarker;
+  const hasBlockChildren = Array.from(node.children).some((child) => child.matches("address,article,aside,blockquote,div,dl,fieldset,figure,footer,form,h1,h2,h3,h4,h5,h6,header,hr,main,nav,ol,p,pre,section,table,ul"));
+  if (hasBlockChildren) {
+    return Array.from(node.children)
+      .map((child) => wikisourceNodeToMarkdown(child, context, listDepth))
+      .filter(Boolean)
+      .join("\n\n");
+  }
+  return normalizeWikisourceBlockText(wikisourceInlineToMarkdown(node, context));
+}
+
+function convertWikisourceHtmlToMarkdown(html) {
+  const template = document.createElement("template");
+  template.innerHTML = String(html || "");
+  const root = template.content.querySelector(".mw-parser-output") || template.content;
+  root.querySelectorAll("script,style,noscript,.mw-editsection,.ws-noexport,.noprint,.printfooter,.catlinks,.navbox,.sistersitebox,.licenseContainer,.textdaten,.Textdaten,.hiddenStructure,.zeilennummer,#bstand,#ws-cover,[style*='display:none' i]").forEach((node) => node.remove());
+  const context = { nextFootnote: 1, footnoteLabels: new Map() };
+  return Array.from(root.children)
+    .map((node) => wikisourceNodeToMarkdown(node, context))
+    .filter(Boolean)
+    .join("\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeImportedHeadingKey(value) {
+  return String(value || "")
+    .replace(/[*_#`]/g, "")
+    .replace(/[„“”‚‘’«»‹›.,:;!?()\[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("de-DE");
+}
+
+function removeRedundantWikisourceHeading(markdown, expectedTitle, options = {}) {
+  const blocks = String(markdown || "").split(/\n{2,}/);
+  const candidateIndex = blocks.findIndex((block) => !/^\s*\[(?:\d+|[ivxlcdm]+)\]\s*$/i.test(block));
+  if (candidateIndex < 0) return markdown;
+  const candidate = normalizeImportedHeadingKey(blocks[candidateIndex]);
+  const expected = normalizeImportedHeadingKey(expectedTitle);
+  const bothAreChapterLabels = options.chapter === true
+    && /\bkapitel$/.test(candidate)
+    && /\bkapitel$/.test(expected);
+  if (candidate === expected || bothAreChapterLabels) blocks.splice(candidateIndex, 1);
+  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+async function getWikisourceSubpages(title) {
+  const pages = [];
+  let continuation = "";
+  do {
+    const payload = await fetchWikisourceApi({
+      action: "query",
+      list: "allpages",
+      apprefix: `${title}/`,
+      apnamespace: "0",
+      aplimit: "max",
+      ...(continuation ? { apcontinue: continuation } : {}),
+    });
+    pages.push(...(payload.query?.allpages || []));
+    continuation = payload.continue?.apcontinue || "";
+  } while (continuation && pages.length < 250);
+  return pages.sort((left, right) => left.title.localeCompare(right.title, "de", { numeric: true }));
+}
+
+async function sha256Text(value) {
+  if (!crypto?.subtle) return "";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value || "")));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function fetchWikisourceEpubDocument(title) {
+  const response = await fetch("http://127.0.0.1:7319/api/typemap/import-wikisource-epub", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, language: "de" }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.document?.source_raw_markdown) {
+    throw new Error(result.error || `epub-export-${response.status}`);
+  }
+  return result;
+}
+
+function prepareWikisourceEpubMarkdown(rawMarkdown, title) {
+  let markdown = String(rawMarkdown || "").trim();
+  const firstHeading = markdown.match(/^#\s+[^\n]+\n*/);
+  if (firstHeading) markdown = markdown.slice(firstHeading[0].length).trim();
+  // Einzelne EPUB-Spine-Dokumente beginnen häufig wieder mit H1. Im
+  // zusammengeführten TypeMap-Werk sind diese Grenzen Kapitel (H2).
+  markdown = markdown.replace(/^#\s+/gm, "## ");
+  return removeRedundantWikisourceHeading(markdown, title).trim();
+}
+
+async function importSelectedWikisourcePage() {
+  const selection = state.selectedWikisourcePage;
+  if (!selection) return;
+  ui.importWikisourceButton.disabled = true;
+  ui.importWikisourceButton.setAttribute("aria-busy", "true");
+  setSearchDialogStatus("Werk und bibliografische Daten werden geladen …");
+  try {
+    const epubPromise = fetchWikisourceEpubDocument(selection.title)
+      .then((result) => ({ result, error: null }))
+      .catch((error) => ({ result: null, error }));
+    const [parsed, pageInfo, subpages, epubImport] = await Promise.all([
+      fetchWikisourceApi({ action: "parse", page: selection.title, prop: "text|sections|links|externallinks" }),
+      fetchWikisourceApi({ action: "query", prop: "revisions|info|pageprops", ppprop: "wikibase_item", rvprop: "ids|timestamp|content", rvslots: "main", inprop: "url", redirects: "1", titles: selection.title }),
+      getWikisourceSubpages(selection.title),
+      epubPromise,
+    ]);
+    const page = pageInfo.query?.pages?.[0] || {};
+    const revision = page.revisions?.[0] || {};
+    const wikitext = revision.slots?.main?.content || "";
+    const textData = parseWikisourceTextData(wikitext);
+    let bodyMarkdown = removeRedundantWikisourceHeading(
+      convertWikisourceHtmlToMarkdown(parsed.parse?.text || ""),
+      textData.TITEL || selection.title,
+    );
+    const importedPages = [selection.title];
+
+    // Kurze Übersichtsseiten mit echten Unterseiten werden vollständig aus den
+    // Unterseiten zusammengesetzt; bereits transkludierte Volltexte bleiben einmalig.
+    if (!epubImport.result && subpages.length && bodyMarkdown.length < 5000) {
+      const parts = [];
+      for (let index = 0; index < subpages.length; index += 4) {
+        const batch = subpages.slice(index, index + 4);
+        const responses = await Promise.all(batch.map((item) => fetchWikisourceApi({ action: "parse", page: item.title, prop: "text" })));
+        responses.forEach((response, responseIndex) => {
+          const subpage = batch[responseIndex];
+          const subTitle = subpage.title.slice(selection.title.length + 1).replace(/_/g, " ");
+          const content = removeRedundantWikisourceHeading(
+            convertWikisourceHtmlToMarkdown(response.parse?.text || ""),
+            subTitle,
+            { chapter: true },
+          );
+          if (content) parts.push(`## ${subTitle}\n\n${content}`);
+          importedPages.push(subpage.title);
+        });
+        setSearchDialogStatus(`Unterseiten werden zusammengesetzt … ${Math.min(index + 4, subpages.length)}/${subpages.length}`);
+      }
+      bodyMarkdown = parts.join("\n\n");
+    }
+
+    const title = textData.TITEL || selection.title.replace(/_/g, " ");
+    const epubMarkdown = epubImport.result
+      ? prepareWikisourceEpubMarkdown(epubImport.result.document.source_raw_markdown, title)
+      : "";
+    const textBasis = epubMarkdown.length > 100 ? "ws-export-epub-3" : "mediawiki-rendered-html";
+    if (epubMarkdown.length > 100) bodyMarkdown = epubMarkdown;
+    if (!bodyMarkdown.trim()) throw new Error("Kein nutzbarer Werktext gefunden.");
+    const rawText = `# ${normalizeMarkdownHeadingText(title)}\n\n${bodyMarkdown.replace(/^#\s+[^\n]+\n*/i, "").trim()}\n`;
+    const canonicalUrl = page.canonicalurl || `https://de.wikisource.org/wiki/${encodeURIComponent(selection.title.replace(/ /g, "_"))}`;
+    const revisionUrl = revision.revid ? `${canonicalUrl}?oldid=${encodeURIComponent(revision.revid)}` : "";
+    const wikidataId = String(page.pageprops?.wikibase_item || "");
+    const indexLinks = (parsed.parse?.links || [])
+      .filter((link) => Number(link.ns) === 104)
+      .map((link) => ({
+        type: "wikisource-index",
+        title: link.title,
+        url: `https://de.wikisource.org/wiki/${encodeURIComponent(String(link.title).replace(/ /g, "_"))}`,
+      }));
+    const externalLinks = (parsed.parse?.externallinks || []).map((url) => ({
+      type: "external-source-link",
+      title: (() => {
+        try { return new URL(url).hostname; } catch (error) { return url; }
+      })(),
+      url,
+    }));
+    const citation = {
+      ...createDefaultCitationSource(title),
+      source_type: "book",
+      title,
+      subtitle: textData.SUBTITEL || "",
+      authors: formatImportedAuthorNames(textData.AUTOR || ""),
+      editors: formatImportedAuthorNames(textData.HERAUSGEBER || ""),
+      translators: formatImportedAuthorNames(textData.ÜBERSETZER || ""),
+      original_title: textData.ORIGINALTITEL || "",
+      publisher: textData.VERLAG || "",
+      publisher_place: textData.ERSCHEINUNGSORT || "",
+      issued_year: (textData.ERSCHEINUNGSJAHR || "").match(/\d{4}/)?.[0] || "",
+      edition: textData.AUFLAGE || "",
+    };
+    const project = createDefaultProject(title);
+    project.source.rawText = rawText;
+    project.citationSource = normalizeCitationSource(citation, project);
+    project.metadata.textKind = "article";
+    project.sourceMetadata = {
+      provenance_type: "wikisource",
+      format: "wikisource",
+      provider: "Wikimedia Foundation",
+      site: "de.wikisource.org",
+      page_id: page.pageid || selection.pageid,
+      revision_id: revision.revid || "",
+      revision_parent_id: revision.parentid || "",
+      revision_timestamp: revision.timestamp || "",
+      canonical_url: canonicalUrl,
+      revision_url: revisionUrl,
+      imported_at: new Date().toISOString(),
+      imported_pages: importedPages,
+      related_links: [
+        ...indexLinks,
+        ...externalLinks,
+        ...importedPages.slice(1).map((importedTitle) => ({
+          type: "wikisource-subpage",
+          title: importedTitle,
+          url: `https://de.wikisource.org/wiki/${encodeURIComponent(String(importedTitle).replace(/ /g, "_"))}`,
+        })),
+      ],
+      extraction: {
+        structure_basis: "mediawiki-api",
+        text_basis: textBasis,
+        epub_export_url: epubImport.result?.export_url || "",
+        epub_fallback_reason: epubImport.error?.message || "",
+        api_chapters: subpages.map((subpage) => subpage.title),
+        epub_headings: Array.from(epubMarkdown.matchAll(/^##\s+(.+)$/gm), (match) => match[1].trim()),
+      },
+      wikidata: wikidataId ? {
+        id: wikidataId,
+        url: `https://www.wikidata.org/wiki/${encodeURIComponent(wikidataId)}`,
+      } : null,
+      content_hash_sha256: await sha256Text(rawText),
+      license: {
+        name: "Creative Commons Attribution-Share Alike 4.0",
+        url: "https://creativecommons.org/licenses/by-sa/4.0/deed.de",
+      },
+    };
+    addGeneratedProject(project);
+    state.editorDataView = "markdown";
+    setSearchDialogOpen(false);
+  } catch (error) {
+    setSearchDialogStatus(`Wikisource-Import fehlgeschlagen: ${error?.message || "Unbekannter Fehler"}`, true);
+  } finally {
+    ui.importWikisourceButton.disabled = !state.selectedWikisourcePage;
+    ui.importWikisourceButton.removeAttribute("aria-busy");
+  }
 }
 
 function setGenerateDialogOpen(isOpen) {
@@ -4205,6 +4902,8 @@ function applyJsonEditorDraft() {
     const projectIndex = state.projects.findIndex((project) => project.id === activeProject.id);
     if (projectIndex < 0) return;
     state.projects[projectIndex] = normalized;
+    state.previewDirty = true;
+    state.previewRenderToken += 1;
     state.jsonEditorDraft = "";
     state.jsonEditorDraftProjectId = null;
     ui.textInput?.removeAttribute("aria-invalid");
@@ -4240,11 +4939,15 @@ function updateActiveProject(mutator, options = {}) {
   if (options.renderBrowser !== false) {
     renderProjectList();
   }
-  if (options.renderPreview !== false) rebuildModelsAndPreview();
 }
 
 function updateActiveProjectTextFromEditor(nextText) {
   updateActiveProject((project) => {
+    if (!state.activeSourceRange) {
+      project.source.rawText = nextText;
+      syncProjectTitleFromHeading(project);
+      return;
+    }
     const sourceModel = buildSourceModel(project);
     const range = getActiveSourceRangeForProject(project, sourceModel);
     if (!range || range.id === "document-root") {
@@ -5083,10 +5786,11 @@ async function loadLocalSnapshot() {
 
 function scheduleAutosave() {
   if (state.autosaveTimer) window.clearTimeout(state.autosaveTimer);
+  const delay = (getActiveProject()?.source?.rawText?.length || 0) > 120000 ? 1800 : 500;
   state.autosaveTimer = window.setTimeout(() => {
     state.autosaveTimer = null;
     saveLocalSnapshot();
-  }, 500);
+  }, delay);
 }
 
 async function flushAutosave() {
@@ -5189,6 +5893,9 @@ function setWorkspaceSection(section) {
     setDetailsLayoutMode(state.detailsLayoutMode);
   }
   if (activeSection === "preview" && previousSection !== "preview") {
+    // Der Editor mutiert ausschließlich das Dokumentmodell. Erst dieser
+    // bewusste Wechsel startet Parsing, Satzmodell und DOM-Aufbau der TypeMap.
+    void renderPreviewOnDemand();
     window.requestAnimationFrame(() => {
       if (!ui.typeStage) return;
       ui.typeStage.scrollTop = 0;
@@ -5228,6 +5935,7 @@ function bindMenu() {
       setHyphenationDialogOpen(false);
       setExportMenuOpen(false);
       setBrowserActionsMenuOpen(false);
+      setSearchDialogOpen(false);
     }
   });
 }
@@ -5289,6 +5997,20 @@ function bindEditor() {
     setGenerateDialogStatus("");
     setGenerateDialogOpen(true);
   });
+  ui.openSearchDialogButton?.addEventListener("click", () => {
+    setBrowserActionsMenuOpen(false);
+    setSearchDialogStatus("");
+    setSearchDialogOpen(true);
+  });
+  ui.searchDialogOverlay?.addEventListener("click", () => setSearchDialogOpen(false));
+  ui.searchDialogCloseButton?.addEventListener("click", () => setSearchDialogOpen(false));
+  ui.wikisourceSearchButton?.addEventListener("click", searchWikisource);
+  ui.wikisourceSearchInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void searchWikisource();
+  });
+  ui.importWikisourceButton?.addEventListener("click", importSelectedWikisourcePage);
   ui.generateDialogOverlay?.addEventListener("click", () => setGenerateDialogOpen(false));
   ui.generateDialogCloseButton?.addEventListener("click", () => setGenerateDialogOpen(false));
   ui.generateWebTab?.addEventListener("click", () => setGenerateSourceMode("web"));
@@ -5462,6 +6184,19 @@ function bindEditor() {
   ui.documentPropertiesCloseButton?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesCancelButton?.addEventListener("click", () => setDialogOpen(false));
   ui.documentPropertiesSaveButton?.addEventListener("click", saveDocumentPropertiesDialog);
+  ui.propertyTabSourceCitation?.addEventListener("click", () => setDocumentPropertiesTab("citation"));
+  ui.propertyTabProvenance?.addEventListener("click", () => setDocumentPropertiesTab("provenance"));
+  ui.provenanceLicenseSelect?.addEventListener("change", updateProvenanceLicenseLink);
+  ui.provenanceTypeSelect?.addEventListener("change", updateProvenanceFieldVisibility);
+  [ui.propertyTabSourceCitation, ui.propertyTabProvenance].forEach((tab) => {
+    tab?.addEventListener("keydown", (event) => {
+      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const nextTab = tab === ui.propertyTabSourceCitation ? ui.propertyTabProvenance : ui.propertyTabSourceCitation;
+      setDocumentPropertiesTab(nextTab === ui.propertyTabProvenance ? "provenance" : "citation");
+      nextTab.focus();
+    });
+  });
   document.querySelectorAll("#propertyPanelSourceCitation input, #propertyPanelSourceCitation select, #propertyPanelSourceCitation textarea")
     .forEach((control) => {
       control.addEventListener("input", updateSourceCitationForm);
@@ -5553,7 +6288,9 @@ function bindEditor() {
     updateActiveProjectTextFromEditor(ui.textInput.value);
     renderEditorHighlight(ui.textInput.value, getActiveProject());
     syncEditorHighlightScroll();
-    scheduleProjectBrowserRender();
+    // Der vollständige Dokumentbaum großer Werke wird nicht während des
+    // Tippens rekonstruiert; Struktur und Vorschau entstehen erst beim Satz.
+    if (ui.textInput.value.length <= 120000) scheduleProjectBrowserRender();
   });
   ui.textInput?.addEventListener("blur", () => {
     if (state.editorDataView === "json") {

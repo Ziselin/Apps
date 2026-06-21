@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="typemap.css?v=20260621i">
+  <link rel="stylesheet" href="typemap.css?v=20260621o">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -101,6 +101,10 @@
       </aside>
 
       <section class="type-stage" aria-label="TypeMap Vorschau">
+        <div id="previewRenderProgress" class="preview-render-progress" role="status" aria-live="polite" hidden>
+          <span id="previewRenderProgressLabel">TypeMap wird gesetzt …</span>
+          <progress id="previewRenderProgressBar" max="100" value="0"></progress>
+        </div>
         <article id="previewCanvas" class="preview-canvas">
           <div class="preview-page" style="--preview-font-size: 16px; --preview-line-height: 1.38; --preview-measure: 64ch;">
             <div id="previewText" class="preview-text"></div>
@@ -129,6 +133,7 @@
                 <button type="button" id="createProjectButton" role="menuitem">Neues Dokument</button>
                 <button type="button" id="openImportButton" role="menuitem">Importieren</button>
                 <button type="button" id="openGenerateDialogButton" role="menuitem">Generieren</button>
+                <button type="button" id="openSearchDialogButton" role="menuitem">Suche</button>
                 <button type="button" id="browserExportJsonButton" role="menuitem">Exportieren</button>
               </div>
             </div>
@@ -410,6 +415,33 @@
     </div>
   </section>
 
+  <div id="searchDialogOverlay" class="modal-overlay" hidden></div>
+  <section id="searchDialog" class="property-dialog search-dialog" role="dialog" aria-modal="true" aria-labelledby="searchDialogTitle" hidden>
+    <div class="property-dialog-head">
+      <div>
+        <span class="label">Suche</span>
+        <h2 id="searchDialogTitle">Wikisource</h2>
+      </div>
+      <button type="button" id="searchDialogCloseButton" class="dialog-icon-button" aria-label="Suche schließen">X</button>
+    </div>
+    <div class="property-dialog-body">
+      <p class="event-description">Durchsuchen Sie die deutsche Wikisource und übernehmen Sie ein Werk als zusammenhängendes TypeMap-Dokument.</p>
+      <div class="wikisource-search-row">
+        <label class="generate-url-field">
+          <span>Werk oder Autor</span>
+          <input id="wikisourceSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="z. B. Faust oder Goethe">
+        </label>
+        <button type="button" id="wikisourceSearchButton" class="secondary-button">Suchen</button>
+      </div>
+      <div id="wikisourceSearchResults" class="wikisource-results" role="listbox" aria-label="Wikisource-Suchergebnisse"></div>
+      <p class="generate-api-note">TypeMap verwendet die öffentliche Wikimedia-API. Werktext, Originalpaginierung, Fußnoten, Quellenadresse und Revisionsstand werden ohne KI-Zugriff übernommen.</p>
+      <p id="searchDialogStatus" class="generate-dialog-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="property-dialog-actions">
+      <button type="button" id="importWikisourceButton" class="secondary-button primary-action" disabled>Ausgewähltes Werk importieren</button>
+    </div>
+  </section>
+
   <div id="documentPropertiesOverlay" class="modal-overlay" hidden></div>
   <section id="documentPropertiesDialog" class="property-dialog" role="dialog" aria-modal="true" aria-labelledby="documentPropertiesTitle" hidden>
     <div class="property-dialog-head">
@@ -422,6 +454,7 @@
 
     <div class="property-tabs" role="tablist" aria-label="Eigenschaftsbereiche">
       <button type="button" class="property-tab is-active" role="tab" aria-selected="true" aria-controls="propertyPanelSourceCitation" id="propertyTabSourceCitation">Quellenangabe</button>
+      <button type="button" class="property-tab" role="tab" aria-selected="false" aria-controls="propertyPanelProvenance" id="propertyTabProvenance" tabindex="-1">Provenienz</button>
     </div>
 
     <div class="property-dialog-body property-tab-body">
@@ -567,6 +600,79 @@
             </div>
           </div>
         </section>
+      </section>
+      <section id="propertyPanelProvenance" class="property-tab-panel" role="tabpanel" aria-labelledby="propertyTabProvenance" hidden>
+        <p id="provenanceEmptyHint" class="property-hint">Für dieses Dokument sind noch keine strukturierten Provenienzangaben hinterlegt.</p>
+        <div id="provenanceContent">
+          <section class="property-section">
+            <h3>Art der Herkunft</h3>
+            <div class="property-list">
+              <div class="property-row property-row-stack">
+                <span>Herkunftsart</span>
+                <div class="property-select-shell">
+                  <select id="provenanceTypeSelect">
+                    <option value="wikisource">Wikisource</option>
+                    <option value="file-import">Dateiimport</option>
+                    <option value="web-source">Webquelle</option>
+                    <option value="other">Sonstige / manuelle Herkunft</option>
+                  </select>
+                  <span class="property-select-caret" aria-hidden="true"></span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="property-section">
+            <h3>Digitale Herkunft</h3>
+            <div class="property-list">
+              <label class="property-row"><span>Quellsystem</span><input id="provenanceProviderOutput" type="text" readonly></label>
+              <label class="property-row"><span>Website</span><input id="provenanceSiteOutput" type="text" readonly></label>
+              <label class="property-row"><span>Importformat</span><input id="provenanceFormatOutput" type="text" readonly></label>
+              <div class="property-row" data-provenance-only="wikisource"><span>Wikisource</span><a id="provenanceSourceLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
+              <div class="property-row" data-provenance-only="wikisource"><span>Importierte Fassung</span><a id="provenanceRevisionLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
+              <div class="property-row" data-provenance-only="wikisource"><span>Wikidata</span><a id="provenanceWikidataLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a></div>
+            </div>
+          </section>
+          <section class="property-section">
+            <h3>Identität und Revisionsstand</h3>
+            <div class="property-list">
+              <label class="property-row" data-provenance-only="wikisource"><span>Wikisource-Seiten-ID</span><input id="provenancePageIdOutput" type="text" readonly></label>
+              <label class="property-row" data-provenance-only="wikisource"><span>Revisions-ID</span><input id="provenanceRevisionIdOutput" type="text" readonly></label>
+              <label class="property-row" data-provenance-only="wikisource"><span>Vorherige Revisions-ID</span><input id="provenanceParentRevisionIdOutput" type="text" readonly></label>
+              <label class="property-row" data-provenance-only="wikisource"><span>Revisionszeitpunkt</span><input id="provenanceRevisionTimestampOutput" type="text" readonly></label>
+              <label class="property-row"><span>Importiert am</span><input id="provenanceImportedAtOutput" type="text" readonly></label>
+              <label class="property-row property-row-stack"><span>SHA-256 der importierten Textfassung</span><textarea id="provenanceHashOutput" rows="2" readonly spellcheck="false"></textarea></label>
+            </div>
+          </section>
+          <section class="property-section" data-provenance-only="wikisource">
+            <h3>Verknüpfte Wikisource-Seiten</h3>
+            <div id="provenanceRelatedLinks" class="provenance-related-links"></div>
+          </section>
+          <section class="property-section">
+            <h3>Lizenzhinweis der digitalen Quelle</h3>
+            <div class="property-list">
+              <div class="property-row property-row-stack">
+                <span>Lizenz</span>
+                <div class="provenance-license-control">
+                  <div class="property-select-shell">
+                    <select id="provenanceLicenseSelect" aria-label="Lizenz der digitalen Quelle">
+                      <option value="unknown">Nicht bestimmt</option>
+                      <option value="public-domain">Gemeinfrei / Public Domain</option>
+                      <option value="cc0-1.0">CC0 1.0</option>
+                      <option value="cc-by-4.0">CC BY 4.0</option>
+                      <option value="cc-by-sa-4.0">CC BY-SA 4.0</option>
+                      <option value="cc-by-nc-4.0">CC BY-NC 4.0</option>
+                      <option value="cc-by-nc-sa-4.0">CC BY-NC-SA 4.0</option>
+                      <option value="all-rights-reserved">Alle Rechte vorbehalten</option>
+                    </select>
+                    <span class="property-select-caret" aria-hidden="true"></span>
+                  </div>
+                  <a id="provenanceLicenseLink" class="provenance-link" target="_blank" rel="noopener noreferrer"></a>
+                </div>
+              </div>
+            </div>
+            <p class="property-hint">Der Lizenzhinweis der Plattform ist nicht automatisch mit dem urheberrechtlichen Status des zugrunde liegenden Werkes gleichzusetzen.</p>
+          </section>
+        </div>
       </section>
     </div>
 
@@ -788,7 +894,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260621b"></script>
-  <script src="typemap.js?v=20260621o"></script>
+  <script src="typemap.js?v=20260621v"></script>
 </body>
 </html>
 

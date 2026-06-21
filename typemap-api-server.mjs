@@ -10,6 +10,7 @@ import { inflateRawSync } from "node:zlib";
 const ROOT = resolve(fileURLToPath(new URL("./", import.meta.url)));
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.TYPEMAP_PORT) || 7319;
+const HELPER_VERSION = "20260621-hybrid-wikisource-1";
 const MAX_REQUEST_BYTES = 72 * 1024 * 1024;
 const MAX_EPUB_UNCOMPRESSED_BYTES = 160 * 1024 * 1024;
 
@@ -928,6 +929,35 @@ async function importEbook(request, response) {
   sendJson(response, 200, { document });
 }
 
+async function importWikisourceEpub(request, response) {
+  const body = await readJsonBody(request);
+  const title = String(body.title || "").trim();
+  const language = String(body.language || "de").trim().toLowerCase();
+  if (!title || title.length > 500) throw new Error("Der Wikisource-Titel fehlt oder ist zu lang.");
+  if (!/^[a-z-]{2,12}$/.test(language)) throw new Error("Die Wikisource-Sprachkennung ist ungültig.");
+  const exportUrl = new URL("https://ws-export.wmcloud.org/");
+  exportUrl.search = new URLSearchParams({
+    lang: language,
+    page: title,
+    format: "epub-3",
+    images: "false",
+    credits: "false",
+  }).toString();
+  const exportResponse = await fetch(exportUrl, {
+    headers: { "User-Agent": "TypeMap/1.0 (local Wikisource import)" },
+    redirect: "follow",
+  });
+  if (!exportResponse.ok) throw new Error(`Der Wikisource-EPUB-Export antwortete mit ${exportResponse.status}.`);
+  const contentType = exportResponse.headers.get("content-type") || "";
+  if (!/application\/epub\+zip/i.test(contentType)) throw new Error("Der Wikisource-Export lieferte keine EPUB-Datei.");
+  const buffer = Buffer.from(await exportResponse.arrayBuffer());
+  if (!buffer.length || buffer.length > 50 * 1024 * 1024) throw new Error("Die Wikisource-EPUB-Datei ist leer oder überschreitet 50 MB.");
+  const filename = `${title.replace(/[\\/:*?"<>|]+/g, "_")}.epub`;
+  const fileData = `data:application/epub+zip;base64,${buffer.toString("base64")}`;
+  const document = buildEpubDocument({ filename, fileData });
+  sendJson(response, 200, { document, export_url: exportUrl.toString() });
+}
+
 async function serveStatic(request, response) {
   const requestUrl = new URL(request.url || "/", `http://${HOST}:${PORT}`);
   let pathname = decodeURIComponent(requestUrl.pathname);
@@ -974,6 +1004,14 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === "POST" && ["/api/typemap/import-ebook", "/api/typemap/import-epub"].includes(request.url)) {
       await importEbook(request, response);
+      return;
+    }
+    if (request.method === "POST" && request.url === "/api/typemap/import-wikisource-epub") {
+      await importWikisourceEpub(request, response);
+      return;
+    }
+    if (request.method === "GET" && request.url === "/api/typemap/version") {
+      sendJson(response, 200, { version: HELPER_VERSION });
       return;
     }
     if (request.method === "GET" || request.method === "HEAD") {
