@@ -10,29 +10,29 @@ const BUNDLED_PROFILE_FILES = [
 ];
 
 // Die Bezeichnungen folgen dem Bildungsserver Mecklenburg-Vorpommern. Das
-// Bundesland ist Profilraum im Maschinenraum; die BrÃ¼cke zeigt nur die drei
-// Entscheidungen, die fÃ¼r eine konkrete Berechnung nÃ¶tig sind.
+// Bundesland ist Profilraum im Maschinenraum; die Brücke zeigt nur die drei
+// Entscheidungen, die für eine konkrete Berechnung nötig sind.
 const MV_SCHOOL_TYPES = [
   { name: "Grundschule", classes: ["1", "2", "3", "4"] },
-  { name: "SchulartunabhÃ¤ngige Orientierungsstufe", classes: ["5", "6"] },
+  { name: "Schulartunabhängige Orientierungsstufe", classes: ["5", "6"] },
   { name: "Regionale Schule", classes: ["5", "6", "7", "8", "9", "10"] },
   { name: "Gymnasium", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
-  { name: "FÃ¶rderschule", classes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] },
+  { name: "Förderschule", classes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] },
   { name: "Gesamtschule", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
   { name: "Berufliche Schulen", classes: ["Berufliche Bildung"] },
-  { name: "Schulen in freier TrÃ¤gerschaft", classes: ["nach Schulart"] },
-  { name: "Abendgymnasium", classes: ["EinfÃ¼hrungsphase", "Qualifikationsphase"] },
+  { name: "Schulen in freier Trägerschaft", classes: ["nach Schulart"] },
+  { name: "Abendgymnasium", classes: ["Einführungsphase", "Qualifikationsphase"] },
 ];
 
 const grade6Labels = [
   ["1", "sehr gut"], ["2", "gut"], ["3", "befriedigend"],
-  ["4", "ausreichend"], ["5", "mangelhaft"], ["6", "ungenÃ¼gend"],
+  ["4", "ausreichend"], ["5", "mangelhaft"], ["6", "ungenügend"],
 ];
 const point15Labels = [
-  ["15", "1+"], ["14", "1"], ["13", "1âˆ’"], ["12", "2+"],
-  ["11", "2"], ["10", "2âˆ’"], ["09", "3+"], ["08", "3"],
-  ["07", "3âˆ’"], ["06", "4+"], ["05", "4"], ["04", "4âˆ’"],
-  ["03", "5+"], ["02", "5"], ["01", "5âˆ’"], ["00", "6"],
+  ["15", "1+"], ["14", "1"], ["13", "1-"], ["12", "2+"],
+  ["11", "2"], ["10", "2-"], ["09", "3+"], ["08", "3"],
+  ["07", "3-"], ["06", "4+"], ["05", "4"], ["04", "4-"],
+  ["03", "5+"], ["02", "5"], ["01", "5-"], ["00", "6"],
 ];
 
 function makeThresholds(labels, percentages) {
@@ -63,7 +63,7 @@ function clone(value) {
 }
 
 // Vorhandene Profile werden beim Lesen verlustfrei in die Trennung aus
-// Rechtsraum, Berechnungsgrundlage und Geltungsbereichen Ã¼berfÃ¼hrt.
+// Rechtsraum, Berechnungsgrundlage und Geltungsbereichen überführt.
 function normalizeProfile(profile) {
   const legacyParts = String(profile.assessmentType || "").split(/\s*Â·\s*/).filter(Boolean);
   const scopes = Array.isArray(profile.scopes) && profile.scopes.length
@@ -198,7 +198,7 @@ function persist() {
       engineTab: state.engineTab,
     }));
   } catch (error) {
-    console.warn("Der lokale Speicher ist nicht verfÃ¼gbar.", error);
+    console.warn("Der lokale Speicher ist nicht verfügbar.", error);
   }
 }
 
@@ -209,7 +209,7 @@ function parseNumber(value) {
 }
 
 function formatNumber(value, maximumFractionDigits = 2) {
-  if (!Number.isFinite(value)) return "â€“";
+  if (!Number.isFinite(value)) return "-";
   return new Intl.NumberFormat("de-DE", { minimumFractionDigits: 0, maximumFractionDigits }).format(value);
 }
 
@@ -339,17 +339,17 @@ function renderBridge() {
 
   ui.inputMessage.classList.remove("is-error");
   if (!result) {
-    ui.percentageOutput.textContent = "â€“ %";
-    ui.resultPrimary.textContent = "â€“";
-    ui.resultSecondary.textContent = profile ? "Bitte gÃ¼ltige Punktwerte eingeben." : "Kein Bewertungsprofil";
-    ui.betterGradeOutput.textContent = "â€“";
-    ui.worseGradeOutput.textContent = "â€“";
-    ui.pointsNeededOutput.textContent = "â€“";
-    ui.pointsToWorseOutput.textContent = "â€“";
+    ui.percentageOutput.textContent = "- %";
+    ui.resultPrimary.textContent = "-";
+    ui.resultSecondary.textContent = profile ? "Bitte gültige Punktwerte eingeben." : "Kein Bewertungsprofil";
+    ui.betterGradeOutput.textContent = "-";
+    ui.worseGradeOutput.textContent = "-";
+    ui.pointsNeededOutput.textContent = "-";
+    ui.pointsToWorseOutput.textContent = "-";
     ui.scoreTrackFill.style.width = "0%";
     ui.inputMessage.textContent = !profile
-      ? "FÃ¼r diese Auswahl muss im Maschinenraum noch ein Profil angelegt werden."
-      : total === 0 ? "Die Gesamtpunktzahl muss grÃ¶ÃŸer als null sein." : "Bitte Zahlen grÃ¶ÃŸer oder gleich null eingeben.";
+      ? "Für diese Auswahl muss im Maschinenraum noch ein Profil angelegt werden."
+      : total === 0 ? "Die Gesamtpunktzahl muss größer als null sein." : "Bitte Zahlen größer oder gleich null eingeben.";
     ui.inputMessage.classList.add("is-error");
     ui.boundaryList.replaceChildren();
     return;
@@ -358,20 +358,20 @@ function renderBridge() {
   ui.percentageOutput.textContent = `${formatNumber(result.percent)} %`;
   ui.scoreTrackFill.style.width = `${Math.min(100, Math.max(0, result.percent))}%`;
   if (earned > total) {
-    ui.inputMessage.textContent = "Die erreichte Punktzahl liegt Ã¼ber der Gesamtpunktzahl.";
+    ui.inputMessage.textContent = "Die erreichte Punktzahl liegt über der Gesamtpunktzahl.";
     ui.inputMessage.classList.add("is-error");
   } else {
     ui.inputMessage.textContent = "";
   }
 
   const pointScale = profile.scaleType === "points15";
-  ui.resultPrimary.textContent = result.current?.level || "â€“";
+  ui.resultPrimary.textContent = result.current?.level || "-";
   const numericNote = String(pointScale ? result.current?.note : result.current?.level || "").match(/[1-6]/)?.[0] || "";
   ui.resultSecondary.textContent = grade6Labels.find(([grade]) => grade === numericNote)?.[1] || "";
-  ui.betterGradeOutput.textContent = result.better?.level || "â€“";
-  ui.worseGradeOutput.textContent = result.worse?.level || "â€“";
+  ui.betterGradeOutput.textContent = result.better?.level || "-";
+  ui.worseGradeOutput.textContent = result.worse?.level || "-";
   ui.pointsNeededOutput.textContent = result.better ? `+ ${formatNumber(result.pointsNeeded)} P.` : "Beststufe";
-  ui.pointsToWorseOutput.textContent = result.worse ? `âˆ’ ${formatNumber(result.pointsToWorse)} P.` : "Endstufe";
+  ui.pointsToWorseOutput.textContent = result.worse ? `- ${formatNumber(result.pointsToWorse)} P.` : "Endstufe";
 
   ui.boundaryList.replaceChildren(...result.thresholds.map((threshold) => {
     const item = document.createElement("div");
@@ -440,7 +440,7 @@ function renderProfileEditor() {
     input.type = "text";
     input.inputMode = "decimal";
     input.value = formatNumber(Number(threshold.minPercent));
-    input.setAttribute("aria-label", `Mindestprozent fÃ¼r ${threshold.level}`);
+    input.setAttribute("aria-label", `Mindestprozent für ${threshold.level}`);
     input.addEventListener("change", () => {
       const nextValue = Math.min(100, Math.max(0, parseNumber(input.value)));
       if (!Number.isFinite(nextValue)) {
@@ -502,8 +502,8 @@ function renderProfileBrowser() {
     const menu = document.createElement("details");
     menu.className = "profile-record-menu";
     const summary = document.createElement("summary");
-    summary.setAttribute("aria-label", `Aktionen fÃ¼r ${collection.name || "Profil"}`);
-    summary.textContent = "â‹®";
+    summary.setAttribute("aria-label", `Aktionen für ${collection.name || "Profil"}`);
+    summary.textContent = "⋮";
     const actions = document.createElement("div");
     actions.className = "profile-record-actions";
     [
