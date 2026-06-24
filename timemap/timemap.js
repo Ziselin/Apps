@@ -19542,9 +19542,7 @@ function setTimelineMenuOpen(isOpen) {
   if (ui.timelineMenuButton) {
     ui.timelineMenuButton.setAttribute("aria-expanded", String(state.timelineMenuOpen));
   }
-  if (!state.timelineMenuOpen) {
-    setTimelineMenuPanelOpen(null);
-  }
+  setTimelineMenuPanelOpen(null);
 }
 
 function toggleTimelineMenu(event) {

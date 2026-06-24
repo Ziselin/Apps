@@ -1,19 +1,19 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#eeeee7">
-  <title>Notenrechner · Schola</title>
+  <title>Notenrechner Â· Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/notenrechner-icon.svg?v=20260621b">
-  <link rel="stylesheet" href="noten.css?v=20260621k">
+  <link rel="stylesheet" href="noten.css?v=20260621n">
 </head>
 <body>
   <div id="gradeApp" class="app-frame workspace-mode-bridge">
     <section class="bridge-view" aria-label="Notenrechner">
       <header class="topbar">
         <div class="brand-plate">
-          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="MenÃ¼ Ã¶ffnen" aria-expanded="false" aria-controls="sideMenu">
             <span class="menu-lines" aria-hidden="true"></span>
           </button>
           <div class="brand-mark">
@@ -24,7 +24,7 @@
           </div>
         </div>
         <div class="topbar-actions">
-          <button type="button" id="resetScoreButton" class="header-icon-button" aria-label="Eingabe zurücksetzen" title="Eingabe zurücksetzen">
+          <button type="button" id="resetScoreButton" class="header-icon-button" aria-label="Eingabe zurÃ¼cksetzen" title="Eingabe zurÃ¼cksetzen">
             <span class="reset-icon" aria-hidden="true"></span>
           </button>
         </div>
@@ -34,21 +34,28 @@
       <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
         <div class="side-menu-inner">
           <div class="side-menu-head">
-            <div><span class="label">Menü</span><strong>Notenrechner</strong></div>
-            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+            <div><span class="label">MenÃ¼</span><strong>Notenrechner</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="MenÃ¼ schlieÃŸen">Ã—</button>
           </div>
           <div class="side-menu-list">
             <details>
+              <summary>Projekte</summary>
+              <div class="project-choice-list" aria-label="Projektbereich wechseln">
+                <a class="project-choice" href="../../index.html">Atlas</a>
+                <a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a>
+              </div>
+            </details>
+            <details>
               <summary>Funktionsweise</summary>
-              <p>Oben werden erreichte und mögliche Punkte eingegeben. Das gewählte Bewertungsprofil bestimmt Notenstufe, Prozentwert und Abstand zur nächstbesseren Stufe.</p>
+              <p>Oben werden erreichte und mÃ¶gliche Punkte eingegeben. Das gewÃ¤hlte Bewertungsprofil bestimmt Notenstufe, Prozentwert und Abstand zur nÃ¤chstbesseren Stufe.</p>
             </details>
             <details>
               <summary>Datenstand</summary>
-              <p>Die ersten Profile wurden aus „Notenberechnung B M G.ods“ übernommen. Sie sind persönliche Arbeitsgrundlagen und noch nicht als amtliche Bewertungsgrundlagen verifiziert.</p>
+              <p>Kein geprÃ¼fter Datenstand.</p>
             </details>
             <details>
               <summary>Appbeschreibung</summary>
-              <p>Der Notenrechner ist die erste App des Projekts Schola. Bewertungsprofile bleiben von einzelnen Berechnungen getrennt und können später um amtliche Quellen ergänzt werden.</p>
+              <p>Der Notenrechner ist die erste App des Projekts Schola. Bewertungsprofile bleiben von einzelnen Berechnungen getrennt und kÃ¶nnen spÃ¤ter um amtliche Quellen ergÃ¤nzt werden.</p>
             </details>
           </div>
         </div>
@@ -57,7 +64,7 @@
       <main class="bridge-stage">
         <section class="bridge-shell">
           <div class="profile-bar">
-            <nav class="selection-menu" aria-label="Bewertungsprofil auswählen">
+            <nav class="selection-menu" aria-label="Bewertungsprofil auswÃ¤hlen">
               <div class="selection-menu-shell">
                 <button type="button" id="schoolTypeMenuButton" class="selection-menu-button" aria-expanded="false" aria-controls="schoolTypeMenu"><span>Schulart</span></button>
                 <div id="schoolTypeMenu" class="selection-menu-popup" role="menu" hidden></div>
@@ -95,8 +102,8 @@
                 </div>
                 <output id="resultSecondary" class="result-secondary"></output>
                 <div class="result-facts">
-                  <div><span class="result-fact-label">Zur besseren Note</span><strong id="betterGradeOutput" class="result-neighbor-grade">–</strong><output id="pointsNeededOutput">–</output></div>
-                  <div><span class="result-fact-label">Zur schlechteren Note</span><strong id="worseGradeOutput" class="result-neighbor-grade">–</strong><output id="pointsToWorseOutput">–</output></div>
+                  <div><span class="result-fact-label">Zur besseren Note</span><strong id="betterGradeOutput" class="result-neighbor-grade">â€“</strong><output id="pointsNeededOutput">â€“</output></div>
+                  <div><span class="result-fact-label">Zur schlechteren Note</span><strong id="worseGradeOutput" class="result-neighbor-grade">â€“</strong><output id="pointsToWorseOutput">â€“</output></div>
                 </div>
               </div>
             </section>
@@ -109,24 +116,39 @@
         </section>
       </main>
 
-      <button type="button" id="openEngineButton" class="workspace-strip" aria-label="Maschinenraum öffnen">
+      <button type="button" id="openEngineButton" class="workspace-strip" aria-label="Maschinenraum Ã¶ffnen">
         <span>Maschinenraum</span>
       </button>
     </section>
 
     <section class="engine-view" aria-label="Maschinenraum">
-      <button type="button" id="returnBridgeButton" class="workspace-strip workspace-strip-top" aria-label="Zum Notenrechner zurückkehren">
+      <button type="button" id="returnBridgeButton" class="workspace-strip workspace-strip-top" aria-label="Zum Notenrechner zurÃ¼ckkehren">
         <span>Notenrechner</span>
       </button>
       <main class="engine-stage">
         <section class="engine-panel profile-manager">
           <div class="panel-head"><div><span class="label">Maschinenraum</span><h2>Bewertungsprofile</h2></div></div>
-          <label class="field full"><span>Aktives Profil</span><span class="select-shell"><select id="engineProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
-          <div class="button-row profile-actions">
-            <button type="button" id="newProfileButton" class="secondary-button primary-action">Neues Bewertungsprofil</button>
-            <button type="button" id="duplicateProfileButton" class="secondary-button">Profil duplizieren</button>
-            <button type="button" id="deleteProfileButton" class="secondary-button">Löschen</button>
+          <div class="engine-tabs" role="tablist" aria-label="Maschinenraum-Bereich">
+            <button type="button" id="engineBrowserTab" class="engine-tab" role="tab" aria-selected="true" aria-controls="engineBrowserPane">Browser</button>
+            <button type="button" id="engineProfileTab" class="engine-tab" role="tab" aria-selected="false" aria-controls="engineProfilePane">Aktives Profil</button>
           </div>
+          <section id="engineBrowserPane" class="engine-tab-pane" role="tabpanel" aria-labelledby="engineBrowserTab">
+            <div class="browser-toolbar">
+              <button type="button" id="newProfileButton" class="secondary-button primary-action">Neues Bewertungsprofil</button>
+              <span class="import-menu-shell">
+                <button type="button" id="importProfilesButton" class="secondary-button" aria-expanded="false" aria-controls="profileImportMenu">Importieren</button>
+                <span id="profileImportMenu" class="profile-import-menu" hidden>
+                  <button type="button" id="importFromDesktopButton">Desktop</button>
+                  <button type="button" id="importFromProfileFolderButton">Profilordner</button>
+                </span>
+              </span>
+              <button type="button" id="exportProfilesButton" class="secondary-button">Exportieren</button>
+              <input id="profileImportInput" type="file" accept=".json,application/json" hidden>
+            </div>
+            <div id="profileBrowserList" class="profile-browser-list" aria-label="Bewertungsprofile"></div>
+          </section>
+          <section id="engineProfilePane" class="engine-tab-pane" role="tabpanel" aria-labelledby="engineProfileTab" hidden>
+          <label class="field full"><span>Aktives Profil</span><span class="select-shell"><select id="engineProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
           <div class="engine-section">
             <div class="engine-section-head"><div><span class="label">Rechtsraum</span><h3>Geltung des Profils</h3></div></div>
             <div class="profile-fields compact-fields">
@@ -143,23 +165,23 @@
             <label class="field full basis-select"><span>Aktive Berechnungsgrundlage</span><span class="select-shell"><select id="basisSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
             <div class="button-row basis-actions">
               <button type="button" id="duplicateBasisButton" class="secondary-button">Grundlage duplizieren</button>
-              <button type="button" id="deleteBasisButton" class="text-button">Grundlage löschen</button>
+              <button type="button" id="deleteBasisButton" class="text-button">Grundlage lÃ¶schen</button>
             </div>
           <div class="profile-fields">
             <label class="field full"><span>Name der Berechnungsgrundlage</span><input id="basisNameInput" type="text"></label>
             <label class="field"><span>Version</span><input id="profileVersionInput" type="text" value="1"></label>
-            <label class="field"><span>Notensystem</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1–6</option><option value="points15">15–0 Punkte</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">Persönliche Arbeitsgrundlage</option><option value="verified">Amtlich geprüft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <label class="field"><span>Gültig ab</span><input id="validFromInput" type="date"></label>
-            <label class="field"><span>Gültig bis</span><input id="validUntilInput" type="date"></label>
+            <label class="field"><span>Notensystem</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1â€“6</option><option value="points15">15â€“0 Punkte</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+            <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">PersÃ¶nliche Arbeitsgrundlage</option><option value="verified">Amtlich geprÃ¼ft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+            <label class="field"><span>GÃ¼ltig ab</span><input id="validFromInput" type="date"></label>
+            <label class="field"><span>GÃ¼ltig bis</span><input id="validUntilInput" type="date"></label>
             <label class="field full"><span>Quellenhinweis</span><textarea id="sourceNoteInput" rows="3"></textarea></label>
-            <label class="field full"><span>Quellen-URL</span><input id="sourceUrlInput" type="url" placeholder="https://…"></label>
+            <label class="field full"><span>Quellen-URL</span><input id="sourceUrlInput" type="url" placeholder="https://â€¦"></label>
           </div>
           </div>
           <div class="engine-section scope-section">
             <div class="engine-section-head scope-head">
               <div><span class="label">Geltungsbereiche</span><h3>Auswahl zuordnen</h3></div>
-              <button type="button" id="addScopeButton" class="secondary-button">Geltungsbereich hinzufügen</button>
+              <button type="button" id="addScopeButton" class="secondary-button">Geltungsbereich hinzufÃ¼gen</button>
             </div>
             <label class="field full"><span>Aktiver Geltungsbereich</span><span class="select-shell"><select id="scopeSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
             <div class="profile-fields compact-fields">
@@ -170,21 +192,22 @@
             </div>
             <button type="button" id="deleteScopeButton" class="text-button scope-delete">Geltungsbereich entfernen</button>
           </div>
+          </section>
         </section>
 
         <section class="engine-panel threshold-manager">
           <div class="panel-head threshold-head">
             <div><span class="label">Berechnungsgrundlage</span><h2>Prozentgrenzen</h2></div>
-            <button type="button" id="resetProfilesButton" class="text-button">Ausgangsprofile wiederherstellen</button>
           </div>
-          <p class="panel-note">Jede Zeile bezeichnet den Mindestanteil für die jeweilige Stufe. Änderungen werden lokal im Browser gespeichert und wirken sofort auf der Brücke.</p>
+          <p class="panel-note">Jede Zeile bezeichnet den Mindestanteil fÃ¼r die jeweilige Stufe. Ã„nderungen werden lokal im Browser gespeichert und wirken sofort auf der BrÃ¼cke.</p>
           <div class="threshold-table-head"><span>Stufe</span><span>Note</span><span>Ab Prozent</span></div>
           <div id="thresholdEditor" class="threshold-editor"></div>
-          <div class="architecture-note"><strong>Architekturregel</strong><p>Ein Profil bündelt die Daten eines Rechtsraums. Darin liegen eigenständige Berechnungsgrundlagen mit Grenzwerten, Quelle und Version. Geltungsbereiche ordnen eine Grundlage Schularten, Klassen und Leistungsarten zu. Eine weitere Auswahl dupliziert daher niemals die Berechnungsgrundlage.</p></div>
+          <div class="architecture-note"><strong>Architekturregel</strong><p>Ein Profil bÃ¼ndelt die Daten eines Rechtsraums. Darin liegen eigenstÃ¤ndige Berechnungsgrundlagen mit Grenzwerten, Quelle und Version. Geltungsbereiche ordnen eine Grundlage Schularten, Klassen und Leistungsarten zu. Eine weitere Auswahl dupliziert daher niemals die Berechnungsgrundlage.</p></div>
         </section>
       </main>
     </section>
   </div>
-  <script src="noten.js?v=20260621g"></script>
+  <script src="noten.js?v=20260621j"></script>
 </body>
 </html>
+

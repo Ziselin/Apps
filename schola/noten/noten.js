@@ -1,32 +1,38 @@
-const STORAGE_KEY = "schola-grade-profiles-v4";
-const SESSION_KEY = "schola-grade-session-v4";
-const LEGACY_STORAGE_KEYS = ["schola-grade-profiles-v3", "schola-grade-profiles-v2"];
-const LEGACY_SESSION_KEYS = ["schola-grade-session-v3", "schola-grade-session-v2"];
+﻿const STORAGE_KEY = "schola-grade-profiles-v5";
+const SESSION_KEY = "schola-grade-session-v5";
+const LEGACY_STORAGE_KEYS = [];
+const LEGACY_SESSION_KEYS = [];
+// Architekturregel: Bewertungsprofile werden nicht im Programmcode gepflegt.
+// Mitgelieferte oder verifizierte Profile liegen als JSON im Profilordner und
+// müssen vom Nutzer bewusst importiert werden.
+const BUNDLED_PROFILE_FILES = [
+  { label: "Mecklenburg-Vorpommern", path: "profile/mecklenburg-vorpommern.json" },
+];
 
 // Die Bezeichnungen folgen dem Bildungsserver Mecklenburg-Vorpommern. Das
-// Bundesland ist Profilraum im Maschinenraum; die Brücke zeigt nur die drei
-// Entscheidungen, die für eine konkrete Berechnung nötig sind.
+// Bundesland ist Profilraum im Maschinenraum; die BrÃ¼cke zeigt nur die drei
+// Entscheidungen, die fÃ¼r eine konkrete Berechnung nÃ¶tig sind.
 const MV_SCHOOL_TYPES = [
   { name: "Grundschule", classes: ["1", "2", "3", "4"] },
-  { name: "Schulartunabhängige Orientierungsstufe", classes: ["5", "6"] },
+  { name: "SchulartunabhÃ¤ngige Orientierungsstufe", classes: ["5", "6"] },
   { name: "Regionale Schule", classes: ["5", "6", "7", "8", "9", "10"] },
   { name: "Gymnasium", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
-  { name: "Förderschule", classes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] },
+  { name: "FÃ¶rderschule", classes: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] },
   { name: "Gesamtschule", classes: ["5", "6", "7", "8", "9", "10", "11", "12"] },
   { name: "Berufliche Schulen", classes: ["Berufliche Bildung"] },
-  { name: "Schulen in freier Trägerschaft", classes: ["nach Schulart"] },
-  { name: "Abendgymnasium", classes: ["Einführungsphase", "Qualifikationsphase"] },
+  { name: "Schulen in freier TrÃ¤gerschaft", classes: ["nach Schulart"] },
+  { name: "Abendgymnasium", classes: ["EinfÃ¼hrungsphase", "Qualifikationsphase"] },
 ];
 
 const grade6Labels = [
   ["1", "sehr gut"], ["2", "gut"], ["3", "befriedigend"],
-  ["4", "ausreichend"], ["5", "mangelhaft"], ["6", "ungenügend"],
+  ["4", "ausreichend"], ["5", "mangelhaft"], ["6", "ungenÃ¼gend"],
 ];
 const point15Labels = [
-  ["15", "1+"], ["14", "1"], ["13", "1−"], ["12", "2+"],
-  ["11", "2"], ["10", "2−"], ["09", "3+"], ["08", "3"],
-  ["07", "3−"], ["06", "4+"], ["05", "4"], ["04", "4−"],
-  ["03", "5+"], ["02", "5"], ["01", "5−"], ["00", "6"],
+  ["15", "1+"], ["14", "1"], ["13", "1âˆ’"], ["12", "2+"],
+  ["11", "2"], ["10", "2âˆ’"], ["09", "3+"], ["08", "3"],
+  ["07", "3âˆ’"], ["06", "4+"], ["05", "4"], ["04", "4âˆ’"],
+  ["03", "5+"], ["02", "5"], ["01", "5âˆ’"], ["00", "6"],
 ];
 
 function makeThresholds(labels, percentages) {
@@ -36,40 +42,16 @@ function makeThresholds(labels, percentages) {
 function makeScope(id, schoolType, classes, assessmentType, qualification = "") {
   return { id, schoolType, classes: [...classes], assessmentType, qualification };
 }
-
-function createDefaultProfiles() {
-  const sourceNote = "Übernommen aus „Notenberechnung B M G.ods“; persönliche Arbeitsgrundlage, noch nicht amtlich verifiziert.";
-  const gradeProfile = (id, name, schoolType, classes, assessmentType, percentages) => ({
-    id, name, federalState: "Mecklenburg-Vorpommern", authority: "Eigene Ausgangstabelle", schoolType, classes, assessmentType,
-    scaleType: "grade6", status: "personal", sourceNote, sourceUrl: "",
-    thresholds: makeThresholds(grade6Labels, [...percentages, 0]),
-  });
-  const pointProfile = (id, name, assessmentType, percentages) => ({
-    id, name, federalState: "Mecklenburg-Vorpommern", authority: "Eigene Ausgangstabelle", schoolType: "Gymnasium",
-    classes: ["10", "11", "12"], assessmentType,
-    scaleType: "points15", status: "personal", sourceNote, sourceUrl: "",
-    thresholds: makeThresholds(point15Labels, percentages),
-  });
-  return [
-    gradeProfile("b-class-test", "Regionale Schule · Berufsreife · Klassenarbeit", "Regionale Schule", ["7", "8", "9", "10"], "Klassenarbeit · Berufsreife", [80, 60, 45, 25, 10]),
-    gradeProfile("m-class-test", "Regionale Schule · Mittlere Reife · Klassenarbeit", "Regionale Schule", ["7", "8", "9", "10"], "Klassenarbeit · Mittlere Reife", [96, 80, 60, 40, 20]),
-    gradeProfile("b-check", "Regionale Schule · Berufsreife · Leistungskontrolle", "Regionale Schule", ["7", "8", "9", "10"], "Leistungskontrolle · Berufsreife", [81, 62, 47, 29, 15]),
-    gradeProfile("m-check", "Regionale Schule · Mittlere Reife · Leistungskontrolle", "Regionale Schule", ["7", "8", "9", "10"], "Leistungskontrolle · Mittlere Reife", [97, 82, 62, 46, 30]),
-    gradeProfile("gym-sek1-simple", "Gymnasium · Sek. I · einfach", "Gymnasium", ["7", "8", "9"], "einfache Leistung", [80, 60, 45, 25, 10]),
-    gradeProfile("gym-sek1-test", "Gymnasium · Sek. I · Klassenarbeit", "Gymnasium", ["7", "8", "9"], "Klassenarbeit", [96, 80, 60, 40, 20]),
-    pointProfile("gym-sek2-simple", "Gymnasium · Sek. II · einfach", "einfache Leistung", [100, 98, 96, 91, 86, 80, 73, 66, 60, 53, 46, 40, 33, 26, 20, 0]),
-    pointProfile("gym-sek2-exam", "Gymnasium · Sek. II · Klausur", "Klausur", [95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 33, 27, 20, 0]),
-  ];
-}
-
 const ui = Object.fromEntries([
   "gradeApp", "menuButton", "menuCloseButton", "menuOverlay", "sideMenu", "resetScoreButton",
   "openEngineButton", "returnBridgeButton", "schoolTypeMenuButton", "schoolTypeMenu",
   "classLevelMenuButton", "classLevelMenu", "performanceMenuButton", "performanceMenu",
-  "selectionSummary", "engineProfileSelect",
+  "selectionSummary", "engineBrowserTab", "engineProfileTab", "engineBrowserPane", "engineProfilePane",
+  "profileBrowserList", "importProfilesButton", "profileImportMenu", "importFromDesktopButton", "importFromProfileFolderButton",
+  "exportProfilesButton", "profileImportInput", "engineProfileSelect",
   "earnedInput", "totalInput", "percentageOutput", "scoreTrackFill", "inputMessage", "resultPrimary",
   "resultSecondary", "betterGradeOutput", "worseGradeOutput", "pointsNeededOutput", "pointsToWorseOutput", "boundaryList",
-  "newProfileButton", "duplicateProfileButton", "deleteProfileButton", "profileNameInput", "countryCodeInput",
+  "newProfileButton", "profileNameInput", "countryCodeInput",
   "subdivisionCodeInput", "basisSelect", "addBasisButton", "duplicateBasisButton", "deleteBasisButton", "basisNameInput",
   "profileVersionInput", "validFromInput", "validUntilInput", "scopeSelect", "addScopeButton",
   "deleteScopeButton", "schoolTypeInput", "gradeBandInput", "assessmentTypeInput", "qualificationInput", "scaleTypeSelect", "profileStatusSelect",
@@ -81,9 +63,9 @@ function clone(value) {
 }
 
 // Vorhandene Profile werden beim Lesen verlustfrei in die Trennung aus
-// Rechtsraum, Berechnungsgrundlage und Geltungsbereichen überführt.
+// Rechtsraum, Berechnungsgrundlage und Geltungsbereichen Ã¼berfÃ¼hrt.
 function normalizeProfile(profile) {
-  const legacyParts = String(profile.assessmentType || "").split(/\s*·\s*/).filter(Boolean);
+  const legacyParts = String(profile.assessmentType || "").split(/\s*Â·\s*/).filter(Boolean);
   const scopes = Array.isArray(profile.scopes) && profile.scopes.length
     ? profile.scopes.map((scope, index) => ({
       id: scope.id || `${profile.id}-scope-${index + 1}`,
@@ -97,7 +79,7 @@ function normalizeProfile(profile) {
       profile.schoolType || "Regionale Schule",
       Array.isArray(profile.classes) && profile.classes.length ? profile.classes : ["7"],
       legacyParts[0] || "",
-      legacyParts.slice(1).join(" · "),
+      legacyParts.slice(1).join(" Â· "),
     )];
   const normalized = {
     ...profile,
@@ -150,8 +132,7 @@ function loadWorkspaceData() {
   } catch (error) {
     console.warn("Gespeicherte Bewertungsprofile konnten nicht gelesen werden.", error);
   }
-  const bases = createDefaultProfiles().map(normalizeProfile).map((basis) => assignBasisToCollection(basis, "de-de-mv"));
-  return { collections: [{ id: "de-de-mv", name: "Mecklenburg-Vorpommern", countryCode: "DE", subdivisionCode: "DE-MV" }], bases };
+  return { collections: [], bases: [] };
 }
 
 function loadSession() {
@@ -169,13 +150,14 @@ const state = {
   profiles: storedWorkspace.bases,
   activeProfileId: storedWorkspace.collections.some((entry) => entry.id === storedSession.activeProfileId) ? storedSession.activeProfileId : storedWorkspace.collections[0]?.id || "",
   activeBasisId: storedSession.activeBasisId || (storedWorkspace.bases.some((entry) => entry.id === storedSession.activeProfileId) ? storedSession.activeProfileId : storedWorkspace.bases[0]?.id || ""),
-  bridgeProfileId: storedSession.bridgeProfileId || "gym-sek1-test",
+  bridgeProfileId: storedWorkspace.bases.some((entry) => entry.id === storedSession.bridgeProfileId) ? storedSession.bridgeProfileId : "",
   bridgeScopeId: storedSession.bridgeScopeId || "",
   activeScopeId: storedSession.activeScopeId || "",
   schoolType: storedSession.schoolType || "Gymnasium",
   classLevel: storedSession.classLevel || "7",
   earned: storedSession.earned ?? "46",
   total: storedSession.total ?? "54",
+  engineTab: storedSession.engineTab === "profile" ? "profile" : "browser",
 };
 
 function getActiveProfile() {
@@ -213,9 +195,10 @@ function persist() {
       classLevel: state.classLevel,
       earned: state.earned,
       total: state.total,
+      engineTab: state.engineTab,
     }));
   } catch (error) {
-    console.warn("Der lokale Speicher ist nicht verfügbar.", error);
+    console.warn("Der lokale Speicher ist nicht verfÃ¼gbar.", error);
   }
 }
 
@@ -226,7 +209,7 @@ function parseNumber(value) {
 }
 
 function formatNumber(value, maximumFractionDigits = 2) {
-  if (!Number.isFinite(value)) return "–";
+  if (!Number.isFinite(value)) return "â€“";
   return new Intl.NumberFormat("de-DE", { minimumFractionDigits: 0, maximumFractionDigits }).format(value);
 }
 
@@ -333,7 +316,7 @@ function renderBridgeSelectors() {
   });
   renderSelectionMenu(ui.performanceMenu, profiles.map(({ profile: entry, scope: entryScope }) => ({
     value: `${entry.id}::${entryScope.id}`,
-    label: [entryScope.assessmentType || entry.name, entryScope.qualification].filter(Boolean).join(" · "),
+    label: [entryScope.assessmentType || entry.name, entryScope.qualification].filter(Boolean).join(" Â· "),
   })), `${state.bridgeProfileId}::${state.bridgeScopeId}`, (value) => {
     [state.bridgeProfileId, state.bridgeScopeId] = value.split("::");
     renderBridgeSelectors();
@@ -356,17 +339,17 @@ function renderBridge() {
 
   ui.inputMessage.classList.remove("is-error");
   if (!result) {
-    ui.percentageOutput.textContent = "– %";
-    ui.resultPrimary.textContent = "–";
-    ui.resultSecondary.textContent = profile ? "Bitte gültige Punktwerte eingeben." : "Kein Bewertungsprofil";
-    ui.betterGradeOutput.textContent = "–";
-    ui.worseGradeOutput.textContent = "–";
-    ui.pointsNeededOutput.textContent = "–";
-    ui.pointsToWorseOutput.textContent = "–";
+    ui.percentageOutput.textContent = "â€“ %";
+    ui.resultPrimary.textContent = "â€“";
+    ui.resultSecondary.textContent = profile ? "Bitte gÃ¼ltige Punktwerte eingeben." : "Kein Bewertungsprofil";
+    ui.betterGradeOutput.textContent = "â€“";
+    ui.worseGradeOutput.textContent = "â€“";
+    ui.pointsNeededOutput.textContent = "â€“";
+    ui.pointsToWorseOutput.textContent = "â€“";
     ui.scoreTrackFill.style.width = "0%";
     ui.inputMessage.textContent = !profile
-      ? "Für diese Auswahl muss im Maschinenraum noch ein Profil angelegt werden."
-      : total === 0 ? "Die Gesamtpunktzahl muss größer als null sein." : "Bitte Zahlen größer oder gleich null eingeben.";
+      ? "FÃ¼r diese Auswahl muss im Maschinenraum noch ein Profil angelegt werden."
+      : total === 0 ? "Die Gesamtpunktzahl muss grÃ¶ÃŸer als null sein." : "Bitte Zahlen grÃ¶ÃŸer oder gleich null eingeben.";
     ui.inputMessage.classList.add("is-error");
     ui.boundaryList.replaceChildren();
     return;
@@ -375,20 +358,20 @@ function renderBridge() {
   ui.percentageOutput.textContent = `${formatNumber(result.percent)} %`;
   ui.scoreTrackFill.style.width = `${Math.min(100, Math.max(0, result.percent))}%`;
   if (earned > total) {
-    ui.inputMessage.textContent = "Die erreichte Punktzahl liegt über der Gesamtpunktzahl.";
+    ui.inputMessage.textContent = "Die erreichte Punktzahl liegt Ã¼ber der Gesamtpunktzahl.";
     ui.inputMessage.classList.add("is-error");
   } else {
     ui.inputMessage.textContent = "";
   }
 
   const pointScale = profile.scaleType === "points15";
-  ui.resultPrimary.textContent = result.current?.level || "–";
+  ui.resultPrimary.textContent = result.current?.level || "â€“";
   const numericNote = String(pointScale ? result.current?.note : result.current?.level || "").match(/[1-6]/)?.[0] || "";
   ui.resultSecondary.textContent = grade6Labels.find(([grade]) => grade === numericNote)?.[1] || "";
-  ui.betterGradeOutput.textContent = result.better?.level || "–";
-  ui.worseGradeOutput.textContent = result.worse?.level || "–";
+  ui.betterGradeOutput.textContent = result.better?.level || "â€“";
+  ui.worseGradeOutput.textContent = result.worse?.level || "â€“";
   ui.pointsNeededOutput.textContent = result.better ? `+ ${formatNumber(result.pointsNeeded)} P.` : "Beststufe";
-  ui.pointsToWorseOutput.textContent = result.worse ? `− ${formatNumber(result.pointsToWorse)} P.` : "Endstufe";
+  ui.pointsToWorseOutput.textContent = result.worse ? `âˆ’ ${formatNumber(result.pointsToWorse)} P.` : "Endstufe";
 
   ui.boundaryList.replaceChildren(...result.thresholds.map((threshold) => {
     const item = document.createElement("div");
@@ -428,7 +411,7 @@ function renderProfileEditor() {
   ui.validFromInput.value = activeBasis.validFrom || "";
   ui.validUntilInput.value = activeBasis.validUntil || "";
   ui.scopeSelect.replaceChildren(...activeBasis.scopes.map((entry, index) => new Option(
-    [entry.schoolType, entry.assessmentType, entry.qualification].filter(Boolean).join(" · ") || `Geltungsbereich ${index + 1}`,
+    [entry.schoolType, entry.assessmentType, entry.qualification].filter(Boolean).join(" Â· ") || `Geltungsbereich ${index + 1}`,
     entry.id,
   )));
   ui.scopeSelect.value = state.activeScopeId;
@@ -439,7 +422,6 @@ function renderProfileEditor() {
   ui.qualificationInput.value = scope?.qualification || "";
   ui.deleteScopeButton.disabled = activeBasis.scopes.length <= 1;
   ui.deleteBasisButton.disabled = availableBases.length <= 1;
-  ui.deleteProfileButton.disabled = state.collections.length <= 1;
   ui.scaleTypeSelect.value = activeBasis.scaleType || "grade6";
   ui.profileStatusSelect.value = activeBasis.status || "personal";
   ui.sourceNoteInput.value = activeBasis.sourceNote || "";
@@ -458,7 +440,7 @@ function renderProfileEditor() {
     input.type = "text";
     input.inputMode = "decimal";
     input.value = formatNumber(Number(threshold.minPercent));
-    input.setAttribute("aria-label", `Mindestprozent für ${threshold.level}`);
+    input.setAttribute("aria-label", `Mindestprozent fÃ¼r ${threshold.level}`);
     input.addEventListener("change", () => {
       const nextValue = Math.min(100, Math.max(0, parseNumber(input.value)));
       if (!Number.isFinite(nextValue)) {
@@ -476,14 +458,82 @@ function renderProfileEditor() {
   }));
 }
 
+function setEngineTab(tabName) {
+  state.engineTab = tabName === "profile" ? "profile" : "browser";
+  const isProfile = state.engineTab === "profile";
+  ui.gradeApp.classList.toggle("engine-tab-browser", !isProfile);
+  ui.gradeApp.classList.toggle("engine-tab-profile", isProfile);
+  ui.engineBrowserTab.setAttribute("aria-selected", String(!isProfile));
+  ui.engineProfileTab.setAttribute("aria-selected", String(isProfile));
+  ui.engineBrowserPane.hidden = isProfile;
+  ui.engineProfilePane.hidden = !isProfile;
+  persist();
+}
+
+function getCollectionBases(collectionId) {
+  return state.profiles.filter((basis) => basis.collectionId === collectionId);
+}
+
+function renderProfileBrowser() {
+  if (!state.collections.length) {
+    const empty = document.createElement("p");
+    empty.className = "profile-browser-empty";
+    empty.textContent = "Noch keine Bewertungsprofile. Importieren Sie ein Profil oder legen Sie ein neues an.";
+    ui.profileBrowserList.replaceChildren(empty);
+    return;
+  }
+  ui.profileBrowserList.replaceChildren(...state.collections.map((collection) => {
+    const bases = getCollectionBases(collection.id);
+    const item = document.createElement("article");
+    item.className = "profile-browser-item";
+    if (collection.id === state.activeProfileId) item.classList.add("is-active");
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    title.className = "profile-browser-title";
+    title.textContent = collection.name || "Unbenanntes Profil";
+    const meta = document.createElement("span");
+    meta.className = "profile-browser-meta";
+    meta.textContent = [
+      [collection.countryCode, collection.subdivisionCode].filter(Boolean).join("-") || "ohne Rechtsraum",
+      `${bases.length} Berechnungsgrundlage${bases.length === 1 ? "" : "n"}`,
+    ].join(" Â· ");
+    text.append(title, meta);
+
+    const menu = document.createElement("details");
+    menu.className = "profile-record-menu";
+    const summary = document.createElement("summary");
+    summary.setAttribute("aria-label", `Aktionen fÃ¼r ${collection.name || "Profil"}`);
+    summary.textContent = "â‹®";
+    const actions = document.createElement("div");
+    actions.className = "profile-record-actions";
+    [
+      ["activate", "Aktivieren"],
+      ["edit", "Bearbeiten"],
+      ["export", "Exportieren"],
+    ].forEach(([action, label]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.profileAction = action;
+      button.dataset.profileId = collection.id;
+      button.textContent = label;
+      actions.appendChild(button);
+    });
+    menu.append(summary, actions);
+    item.append(text, menu);
+    return item;
+  }));
+}
+
 function renderAll() {
   if (!state.collections.some((profile) => profile.id === state.activeProfileId)) state.activeProfileId = state.collections[0]?.id || "";
   const availableBases = state.profiles.filter((basis) => basis.collectionId === state.activeProfileId);
   if (!availableBases.some((basis) => basis.id === state.activeBasisId)) state.activeBasisId = availableBases[0]?.id || "";
   renderProfileOptions();
+  renderProfileBrowser();
   renderBridgeSelectors();
   renderBridge();
   renderProfileEditor();
+  setEngineTab(state.engineTab);
   persist();
 }
 
@@ -533,7 +583,7 @@ function updateScopeField(field, value) {
     if (field === "classes" && !value.includes(state.classLevel)) state.classLevel = value[0] || state.classLevel;
   }
   const option = [...ui.scopeSelect.options].find((entry) => entry.value === scope.id);
-  if (option) option.textContent = [scope.schoolType, scope.assessmentType, scope.qualification].filter(Boolean).join(" · ") || "Geltungsbereich";
+  if (option) option.textContent = [scope.schoolType, scope.assessmentType, scope.qualification].filter(Boolean).join(" Â· ") || "Geltungsbereich";
   renderBridgeSelectors();
   renderBridge();
   persist();
@@ -562,14 +612,91 @@ function createBlankCollection() {
   return { id, name: "Neues Profil", countryCode: "DE", subdivisionCode: "DE-MV" };
 }
 
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportWorkspace() {
+  downloadJson("schola-bewertungsprofile.json", {
+    type: "schola-grade-profiles-export",
+    version: 1,
+    collections: state.collections,
+    bases: state.profiles,
+  });
+}
+
+function exportCollection(collectionId) {
+  const collection = state.collections.find((entry) => entry.id === collectionId);
+  if (!collection) return;
+  downloadJson(`${collection.name || "bewertungsprofil"}.json`, {
+    type: "schola-grade-profile-export",
+    version: 1,
+    collections: [collection],
+    bases: getCollectionBases(collection.id),
+  });
+}
+
+async function importBundledProfile(profilePath = BUNDLED_PROFILE_FILES[0]?.path) {
+  if (!profilePath) return;
+  const response = await fetch(profilePath, { cache: "no-store" });
+  if (!response.ok) throw new Error("profile-folder-import-failed");
+  importWorkspacePayload(await response.json());
+}
+
+function importWorkspacePayload(payload) {
+  const collections = Array.isArray(payload?.collections) ? payload.collections : [];
+  const bases = Array.isArray(payload?.bases) ? payload.bases : Array.isArray(payload?.profiles) ? payload.profiles : [];
+  if (!collections.length || !bases.length) throw new Error("invalid-import");
+  const idMap = new Map();
+  const importedCollections = collections.map((collection, index) => {
+    const originalId = collection.id || `import-${Date.now()}-${index}`;
+    const nextId = state.collections.some((entry) => entry.id === originalId) ? `${originalId}-import-${Date.now()}` : originalId;
+    idMap.set(originalId, nextId);
+    return {
+      id: nextId,
+      name: collection.name || "Importiertes Profil",
+      countryCode: collection.countryCode || "DE",
+      subdivisionCode: collection.subdivisionCode || "DE-MV",
+    };
+  });
+  const importedBases = bases.map(normalizeProfile).map((basis, index) => {
+    const originalCollectionId = basis.collectionId || collections[0]?.id;
+    const collectionId = idMap.get(originalCollectionId) || importedCollections[0].id;
+    const copy = clone(basis);
+    copy.id = state.profiles.some((entry) => entry.id === copy.id) ? `${copy.id}-import-${Date.now()}-${index}` : copy.id || `basis-import-${Date.now()}-${index}`;
+    copy.collectionId = collectionId;
+    copy.scopes = copy.scopes.map((scope, scopeIndex) => ({ ...scope, id: `${copy.id}-scope-${scopeIndex + 1}` }));
+    return copy;
+  });
+  state.collections.push(...importedCollections);
+  state.profiles.push(...importedBases);
+  state.activeProfileId = importedCollections[0].id;
+  state.activeBasisId = importedBases.find((basis) => basis.collectionId === state.activeProfileId)?.id || "";
+  state.activeScopeId = getActiveBasis()?.scopes?.[0]?.id || "";
+  renderAll();
+}
+
 function setWorkspaceMode(mode) {
   ui.gradeApp.classList.toggle("workspace-mode-engine", mode === "engine");
   ui.gradeApp.classList.toggle("workspace-mode-bridge", mode !== "engine");
-  if (mode === "engine") ui.engineProfileSelect.focus();
+  if (mode === "engine") (state.engineTab === "profile" ? ui.engineProfileSelect : ui.engineBrowserTab).focus();
   else ui.earnedInput.focus();
 }
 
 function setMenuOpen(isOpen) {
+  if (isOpen) {
+    ui.sideMenu.querySelectorAll("details[open]").forEach((details) => {
+      details.open = false;
+    });
+  }
   ui.sideMenu.classList.toggle("is-open", isOpen);
   ui.sideMenu.setAttribute("aria-hidden", String(!isOpen));
   ui.sideMenu.inert = !isOpen;
@@ -583,6 +710,8 @@ ui.menuOverlay.addEventListener("click", () => setMenuOpen(false));
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenuOpen(false); });
 ui.openEngineButton.addEventListener("click", () => setWorkspaceMode("engine"));
 ui.returnBridgeButton.addEventListener("click", () => setWorkspaceMode("bridge"));
+ui.engineBrowserTab.addEventListener("click", () => setEngineTab("browser"));
+ui.engineProfileTab.addEventListener("click", () => setEngineTab("profile"));
 ui.engineProfileSelect.addEventListener("change", () => selectProfile(ui.engineProfileSelect.value));
 ui.schoolTypeMenuButton.addEventListener("click", () => toggleSelectionMenu(ui.schoolTypeMenuButton, ui.schoolTypeMenu));
 ui.classLevelMenuButton.addEventListener("click", () => toggleSelectionMenu(ui.classLevelMenuButton, ui.classLevelMenu));
@@ -591,6 +720,16 @@ document.addEventListener("click", (event) => {
   if (!event.target.closest(".selection-menu-shell")) closeSelectionMenus();
 });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeSelectionMenus(); });
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".profile-record-menu")) return;
+  document.querySelectorAll(".profile-record-menu[open]").forEach((menu) => {
+    menu.open = false;
+  });
+  if (!event.target.closest(".import-menu-shell")) {
+    ui.profileImportMenu.hidden = true;
+    ui.importProfilesButton.setAttribute("aria-expanded", "false");
+  }
+});
 
 ui.earnedInput.addEventListener("input", () => { state.earned = ui.earnedInput.value; renderBridge(); persist(); });
 ui.totalInput.addEventListener("input", () => { state.total = ui.totalInput.value; renderBridge(); persist(); });
@@ -655,30 +794,56 @@ ui.newProfileButton.addEventListener("click", () => {
   state.activeProfileId = profile.id;
   state.activeBasisId = basis.id;
   state.activeScopeId = basis.scopes[0].id;
+  setEngineTab("profile");
   renderAll();
   ui.profileNameInput.select();
 });
 
-ui.duplicateProfileButton.addEventListener("click", () => {
-  const source = getActiveProfile();
-  if (!source) return;
-  const profile = clone(source);
-  profile.id = `profile-${Date.now()}`;
-  profile.name = `${source.name} · Kopie`;
-  const bases = state.profiles.filter((basis) => basis.collectionId === source.id).map((basis, basisIndex) => {
-    const copy = clone(basis);
-    copy.id = `${profile.id}-basis-${basisIndex + 1}`;
-    copy.collectionId = profile.id;
-    copy.status = "draft";
-    copy.scopes = copy.scopes.map((scope, index) => ({ ...scope, id: `${copy.id}-scope-${index + 1}` }));
-    return copy;
-  });
-  state.collections.push(profile);
-  state.profiles.push(...bases);
-  state.activeProfileId = profile.id;
-  state.activeBasisId = bases[0]?.id || "";
-  state.activeScopeId = bases[0]?.scopes?.[0]?.id || "";
-  renderAll();
+ui.profileBrowserList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-profile-action]");
+  if (!button) return;
+  const profileId = button.dataset.profileId;
+  if (button.dataset.profileAction === "activate") {
+    selectProfile(profileId);
+    setEngineTab("browser");
+  }
+  if (button.dataset.profileAction === "edit") {
+    selectProfile(profileId);
+    setEngineTab("profile");
+    ui.profileNameInput.focus();
+  }
+  if (button.dataset.profileAction === "export") exportCollection(profileId);
+});
+
+ui.exportProfilesButton.addEventListener("click", exportWorkspace);
+ui.importProfilesButton.addEventListener("click", () => {
+  const nextOpen = ui.profileImportMenu.hidden;
+  ui.profileImportMenu.hidden = !nextOpen;
+  ui.importProfilesButton.setAttribute("aria-expanded", String(nextOpen));
+});
+ui.importFromDesktopButton.addEventListener("click", () => {
+  ui.profileImportMenu.hidden = true;
+  ui.importProfilesButton.setAttribute("aria-expanded", "false");
+  ui.profileImportInput.click();
+});
+ui.importFromProfileFolderButton.addEventListener("click", async () => {
+  ui.profileImportMenu.hidden = true;
+  ui.importProfilesButton.setAttribute("aria-expanded", "false");
+  try {
+    await importBundledProfile();
+  } catch (error) {
+    window.alert("Das Profil aus dem Profilordner konnte nicht importiert werden.");
+  }
+});
+ui.profileImportInput.addEventListener("change", async () => {
+  const file = ui.profileImportInput.files?.[0];
+  ui.profileImportInput.value = "";
+  if (!file) return;
+  try {
+    importWorkspacePayload(JSON.parse(await file.text()));
+  } catch (error) {
+    window.alert("Die Datei konnte nicht als Schola-Bewertungsprofil importiert werden.");
+  }
 });
 
 ui.addBasisButton.addEventListener("click", () => {
@@ -697,7 +862,7 @@ ui.duplicateBasisButton.addEventListener("click", () => {
   if (!source) return;
   const basis = clone(source);
   basis.id = `basis-${Date.now()}`;
-  basis.name = `${source.name} · Kopie`;
+  basis.name = `${source.name} Â· Kopie`;
   basis.status = "draft";
   basis.scopes = basis.scopes.map((scope, index) => ({ ...scope, id: `${basis.id}-scope-${index + 1}` }));
   state.profiles.push(basis);
@@ -744,31 +909,20 @@ ui.deleteScopeButton.addEventListener("click", () => {
   renderAll();
 });
 
-ui.deleteProfileButton.addEventListener("click", () => {
-  if (state.collections.length <= 1) return;
-  const profile = getActiveProfile();
-  if (!profile || !window.confirm(`Profil „${profile.name}“ löschen?`)) return;
-  state.collections = state.collections.filter((entry) => entry.id !== profile.id);
-  state.profiles = state.profiles.filter((entry) => entry.collectionId !== profile.id);
-  state.activeProfileId = state.collections[0].id;
-  const next = state.profiles.find((entry) => entry.collectionId === state.activeProfileId);
-  state.activeBasisId = next?.id || "";
-  state.activeScopeId = next?.scopes?.[0]?.id || "";
-  renderAll();
-});
-
-ui.resetProfilesButton.addEventListener("click", () => {
-  if (!window.confirm("Alle lokal geänderten Profile durch die Ausgangsprofile aus der ODS-Datei ersetzen?")) return;
-  state.collections = [{ id: "de-de-mv", name: "Mecklenburg-Vorpommern", countryCode: "DE", subdivisionCode: "DE-MV" }];
-  state.profiles = createDefaultProfiles().map(normalizeProfile).map((basis) => assignBasisToCollection(basis, "de-de-mv"));
-  state.activeProfileId = "de-de-mv";
-  state.activeBasisId = "gym-sek1-test";
-  state.activeScopeId = state.profiles.find((profile) => profile.id === state.activeBasisId)?.scopes?.[0]?.id || "";
-  state.bridgeProfileId = "gym-sek1-test";
-  state.bridgeScopeId = state.activeScopeId;
-  state.schoolType = "Gymnasium";
-  state.classLevel = "7";
+ui.resetProfilesButton?.addEventListener("click", () => {
+  if (!window.confirm("Alle lokal gespeicherten Bewertungsprofile aus dieser App entfernen?")) return;
+  state.collections = [];
+  state.profiles = [];
+  state.activeProfileId = "";
+  state.activeBasisId = "";
+  state.activeScopeId = "";
+  state.bridgeProfileId = "";
+  state.bridgeScopeId = "";
   renderAll();
 });
 
 renderAll();
+
+
+
+

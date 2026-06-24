@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="typemap.css?v=20260621q">
+  <link rel="stylesheet" href="typemap.css?v=20260621r">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -69,6 +69,18 @@
             <button type="button" id="typeMenuCloseButton" class="type-menu-close-button" aria-label="Menü schließen">X</button>
           </div>
           <div class="type-menu-list">
+            <div class="type-menu-section">
+              <button type="button" class="type-menu-item" data-menu-panel="projects" aria-expanded="false">
+                <img class="type-menu-icon" src="https://api.iconify.design/mdi/folder-multiple-outline.svg" alt="" aria-hidden="true">
+                <span>Projekte</span>
+              </button>
+              <div class="type-menu-popup" data-menu-popup="projects" hidden>
+                <div class="project-choice-list" aria-label="Projektbereich wechseln">
+                  <a class="project-choice" href="../index.html" aria-current="page">Atlas</a>
+                  <a class="project-choice" href="../index.html?project=schola">Schola</a>
+                </div>
+              </div>
+            </div>
             <div class="type-menu-section">
               <button type="button" class="type-menu-item" data-menu-panel="help" aria-expanded="false">
                 <img class="type-menu-icon" src="https://api.iconify.design/mdi/teacher.svg" alt="" aria-hidden="true">
@@ -903,7 +915,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260621b"></script>
-  <script src="typemap.js?v=20260621zf"></script>
+  <script src="typemap.js?v=20260621zg"></script>
 </body>
 </html>
 

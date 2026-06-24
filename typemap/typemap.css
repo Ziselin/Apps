@@ -679,6 +679,44 @@ body.typemap-theme-light .type-menu-popup {
   display: none;
 }
 
+.project-choice-list {
+  display: grid;
+  gap: 6px;
+}
+
+.project-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.project-choice:hover,
+.project-choice[aria-current="page"] {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+body.typemap-theme-light .project-choice:hover,
+body.typemap-theme-light .project-choice[aria-current="page"] {
+  background: rgba(33, 54, 51, 0.055);
+}
+
+.project-choice[aria-current="page"]::after {
+  content: "✓";
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .type-stage {
   --type-stage-inline-padding: 40px;
   display: flex;

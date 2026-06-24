@@ -6076,6 +6076,15 @@ async function flushAutosave() {
 }
 
 function setMenuOpen(isOpen) {
+  if (isOpen) {
+    document.querySelectorAll("[data-menu-panel]").forEach((button) => {
+      button.classList.remove("is-active");
+      button.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll("[data-menu-popup]").forEach((panel) => {
+      panel.hidden = true;
+    });
+  }
   ui.sideMenu?.classList.toggle("is-open", isOpen);
   if (ui.menuOverlay) ui.menuOverlay.hidden = !isOpen;
   ui.sideMenu?.setAttribute("aria-hidden", isOpen ? "false" : "true");

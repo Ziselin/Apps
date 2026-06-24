@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TimeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/timemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="timemap.css?v=20260614b">
+  <link rel="stylesheet" href="timemap.css?v=20260614c">
 </head>
 <body>
   <main class="app-frame workspace-mode-timeline">
@@ -45,6 +45,18 @@
             <button type="button" id="timelineMenuCloseButton" class="timeline-menu-close-button" aria-label="Menü schließen">X</button>
           </div>
           <div class="timeline-menu-list">
+            <div class="timeline-menu-section">
+              <button type="button" class="timeline-menu-item" data-menu-panel="projects" aria-expanded="false">
+                <img class="timeline-menu-icon" src="https://api.iconify.design/mdi/folder-multiple-outline.svg" alt="" aria-hidden="true">
+                <span>Projekte</span>
+              </button>
+              <div class="timeline-menu-popup" data-menu-popup="projects" hidden>
+                <div class="project-choice-list" aria-label="Projektbereich wechseln">
+                  <a class="project-choice" href="../index.html" aria-current="page">Atlas</a>
+                  <a class="project-choice" href="../index.html?project=schola">Schola</a>
+                </div>
+              </div>
+            </div>
             <div class="timeline-menu-section">
               <button type="button" class="timeline-menu-item" data-menu-panel="language" aria-expanded="false">
                 <img class="timeline-menu-icon" src="https://api.iconify.design/material-symbols/language.svg" alt="" aria-hidden="true">
@@ -790,7 +802,7 @@
       }
     }, 10000);
   </script>
-<script src="timemap.js?v=20260616b"></script>
+<script src="timemap.js?v=20260616c"></script>
 </body>
 </html>
 
