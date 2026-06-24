@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#eeeee7">
-  <title>Notenrechner Â· Schola</title>
+  <title>Notenrechner · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/notenrechner-icon.svg?v=20260621b">
-  <link rel="stylesheet" href="noten.css?v=20260621n">
+  <link rel="stylesheet" href="noten.css?v=20260621v">
 </head>
 <body>
   <div id="gradeApp" class="app-frame workspace-mode-bridge">
@@ -130,7 +130,7 @@
           <div class="panel-head"><div><span class="label">Maschinenraum</span><h2>Bewertungsprofile</h2></div></div>
           <div class="engine-tabs" role="tablist" aria-label="Maschinenraum-Bereich">
             <button type="button" id="engineBrowserTab" class="engine-tab" role="tab" aria-selected="true" aria-controls="engineBrowserPane">Browser</button>
-            <button type="button" id="engineProfileTab" class="engine-tab" role="tab" aria-selected="false" aria-controls="engineProfilePane">Aktives Profil</button>
+            <button type="button" id="engineProfileTab" class="engine-tab" role="tab" aria-selected="false" aria-controls="engineProfilePane">Bearbeiten</button>
           </div>
           <section id="engineBrowserPane" class="engine-tab-pane" role="tabpanel" aria-labelledby="engineBrowserTab">
             <div class="browser-toolbar">
@@ -141,73 +141,106 @@
                   <button type="button" id="importFromDesktopButton">Desktop</button>
                   <button type="button" id="importFromProfileFolderButton">Profilordner</button>
                 </span>
+                <span id="profileFolderMenu" class="profile-folder-menu" hidden></span>
               </span>
               <button type="button" id="exportProfilesButton" class="secondary-button">Exportieren</button>
               <input id="profileImportInput" type="file" accept=".json,application/json" hidden>
             </div>
             <div id="profileBrowserList" class="profile-browser-list" aria-label="Bewertungsprofile"></div>
           </section>
-          <section id="engineProfilePane" class="engine-tab-pane" role="tabpanel" aria-labelledby="engineProfileTab" hidden>
-          <label class="field full"><span>Aktives Profil</span><span class="select-shell"><select id="engineProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
-          <div class="engine-section">
-            <div class="engine-section-head"><div><span class="label">Rechtsraum</span><h3>Geltung des Profils</h3></div></div>
-            <div class="profile-fields compact-fields">
-              <label class="field full"><span>Profilname</span><input id="profileNameInput" type="text"></label>
-              <label class="field"><span>Staat</span><span class="select-shell"><select id="countryCodeInput"><option value="DE">Deutschland (DE)</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-              <label class="field"><span>Bundesland</span><span class="select-shell"><select id="subdivisionCodeInput"><option value="DE-MV">Mecklenburg-Vorpommern (DE-MV)</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            </div>
-          </div>
-          <div class="engine-section">
-            <div class="engine-section-head scope-head">
-              <div><span class="label">Berechnungsgrundlage</span><h3>Notengrenzen und Herkunft</h3></div>
-              <button type="button" id="addBasisButton" class="secondary-button">Neue Berechnungsgrundlage</button>
-            </div>
-            <label class="field full basis-select"><span>Aktive Berechnungsgrundlage</span><span class="select-shell"><select id="basisSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <div class="button-row basis-actions">
-              <button type="button" id="duplicateBasisButton" class="secondary-button">Grundlage duplizieren</button>
-              <button type="button" id="deleteBasisButton" class="text-button">Grundlage löschen</button>
-            </div>
-          <div class="profile-fields">
-            <label class="field full"><span>Name der Berechnungsgrundlage</span><input id="basisNameInput" type="text"></label>
-            <label class="field"><span>Version</span><input id="profileVersionInput" type="text" value="1"></label>
-            <label class="field"><span>Notensystem</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1-6</option><option value="points15">15-0 Punkte</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">Persönliche Arbeitsgrundlage</option><option value="verified">Amtlich geprüft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <label class="field"><span>Gültig ab</span><input id="validFromInput" type="date"></label>
-            <label class="field"><span>Gültig bis</span><input id="validUntilInput" type="date"></label>
-            <label class="field full"><span>Quellenhinweis</span><textarea id="sourceNoteInput" rows="3"></textarea></label>
-            <label class="field full"><span>Quellen-URL</span><input id="sourceUrlInput" type="url" placeholder="https://…"></label>
-          </div>
-          </div>
-          <div class="engine-section scope-section">
-            <div class="engine-section-head scope-head">
-              <div><span class="label">Geltungsbereiche</span><h3>Auswahl zuordnen</h3></div>
-              <button type="button" id="addScopeButton" class="secondary-button">Geltungsbereich hinzufügen</button>
-            </div>
-            <label class="field full"><span>Aktiver Geltungsbereich</span><span class="select-shell"><select id="scopeSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
-            <div class="profile-fields compact-fields">
-              <label class="field"><span>Schulart</span><span class="select-shell"><select id="schoolTypeInput"></select><span class="select-caret" aria-hidden="true"></span></span></label>
-              <label class="field"><span>Klassen</span><input id="gradeBandInput" type="text" placeholder="z. B. 7, 8, 9"></label>
-              <label class="field"><span>Leistungsart</span><input id="assessmentTypeInput" type="text" placeholder="z. B. Klassenarbeit"></label>
-              <label class="field"><span>Abschluss/Bildungsgang</span><input id="qualificationInput" type="text" placeholder="z. B. Berufsreife"></label>
-            </div>
-            <button type="button" id="deleteScopeButton" class="text-button scope-delete">Geltungsbereich entfernen</button>
-          </div>
+          <section id="engineProfilePane" class="engine-tab-pane profile-workbench" role="tabpanel" aria-labelledby="engineProfileTab" hidden>
+            <label class="field full"><span>Profil zur Bearbeitung</span><span class="select-shell"><select id="engineProfileSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+            <div id="profileBreadcrumb" class="profile-breadcrumb" aria-label="Aktueller Arbeitskontext"></div>
+            <div id="profileEmptyState" class="profile-browser-empty" hidden>Noch kein Bewertungsprofil aktiv. Legen Sie im Browser ein neues Profil an oder importieren Sie ein Profil aus dem Profilordner.</div>
+            <div id="profileTree" class="profile-tree" aria-label="Hierarchie des aktiven Bewertungsprofils"></div>
           </section>
         </section>
 
         <section class="engine-panel threshold-manager">
+          <div id="profilePreview" class="profile-preview">
+            <div class="engine-section-head"><div><span class="label">Browser</span><h3 id="profilePreviewTitle">Profil ansehen</h3></div></div>
+            <p id="profilePreviewHint" class="panel-note compact-note">Klicken Sie links auf eine Profilkarte, um die Struktur hier anzusehen. Bearbeitet wird ein Profil über den Menüpunkt „Profil bearbeiten“.</p>
+            <div id="profilePreviewTree" class="profile-tree profile-tree-readonly" aria-label="Vorschau des Bewertungsprofils"></div>
+          </div>
+          <div class="profile-detail">
+            <div class="engine-section-head"><div><span class="label">Weiche</span><h3 id="profileDetailTitle">Profil bearbeiten</h3></div></div>
+            <p id="profileDetailHint" class="panel-note compact-note"></p>
+
+            <div class="profile-detail-card" data-detail-level="country">
+              <div class="profile-fields compact-fields">
+                <label class="field full"><span>Profilname</span><input id="profileNameInput" type="text"></label>
+                <label class="field"><span>Staat</span><span class="select-shell"><select id="countryCodeInput"><option value="DE">Deutschland (DE)</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+              </div>
+            </div>
+
+            <div class="profile-detail-card" data-detail-level="subdivision" hidden>
+              <div class="profile-fields compact-fields">
+                <label class="field"><span>Land / Region</span><span class="select-shell"><select id="subdivisionCodeInput"><option value="DE-MV">Mecklenburg-Vorpommern (DE-MV)</option><option value="">national geregelt / kein Land</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+              </div>
+            </div>
+
+            <div class="profile-detail-card" data-detail-level="school" hidden>
+              <div class="profile-fields compact-fields">
+                <label class="field"><span>Schulart</span><span class="select-shell"><select id="schoolTypeInput"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+              </div>
+            </div>
+
+            <div class="profile-detail-card" data-detail-level="class" hidden>
+              <div class="profile-fields compact-fields">
+                <label class="field full"><span>Klassenstufe / Geltungsbereich</span><input id="gradeBandInput" type="text" placeholder="z. B. 7, 8, 9"></label>
+              </div>
+            </div>
+
+            <div class="profile-detail-card" data-detail-level="performance" hidden>
+              <div class="profile-fields compact-fields">
+                <label class="field"><span>Leistungsart</span><input id="assessmentTypeInput" type="text" placeholder="z. B. Klassenarbeit"></label>
+                <label class="field"><span>Abschluss / Bildungsgang</span><input id="qualificationInput" type="text" placeholder="z. B. Berufsreife"></label>
+              </div>
+            </div>
+
+            <div class="profile-detail-card" data-detail-level="scale" hidden>
+              <div class="engine-section-head scope-head">
+                <div><span class="label">Berechnungsgrundlage</span><h3>Zensierungsmodus</h3></div>
+                <button type="button" id="addBasisButton" class="secondary-button">Neue Grundlage</button>
+              </div>
+              <label class="field full basis-select"><span>Aktive Grundlage</span><span class="select-shell"><select id="basisSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+              <label class="field full basis-select"><span>Aktiver Geltungsbereich</span><span class="select-shell"><select id="scopeSelect"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+              <div class="button-row basis-actions">
+                <button type="button" id="duplicateBasisButton" class="secondary-button">Grundlage duplizieren</button>
+                <button type="button" id="deleteBasisButton" class="text-button">Grundlage löschen</button>
+                <button type="button" id="addScopeButton" class="secondary-button">Geltungsbereich hinzufügen</button>
+                <button type="button" id="deleteScopeButton" class="text-button scope-delete">Geltungsbereich entfernen</button>
+              </div>
+              <div class="profile-fields">
+                <label class="field full"><span>Name der Berechnungsgrundlage</span><input id="basisNameInput" type="text"></label>
+                <label class="field"><span>Zensierungsmodus</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1-6</option><option value="points15">15-0 Punkte</option><option value="manual">Manuelle Definition</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <label class="field"><span>Version</span><input id="profileVersionInput" type="text" value="1"></label>
+                <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">Persönliche Arbeitsgrundlage</option><option value="verified">Amtlich geprüft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <label class="field"><span>Gültig ab</span><input id="validFromInput" type="date"></label>
+                <label class="field"><span>Gültig bis</span><input id="validUntilInput" type="date"></label>
+                <label class="field full"><span>Quellenhinweis</span><textarea id="sourceNoteInput" rows="3"></textarea></label>
+                <label class="field full"><span>Quellen-URL</span><input id="sourceUrlInput" type="url" placeholder="https://…"></label>
+              </div>
+            </div>
+          </div>
           <div class="panel-head threshold-head">
             <div><span class="label">Berechnungsgrundlage</span><h2>Prozentgrenzen</h2></div>
           </div>
+          <div id="thresholdGuide" class="threshold-guide">
+            <strong>Orientierung</strong>
+            <p>Wählen Sie links die letzte Ebene „Zensierungsmodus“. Erst dort werden die Prozentgrenzen sichtbar, weil sie immer zu einer konkreten Berechnungsgrundlage gehören.</p>
+          </div>
           <p class="panel-note">Jede Zeile bezeichnet den Mindestanteil für die jeweilige Stufe. Änderungen werden lokal im Browser gespeichert und wirken sofort auf der Brücke.</p>
-          <div class="threshold-table-head"><span>Stufe</span><span>Note</span><span>Ab Prozent</span></div>
+          <div class="threshold-actions"><button type="button" id="addThresholdButton" class="secondary-button">Stufe hinzufügen</button></div>
+          <div class="threshold-table-head"><span>Stufe</span><span>Note</span><span>Ab Prozent</span><span></span></div>
           <div id="thresholdEditor" class="threshold-editor"></div>
           <div class="architecture-note"><strong>Architekturregel</strong><p>Ein Profil bündelt die Daten eines Rechtsraums. Darin liegen eigenständige Berechnungsgrundlagen mit Grenzwerten, Quelle und Version. Geltungsbereiche ordnen eine Grundlage Schularten, Klassen und Leistungsarten zu. Eine weitere Auswahl dupliziert daher niemals die Berechnungsgrundlage.</p></div>
         </section>
       </main>
     </section>
   </div>
-  <script src="noten.js?v=20260621k"></script>
+  <script src="profile/mecklenburg-vorpommern.js?v=20260621a"></script>
+  <script src="noten.js?v=20260621v"></script>
 </body>
 </html>
 

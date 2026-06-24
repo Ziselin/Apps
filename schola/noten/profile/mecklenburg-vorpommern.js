@@ -1,4 +1,7 @@
-{
+// Auto-generated local fallback for the Schola profile-folder import.
+// Source of truth remains mecklenburg-vorpommern.json; this file lets file:// starts load the bundled profile without fetch().
+window.SCHOLA_BUNDLED_PROFILE_DATA = window.SCHOLA_BUNDLED_PROFILE_DATA || {};
+window.SCHOLA_BUNDLED_PROFILE_DATA["profile/mecklenburg-vorpommern.json"] = {
   "type": "schola-grade-profile-export",
   "version": 1,
   "collections": [
@@ -571,4 +574,4 @@
       ]
     }
   ]
-}
+};
