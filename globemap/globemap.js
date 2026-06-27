@@ -1,7 +1,9 @@
 ﻿const ui = Object.fromEntries([
   "globeApp", "menuButton", "menuCloseButton", "menuOverlay", "sideMenu",
   "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
-  "newProjectButton", "projectBrowserList", "boundarySummary", "boundaryLevelList",
+  "newProjectButton", "projectBrowserList", "libraryBrowserList", "boundarySummary", "boundaryLevelList",
+  "boundarySearchInput", "boundarySearchButton", "boundarySearchResults",
+  "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerColorInput", "layerColorPaletteButton", "layerMetaList",
 ].map((id) => [id, document.getElementById(id)]));
 
 const STORAGE_KEY = "globemap-projects-v1";
@@ -21,7 +23,7 @@ const GEOMETRY_BASE_REGISTRY = {
   },
 };
 
-// Architekturregel: GlobeMap-Projekte referenzieren Boundary-Sets, statt eine
+// Architekturregel: Earth-Map-Projekte referenzieren Boundary-Sets, statt eine
 // einzelne Weltgeometrie fest einzubauen. Natural Earth ist die Standardbasis
 // für neue moderne Karten. Später können paläogeografische oder andere
 // rekonstruierte Grenzräume als eigene Boundary-Sets mit derselben Schnittstelle
@@ -43,13 +45,41 @@ function createDefaultBoundarySets() {
   }];
 }
 
-function createGlobeMapProject(title = "Neues GlobeMap-Projekt") {
+function createDefaultLibraryFolders() {
+  return [
+    {
+      id: "folder-boundary-maps",
+      type: "boundary-maps",
+      title: "Länderkarten",
+      description: "Importierte Länder- und Grenzkarten dieses Projekts.",
+      items: [],
+    },
+    {
+      id: "folder-datasets",
+      type: "datasets",
+      title: "Datenbanken",
+      description: "Tabellenwerte, die später auf Grenzlayer projiziert werden.",
+      items: [],
+    },
+    {
+      id: "folder-map-collections",
+      type: "map-collections",
+      title: "Kartensammlungen",
+      description: "Zusammenstellungen mehrerer Layer für bestimmte Ansichten.",
+      items: [],
+    },
+  ];
+}
+
+function createGlobeMapProject(title = "Neues Earth-Map-Projekt") {
   return {
     id: `globemap-${Date.now()}`,
     title,
     status: "in Vorbereitung",
     activeBoundarySetId: "",
+    activeLibraryItemId: "",
     boundarySets: createDefaultBoundarySets(),
+    libraryFolders: createDefaultLibraryFolders(),
     dataLayers: [],
     classification: {
       mode: "manual-breaks",
@@ -75,11 +105,52 @@ function repairLegacyText(value) {
     .replaceAll("ÃŸ", "ß");
 }
 
+function normalizeLibraryItem(item) {
+  return {
+    id: item?.id || `layer-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    kind: item?.kind || "boundary-map",
+    name: repairLegacyText(item?.name || "Unbenannte Karte"),
+    source: repairLegacyText(item?.source || ""),
+    iso3: String(item?.iso3 || ""),
+    adminLevel: repairLegacyText(item?.adminLevel || item?.level || ""),
+    detail: repairLegacyText(item?.detail || ""),
+    license: repairLegacyText(item?.license || ""),
+    sourceUrl: item?.sourceUrl || item?.apiUrl || "",
+    importedAt: item?.importedAt || new Date().toISOString(),
+    temporalCoverage: {
+      label: repairLegacyText(item?.temporalCoverage?.label || "gegenwärtig / aktuell"),
+      from: item?.temporalCoverage?.from || "",
+      to: item?.temporalCoverage?.to || "",
+    },
+    display: {
+      visible: item?.display?.visible !== false,
+      color: item?.display?.color || "#c6a86a",
+    },
+    geometryRef: item?.geometryRef || null,
+  };
+}
+
+function normalizeLibraryFolders(folders) {
+  const defaults = createDefaultLibraryFolders();
+  const incoming = Array.isArray(folders) ? folders : [];
+  return defaults.map((folder) => {
+    const existing = incoming.find((candidate) => candidate?.type === folder.type || candidate?.id === folder.id) || {};
+    return {
+      ...folder,
+      ...existing,
+      title: repairLegacyText(existing.title || folder.title),
+      description: repairLegacyText(existing.description || folder.description),
+      items: Array.isArray(existing.items) ? existing.items.map(normalizeLibraryItem) : [],
+    };
+  });
+}
+
 function normalizeProject(project) {
   const normalized = {
-    ...createGlobeMapProject(project?.title || "GlobeMap-Projekt"),
+    ...createGlobeMapProject(project?.title || "Earth-Map-Projekt"),
     ...project,
     boundarySets: Array.isArray(project?.boundarySets) && project.boundarySets.length ? project.boundarySets : createDefaultBoundarySets(),
+    libraryFolders: normalizeLibraryFolders(project?.libraryFolders),
   };
   normalized.title = repairLegacyText(normalized.title);
   normalized.boundarySets = normalized.boundarySets.map((boundarySet) => ({
@@ -92,6 +163,7 @@ function normalizeProject(project) {
     })),
   }));
   normalized.activeBoundarySetId = normalized.activeBoundarySetId || normalized.boundarySets[0]?.id || "";
+  normalized.activeLibraryItemId = String(normalized.activeLibraryItemId || "");
   return normalized;
 }
 
@@ -100,7 +172,7 @@ function loadProjects() {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
     if (Array.isArray(parsed?.projects) && parsed.projects.length) return parsed.projects.map(normalizeProject);
   } catch (error) {
-    console.warn("GlobeMap-Projekte konnten nicht gelesen werden.", error);
+    console.warn("Earth-Map-Projekte konnten nicht gelesen werden.", error);
   }
   return [normalizeProject(createGlobeMapProject("Weltkarte · Grundmodell"))];
 }
@@ -116,7 +188,7 @@ function persistProjects() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects: state.projects }));
   } catch (error) {
-    console.warn("GlobeMap-Projekte konnten nicht gespeichert werden.", error);
+    console.warn("Earth-Map-Projekte konnten nicht gespeichert werden.", error);
   }
 }
 
@@ -126,6 +198,170 @@ function getActiveProject() {
 
 function getActiveBoundarySet(project = getActiveProject()) {
   return project?.boundarySets?.find((set) => set.id === project.activeBoundarySetId) || project?.boundarySets?.[0] || null;
+}
+
+function getLibraryFolder(project, folderType) {
+  return project?.libraryFolders?.find((folder) => folder.type === folderType) || null;
+}
+
+function getActiveLibraryItem(project = getActiveProject()) {
+  const activeId = project?.activeLibraryItemId || "";
+  if (!activeId) return null;
+  for (const folder of project.libraryFolders || []) {
+    const item = folder.items?.find((candidate) => candidate.id === activeId);
+    if (item) return item;
+  }
+  return null;
+}
+
+function getVisibleBoundaryMapItems(project = getActiveProject()) {
+  const folder = getLibraryFolder(project, "boundary-maps");
+  return (folder?.items || []).filter((item) => item.display?.visible !== false);
+}
+
+function getNaturalEarthCountryFeatureByIso3(iso3) {
+  const normalizedIso3 = String(iso3 || "").toUpperCase();
+  if (!normalizedIso3) return null;
+  const features = window.EarthMapNaturalEarthCountries?.features || [];
+  return features.find((feature) => getNaturalEarthIso3(feature).toUpperCase() === normalizedIso3) || null;
+}
+
+function hexToRgba(hex, alpha = 1) {
+  const value = String(hex || "").trim();
+  const match = value.match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return `rgba(198,168,106,${alpha})`;
+  const intValue = Number.parseInt(match[1], 16);
+  const red = (intValue >> 16) & 255;
+  const green = (intValue >> 8) & 255;
+  const blue = intValue & 255;
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function normalizeColorValue(value, fallback = "") {
+  const raw = String(value || "").trim();
+  const short = raw.match(/^#?([0-9a-f]{3})$/i);
+  if (short) {
+    return `#${short[1].split("").map((char) => `${char}${char}`).join("")}`.toLowerCase();
+  }
+  const full = raw.match(/^#?([0-9a-f]{6})$/i);
+  if (full) return `#${full[1].toLowerCase()}`;
+  return fallback;
+}
+
+function isNeutralPaletteColor(color) {
+  const normalized = normalizeColorValue(color);
+  if (!normalized) return true;
+  const intValue = Number.parseInt(normalized.slice(1), 16);
+  const red = (intValue >> 16) & 255;
+  const green = (intValue >> 8) & 255;
+  const blue = intValue & 255;
+  const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
+  const isBlackish = red <= 20 && green <= 20 && blue <= 20;
+  const isWhitish = red >= 235 && green >= 235 && blue >= 235;
+  return isBlackish || isWhitish || spread <= 10;
+}
+
+function collectProjectPaletteColors(project = getActiveProject(), extraColors = []) {
+  const palette = [];
+  const seen = new Set();
+  const pushColor = (value) => {
+    const normalized = normalizeColorValue(value);
+    if (!normalized || isNeutralPaletteColor(normalized) || seen.has(normalized)) return;
+    seen.add(normalized);
+    palette.push(normalized);
+  };
+
+  // Farbregel: Earth Map unterscheidet wie TimeMap freie Farbwahl von
+  // Projektfarben. Die Palette sammelt deshalb nur Farben, die im aktuellen
+  // Projekt bereits semantisch verwendet werden, statt globale Appfarben
+  // ungezielt anzubieten.
+  pushColor("#c6a86a");
+  (project?.classification?.breaks || []).forEach((entry) => pushColor(entry?.color));
+  (project?.libraryFolders || []).forEach((folder) => {
+    (folder.items || []).forEach((item) => pushColor(item?.display?.color));
+  });
+  (Array.isArray(extraColors) ? extraColors : [extraColors]).forEach(pushColor);
+  return palette.slice(0, 12);
+}
+
+function applyLayerColor(value) {
+  const project = getActiveProject();
+  const item = getActiveLibraryItem(project);
+  if (!item) return;
+  const color = normalizeColorValue(value, "#c6a86a");
+  item.display = { ...(item.display || {}), color };
+  if (ui.layerColorInput) ui.layerColorInput.value = color;
+  persistProjects();
+  renderLibraryBrowser();
+  renderGlobe();
+}
+
+function setupLayerColorPalette() {
+  const button = ui.layerColorPaletteButton;
+  const anchor = button?.parentElement;
+  if (!button || !anchor) return;
+  const palette = document.createElement("div");
+  palette.className = "color-palette layer-color-palette";
+  palette.hidden = true;
+  anchor.appendChild(palette);
+
+  const closePalette = () => {
+    if (palette.hidden) return;
+    palette.hidden = true;
+    document.removeEventListener("mousedown", handleDocumentPointerDown, true);
+  };
+
+  function handleDocumentPointerDown(event) {
+    if (anchor.contains(event.target)) return;
+    closePalette();
+  }
+
+  const renderPalette = () => {
+    const currentColor = ui.layerColorInput?.value || "";
+    const colors = collectProjectPaletteColors(getActiveProject(), [currentColor]);
+    if (!colors.length) {
+      const note = document.createElement("p");
+      note.className = "palette-empty";
+      note.textContent = "Noch keine Projektfarben.";
+      palette.replaceChildren(note);
+      return;
+    }
+    palette.replaceChildren(...colors.map((color) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "color-swatch";
+      swatch.style.background = color;
+      swatch.setAttribute("aria-label", `Farbe ${color}`);
+      swatch.classList.toggle("is-active", normalizeColorValue(currentColor) === color);
+      swatch.addEventListener("click", (event) => {
+        event.preventDefault();
+        applyLayerColor(color);
+        closePalette();
+      });
+      return swatch;
+    }));
+  };
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!getActiveLibraryItem()) return;
+    if (palette.hidden) {
+      renderPalette();
+      palette.hidden = false;
+      document.addEventListener("mousedown", handleDocumentPointerDown, true);
+    } else {
+      closePalette();
+    }
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  } catch {
+    return value;
+  }
 }
 
 function setWorkspaceMode(mode) {
@@ -148,6 +384,8 @@ function setMenuOpen(isOpen) {
 
 const ctx = ui.globeCanvas.getContext("2d");
 const DEG = Math.PI / 180;
+const hasD3Geo = typeof window.d3?.geoOrthographic === "function" && typeof window.d3?.geoPath === "function";
+document.documentElement.dataset.geoEngine = hasD3Geo ? "d3-orthographic" : "canvas-fallback";
 
 // Geodatenregel: Die sichtbare Weltgeometrie kommt nicht aus handgebauten
 // Platzhalterpolygonen, sondern aus dem Geometrie-Basisdatensatz des aktiven
@@ -156,7 +394,16 @@ const DEG = Math.PI / 180;
 // bleibt die Darstellung auf der Kugeloberfläche stabil und kann später auch
 // historische oder paläogeografische Grenzräume mit derselben Schnittstelle anzeigen.
 
-const naturalEarthSource = window.GlobeMapNaturalEarthData?.["110m-land"] || null;
+const NATURAL_EARTH_LAND_DETAILS = {
+  "110m": { key: "110m-land", scriptPath: "data/natural-earth/110m/ne_110m_land.js?v=20260627a", minZoom: 1 },
+  "50m": { key: "50m-land", scriptPath: "data/natural-earth/50m/ne_50m_land.js?v=20260627a", minZoom: 2.35 },
+  "10m": { key: "10m-land", tileBasePath: "data/natural-earth/10m/tiles/", minZoom: 5.25 },
+};
+
+let activeNaturalEarthSource = window.GlobeMapNaturalEarthData?.["110m-land"] || null;
+let pendingNaturalEarthDetail = "";
+let activeNaturalEarthTileSignature = "";
+const pendingNaturalEarthTiles = new Set();
 
 const geoState = {
   detailLevel: "110m",
@@ -165,6 +412,190 @@ const geoState = {
   status: "loading",
   samplesReady: false,
 };
+
+function getLoadedNaturalEarthLand(level) {
+  const config = NATURAL_EARTH_LAND_DETAILS[level];
+  return config ? window.GlobeMapNaturalEarthData?.[config.key] || null : null;
+}
+
+function getDesiredNaturalEarthDetailLevel() {
+  if (globeZoom >= NATURAL_EARTH_LAND_DETAILS["10m"].minZoom) return "10m";
+  if (globeZoom >= NATURAL_EARTH_LAND_DETAILS["50m"].minZoom) return "50m";
+  return "110m";
+}
+
+function normalizeLongitude(lon) {
+  let value = lon;
+  while (value < -180) value += 360;
+  while (value > 180) value -= 360;
+  return value;
+}
+
+function getBufferedViewportBounds() {
+  const rect = ui.globe.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  const baseSize = Math.min(width, height);
+  const radius = baseSize * 0.47 * globeZoom;
+  const viewportHalfLon = Math.asin(clamp(width / (2 * radius), 0, 1)) / DEG;
+  const viewportHalfLat = Math.asin(clamp(height / (2 * radius), 0, 1)) / DEG;
+  const bufferedHalfLon = clamp(viewportHalfLon * 3, 8, 180);
+  const bufferedHalfLat = clamp(viewportHalfLat * 3, 8, 90);
+  const centerLon = normalizeLongitude(-rotation.lon);
+  const centerLat = clamp(-rotation.lat, -90, 90);
+  const minLat = clamp(centerLat - bufferedHalfLat, -90, 90);
+  const maxLat = clamp(centerLat + bufferedHalfLat, -90, 90);
+  const minLon = centerLon - bufferedHalfLon;
+  const maxLon = centerLon + bufferedHalfLon;
+  const lonSegments = minLon < -180
+    ? [[minLon + 360, 180], [-180, maxLon]]
+    : maxLon > 180
+      ? [[minLon, 180], [-180, maxLon - 360]]
+      : [[minLon, maxLon]];
+  return { minLat, maxLat, lonSegments };
+}
+
+function tileIntersectsViewport(tile, bounds) {
+  const latIntersects = tile.minLat <= bounds.maxLat && tile.maxLat >= bounds.minLat;
+  if (!latIntersects) return false;
+  return bounds.lonSegments.some(([minLon, maxLon]) => tile.minLon <= maxLon && tile.maxLon >= minLon);
+}
+
+function getVisibleNaturalEarth10mTiles() {
+  const index = window.GlobeMapNaturalEarthTileIndex?.["10m-land"];
+  if (!index?.tiles?.length) return [];
+  const bounds = getBufferedViewportBounds();
+  return index.tiles.filter((tile) => tileIntersectsViewport(tile, bounds));
+}
+
+function buildNaturalEarth10mTileCollection(tiles) {
+  const features = [];
+  tiles.forEach((tile) => {
+    const collection = window.GlobeMapNaturalEarthTileData?.[`10m-land-${tile.key}`];
+    if (collection?.features?.length) features.push(...collection.features);
+  });
+  return {
+    type: "FeatureCollection",
+    name: "ne_10m_land_viewport_tiles",
+    features,
+  };
+}
+
+function installNaturalEarthDetail(level, geojson) {
+  if (!geojson) return;
+  activeNaturalEarthSource = geojson;
+  geoState.detailLevel = level;
+  if (hasD3Geo) {
+    geoState.status = "ready";
+    geoState.landRings = [];
+    geoState.landSamples = [];
+    geoState.samplesReady = false;
+    return;
+  }
+  installLandGeoJson(geojson);
+}
+
+function requestNaturalEarthDetailForZoom() {
+  const desiredLevel = getDesiredNaturalEarthDetailLevel();
+  if (desiredLevel === "10m") {
+    const tiles = getVisibleNaturalEarth10mTiles();
+    if (!tiles.length) return;
+    const signature = tiles.map((tile) => tile.key).sort().join("|");
+    if (signature === activeNaturalEarthTileSignature && geoState.detailLevel === "10m") return;
+
+    const missingTiles = tiles.filter((tile) => !window.GlobeMapNaturalEarthTileData?.[`10m-land-${tile.key}`]);
+    if (missingTiles.length) {
+      missingTiles.forEach((tile) => {
+        if (pendingNaturalEarthTiles.has(tile.key)) return;
+        pendingNaturalEarthTiles.add(tile.key);
+        const script = document.createElement("script");
+        script.src = `${NATURAL_EARTH_LAND_DETAILS["10m"].tileBasePath}${tile.file}?v=20260627a`;
+        script.async = true;
+        script.onload = () => {
+          pendingNaturalEarthTiles.delete(tile.key);
+          scheduleNaturalEarthDetailUpdate(0);
+        };
+        script.onerror = () => {
+          pendingNaturalEarthTiles.delete(tile.key);
+          console.warn(`Natural-Earth-10m-Kachel ${tile.key} konnte nicht geladen werden.`);
+        };
+        document.head.appendChild(script);
+      });
+      return;
+    }
+
+    activeNaturalEarthTileSignature = signature;
+    installNaturalEarthDetail("10m", buildNaturalEarth10mTileCollection(tiles));
+    return;
+  }
+
+  activeNaturalEarthTileSignature = "";
+  if (desiredLevel === geoState.detailLevel && activeNaturalEarthSource) return;
+
+  const loaded = getLoadedNaturalEarthLand(desiredLevel);
+  if (loaded) {
+    installNaturalEarthDetail(desiredLevel, loaded);
+    return;
+  }
+
+  const config = NATURAL_EARTH_LAND_DETAILS[desiredLevel];
+  if (!config || pendingNaturalEarthDetail === desiredLevel) return;
+  pendingNaturalEarthDetail = desiredLevel;
+  const script = document.createElement("script");
+  script.src = config.scriptPath;
+  script.async = true;
+  script.onload = () => {
+    pendingNaturalEarthDetail = "";
+    const loadedAfterScript = getLoadedNaturalEarthLand(desiredLevel);
+    if (loadedAfterScript && getDesiredNaturalEarthDetailLevel() === desiredLevel) {
+      installNaturalEarthDetail(desiredLevel, loadedAfterScript);
+      scheduleGlobeRender();
+    }
+  };
+  script.onerror = () => {
+    pendingNaturalEarthDetail = "";
+    console.warn(`Natural-Earth-Detailstufe ${desiredLevel} konnte nicht geladen werden.`);
+  };
+  document.head.appendChild(script);
+}
+
+function scheduleGlobeRender() {
+  if (renderFrameId) return;
+  renderFrameId = window.requestAnimationFrame(() => {
+    renderFrameId = 0;
+    renderGlobe();
+  });
+}
+
+function scheduleNaturalEarthDetailUpdate(delay = 220) {
+  window.clearTimeout(detailLoadTimer);
+  detailLoadTimer = window.setTimeout(() => {
+    detailLoadTimer = 0;
+    requestNaturalEarthDetailForZoom();
+    scheduleGlobeRender();
+  }, delay);
+}
+
+function markGlobeNavigationActive() {
+  isNavigatingGlobe = true;
+  window.clearTimeout(navigationSettledTimer);
+  navigationSettledTimer = window.setTimeout(() => {
+    isNavigatingGlobe = false;
+    scheduleNaturalEarthDetailUpdate(0);
+    scheduleGlobeRender();
+  }, 180);
+}
+
+function getInteractiveNaturalEarthSource() {
+  if (!isNavigatingGlobe) return activeNaturalEarthSource;
+  if (globeZoom >= NATURAL_EARTH_LAND_DETAILS["10m"].minZoom) {
+    return getLoadedNaturalEarthLand("50m") || getLoadedNaturalEarthLand("110m") || activeNaturalEarthSource;
+  }
+  if (globeZoom >= NATURAL_EARTH_LAND_DETAILS["50m"].minZoom) {
+    return getLoadedNaturalEarthLand("110m") || activeNaturalEarthSource;
+  }
+  return activeNaturalEarthSource;
+}
 
 function sanitizeRing(coordinates) {
   return coordinates
@@ -243,8 +674,8 @@ function installLandGeoJson(geojson) {
   geoState.status = landRings.length ? "ready" : "empty";
 }
 
-if (naturalEarthSource) {
-  installLandGeoJson(naturalEarthSource);
+if (activeNaturalEarthSource) {
+  installNaturalEarthDetail("110m", activeNaturalEarthSource);
 } else {
   geoState.status = "missing";
 }
@@ -271,6 +702,13 @@ function buildLandSamplesDeferred() {
 
 let dragState = null;
 let rotation = { lon: -18, lat: -8 };
+let globeZoom = 1;
+const MIN_GLOBE_ZOOM = 1;
+const MAX_GLOBE_ZOOM = 9;
+let renderFrameId = 0;
+let detailLoadTimer = 0;
+let navigationSettledTimer = 0;
+let isNavigatingGlobe = false;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -330,6 +768,78 @@ function drawSphere(size, radius, center) {
   ctx.lineWidth = Math.max(2, size * 0.006);
   ctx.strokeStyle = "rgba(142,146,142,.72)";
   ctx.stroke();
+}
+
+function createOrthographicProjection(radius, center) {
+  return window.d3.geoOrthographic()
+    .translate([center.x, center.y])
+    .scale(radius)
+    .rotate([rotation.lon, rotation.lat])
+    .clipAngle(90)
+    .precision(0.25);
+}
+
+function drawGeographicLayer(radius, center) {
+  const renderSource = getInteractiveNaturalEarthSource();
+  if (!hasD3Geo || !renderSource) return false;
+
+  const projection = createOrthographicProjection(radius, center);
+  const path = window.d3.geoPath(projection, ctx);
+
+  // Architekturregel: Ab hier ist GeoJSON im Koordinatensystem WGS84 /
+  // lon-lat die einzige Datenquelle für sichtbare Landformen. D3 übernimmt
+  // Orthographic Projection und Horizon-Clipping; dadurch liegen Kontinente
+  // exakt auf der Kugeloberfläche und werden nicht grafisch verschoben.
+  ctx.beginPath();
+  path(renderSource);
+  ctx.fillStyle = "rgba(178,178,176,.82)";
+  ctx.fill();
+
+  ctx.beginPath();
+  path(renderSource);
+  ctx.strokeStyle = "rgba(92,96,94,.46)";
+  ctx.lineWidth = Math.max(0.7, radius * 0.0018);
+  ctx.stroke();
+
+  return true;
+}
+
+function drawProjectBoundaryLayers(radius, center) {
+  if (!hasD3Geo) return false;
+  const items = getVisibleBoundaryMapItems();
+  if (!items.length) return false;
+  const projection = createOrthographicProjection(radius, center);
+  const path = window.d3.geoPath(projection, ctx);
+  let drewLayer = false;
+
+  items.forEach((item) => {
+    const provider = item.geometryRef?.provider || "";
+    const canUseNaturalEarthFallback = provider === "natural-earth"
+      || item.source === "Natural Earth"
+      || (provider === "geoboundaries" && String(item.adminLevel || "").toUpperCase() === "ADM0");
+    const feature = canUseNaturalEarthFallback
+      ? getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3)
+      : null;
+    if (!feature) return;
+
+    const featureCollection = { type: "FeatureCollection", features: [feature] };
+    const color = item.display?.color || "#c6a86a";
+
+    ctx.beginPath();
+    path(featureCollection);
+    ctx.fillStyle = hexToRgba(color, 0.78);
+    ctx.fill();
+
+    ctx.beginPath();
+    path(featureCollection);
+    ctx.strokeStyle = hexToRgba(color, 0.98);
+    ctx.lineWidth = Math.max(1.15, radius * 0.0042);
+    ctx.stroke();
+
+    drewLayer = true;
+  });
+
+  return drewLayer;
 }
 
 function drawProjectedLine(points, radius, center, strokeStyle, lineWidth) {
@@ -461,23 +971,33 @@ function drawAtmosphere(size, radius, center) {
 function renderGlobe() {
   const rect = ui.globe.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  const size = Math.max(220, Math.floor(Math.min(rect.width, rect.height)));
-  ui.globeCanvas.width = Math.floor(size * dpr);
-  ui.globeCanvas.height = Math.floor(size * dpr);
-  ui.globeCanvas.style.width = `${size}px`;
-  ui.globeCanvas.style.height = `${size}px`;
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  const baseSize = Math.min(width, height);
+  ui.globeCanvas.width = Math.floor(width * dpr);
+  ui.globeCanvas.height = Math.floor(height * dpr);
+  ui.globeCanvas.style.width = `${width}px`;
+  ui.globeCanvas.style.height = `${height}px`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, size, size);
-  const radius = size * 0.47;
-  const center = { x: size / 2, y: size / 2 };
-  drawSphere(size, radius, center);
+  ctx.clearRect(0, 0, width, height);
+  // Darstellungsregel: Zoom 1 ist immer die vollständig sichtbare Startkugel.
+  // Alle höheren Zoomstufen skalieren von diesem fensterabhängigen Fit-Radius
+  // aus; dadurch bleibt die kleinste Ansicht auch bei Resize zuverlässig zentriert
+  // und vollständig im verfügbaren Renderbereich.
+  const radius = baseSize * 0.47 * globeZoom;
+  const center = { x: width / 2, y: height / 2 };
+  const visualSize = baseSize * globeZoom;
+  drawSphere(visualSize, radius, center);
   ctx.save();
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.clip();
-  drawGraticule(radius, center);
-  drawLand(radius, center);
-  drawAtmosphere(size, radius, center);
+  const usedGeographicProjection = drawGeographicLayer(radius, center);
+  if (!usedGeographicProjection) {
+    drawLand(radius, center);
+  }
+  drawProjectBoundaryLayers(radius, center);
+  drawAtmosphere(visualSize, radius, center);
   ctx.restore();
 }
 
@@ -502,11 +1022,69 @@ function renderProjectBrowser() {
   }));
 }
 
+function renderLibraryBrowser() {
+  const project = getActiveProject();
+  if (!ui.libraryBrowserList) return;
+  if (!project) {
+    ui.libraryBrowserList.replaceChildren();
+    return;
+  }
+
+  const heading = document.createElement("div");
+  heading.className = "library-browser-heading";
+  heading.innerHTML = "<span class=\"label\">Projektbibliothek</span><strong>Ordner</strong>";
+
+  const folderCards = (project.libraryFolders || []).map((folder) => {
+    const wrapper = document.createElement("section");
+    wrapper.className = "library-folder-card";
+
+    const head = document.createElement("div");
+    head.className = "library-folder-head";
+    const title = document.createElement("strong");
+    title.textContent = folder.title;
+    const meta = document.createElement("span");
+    meta.textContent = `${folder.items?.length || 0} Einträge · ${folder.description}`;
+    head.append(title, meta);
+    wrapper.append(head);
+
+    const list = document.createElement("div");
+    list.className = "library-item-list";
+    const items = Array.isArray(folder.items) ? folder.items : [];
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "library-empty";
+      empty.textContent = folder.type === "boundary-maps"
+        ? "Noch keine Länderkarten hinzugefügt."
+        : "Noch leer.";
+      list.append(empty);
+    } else {
+      items.forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "library-item-card";
+        button.dataset.libraryItemId = item.id;
+        button.classList.toggle("is-active", item.id === project.activeLibraryItemId);
+        button.style.setProperty("--layer-color", item.display?.color || "#c6a86a");
+        const itemTitle = document.createElement("strong");
+        itemTitle.textContent = item.name;
+        const itemMeta = document.createElement("span");
+        itemMeta.textContent = [item.source, item.adminLevel, item.detail].filter(Boolean).join(" · ");
+        button.append(itemTitle, itemMeta);
+        list.append(button);
+      });
+    }
+    wrapper.append(list);
+    return wrapper;
+  });
+
+  ui.libraryBrowserList.replaceChildren(heading, ...folderCards);
+}
+
 function renderBoundaryEditor() {
   const project = getActiveProject();
   const boundarySet = getActiveBoundarySet(project);
   if (!project || !boundarySet) {
-    ui.boundarySummary.textContent = "Noch kein GlobeMap-Projekt ausgewählt.";
+    ui.boundarySummary.textContent = "Noch kein Earth-Map-Projekt ausgewählt.";
     ui.boundaryLevelList.replaceChildren();
     return;
   }
@@ -523,9 +1101,225 @@ function renderBoundaryEditor() {
   }));
 }
 
+function renderLayerEditor() {
+  const project = getActiveProject();
+  const item = getActiveLibraryItem(project);
+  if (!ui.layerEditorTitle || !ui.layerEditorSummary || !ui.layerEditorContent || !ui.layerMetaList) return;
+  if (!item) {
+    ui.layerEditorTitle.textContent = "Keine Karte ausgewählt";
+    ui.layerEditorSummary.textContent = "Wähle links in der Projektbibliothek eine hinzugefügte Länderkarte aus.";
+    ui.layerEditorContent.hidden = true;
+    if (ui.layerColorPaletteButton) ui.layerColorPaletteButton.disabled = true;
+    ui.layerMetaList.replaceChildren();
+    return;
+  }
+
+  ui.layerEditorTitle.textContent = item.name;
+  ui.layerEditorSummary.textContent = "Anzeigeoptionen und Herkunftsdaten dieser Karte.";
+  ui.layerEditorContent.hidden = false;
+  if (ui.layerColorPaletteButton) ui.layerColorPaletteButton.disabled = false;
+  if (ui.layerColorInput) ui.layerColorInput.value = item.display?.color || "#c6a86a";
+
+  const rows = [
+    ["Quelle", item.source || "—"],
+    ["ISO-3", item.iso3 || "—"],
+    ["Ebene", item.adminLevel || "—"],
+    ["Detailtiefe", item.detail || "—"],
+    ["Zeitspanne", item.temporalCoverage?.label || "gegenwärtig / aktuell"],
+    ["Lizenz", item.license || "—"],
+    ["Importiert", formatDateTime(item.importedAt) || "—"],
+    ["Referenz", item.sourceUrl || item.geometryRef?.path || "—"],
+  ];
+  ui.layerMetaList.replaceChildren(...rows.flatMap(([term, description]) => {
+    const dt = document.createElement("dt");
+    dt.textContent = term;
+    const dd = document.createElement("dd");
+    dd.textContent = description;
+    return [dt, dd];
+  }));
+}
+
 function renderWorkspace() {
   renderProjectBrowser();
+  renderLibraryBrowser();
   renderBoundaryEditor();
+  renderLayerEditor();
+}
+
+function setEditorTab(tabName) {
+  document.querySelectorAll("[data-editor-tab]").forEach((tab) => {
+    const isActive = tab.dataset.editorTab === tabName;
+    tab.classList.toggle("is-active", isActive);
+    tab.setAttribute("aria-selected", String(isActive));
+  });
+  document.querySelectorAll("[data-editor-panel]").forEach((panel) => {
+    const isActive = panel.dataset.editorPanel === tabName;
+    panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+  });
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("de-DE")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getNaturalEarthCountryName(feature) {
+  return feature?.properties?.NAME_DE
+    || feature?.properties?.NAME
+    || feature?.properties?.ADMIN
+    || feature?.properties?.NAME_LONG
+    || "Unbenanntes Land";
+}
+
+function getNaturalEarthIso3(feature) {
+  const props = feature?.properties || {};
+  return props.ISO_A3_EH || props.ISO_A3 || props.ADM0_A3 || "";
+}
+
+function searchNaturalEarthCountries(query) {
+  const normalizedQuery = normalizeSearchText(query);
+  const features = window.EarthMapNaturalEarthCountries?.features || [];
+  if (!normalizedQuery) return [];
+  return features
+    .filter((feature) => {
+      const props = feature.properties || {};
+      const haystack = [
+        props.NAME_DE, props.NAME, props.ADMIN, props.NAME_LONG, props.SOVEREIGNT,
+        props.ISO_A3, props.ISO_A3_EH, props.ADM0_A3,
+      ].map(normalizeSearchText).join(" ");
+      return haystack.includes(normalizedQuery);
+    })
+    .slice(0, 8)
+    .map((feature) => ({
+      id: `natural-earth-${getNaturalEarthIso3(feature) || getNaturalEarthCountryName(feature)}`,
+      name: getNaturalEarthCountryName(feature),
+      source: "Natural Earth",
+      level: "ADM0 · Land",
+      detail: "110m · lokale Grunddaten",
+      license: "Public Domain",
+      iso3: getNaturalEarthIso3(feature),
+      importStatus: "bereit",
+    }));
+}
+
+function buildGeoBoundariesCandidates(naturalEarthResults, query) {
+  const directIso = query.trim().toUpperCase();
+  const isoCandidates = new Set();
+  if (/^[A-Z]{3}$/.test(directIso)) isoCandidates.add(directIso);
+  naturalEarthResults.forEach((result) => {
+    if (/^[A-Z]{3}$/.test(result.iso3)) isoCandidates.add(result.iso3);
+  });
+  return [...isoCandidates].flatMap((iso3) => ["ADM0", "ADM1", "ADM2"].map((adm) => ({
+    id: `geoboundaries-${iso3}-${adm}`,
+    name: `${iso3} · ${adm}`,
+    source: "geoBoundaries",
+    level: adm,
+    detail: adm === "ADM0" ? "Staatsgrenze" : "Verwaltungsebene",
+    license: "gbOpen · CC BY 4.0",
+    iso3,
+    apiUrl: `https://www.geoboundaries.org/api/current/gbOpen/${iso3}/${adm}/`,
+    importStatus: "online abrufbar",
+  })));
+}
+
+function createLayerItemFromSearchResult(result) {
+  const isNaturalEarth = result.source === "Natural Earth";
+  return normalizeLibraryItem({
+    id: `layer-${result.source.toLowerCase().replace(/\W+/g, "-")}-${result.iso3 || result.id}-${Date.now()}`,
+    kind: "boundary-map",
+    name: result.name,
+    source: result.source,
+    iso3: result.iso3,
+    adminLevel: result.level,
+    detail: result.detail,
+    license: result.license,
+    sourceUrl: result.apiUrl || (isNaturalEarth ? "data/natural-earth/110m/ne_110m_admin_0_countries.geojson" : ""),
+    temporalCoverage: {
+      label: isNaturalEarth ? "gegenwärtige Natural-Earth-Grundkarte" : "gegenwärtige geoBoundaries-Grenzfassung",
+      from: "",
+      to: "",
+    },
+    display: {
+      visible: true,
+      color: "#c6a86a",
+    },
+    geometryRef: isNaturalEarth
+      ? { provider: "natural-earth", detail: "110m", dataset: "admin_0_countries", iso3: result.iso3 }
+      : { provider: "geoboundaries", apiUrl: result.apiUrl, iso3: result.iso3, level: result.level },
+  });
+}
+
+function addBoundaryLayerFromSearchResult(result) {
+  const project = getActiveProject();
+  const folder = getLibraryFolder(project, "boundary-maps");
+  if (!project || !folder) return;
+  const item = createLayerItemFromSearchResult(result);
+  const duplicate = folder.items.find((candidate) => (
+    candidate.source === item.source
+    && candidate.iso3 === item.iso3
+    && candidate.adminLevel === item.adminLevel
+    && candidate.detail === item.detail
+  ));
+  const activeItem = duplicate || item;
+  if (!duplicate) folder.items.push(item);
+  project.activeLibraryItemId = activeItem.id;
+  persistProjects();
+  renderWorkspace();
+  renderGlobe();
+  setEditorTab("layer-editor");
+}
+
+function createBoundarySearchCard(result) {
+  const card = document.createElement("article");
+  card.className = "search-result-card";
+  const head = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = result.name;
+  const meta = document.createElement("span");
+  meta.textContent = `${result.source} · ${result.level} · ${result.detail}`;
+  head.append(title, meta);
+
+  const license = document.createElement("p");
+  license.textContent = `Lizenz/Status: ${result.license} · ${result.importStatus}`;
+
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = "secondary-button";
+  action.textContent = "Hinzufügen";
+  action.title = result.apiUrl || "In die Projektbibliothek übernehmen.";
+  action.addEventListener("click", () => addBoundaryLayerFromSearchResult(result));
+
+  card.append(head, license, action);
+  return card;
+}
+
+function renderBoundarySearchResults() {
+  const query = ui.boundarySearchInput?.value?.trim() || "";
+  const useNaturalEarth = Boolean(document.getElementById("sourceNaturalEarth")?.checked);
+  const useGeoBoundaries = Boolean(document.getElementById("sourceGeoBoundaries")?.checked);
+  if (!query) {
+    const note = document.createElement("p");
+    note.className = "empty-state";
+    note.textContent = "Bitte Suchbegriff eingeben.";
+    ui.boundarySearchResults.replaceChildren(note);
+    return;
+  }
+
+  const naturalEarthResults = useNaturalEarth ? searchNaturalEarthCountries(query) : [];
+  const geoBoundariesResults = useGeoBoundaries ? buildGeoBoundariesCandidates(naturalEarthResults, query) : [];
+  const results = [...naturalEarthResults, ...geoBoundariesResults];
+  if (!results.length) {
+    const note = document.createElement("p");
+    note.className = "empty-state";
+    note.textContent = "Keine Treffer gefunden. Tipp: Für geoBoundaries kann direkt ein ISO-3-Code wie DEU, FRA oder BRA gesucht werden.";
+    ui.boundarySearchResults.replaceChildren(note);
+    return;
+  }
+
+  ui.boundarySearchResults.replaceChildren(...results.map(createBoundarySearchCard));
 }
 
 ui.menuButton.addEventListener("click", () => setMenuOpen(ui.menuButton.getAttribute("aria-expanded") !== "true"));
@@ -533,6 +1327,15 @@ ui.menuCloseButton.addEventListener("click", () => setMenuOpen(false));
 ui.menuOverlay.addEventListener("click", () => setMenuOpen(false));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") setMenuOpen(false);
+});
+
+document.querySelectorAll("[data-editor-tab]").forEach((tab) => {
+  tab.addEventListener("click", () => setEditorTab(tab.dataset.editorTab));
+});
+
+ui.boundarySearchButton?.addEventListener("click", renderBoundarySearchResults);
+ui.boundarySearchInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") renderBoundarySearchResults();
 });
 
 ui.openWorkspaceButton.addEventListener("click", () => setWorkspaceMode("details"));
@@ -543,6 +1346,7 @@ ui.newProjectButton.addEventListener("click", () => {
   state.activeProjectId = project.id;
   persistProjects();
   renderWorkspace();
+  renderGlobe();
 });
 ui.projectBrowserList.addEventListener("click", (event) => {
   const card = event.target.closest("[data-project-id]");
@@ -551,27 +1355,56 @@ ui.projectBrowserList.addEventListener("click", (event) => {
   persistProjects();
   renderWorkspace();
 });
+ui.libraryBrowserList?.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-library-item-id]");
+  if (!card) return;
+  const project = getActiveProject();
+  if (!project) return;
+  project.activeLibraryItemId = card.dataset.libraryItemId || "";
+  persistProjects();
+  renderWorkspace();
+  renderGlobe();
+  setEditorTab("layer-editor");
+});
+ui.layerColorInput?.addEventListener("input", () => {
+  applyLayerColor(ui.layerColorInput.value || "#c6a86a");
+});
+setupLayerColorPalette();
 
 ui.globe.addEventListener("pointerdown", (event) => {
+  markGlobeNavigationActive();
   dragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startRotation: { ...rotation } };
   ui.globe.setPointerCapture?.(event.pointerId);
 });
 
 ui.globe.addEventListener("pointermove", (event) => {
   if (!dragState || dragState.pointerId !== event.pointerId) return;
-  rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * 0.45;
-  rotation.lat = clamp(dragState.startRotation.lat + (event.clientY - dragState.startY) * 0.28, -58, 58);
-  renderGlobe();
+  markGlobeNavigationActive();
+  const dragSensitivity = 1 / Math.sqrt(globeZoom);
+  rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * 0.45 * dragSensitivity;
+  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * 0.28 * dragSensitivity, -58, 58);
+  scheduleGlobeRender();
 });
+
+ui.globe.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  markGlobeNavigationActive();
+  const zoomFactor = Math.exp(-event.deltaY * 0.0014);
+  globeZoom = clamp(globeZoom * zoomFactor, MIN_GLOBE_ZOOM, MAX_GLOBE_ZOOM);
+  scheduleGlobeRender();
+  scheduleNaturalEarthDetailUpdate(280);
+}, { passive: false });
 
 ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
   ui.globe.addEventListener(type, () => {
     dragState = null;
+    markGlobeNavigationActive();
+    scheduleNaturalEarthDetailUpdate(160);
   });
 });
 
-window.addEventListener("resize", renderGlobe);
+window.addEventListener("resize", scheduleGlobeRender);
 renderWorkspace();
 renderGlobe();
-buildLandSamplesDeferred();
+if (!hasD3Geo) buildLandSamplesDeferred();
 
