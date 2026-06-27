@@ -54,11 +54,12 @@ const ui = Object.fromEntries([
   "exportProfilesButton", "profileImportInput", "engineProfileSelect",
   "earnedInput", "totalInput", "percentageOutput", "scoreTrackFill", "inputMessage", "resultPrimary",
   "resultSecondary", "betterGradeOutput", "worseGradeOutput", "pointsNeededOutput", "pointsToWorseOutput", "boundaryList",
-  "newProfileButton", "profileNameInput", "countryCodeInput",
+  "newProfileButton", "profileNameInput", "countryCodeInput", "addCountryButton",
   "subdivisionCodeInput", "basisSelect", "addBasisButton", "duplicateBasisButton", "deleteBasisButton", "basisNameInput",
   "profileVersionInput", "validFromInput", "validUntilInput", "scopeSelect", "addScopeButton",
-  "deleteScopeButton", "schoolTypeInput", "gradeBandInput", "assessmentTypeInput", "qualificationInput", "scaleTypeSelect", "profileStatusSelect",
-  "sourceNoteInput", "sourceUrlInput", "thresholdGuide", "addThresholdButton", "thresholdEditor", "resetProfilesButton",
+  "deleteScopeButton", "addSubdivisionButton", "schoolTypeInput", "addSchoolTypeButton", "gradeBandInput", "addClassBandButton",
+  "assessmentTypeInput", "qualificationInput", "addPerformanceButton", "scaleTypeSelect", "addScaleButton", "profileStatusSelect",
+  "sourceNoteInput", "sourceUrlInput", "addThresholdButton", "thresholdEditor", "resetProfilesButton",
 ].map((id) => [id, document.getElementById(id)]));
 
 function clone(value) {
@@ -308,6 +309,10 @@ function appendTreeNode(parent, button, children = [], treeKey = "") {
 
 function renderProfileTree(collection, bases, target = ui.profileTree, { readonly = false } = {}) {
   const root = document.createElement("ul");
+  if (!collection?.countryCode) {
+    target.replaceChildren(root);
+    return;
+  }
   const subdivisionList = document.createElement("ul");
   const schoolGroups = new Map();
   bases.forEach((basis) => {
@@ -357,15 +362,20 @@ function renderProfileTree(collection, bases, target = ui.profileTree, { readonl
     );
   });
 
-  const subdivisionLabel = formatSubdivisionLabel(collection);
-  const subdivisionNode = appendTreeNode(
-    document.createElement("ul"),
-    makeTreeButton("subdivision", subdivisionLabel, "Land", "", "", readonly),
-    [...subdivisionList.children],
-    makeTreeKey("subdivision", subdivisionLabel, collection.id),
-  );
+  const countryChildren = [];
+  if (collection.subdivisionCode) {
+    const subdivisionLabel = formatSubdivisionLabel(collection);
+    countryChildren.push(appendTreeNode(
+      document.createElement("ul"),
+      makeTreeButton("subdivision", subdivisionLabel, "Land", "", "", readonly),
+      [...subdivisionList.children],
+      makeTreeKey("subdivision", subdivisionLabel, collection.id),
+    ));
+  } else {
+    countryChildren.push(...subdivisionList.children);
+  }
 
-  appendTreeNode(root, makeTreeButton("country", collection.countryCode || "Staat offen", "Staat", "", "", readonly), [subdivisionNode], makeTreeKey("country", collection.countryCode || "Staat offen", collection.id));
+  appendTreeNode(root, makeTreeButton("country", collection.countryCode, "Staat", "", "", readonly), countryChildren, makeTreeKey("country", collection.countryCode, collection.id));
   target.replaceChildren(root);
 }
 
@@ -899,7 +909,128 @@ function updateScopeField(field, value) {
   persist();
 }
 
-function createBlankBasis(collectionId) {
+function makeDefaultThresholds(scaleType) {
+  if (scaleType === "points15") return makeThresholds(point15Labels, [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 35, 25, 15, 0]);
+  if (scaleType === "manual") return makeThresholds([["Stufe 1", ""], ["Stufe 2", ""]], [50, 0]);
+  return makeThresholds(grade6Labels, [90, 75, 60, 45, 25, 0]);
+}
+
+function makeBasisName(scope, scaleType = "grade6") {
+  const scaleLabel = scaleType === "points15" ? "15-0 Punkte" : scaleType === "manual" ? "manuell" : "1-6";
+  return [scope.schoolType, (scope.classes || []).join(", "), scope.assessmentType, scope.qualification, scaleLabel]
+    .filter(Boolean)
+    .join(" · ") || "Neue Berechnungsgrundlage";
+}
+
+function createBasisForScope(collectionId, scope, scaleType = "grade6") {
+  const basis = createBlankBasis(collectionId, scope);
+  basis.scaleType = scaleType;
+  basis.name = makeBasisName(scope, scaleType);
+  basis.thresholds = makeDefaultThresholds(scaleType);
+  return basis;
+}
+
+function ensureActiveBasisForHierarchy() {
+  const collection = getActiveProfile();
+  if (!collection) return null;
+  let basis = getActiveBasis();
+  if (!basis) {
+    const scope = makeScope(`scope-${Date.now()}`, "", [], "", "");
+    basis = createBasisForScope(collection.id, scope);
+    state.profiles.push(basis);
+    state.activeBasisId = basis.id;
+    state.activeScopeId = basis.scopes[0].id;
+  }
+  return basis;
+}
+
+function commitCountryNode() {
+  const collection = getActiveProfile();
+  if (!collection) return;
+  collection.countryCode = ui.countryCodeInput.value || "DE";
+  state.profileWorkbenchLevel = "subdivision";
+  renderAll();
+}
+
+function commitSubdivisionNode() {
+  const collection = getActiveProfile();
+  if (!collection) return;
+  collection.subdivisionCode = ui.subdivisionCodeInput.value || "";
+  state.profileWorkbenchLevel = "school";
+  renderAll();
+}
+
+function commitSchoolNode() {
+  const collection = getActiveProfile();
+  if (!collection) return;
+  const schoolType = ui.schoolTypeInput.value || MV_SCHOOL_TYPES[0]?.name || "";
+  const existing = state.profiles
+    .filter((basis) => basis.collectionId === collection.id)
+    .flatMap((basis) => (basis.scopes || []).map((scope) => ({ basis, scope })))
+    .find(({ scope }) => scope.schoolType === schoolType && !(scope.classes || []).length && !scope.assessmentType && !scope.qualification);
+  if (existing) {
+    state.activeBasisId = existing.basis.id;
+    state.activeScopeId = existing.scope.id;
+  } else {
+    const scope = makeScope(`scope-${Date.now()}`, schoolType, [], "", "");
+    const basis = createBasisForScope(collection.id, scope);
+    state.profiles.push(basis);
+    state.activeBasisId = basis.id;
+    state.activeScopeId = basis.scopes[0].id;
+  }
+  state.profileWorkbenchLevel = "class";
+  renderAll();
+}
+
+function commitClassNode() {
+  const basis = ensureActiveBasisForHierarchy();
+  const scope = getActiveScope();
+  if (!basis || !scope) return;
+  scope.classes = ui.gradeBandInput.value.split(/[,;]+/).map((value) => value.trim()).filter(Boolean);
+  basis.name = makeBasisName(scope, basis.scaleType);
+  state.profileWorkbenchLevel = "performance";
+  renderAll();
+}
+
+function commitPerformanceNode() {
+  const collection = getActiveProfile();
+  const basis = ensureActiveBasisForHierarchy();
+  const scope = getActiveScope();
+  if (!collection || !basis || !scope) return;
+  const nextScope = {
+    ...scope,
+    id: `${basis.id}-scope-${Date.now()}`,
+    assessmentType: ui.assessmentTypeInput.value.trim(),
+    qualification: ui.qualificationInput.value.trim(),
+  };
+  const currentEmpty = !scope.assessmentType && !scope.qualification;
+  if (currentEmpty) {
+    Object.assign(scope, nextScope, { id: scope.id });
+    basis.name = makeBasisName(scope, basis.scaleType);
+    state.activeScopeId = scope.id;
+  } else {
+    const nextBasis = createBasisForScope(collection.id, nextScope, basis.scaleType || "grade6");
+    state.profiles.push(nextBasis);
+    state.activeBasisId = nextBasis.id;
+    state.activeScopeId = nextBasis.scopes[0].id;
+  }
+  state.profileWorkbenchLevel = "scale";
+  renderAll();
+}
+
+function commitScaleNode() {
+  const basis = ensureActiveBasisForHierarchy();
+  const scope = getActiveScope();
+  if (!basis || !scope) return;
+  const nextScale = ui.scaleTypeSelect.value || "grade6";
+  basis.scaleType = nextScale;
+  basis.thresholds = makeDefaultThresholds(nextScale);
+  basis.name = makeBasisName(scope, nextScale);
+  state.profileWorkbenchLevel = "scale";
+  renderAll();
+}
+
+function createBlankBasis(collectionId, scope = makeScope(`scope-${Date.now()}`, "", [], "", "")) {
   const id = `basis-${Date.now()}`;
   return {
     id,
@@ -912,14 +1043,14 @@ function createBlankBasis(collectionId) {
     status: "draft",
     sourceNote: "",
     sourceUrl: "",
-    scopes: [makeScope(`${id}-scope-1`, "Regionale Schule", ["7"], "", "")],
+    scopes: [{ ...scope, id: scope.id || `${id}-scope-1` }],
     thresholds: makeThresholds(grade6Labels, [90, 75, 60, 45, 25, 0]),
   };
 }
 
 function createBlankCollection() {
   const id = `profile-${Date.now()}`;
-  return { id, name: "Neues Profil", countryCode: "DE", subdivisionCode: "DE-MV" };
+  return { id, name: "Neues Profil", countryCode: "", subdivisionCode: "" };
 }
 
 function downloadJson(filename, payload) {
@@ -1203,7 +1334,7 @@ ui.resetScoreButton.addEventListener("click", () => {
 });
 
 [
-  [ui.profileNameInput, "name"], [ui.countryCodeInput, "countryCode"], [ui.subdivisionCodeInput, "subdivisionCode"],
+  [ui.profileNameInput, "name"],
 ].forEach(([element, field]) => element.addEventListener("input", () => updateProfileField(field, element.value)));
 
 [
@@ -1225,33 +1356,12 @@ ui.scopeSelect.addEventListener("change", () => {
   renderProfileEditor();
   persist();
 });
-ui.schoolTypeInput.addEventListener("change", () => updateScopeField("schoolType", ui.schoolTypeInput.value));
-ui.assessmentTypeInput.addEventListener("input", () => updateScopeField("assessmentType", ui.assessmentTypeInput.value));
-ui.qualificationInput.addEventListener("input", () => updateScopeField("qualification", ui.qualificationInput.value));
-
-ui.gradeBandInput.addEventListener("input", () => {
-  const classes = ui.gradeBandInput.value.split(/[,;]+/).map((value) => value.trim()).filter(Boolean);
-  updateScopeField("classes", classes);
-});
-
-ui.scaleTypeSelect.addEventListener("change", () => {
-  const profile = getActiveBasis();
-  if (!profile || profile.scaleType === ui.scaleTypeSelect.value) return;
-  const confirmed = window.confirm("Beim Wechsel des Zensierungsmodus werden die Prozentgrenzen dieser Grundlage angepasst. Bei manueller Definition bleiben die bestehenden Zeilen erhalten.");
-  if (!confirmed) {
-    ui.scaleTypeSelect.value = profile.scaleType;
-    return;
-  }
-  profile.scaleType = ui.scaleTypeSelect.value;
-  if (profile.scaleType === "points15") {
-    profile.thresholds = makeThresholds(point15Labels, [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 35, 25, 15, 0]);
-  } else if (profile.scaleType === "grade6") {
-    profile.thresholds = makeThresholds(grade6Labels, [90, 75, 60, 45, 25, 0]);
-  } else if (!profile.thresholds?.length) {
-    profile.thresholds = makeThresholds([["Stufe 1", ""], ["Stufe 2", ""]], [50, 0]);
-  }
-  renderAll();
-});
+ui.addCountryButton.addEventListener("click", commitCountryNode);
+ui.addSubdivisionButton.addEventListener("click", commitSubdivisionNode);
+ui.addSchoolTypeButton.addEventListener("click", commitSchoolNode);
+ui.addClassBandButton.addEventListener("click", commitClassNode);
+ui.addPerformanceButton.addEventListener("click", commitPerformanceNode);
+ui.addScaleButton.addEventListener("click", commitScaleNode);
 
 ui.addThresholdButton.addEventListener("click", () => {
   const profile = getActiveBasis();
@@ -1263,12 +1373,10 @@ ui.addThresholdButton.addEventListener("click", () => {
 
 ui.newProfileButton.addEventListener("click", () => {
   const profile = createBlankCollection();
-  const basis = createBlankBasis(profile.id);
   state.collections.push(profile);
-  state.profiles.push(basis);
   state.activeProfileId = profile.id;
-  state.activeBasisId = basis.id;
-  state.activeScopeId = basis.scopes[0].id;
+  state.activeBasisId = "";
+  state.activeScopeId = "";
   state.profileWorkbenchLevel = "country";
   setEngineTab("profile");
   renderAll();

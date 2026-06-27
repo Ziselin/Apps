@@ -453,18 +453,7 @@ textarea:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33
 .engine-tab-profile:not(.engine-scale-selected) .threshold-manager .panel-note,
 .engine-tab-profile:not(.engine-scale-selected) .threshold-manager .threshold-actions,
 .engine-tab-profile:not(.engine-scale-selected) .threshold-manager .threshold-table-head,
-.engine-tab-profile:not(.engine-scale-selected) .threshold-manager .threshold-editor,
-.engine-tab-profile:not(.engine-scale-selected) .threshold-manager .architecture-note { display: none; }
-.engine-tab-profile.engine-scale-selected .threshold-guide { display: none; }
-.threshold-guide {
-  margin-top: 18px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255,255,252,.44);
-}
-.threshold-guide strong { font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
-.threshold-guide p { margin: 8px 0 0; color: var(--muted); font-size: .9rem; line-height: 1.5; }
+.engine-tab-profile:not(.engine-scale-selected) .threshold-manager .threshold-editor { display: none; }
 .profile-workbench { display: grid; gap: 14px; }
 .profile-breadcrumb {
   display: flex;
@@ -586,6 +575,11 @@ textarea:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33
 .field { display: grid; gap: 6px; min-width: 0; }
 .field > span:first-child { color: var(--muted); font-size: .78rem; }
 .field.full { grid-column: 1 / -1; }
+.field label { display: grid; gap: 6px; min-width: 0; }
+.field label > span:first-child { color: var(--muted); font-size: .78rem; }
+.field-with-action { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.field-with-action.full { grid-column: 1 / -1; }
+.profile-fields > .full { grid-column: 1 / -1; }
 .profile-manager > .field { margin-top: 18px; }
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .secondary-button,
@@ -629,10 +623,6 @@ textarea:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33
 .percent-field { position: relative; }
 .percent-field::after { content: "%"; position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .percent-field input { padding-right: 30px; }
-.architecture-note { margin-top: 20px; padding: 14px 16px; border-left: 2px solid var(--ink-soft); background: rgba(33,54,51,.035); }
-.architecture-note strong { font-size: .82rem; }
-.architecture-note p { margin: 6px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
-
 .menu-overlay { position: fixed; inset: 0; z-index: 30; background: rgba(33,54,51,.13); backdrop-filter: blur(2px); }
 .menu-overlay[hidden] { display: none; }
 .side-menu { position: fixed; z-index: 31; inset: 0 auto 0 0; width: min(420px, calc(100vw - 28px)); padding: 18px; border-right: 1px solid var(--line); background: rgba(246,246,239,.97); box-shadow: 24px 0 70px rgba(33,54,51,.15); transform: translateX(-100%); transition: transform 180ms ease; }

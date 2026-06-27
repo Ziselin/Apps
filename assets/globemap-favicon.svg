@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="GlobeMap">
+  <defs>
+    <linearGradient id="sea" x1="22" y1="14" x2="102" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2d4845"/>
+      <stop offset="1" stop-color="#132521"/>
+    </linearGradient>
+    <linearGradient id="land" x1="28" y1="26" x2="104" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e8d7a2"/>
+      <stop offset="1" stop-color="#b6c2a0"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="50" fill="url(#sea)" stroke="#f2a33a" stroke-width="5"/>
+  <path fill="none" stroke="#f2a33a" stroke-width="2.4" opacity=".72" d="M18 64h92M64 14c-14 13-21 30-21 50s7 37 21 50M64 14c14 13 21 30 21 50s-7 37-21 50M28 36c18 8 54 8 72 0M28 92c18-8 54-8 72 0"/>
+  <path fill="url(#land)" d="M45 29c8-5 19-1 23 5 3 5-4 9-10 8-7-1-9 5-15 6-7 1-15-6-11-12 2-3 8-4 13-7Zm31 22c8-3 22 1 25 8 3 8-9 11-15 7-7-4-11 3-17 1-7-2-6-13 7-16ZM33 69c8-5 22-4 27 3 4 6-6 13-15 12-8-1-19-1-21-6-2-4 3-6 9-9Zm51 13c10-3 19 2 20 9 1 8-10 12-18 9-7-3-17-1-17-8 0-5 7-8 15-10Z"/>
+</svg>

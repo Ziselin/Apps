@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Notenrechner · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/notenrechner-icon.svg?v=20260621b">
-  <link rel="stylesheet" href="noten.css?v=20260621v">
+  <link rel="stylesheet" href="noten.css?v=20260621x">
 </head>
 <body>
   <div id="gradeApp" class="app-frame workspace-mode-bridge">
@@ -169,25 +169,25 @@
             <div class="profile-detail-card" data-detail-level="country">
               <div class="profile-fields compact-fields">
                 <label class="field full"><span>Profilname</span><input id="profileNameInput" type="text"></label>
-                <label class="field"><span>Staat</span><span class="select-shell"><select id="countryCodeInput"><option value="DE">Deutschland (DE)</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <div class="field field-with-action"><label><span>Staat</span><span class="select-shell"><select id="countryCodeInput"><option value="DE">Deutschland (DE)</option></select><span class="select-caret" aria-hidden="true"></span></span></label><button type="button" id="addCountryButton" class="secondary-button">Hinzufügen</button></div>
               </div>
             </div>
 
             <div class="profile-detail-card" data-detail-level="subdivision" hidden>
               <div class="profile-fields compact-fields">
-                <label class="field"><span>Land / Region</span><span class="select-shell"><select id="subdivisionCodeInput"><option value="DE-MV">Mecklenburg-Vorpommern (DE-MV)</option><option value="">national geregelt / kein Land</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <div class="field field-with-action"><label><span>Land / Region</span><span class="select-shell"><select id="subdivisionCodeInput"><option value="DE-MV">Mecklenburg-Vorpommern (DE-MV)</option><option value="">national geregelt / kein Land</option></select><span class="select-caret" aria-hidden="true"></span></span></label><button type="button" id="addSubdivisionButton" class="secondary-button">Hinzufügen</button></div>
               </div>
             </div>
 
             <div class="profile-detail-card" data-detail-level="school" hidden>
               <div class="profile-fields compact-fields">
-                <label class="field"><span>Schulart</span><span class="select-shell"><select id="schoolTypeInput"></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <div class="field field-with-action"><label><span>Schulart</span><span class="select-shell"><select id="schoolTypeInput"></select><span class="select-caret" aria-hidden="true"></span></span></label><button type="button" id="addSchoolTypeButton" class="secondary-button">Hinzufügen</button></div>
               </div>
             </div>
 
             <div class="profile-detail-card" data-detail-level="class" hidden>
               <div class="profile-fields compact-fields">
-                <label class="field full"><span>Klassenstufe / Geltungsbereich</span><input id="gradeBandInput" type="text" placeholder="z. B. 7, 8, 9"></label>
+                <div class="field field-with-action full"><label><span>Klassenstufe / Geltungsbereich</span><input id="gradeBandInput" type="text" placeholder="z. B. 7, 8, 9"></label><button type="button" id="addClassBandButton" class="secondary-button">Hinzufügen</button></div>
               </div>
             </div>
 
@@ -195,6 +195,7 @@
               <div class="profile-fields compact-fields">
                 <label class="field"><span>Leistungsart</span><input id="assessmentTypeInput" type="text" placeholder="z. B. Klassenarbeit"></label>
                 <label class="field"><span>Abschluss / Bildungsgang</span><input id="qualificationInput" type="text" placeholder="z. B. Berufsreife"></label>
+                <button type="button" id="addPerformanceButton" class="secondary-button full">Hinzufügen</button>
               </div>
             </div>
 
@@ -213,7 +214,7 @@
               </div>
               <div class="profile-fields">
                 <label class="field full"><span>Name der Berechnungsgrundlage</span><input id="basisNameInput" type="text"></label>
-                <label class="field"><span>Zensierungsmodus</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1-6</option><option value="points15">15-0 Punkte</option><option value="manual">Manuelle Definition</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
+                <div class="field field-with-action"><label><span>Zensierungsmodus</span><span class="select-shell"><select id="scaleTypeSelect"><option value="grade6">Noten 1-6</option><option value="points15">15-0 Punkte</option><option value="manual">Manuelle Definition</option></select><span class="select-caret" aria-hidden="true"></span></span></label><button type="button" id="addScaleButton" class="secondary-button">Hinzufügen</button></div>
                 <label class="field"><span>Version</span><input id="profileVersionInput" type="text" value="1"></label>
                 <label class="field"><span>Status</span><span class="select-shell"><select id="profileStatusSelect"><option value="personal">Persönliche Arbeitsgrundlage</option><option value="verified">Amtlich geprüft</option><option value="draft">Entwurf</option></select><span class="select-caret" aria-hidden="true"></span></span></label>
                 <label class="field"><span>Gültig ab</span><input id="validFromInput" type="date"></label>
@@ -226,21 +227,16 @@
           <div class="panel-head threshold-head">
             <div><span class="label">Berechnungsgrundlage</span><h2>Prozentgrenzen</h2></div>
           </div>
-          <div id="thresholdGuide" class="threshold-guide">
-            <strong>Orientierung</strong>
-            <p>Wählen Sie links die letzte Ebene „Zensierungsmodus“. Erst dort werden die Prozentgrenzen sichtbar, weil sie immer zu einer konkreten Berechnungsgrundlage gehören.</p>
-          </div>
           <p class="panel-note">Jede Zeile bezeichnet den Mindestanteil für die jeweilige Stufe. Änderungen werden lokal im Browser gespeichert und wirken sofort auf der Brücke.</p>
           <div class="threshold-actions"><button type="button" id="addThresholdButton" class="secondary-button">Stufe hinzufügen</button></div>
           <div class="threshold-table-head"><span>Stufe</span><span>Note</span><span>Ab Prozent</span><span></span></div>
           <div id="thresholdEditor" class="threshold-editor"></div>
-          <div class="architecture-note"><strong>Architekturregel</strong><p>Ein Profil bündelt die Daten eines Rechtsraums. Darin liegen eigenständige Berechnungsgrundlagen mit Grenzwerten, Quelle und Version. Geltungsbereiche ordnen eine Grundlage Schularten, Klassen und Leistungsarten zu. Eine weitere Auswahl dupliziert daher niemals die Berechnungsgrundlage.</p></div>
         </section>
       </main>
     </section>
   </div>
   <script src="profile/mecklenburg-vorpommern.js?v=20260621a"></script>
-  <script src="noten.js?v=20260621v"></script>
+  <script src="noten.js?v=20260621x"></script>
 </body>
 </html>
 

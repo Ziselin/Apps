@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3efe5">
+  <title>GlobeMap</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/globemap-favicon.svg?v=20260627a">
+  <link rel="stylesheet" href="globemap.css?v=20260627c">
+</head>
+<body>
+  <main id="globeApp" class="app-frame workspace-mode-preview">
+    <section class="preview-view" aria-label="GlobeMap Ansicht">
+      <header class="topbar">
+        <div class="brand-plate">
+          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="menu-lines" aria-hidden="true"></span>
+          </button>
+          <div class="brand-mark">
+            <a class="brand-home-link" href="../index.html" aria-label="Zur Atlas-Startseite">
+              <img class="brand-bird" src="../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+            </a>
+            <span class="brand-name">globe map</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-pill">in Vorbereitung</span>
+        </div>
+      </header>
+
+      <div id="menuOverlay" class="menu-overlay" hidden></div>
+      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+        <div class="side-menu-inner">
+          <div class="side-menu-head">
+            <div><span class="label">Menü</span><strong>GlobeMap</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          </div>
+          <div class="side-menu-list">
+            <details>
+              <summary>Projekte</summary>
+              <div class="project-choice-list" aria-label="Projektbereich wechseln">
+                <a class="project-choice" href="../index.html" aria-current="page">Atlas</a>
+                <a class="project-choice" href="../index.html?project=schola">Schola</a>
+              </div>
+            </details>
+            <details>
+              <summary>Funktionsweise</summary>
+              <p>GlobeMap soll statistische Daten später auf ausgewählte geografische oder historische Grenzräume projizieren.</p>
+            </details>
+            <details>
+              <summary>Appbeschreibung</summary>
+              <p>GlobeMap ist in Vorbereitung. Angelegt sind Globusansicht, Projektbrowser und Editorstruktur; Geodatenquellen, Grenzlayer und Klassierungen folgen.</p>
+            </details>
+          </div>
+        </div>
+      </aside>
+
+      <section class="globe-stage">
+        <aside class="render-note">
+          <span class="label">Layer</span>
+          <strong>Welt · Kontinente</strong>
+          <p>Natural-Earth-Landgeometrie als moderne Grundkarte. Später werden darauf Staaten, Regionen und Datenklassierungen gelegt.</p>
+        </aside>
+
+        <section class="globe-card" aria-labelledby="globeTitle">
+          <div class="globe-copy">
+            <span class="label">GlobeMap</span>
+            <h1 id="globeTitle">Interaktiver Globus</h1>
+            <p>Meere, Kontinente und später auswählbare Grenzräume: Staaten, föderale Ebenen, Gemeinden, Wahlkreise und historische Grenzen.</p>
+          </div>
+          <div id="globe" class="globe" role="img" aria-label="Interaktiver dreidimensional projizierter Globus">
+            <canvas id="globeCanvas" class="globe-canvas"></canvas>
+          </div>
+        </section>
+      </section>
+
+      <button type="button" id="openWorkspaceButton" class="workspace-strip" aria-label="Browser und Editor öffnen">
+        <span>Browser/Editor</span>
+      </button>
+    </section>
+
+    <section class="details-view" aria-label="GlobeMap Arbeitsbereich">
+      <button type="button" id="returnPreviewButton" class="workspace-strip workspace-strip-top" aria-label="Zur GlobeMap Ansicht zurückkehren">
+        <span>GlobeMap</span>
+      </button>
+      <main class="workspace-stage">
+        <section class="workspace-panel browser-panel">
+          <div class="panel-head"><div><span class="label">Browser</span><h2>Projekte</h2></div></div>
+          <div class="browser-actions">
+            <button type="button" id="newProjectButton" class="secondary-button">Neues GlobeMap-Projekt</button>
+            <button type="button" class="secondary-button">Importieren</button>
+            <button type="button" class="secondary-button">Exportieren</button>
+          </div>
+          <div id="projectBrowserList" class="project-browser-list" aria-label="GlobeMap-Projekte"></div>
+          <article class="project-card is-active">
+            <strong>Weltkarte · Grundmodell</strong>
+            <span>Globus · Kontinente · ohne Datenlayer</span>
+          </article>
+          <article class="project-card">
+            <strong>Grenzlayer</strong>
+            <span>Staaten, Regionen, Gemeinden, Wahlkreise · in Vorbereitung</span>
+          </article>
+          <article class="project-card">
+            <strong>Datenklassierung</strong>
+            <span>Farbklassen, Wertebereiche, Legenden · in Vorbereitung</span>
+          </article>
+        </section>
+
+        <section class="workspace-panel editor-panel">
+          <div class="panel-head"><div><span class="label">Editor</span><h2>GlobeMap-Konzept</h2></div></div>
+          <div class="editor-section">
+            <h3>Geografische Grundlage</h3>
+            <p id="boundarySummary" class="boundary-summary">Neue Projekte erhalten automatisch Natural Earth als moderne geografische Grenzgrundlage mit 110m, 50m und 10m Detailstufe.</p>
+            <div id="boundaryLevelList" class="boundary-level-list"></div>
+            <p>Hier werden später Globusprojektion, Grenzlayer, Datenquelle und Gültigkeitszeitraum ausgewählt.</p>
+          </div>
+          <div class="editor-section">
+            <h3>Datenbasis</h3>
+            <p>Geplant ist eine Zuordnung von Tabellenwerten zu geografischen Einheiten, etwa Staat, Landkreis, Gemeinde oder Wahlkreis.</p>
+          </div>
+          <div class="editor-section">
+            <h3>Klassierung</h3>
+            <div class="class-row"><span>0–10</span><i></i></div>
+            <div class="class-row"><span>11–50</span><i></i></div>
+            <div class="class-row"><span>51–200</span><i></i></div>
+          </div>
+        </section>
+      </main>
+    </section>
+  </main>
+
+  <script src="data/natural-earth/110m/ne_110m_land.js?v=20260627a"></script>
+  <script src="globemap.js?v=20260627p"></script>
+</body>
+</html>
