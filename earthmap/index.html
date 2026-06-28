@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3efe5">
+  <title>Earth Map</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260627b">
+  <link rel="stylesheet" href="earthmap.css?v=20260627a">
+</head>
+<body>
+  <main id="globeApp" class="app-frame workspace-mode-preview">
+    <section class="preview-view" aria-label="Earth Map Ansicht">
+      <header class="topbar">
+        <div class="brand-plate">
+          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="menu-lines" aria-hidden="true"></span>
+          </button>
+          <div class="brand-mark">
+            <a class="brand-home-link" href="../index.html" aria-label="Zur Atlas-Startseite">
+              <img class="brand-bird" src="../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+            </a>
+            <span class="brand-name">earth map</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="export-control">
+            <button type="button" id="exportProjectButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
+              <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
+            </button>
+            <div id="exportMenu" class="export-menu" hidden>
+              <button type="button" data-export-format="html">
+                <span class="file-format-icon file-format-icon-html" aria-hidden="true"></span>
+                <span>HTML</span>
+              </button>
+              <button type="button" data-export-format="png">
+                <span class="file-format-icon file-format-icon-png" aria-hidden="true"></span>
+                <span>PNG</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div id="menuOverlay" class="menu-overlay" hidden></div>
+      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+        <div class="side-menu-inner">
+          <div class="side-menu-head">
+            <div><span class="label">Menü</span><strong>Earth Map</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          </div>
+          <div class="side-menu-list">
+            <details>
+              <summary>Projekte</summary>
+              <div class="project-choice-list" aria-label="Projektbereich wechseln">
+                <a class="project-choice" href="../index.html" aria-current="page">Atlas</a>
+                <a class="project-choice" href="../index.html?project=schola">Schola</a>
+              </div>
+            </details>
+            <details>
+              <summary>Funktionsweise</summary>
+              <p>Earth Map soll statistische Daten später auf ausgewählte geografische oder historische Grenzräume projizieren.</p>
+            </details>
+            <details>
+              <summary>Appbeschreibung</summary>
+              <p>Earth Map ist in Vorbereitung. Angelegt sind Globusansicht, Projektbrowser und Editorstruktur; Geodatenquellen, Grenzlayer und Klassierungen folgen.</p>
+            </details>
+          </div>
+        </div>
+      </aside>
+
+      <section class="globe-stage">
+        <section class="globe-card" aria-label="Interaktiver Globus">
+          <div id="globe" class="globe" role="img" aria-label="Interaktiver dreidimensional projizierter Globus">
+            <canvas id="globeCanvas" class="globe-canvas"></canvas>
+          </div>
+        </section>
+      </section>
+
+      <button type="button" id="openWorkspaceButton" class="workspace-strip" aria-label="Browser und Editor öffnen">
+        <span>Browser/Editor</span>
+      </button>
+    </section>
+
+    <section class="details-view" aria-label="Earth Map Arbeitsbereich">
+      <button type="button" id="returnPreviewButton" class="workspace-strip workspace-strip-top" aria-label="Zur Earth Map Ansicht zurückkehren">
+        <span>Earth Map</span>
+      </button>
+      <main class="workspace-stage">
+        <section class="workspace-panel browser-panel">
+          <div class="panel-head"><div><span class="label">Browser</span><h2>Projekte</h2></div></div>
+          <div class="browser-actions">
+            <button type="button" id="newProjectButton" class="secondary-button">Neues Earth-Map-Projekt</button>
+            <button type="button" class="secondary-button">Importieren</button>
+            <button type="button" class="secondary-button">Exportieren</button>
+          </div>
+          <div id="projectBrowserList" class="project-browser-list" aria-label="Earth-Map-Projekte"></div>
+          <div id="libraryBrowserList" class="library-browser-list" aria-label="Projektbibliothek"></div>
+        </section>
+
+        <section class="workspace-panel editor-panel">
+          <div class="panel-head"><div><span class="label">Editor</span><h2>Earth-Map-Konzept</h2></div></div>
+          <div class="editor-tabs" role="tablist" aria-label="Earth-Map-Editorbereiche">
+            <button type="button" class="editor-tab is-active" id="tabConcept" data-editor-tab="concept" role="tab" aria-selected="true" aria-controls="panelConcept">Konzept</button>
+            <button type="button" class="editor-tab" id="tabBoundarySearch" data-editor-tab="boundary-search" role="tab" aria-selected="false" aria-controls="panelBoundarySearch">Grenzlayer suchen</button>
+            <button type="button" class="editor-tab" id="tabLayerEditor" data-editor-tab="layer-editor" role="tab" aria-selected="false" aria-controls="panelLayerEditor">Karteneditor</button>
+          </div>
+
+          <section id="panelConcept" class="editor-tab-panel is-active" data-editor-panel="concept" role="tabpanel" aria-labelledby="tabConcept">
+            <div class="editor-section">
+              <h3>Geografische Grundlage</h3>
+              <p id="boundarySummary" class="boundary-summary">Neue Projekte erhalten automatisch Natural Earth als moderne geografische Grenzgrundlage mit 110m, 50m und 10m Detailstufe.</p>
+              <div id="boundaryLevelList" class="boundary-level-list"></div>
+              <p>Hier werden später Globusprojektion, Grenzlayer, Datenquelle und Gültigkeitszeitraum ausgewählt.</p>
+            </div>
+            <div class="editor-section">
+              <h3>Datenbasis</h3>
+              <p>Geplant ist eine Zuordnung von Tabellenwerten zu geografischen Einheiten, etwa Staat, Landkreis, Gemeinde oder Wahlkreis.</p>
+            </div>
+            <div class="editor-section">
+              <h3>Klassierung</h3>
+              <div class="class-row"><span>0–10</span><i></i></div>
+              <div class="class-row"><span>11–50</span><i></i></div>
+              <div class="class-row"><span>51–200</span><i></i></div>
+            </div>
+          </section>
+
+          <section id="panelBoundarySearch" class="editor-tab-panel" data-editor-panel="boundary-search" role="tabpanel" aria-labelledby="tabBoundarySearch" hidden>
+            <div class="editor-section">
+              <h3>Grenzlayer suchen</h3>
+              <p>Suche später parallel in Natural Earth und geoBoundaries nach Ländern, Verwaltungsebenen und Grenzräumen. Treffer werden als Layer mit Quelle, Lizenz und Abrufdatum im Projekt gespeichert.</p>
+              <label class="search-field">
+                <span>Suchbegriff</span>
+                <input id="boundarySearchInput" type="search" placeholder="z. B. Deutschland, Mecklenburg-Vorpommern, France">
+              </label>
+              <div class="source-toggle-list" aria-label="Suchquellen">
+                <label><input type="checkbox" id="sourceNaturalEarth" checked> Natural Earth</label>
+                <label><input type="checkbox" id="sourceGeoBoundaries" checked> geoBoundaries</label>
+              </div>
+              <button type="button" id="boundarySearchButton" class="secondary-button">Suchen</button>
+            </div>
+            <div class="editor-section">
+              <h3>Suchergebnisse</h3>
+              <div id="boundarySearchResults" class="search-result-list">
+                <p class="empty-state">Noch keine Suche ausgeführt.</p>
+              </div>
+            </div>
+          </section>
+
+          <section id="panelLayerEditor" class="editor-tab-panel" data-editor-panel="layer-editor" role="tabpanel" aria-labelledby="tabLayerEditor" hidden>
+            <div class="editor-section">
+              <h3 id="layerEditorTitle">Keine Karte ausgewählt</h3>
+              <p id="layerEditorSummary" class="empty-state">Wähle links in der Projektbibliothek eine hinzugefügte Länderkarte aus.</p>
+              <div id="layerEditorContent" class="layer-editor-content" hidden>
+                <label class="color-field">
+                  <span>Anzeigefarbe</span>
+                  <div class="layer-color-controls">
+                    <input id="layerColorInput" type="color" value="#c6a86a" aria-label="Freie Farbe wählen">
+                    <button type="button" id="layerColorPaletteButton" class="color-picker-button" aria-label="Projektfarben wählen">
+                      <span class="color-picker-icon" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                </label>
+                <dl id="layerMetaList" class="layer-meta-list"></dl>
+              </div>
+            </div>
+            <div class="editor-section">
+              <h3>Bibliothekslogik</h3>
+              <p>Importierte Geometrien liegen im aktuellen Projekt in eigenen Ordnern. Später kann daraus eine kuratierte GeoJSON-Bibliothek wachsen: wiederverwendbar, zitierbar und mit klarer Quelle, Lizenz, Zeitspanne und Detailtiefe.</p>
+            </div>
+          </section>
+        </section>
+      </main>
+    </section>
+  </main>
+
+  <script src="../assets/vendor/d3.v7.min.js?v=20260627a"></script>
+  <script src="../assets/geojson/natural-earth/110m/ne_110m_land.js?v=20260627a"></script>
+  <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
+  <script src="earthmap.js?v=20260628h"></script>
+</body>
+</html>
