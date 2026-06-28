@@ -1,2 +1,0 @@
-window.GlobeMapNaturalEarthTileData = window.GlobeMapNaturalEarthTileData || {};
-window.GlobeMapNaturalEarthTileData['10m-land-p60_p30'] = {"type":"FeatureCollection","name":"ne_10m_land_p60_p30","features":[{"type":"Feature","properties":{"featurecla":"Land","scalerank":0,"min_zoom":0},"bbox":[60,30,90,60],"geometry":{"type":"Polygon","coordinates":[[[60,30],[60,60],[90,60],[90,30],[60,30]]]}}]};
