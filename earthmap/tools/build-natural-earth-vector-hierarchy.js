@@ -218,25 +218,18 @@ function buildHierarchy(source) {
     source: "Natural Earth 10m land",
     strategy: "single-master-vector-hierarchy",
     tileStep: TILE_STEP,
+    // Detailkurve: Wir speichern keine separaten Weltkopien pro Zoomstufe.
+    // Stattdessen hält jeder Punkt eine Bedeutung im 10m-Master. Die Anzeige
+    // schaltet die Schwellwerte jetzt etwa dreimal früher frei, damit beim
+    // Hineinzoomen schneller mehr Geometrie sichtbar wird, ohne mehr MB zu
+    // erzeugen.
     thresholds: [
-      { zoom: 1, importance: 0.52 },
-      { zoom: 2, importance: 0.38 },
-      { zoom: 3, importance: 0.27 },
-      { zoom: 4, importance: 0.19 },
-      { zoom: 5, importance: 0.13 },
-      { zoom: 6, importance: 0.09 },
-      { zoom: 7, importance: 0.062 },
-      { zoom: 8, importance: 0.043 },
-      { zoom: 9, importance: 0.030 },
-      { zoom: 10, importance: 0.021 },
-      { zoom: 11, importance: 0.015 },
-      { zoom: 12, importance: 0.0105 },
-      { zoom: 13, importance: 0.0074 },
-      { zoom: 14, importance: 0.0052 },
-      { zoom: 15, importance: 0.0037 },
-      { zoom: 16, importance: 0.0026 },
-      { zoom: 17, importance: 0.0018 },
-    ],
+      0.52, 0.38, 0.27, 0.19, 0.13, 0.09, 0.062, 0.043, 0.030,
+      0.021, 0.015, 0.0105, 0.0074, 0.0052, 0.0037, 0.0026, 0.0018,
+    ].map((importance, index) => ({
+      zoom: Number((1 + index / 3).toFixed(3)),
+      importance,
+    })),
     global: { key: "global", file: globalFile, featureCount: globalFeatures.length },
     tiles: nonEmptyTiles.map(({ key, minLon, maxLon, minLat, maxLat, file, features }) => ({
       key,

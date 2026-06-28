@@ -128,14 +128,13 @@
           <section id="panelBoundarySearch" class="editor-tab-panel" data-editor-panel="boundary-search" role="tabpanel" aria-labelledby="tabBoundarySearch" hidden>
             <div class="editor-section">
               <h3>Grenzlayer suchen</h3>
-              <p>Suche später parallel in Natural Earth und geoBoundaries nach Ländern, Verwaltungsebenen und Grenzräumen. Treffer werden als Layer mit Quelle, Lizenz und Abrufdatum im Projekt gespeichert.</p>
+              <p>Suche in Natural Earth nach Ländern und Grenzräumen. Treffer werden als Layer mit Quelle, Lizenz und Abrufdatum im Projekt gespeichert.</p>
               <label class="search-field">
                 <span>Suchbegriff</span>
                 <input id="boundarySearchInput" type="search" placeholder="z. B. Deutschland, Mecklenburg-Vorpommern, France">
               </label>
               <div class="source-toggle-list" aria-label="Suchquellen">
                 <label><input type="checkbox" id="sourceNaturalEarth" checked> Natural Earth</label>
-                <label><input type="checkbox" id="sourceGeoBoundaries" checked> geoBoundaries</label>
               </div>
               <button type="button" id="boundarySearchButton" class="secondary-button">Suchen</button>
             </div>
@@ -175,8 +174,9 @@
   </main>
 
   <script src="../assets/vendor/d3.v7.min.js?v=20260627a"></script>
-  <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260628h"></script>
+  <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260628i"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
   <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260628aj"></script>
+  <script src="earthmap.js?v=20260628ay"></script>
 </body>
 </html>

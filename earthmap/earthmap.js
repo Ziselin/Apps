@@ -10,6 +10,7 @@
 const STORAGE_KEY = "earthmap-projects-v1";
 const LEGACY_STORAGE_KEY = "globemap-projects-v1";
 const NATURAL_EARTH_ASSET_BASE = "../assets/geojson/natural-earth/";
+const boundaryFeatureRenderCache = new Map();
 
 const GEOMETRY_BASE_REGISTRY = {
   naturalEarthModern: {
@@ -247,8 +248,106 @@ function getVisibleBoundaryMapItems(project = getActiveProject()) {
 function getNaturalEarthCountryFeatureByIso3(iso3) {
   const normalizedIso3 = String(iso3 || "").toUpperCase();
   if (!normalizedIso3) return null;
-  const features = window.EarthMapNaturalEarthCountries?.features || [];
+  const features = getNaturalEarthCountryDataset().features;
   return features.find((feature) => getNaturalEarthIso3(feature).toUpperCase() === normalizedIso3) || null;
+}
+
+function getNaturalEarthCountryDataset() {
+  const tenMeter = window.EarthMapNaturalEarthCountries10m;
+  if (tenMeter?.features?.length) {
+    return {
+      detail: "10m",
+      label: "10m · Natural-Earth-Admin-0",
+      sourceUrl: `${NATURAL_EARTH_ASSET_BASE}10m/ne_10m_admin_0_countries.geojson`,
+      features: tenMeter.features,
+    };
+  }
+  const fallback = window.EarthMapNaturalEarthCountries;
+  return {
+    detail: "110m",
+    label: "110m · Natural-Earth-Fallback",
+    sourceUrl: `${NATURAL_EARTH_ASSET_BASE}110m/ne_110m_admin_0_countries.geojson`,
+    features: fallback?.features || [],
+  };
+}
+
+function getSquaredDistanceToSegment(point, start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  if (dx === 0 && dy === 0) {
+    const px = point[0] - start[0];
+    const py = point[1] - start[1];
+    return px * px + py * py;
+  }
+  const t = clamp(((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy), 0, 1);
+  const projected = [start[0] + t * dx, start[1] + t * dy];
+  const px = point[0] - projected[0];
+  const py = point[1] - projected[1];
+  return px * px + py * py;
+}
+
+function simplifyOpenLine(points, toleranceSquared, startIndex = 0, endIndex = points.length - 1, keep = new Set([0, points.length - 1])) {
+  if (endIndex <= startIndex + 1) return keep;
+  let maxDistance = 0;
+  let splitIndex = -1;
+  for (let index = startIndex + 1; index < endIndex; index += 1) {
+    const distance = getSquaredDistanceToSegment(points[index], points[startIndex], points[endIndex]);
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      splitIndex = index;
+    }
+  }
+  if (maxDistance > toleranceSquared && splitIndex > -1) {
+    keep.add(splitIndex);
+    simplifyOpenLine(points, toleranceSquared, startIndex, splitIndex, keep);
+    simplifyOpenLine(points, toleranceSquared, splitIndex, endIndex, keep);
+  }
+  return keep;
+}
+
+function simplifyClosedRing(ring, tolerance) {
+  const source = (ring || []).filter((point) => Number.isFinite(point?.[0]) && Number.isFinite(point?.[1]));
+  if (source.length < 4 || tolerance <= 0) return source;
+  const open = source.slice(0, -1);
+  if (open.length < 3) return source;
+  const keep = simplifyOpenLine(open, tolerance * tolerance);
+  const simplified = [...keep].sort((a, b) => a - b).map((index) => open[index]);
+  if (simplified.length < 3) return [];
+  simplified.push(simplified[0]);
+  return simplified;
+}
+
+function simplifyBoundaryFeatureForZoom(feature, detail) {
+  if (!feature || detail !== "10m") return feature;
+  const tolerance = Math.max(0.0001, getNaturalEarth10mDetailThreshold() * 0.7);
+  const iso3 = getNaturalEarthIso3(feature) || feature.properties?.NAME || "unknown";
+  const cacheKey = `${iso3}|${tolerance.toFixed(5)}`;
+  if (boundaryFeatureRenderCache.has(cacheKey)) return boundaryFeatureRenderCache.get(cacheKey);
+  if (boundaryFeatureRenderCache.size > 180) boundaryFeatureRenderCache.clear();
+
+  // Renderregel: Natural-Earth-Länder verwenden den 10m-Masterdatensatz und
+  // werden erst zur Anzeige vereinfacht. Dadurch bleiben Quellen-/Layerdaten
+  // bibliotheksfähig, während die sichtbare Vektordichte denselben Zoomtakt
+  // nutzt wie die Küstenlinien.
+  const simplifyPolygon = (polygon) => (polygon || [])
+    .map((ring) => simplifyClosedRing(ring, tolerance))
+    .filter((ring) => ring.length >= 4);
+  const geometry = feature.geometry?.type === "Polygon"
+    ? { type: "Polygon", coordinates: simplifyPolygon(feature.geometry.coordinates) }
+    : feature.geometry?.type === "MultiPolygon"
+      ? { type: "MultiPolygon", coordinates: (feature.geometry.coordinates || []).map(simplifyPolygon).filter((polygon) => polygon.length) }
+      : feature.geometry;
+  const simplified = { ...feature, geometry };
+  boundaryFeatureRenderCache.set(cacheKey, simplified);
+  return simplified;
+}
+
+function getRenderableBoundaryFeature(item) {
+  const provider = item?.geometryRef?.provider || "";
+  if (provider !== "natural-earth" && item?.source !== "Natural Earth") return null;
+  const dataset = getNaturalEarthCountryDataset();
+  const feature = getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3);
+  return simplifyBoundaryFeatureForZoom(feature, dataset.detail);
 }
 
 function hexToRgba(hex, alpha = 1) {
@@ -501,7 +600,7 @@ function getEarthMapHtmlExportState() {
     || { type: "FeatureCollection", features: [] };
   const landRings = extractLandRings(land);
   const layers = getVisibleBoundaryMapItems(project).map((item) => {
-    const feature = getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3);
+    const feature = getRenderableBoundaryFeature(item);
     if (!feature) return null;
     const layerFeature = cloneFeatureForExport(feature);
     return {
@@ -787,11 +886,17 @@ function buildEarthMapHtmlExport() {
       document.body.classList.add("is-dragging");
       canvas.setPointerCapture(event.pointerId);
     });
+    function getLatitudeLimit() {
+      const t = Math.max(0, Math.min(1, (zoom - 1) / 5));
+      const eased = 1 - ((1 - t) ** 2);
+      return 58 + eased * 31.2;
+    }
     canvas.addEventListener("pointermove", (event) => {
       if (!drag) return;
       const sensitivity = 0.42 / Math.sqrt(Math.max(1, zoom));
+      const latitudeLimit = getLatitudeLimit();
       rotation.lon = drag.lon + (event.clientX - drag.x) * sensitivity;
-      rotation.lat = Math.max(-82, Math.min(82, drag.lat - (event.clientY - drag.y) * sensitivity));
+      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, drag.lat - (event.clientY - drag.y) * sensitivity));
       render();
     });
     canvas.addEventListener("pointerup", (event) => {
@@ -803,6 +908,8 @@ function buildEarthMapHtmlExport() {
       event.preventDefault();
       const factor = Math.exp(-event.deltaY * 0.0012);
       zoom = Math.min(9, Math.max(1, zoom * factor));
+      const latitudeLimit = getLatitudeLimit();
+      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, rotation.lat));
       render();
     }, { passive: false });
     window.addEventListener("resize", render);
@@ -863,7 +970,7 @@ let activeNaturalEarthTileSignature = "";
 const pendingNaturalEarthTiles = new Set();
 
 const geoState = {
-  detailLevel: "110m",
+  detailLevel: "10m",
   landRings: [],
   landSamples: [],
   status: "loading",
@@ -931,8 +1038,8 @@ function createProgram(gl) {
       );
       gl_Position = vec4(r.x * u_scaleX, r.y * u_scaleY, -r.z * u_depthScale, 1.0);
       v_uv = a_uv;
-      v_light = clamp(0.88 + r.z * 0.08 + r.y * 0.035 - r.x * 0.025, 0.74, 1.04);
-      v_rim = smoothstep(0.38, 0.98, 1.0 - max(0.0, r.z));
+      v_light = clamp(0.98 + r.z * 0.035 + r.y * 0.012 - r.x * 0.008, 0.92, 1.03);
+      v_rim = smoothstep(0.58, 1.0, 1.0 - max(0.0, r.z));
     }
   `);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, `
@@ -944,7 +1051,7 @@ function createProgram(gl) {
     void main() {
       vec4 base = texture2D(u_map, v_uv);
       vec3 shaded = base.rgb * v_light;
-      shaded = mix(shaded, vec3(0.70, 0.71, 0.69), v_rim * 0.16);
+      shaded = mix(shaded, vec3(0.90, 0.90, 0.87), v_rim * 0.055);
       gl_FragColor = vec4(shaded, base.a);
     }
   `);
@@ -1056,87 +1163,26 @@ function deleteWebglMesh(mesh) {
   if (mesh?.buffer && webglState.gl) webglState.gl.deleteBuffer(mesh.buffer);
 }
 
-function lonToTextureX(lon, width) {
-  return ((normalizeLongitude(lon) + 180) / 360) * width;
-}
-
-function latToTextureY(lat, height) {
-  return ((90 - clamp(lat, -90, 90)) / 180) * height;
-}
-
-function drawGeoJsonOnTexture(textureContext, geojson, fillStyle, strokeStyle = "", lineWidth = 1) {
-  const width = textureContext.canvas.width;
-  const height = textureContext.canvas.height;
-  const drawRing = (ring) => {
-    const cleanRing = sanitizeRing(ring);
-    if (cleanRing.length < 4) return;
-    cleanRing.forEach(([lon, lat], index) => {
-      const x = lonToTextureX(lon, width);
-      const y = latToTextureY(lat, height);
-      if (index === 0) textureContext.moveTo(x, y);
-      else textureContext.lineTo(x, y);
-    });
-    textureContext.closePath();
-  };
-  const drawPolygon = (polygon) => {
-    textureContext.beginPath();
-    (polygon || []).forEach(drawRing);
-    if (fillStyle) {
-      textureContext.fillStyle = fillStyle;
-      textureContext.fill("evenodd");
-    }
-    if (strokeStyle) {
-      textureContext.strokeStyle = strokeStyle;
-      textureContext.lineWidth = lineWidth;
-      textureContext.stroke();
-    }
-  };
-  (geojson?.features || []).forEach((feature) => {
-    const geometry = feature.geometry;
-    if (geometry?.type === "Polygon") drawPolygon(geometry.coordinates || []);
-    if (geometry?.type === "MultiPolygon") (geometry.coordinates || []).forEach(drawPolygon);
-  });
-}
-
 function getWebglTextureSize() {
-  const desired = globeZoom >= 10 ? 8192 : globeZoom >= 5 ? 6144 : 4096;
-  return Math.min(webglState.maxTextureSize || 4096, desired);
+  return Math.min(webglState.maxTextureSize || 1024, 1024);
 }
 
-function createEarthMapTextureCanvas(source, textureWidth = getWebglTextureSize()) {
+function createEarthMapTextureCanvas(textureWidth = getWebglTextureSize()) {
   const canvas = document.createElement("canvas");
   canvas.width = textureWidth;
   canvas.height = Math.floor(textureWidth / 2);
   const textureContext = canvas.getContext("2d");
   textureContext.fillStyle = "#fbfbf8";
   textureContext.fillRect(0, 0, canvas.width, canvas.height);
-  if (source) {
-    drawGeoJsonOnTexture(textureContext, source, "#b8b8b4");
-  }
-
-  getVisibleBoundaryMapItems().forEach((item) => {
-    const provider = item.geometryRef?.provider || "";
-    const canUseNaturalEarthFallback = provider === "natural-earth"
-      || item.source === "Natural Earth"
-      || (provider === "geoboundaries" && String(item.adminLevel || "").toUpperCase() === "ADM0");
-    const feature = canUseNaturalEarthFallback
-      ? getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3)
-      : null;
-    if (!feature) return;
-    const color = normalizeColorValue(item.display?.color, "#d9dc8c") || "#d9dc8c";
-    drawGeoJsonOnTexture(textureContext, { type: "FeatureCollection", features: [feature] }, color);
-  });
   return canvas;
 }
 
 function updateWebglMapTexture() {
   const gl = webglState.gl;
-  const source = getRenderableLandGeoJson();
-  const layerSignature = getLayerMeshSignature(getVisibleBoundaryMapItems());
   const textureSize = getWebglTextureSize();
-  const signature = `${activeNaturalEarthTileSignature}|${source?.features?.length || 0}|${layerSignature}|${textureSize}`;
+  const signature = `water-sphere|${textureSize}`;
   if (signature === webglState.mapTextureSignature && webglState.mapTexture) return;
-  const textureCanvas = createEarthMapTextureCanvas(source, textureSize);
+  const textureCanvas = createEarthMapTextureCanvas(textureSize);
   if (!webglState.mapTexture) webglState.mapTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, webglState.mapTexture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -1146,6 +1192,7 @@ function updateWebglMapTexture() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   webglState.mapTextureSignature = signature;
+  webglState.mapTextureSize = textureSize;
 }
 
 function initWebglRenderer() {
@@ -1194,7 +1241,9 @@ function updateWebglLandMesh() {
 }
 
 function getLayerMeshSignature(items) {
-  return items.map((item) => `${item.id}:${item.iso3}:${item.display?.color || ""}`).join("|");
+  const dataset = getNaturalEarthCountryDataset();
+  const threshold = dataset.detail === "10m" ? getNaturalEarth10mDetailThreshold().toFixed(5) : "fallback";
+  return items.map((item) => `${item.id}:${item.iso3}:${item.display?.color || ""}`).join("|") + `|${dataset.detail}|${threshold}`;
 }
 
 function updateWebglLayerMeshes() {
@@ -1204,13 +1253,7 @@ function updateWebglLayerMeshes() {
   webglState.layerMeshes.forEach(deleteWebglMesh);
   webglState.layerMeshes.clear();
   items.forEach((item) => {
-    const provider = item.geometryRef?.provider || "";
-    const canUseNaturalEarthFallback = provider === "natural-earth"
-      || item.source === "Natural Earth"
-      || (provider === "geoboundaries" && String(item.adminLevel || "").toUpperCase() === "ADM0");
-    const feature = canUseNaturalEarthFallback
-      ? getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3)
-      : null;
+    const feature = getRenderableBoundaryFeature(item);
     if (!feature) return;
     const mesh = createWebglMesh(geoJsonToSphereVertices({ type: "FeatureCollection", features: [feature] }, 1.008));
     if (mesh) webglState.layerMeshes.set(item.id, { mesh, color: normalizeColorValue(item.display?.color, "#d9dc8c") || "#d9dc8c" });
@@ -1238,7 +1281,7 @@ function drawWebglMesh(mesh, color, depthScale = 0.62, mode = null) {
   const width = Math.max(1, webglState.canvas.width);
   const height = Math.max(1, webglState.canvas.height);
   const fit = Math.min(width, height);
-  const zoomScale = Math.min(0.94 * globeZoom, 18);
+  const zoomScale = 0.94 * globeZoom;
   gl.uniform1f(gl.getUniformLocation(program, "u_scaleX"), zoomScale * (fit / width));
   gl.uniform1f(gl.getUniformLocation(program, "u_scaleY"), zoomScale * (fit / height));
   gl.uniform1f(gl.getUniformLocation(program, "u_depthScale"), depthScale);
@@ -1264,7 +1307,7 @@ function drawWebglTexturedSphere() {
   const width = Math.max(1, webglState.canvas.width);
   const height = Math.max(1, webglState.canvas.height);
   const fit = Math.min(width, height);
-  const zoomScale = Math.min(0.94 * globeZoom, 18);
+  const zoomScale = 0.94 * globeZoom;
   gl.uniform1f(gl.getUniformLocation(program, "u_scaleX"), zoomScale * (fit / width));
   gl.uniform1f(gl.getUniformLocation(program, "u_scaleY"), zoomScale * (fit / height));
   gl.uniform1f(gl.getUniformLocation(program, "u_depthScale"), 0.62);
@@ -1285,23 +1328,35 @@ function drawProjectedOutlineRings(geojson, radius, center, strokeStyle, lineWid
 }
 
 function drawWebglMapOutlines(radius, center) {
+  // Outlines sind optisch hilfreich, aber rechnerisch teuer, weil sie aus
+  // vielen Lon/Lat-Ringen in Screen-Kurven übersetzt werden. Während aktiver
+  // Bewegung verzichten wir darauf; die Vektorflächen liefern bereits eine
+  // saubere Lesefassung, die feinen Linien erscheinen nach der Ruhephase.
+  if (isNavigatingGlobe && globeZoom > 1.35) return;
   const source = getRenderableLandGeoJson();
   if (source) {
     drawProjectedOutlineRings(source, radius, center, "rgba(116,121,117,.58)", 1.05, 0.85);
   }
 
   getVisibleBoundaryMapItems().forEach((item) => {
-    const provider = item.geometryRef?.provider || "";
-    const canUseNaturalEarthFallback = provider === "natural-earth"
-      || item.source === "Natural Earth"
-      || (provider === "geoboundaries" && String(item.adminLevel || "").toUpperCase() === "ADM0");
-    const feature = canUseNaturalEarthFallback
-      ? getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3)
-      : null;
+    const feature = getRenderableBoundaryFeature(item);
     if (!feature) return;
     const color = normalizeColorValue(item.display?.color, "#d9dc8c") || "#d9dc8c";
     drawProjectedOutlineRings({ type: "FeatureCollection", features: [feature] }, radius, center, hexToRgba(color, 0.95), 1.25, 0.65);
   });
+}
+
+function drawVectorMapSurface(radius, center) {
+  if (!hasD3Geo) return false;
+  const source = getRenderableLandGeoJson();
+  if (!source?.features?.length) return false;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.clip();
+  drawGeographicLayer(radius, center);
+  ctx.restore();
+  return true;
 }
 
 function drawWebglAtmosphereOverlay(width, height, dpr) {
@@ -1317,11 +1372,6 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-  // Darstellungsregel: Flächen liegen als Textur auf der echten WebGL-Kugel.
-  // Outlines werden dagegen in Screen-Pixeln darüber gezeichnet, damit ihre
-  // Stärke beim Zoomen konstant bleibt und nicht mit der Textur skaliert.
-  drawWebglMapOutlines(radius, center);
-
   const rim = ctx.createRadialGradient(
     center.x - radius * 0.16,
     center.y - radius * 0.18,
@@ -1332,8 +1382,8 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   );
   rim.addColorStop(0, "rgba(255,255,255,0)");
   rim.addColorStop(0.72, "rgba(255,255,255,0)");
-  rim.addColorStop(0.92, "rgba(132,138,134,.12)");
-  rim.addColorStop(1, "rgba(80,86,82,.24)");
+  rim.addColorStop(0.92, "rgba(170,176,171,.055)");
+  rim.addColorStop(1, "rgba(108,116,111,.11)");
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.fillStyle = rim;
@@ -1342,7 +1392,7 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.lineWidth = Math.max(1.2, baseSize * 0.0032);
-  ctx.strokeStyle = "rgba(103,110,106,.42)";
+  ctx.strokeStyle = "rgba(118,126,121,.30)";
   ctx.stroke();
 
   ctx.beginPath();
@@ -1350,6 +1400,14 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   ctx.lineWidth = Math.max(0.8, baseSize * 0.0016);
   ctx.strokeStyle = "rgba(255,255,255,.48)";
   ctx.stroke();
+
+  // Farbregel: Die Kartenflächen werden nach der Kugel-/Atmosphärebasis
+  // deckend gezeichnet. Sie dürfen nicht halbtransparent mit der Wasserbasis
+  // oder dem Rim verrechnet werden, sonst ändert sich die Landfarbe je nach
+  // Zoom, Kippwinkel und Position auf der Kugel.
+  const usedVectorSurface = drawVectorMapSurface(radius, center);
+  drawProjectBoundaryLayers(radius, center);
+  if (!usedVectorSurface) drawWebglMapOutlines(radius, center);
 }
 
 function renderWebglGlobe() {
@@ -1440,6 +1498,13 @@ function getNaturalEarth10mDetailThreshold() {
   return current;
 }
 
+function getSurfaceBudgetSignature() {
+  if (globeZoom < 2.4) return "surface-xl";
+  if (globeZoom < 4.2) return "surface-l";
+  if (globeZoom < 7) return "surface-m";
+  return "surface-s";
+}
+
 function getVisibleNaturalEarth10mTiles() {
   const index = getNaturalEarth10mTileIndex();
   if (!index?.tiles?.length) return [];
@@ -1462,10 +1527,57 @@ function decodeHierarchicalRing(ring, threshold) {
   return decoded;
 }
 
+function getRingPlanarArea(ring) {
+  if (!Array.isArray(ring) || ring.length < 4) return 0;
+  let area = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const current = ring[index];
+    const next = ring[index + 1];
+    area += (current[0] * next[1]) - (next[0] * current[1]);
+  }
+  return Math.abs(area / 2);
+}
+
+function getApproxFeaturePixelMetrics(feature) {
+  const bbox = feature?.bbox;
+  if (!Array.isArray(bbox) || bbox.length < 4) {
+    return { width: Infinity, height: Infinity, area: Infinity };
+  }
+  const rect = ui.globe.getBoundingClientRect();
+  const baseSize = Math.max(1, Math.min(rect.width || 1, rect.height || 1));
+  const radius = baseSize * 0.47 * globeZoom;
+  const midLat = ((bbox[1] || 0) + (bbox[3] || 0)) / 2;
+  const lonScale = Math.max(0.18, Math.cos(midLat * DEG));
+  const pxPerDegree = radius * DEG;
+  const width = Math.abs(normalizeLonDelta((bbox[2] || 0) - (bbox[0] || 0))) * lonScale * pxPerDegree;
+  const height = Math.abs((bbox[3] || 0) - (bbox[1] || 0)) * pxPerDegree;
+  return { width, height, area: width * height };
+}
+
+function isRenderableSurfaceFeature(feature, outerRing) {
+  const metrics = getApproxFeaturePixelMetrics(feature);
+  const ringArea = getRingPlanarArea(outerRing);
+  const pointCount = Math.max(0, (outerRing?.length || 0) - 1);
+
+  // Oberflächenbudget: Küsten, Inseln, Atolle und Fluss-/Wasser-Ränder sind
+  // keine gleichwertigen Punktewolken. Ein Objekt wird erst gezeichnet, wenn
+  // seine sichtbare Fläche groß genug ist, um als Oberfläche lesbar zu sein.
+  // Dadurch verschwinden winzige Inselgruppen auf niedrigen Zoomstufen, statt
+  // mit Minimaldreiecken die Karte und den Hauptthread zu verstopfen.
+  const minSide = globeZoom < 2.4 ? 2.4 : globeZoom < 4.2 ? 1.9 : globeZoom < 7 ? 1.35 : 0.75;
+  const minArea = globeZoom < 2.4 ? 18 : globeZoom < 4.2 ? 11 : globeZoom < 7 ? 6 : 2.5;
+  const maxTinyComplexity = globeZoom < 4.2 ? 14 : globeZoom < 7 ? 22 : 42;
+  if (metrics.width < minSide && metrics.height < minSide) return false;
+  if (metrics.area < minArea && pointCount <= maxTinyComplexity) return false;
+  if (ringArea < 0.00012 && globeZoom < 5.8) return false;
+  return true;
+}
+
 function decodeHierarchicalFeature(feature, threshold) {
   const polygon = feature?.geometry?.coordinates || [];
   const outer = decodeHierarchicalRing(polygon[0] || [], threshold);
   if (outer.length < 4) return null;
+  if (!isRenderableSurfaceFeature(feature, outer)) return null;
   return {
     type: "Feature",
     properties: feature.properties || {},
@@ -1548,7 +1660,7 @@ function requestNaturalEarthDetailForZoom() {
       ...tiles,
     ].filter(Boolean);
     const threshold = getNaturalEarth10mDetailThreshold();
-    const signature = `hierarchy|${threshold}|${required.map((tile) => tile.key).sort().join("|")}`;
+    const signature = `hierarchy|${threshold}|${getSurfaceBudgetSignature()}|${required.map((tile) => tile.key).sort().join("|")}`;
     if (signature === activeNaturalEarthTileSignature && geoState.detailLevel === "10m" && activeNaturalEarthSource) return;
 
     const missing = required.filter((tile) => {
@@ -1646,7 +1758,6 @@ function scheduleNaturalEarthDetailUpdate(delay = 220) {
   detailLoadTimer = window.setTimeout(() => {
     detailLoadTimer = 0;
     requestNaturalEarthDetailForZoom();
-    scheduleGlobeRender();
   }, delay);
 }
 
@@ -1656,9 +1767,9 @@ function markGlobeNavigationActive() {
   window.clearTimeout(navigationSettledTimer);
   navigationSettledTimer = window.setTimeout(() => {
     isNavigatingGlobe = false;
-    scheduleNaturalEarthDetailUpdate(420);
+    scheduleNaturalEarthDetailUpdate(680);
     scheduleGlobeRender();
-  }, 180);
+  }, 360);
 }
 
 function getInteractiveNaturalEarthSource() {
@@ -1698,8 +1809,9 @@ function orientRingForD3(ring, shouldBeClockwise) {
 function orientPolygonForD3(polygon) {
   if (!Array.isArray(polygon) || !polygon.length) return [];
   // D3s sphärische Polygonfüllung nutzt eine andere Winding-Konvention als
-  // RFC-GeoJSON. Für kleine Landflächen müssen Außenringe clockwise und Löcher
-  // counter-clockwise laufen, sonst wird der Ozean als Innenfläche gefüllt.
+  // RFC-GeoJSON. Außenringe laufen für die sichtbaren Landflächen clockwise,
+  // Innenringe gegenläufig. Diese Regel darf nicht global umgedreht werden:
+  // sonst füllt D3 das sphärische Komplement, also den Ozean.
   return polygon.map((ring, index) => orientRingForD3(ring, index === 0));
 }
 
@@ -1809,6 +1921,11 @@ function installLandGeoJson(geojson) {
 geoState.status = "loading";
 
 function buildLandSamplesDeferred() {
+  if (webglState.ready) {
+    geoState.samplesReady = true;
+    geoState.landSamples = [];
+    return;
+  }
   if (geoState.status !== "ready" || geoState.samplesReady) return;
   const rings = [...geoState.landRings];
   const generation = geoState.sampleGeneration;
@@ -1842,6 +1959,17 @@ let isNavigatingGlobe = false;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function getLatitudeNavigationLimit() {
+  // Navigationsregel: In der vollständig sichtbaren Startkugel verhindert eine
+  // moderate Kippgrenze, dass die Erde unnatürlich auf den Kopf fällt. Beim
+  // Hineinzoomen wird diese Grenze aber zu einer künstlichen Kartensperre:
+  // Skandinavien, Arktis oder Antarktis müssen dann bis fast an den Polrand
+  // verschiebbar sein. Deshalb wächst der erlaubte Breitengrad mit dem Zoom.
+  const t = clamp((globeZoom - 1) / 5, 0, 1);
+  const eased = 1 - ((1 - t) ** 2);
+  return 58 + eased * 31.2;
 }
 
 function normalizeLonDelta(delta) {
@@ -1923,24 +2051,28 @@ function createOrthographicProjection(radius, center) {
 function drawGeographicLayer(radius, center) {
   const renderSource = getRenderableNaturalEarthSource(getInteractiveNaturalEarthSource());
   if (!hasD3Geo || !renderSource) return false;
-  const d3Source = orientGeoJsonForD3(renderSource);
-  const projection = createOrthographicProjection(radius, center);
-  const path = window.d3.geoPath(projection, ctx);
+  const rings = extractLandRings(renderSource);
+  if (!rings.length) return false;
 
-  // Renderregel: Die Landfüllung läuft wieder über D3s sphärische Projektion,
-  // aber erst nach expliziter Ringnormalisierung. Das vermeidet die früheren
-  // Außenraum-/Ozeanfüllungen und ist stabiler als handgestricktes
-  // Horizont-Clipping im Canvas.
-  ctx.beginPath();
-  path(d3Source);
-  ctx.fillStyle = "rgba(178,178,176,.82)";
-  ctx.fill();
+  // Renderregel: Die Basislandmasse wird nicht mehr mit D3s sphärischer
+  // Polygonfüllung gefüllt. Wasser ist die unveränderliche Basis; Land wird
+  // mit unserer eigenen Projektion gefüllt. Horizontgeschnittene Polygone
+  // schließen wir über den Globusrand, statt sie ganz weiß zu lassen oder D3
+  // wieder das sphärische Komplement füllen zu lassen.
+  rings.forEach((ring) => {
+    const denseRing = densifyRing(ring, globeZoom > 7 ? 0.45 : 0.9);
+    drawVisibleHemisphereFill(denseRing, radius, center, "#c4c4c0");
+  });
 
-  ctx.beginPath();
-  path(d3Source);
-  ctx.strokeStyle = "rgba(92,96,94,.46)";
-  ctx.lineWidth = getStableGlobeStrokeWidth(radius, 0.0018, 0.7);
-  ctx.stroke();
+  rings.forEach((ring) => {
+    drawProjectedLine(
+      densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85),
+      radius,
+      center,
+      "rgba(92,96,94,.46)",
+      getStableGlobeStrokeWidth(radius, 0.0018, 0.7),
+    );
+  });
 
   return true;
 }
@@ -1954,13 +2086,7 @@ function drawProjectBoundaryLayers(radius, center) {
   let drewLayer = false;
 
   items.forEach((item) => {
-    const provider = item.geometryRef?.provider || "";
-    const canUseNaturalEarthFallback = provider === "natural-earth"
-      || item.source === "Natural Earth"
-      || (provider === "geoboundaries" && String(item.adminLevel || "").toUpperCase() === "ADM0");
-    const feature = canUseNaturalEarthFallback
-      ? getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3)
-      : null;
+    const feature = getRenderableBoundaryFeature(item);
     if (!feature) return;
 
     const featureCollection = orientGeoJsonForD3({ type: "FeatureCollection", features: [feature] });
@@ -2038,53 +2164,92 @@ function drawProjectedFill(points, radius, center, fillStyle) {
   ctx.fill();
 }
 
-function interpolateHorizonPoint(fromVector, toVector) {
-  const denominator = fromVector.z - toVector.z;
-  const t = Math.abs(denominator) < 0.000001 ? 0 : clamp(fromVector.z / denominator, 0, 1);
-  return {
+function normalizeVector(vector) {
+  const length = Math.hypot(vector.x, vector.y, vector.z) || 1;
+  return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+}
+
+function getHorizonIntersection(fromVector, toVector, horizon = 0.0008) {
+  const denominator = toVector.z - fromVector.z;
+  if (Math.abs(denominator) < 0.000001) return null;
+  const t = clamp((horizon - fromVector.z) / denominator, 0, 1);
+  const point = normalizeVector({
     x: fromVector.x + (toVector.x - fromVector.x) * t,
     y: fromVector.y + (toVector.y - fromVector.y) * t,
-    z: 0,
-  };
+    z: horizon,
+  });
+  const xyLength = Math.hypot(point.x, point.y) || 1;
+  return { x: point.x / xyLength, y: point.y / xyLength, z: 0, horizon: true };
 }
 
-function splitVisibleProjectedSegments(points) {
-  const vectors = points.map(([lon, lat]) => toRotatedUnit(lon, lat));
-  const segments = [];
-  let current = [];
-  const horizon = 0.0008;
+function clipRingVectorsToVisibleHemisphere(points, horizon = 0.0008) {
+  const source = points
+    .slice(0, -1)
+    .map(([lon, lat]) => toRotatedUnit(lon, lat));
+  if (source.length < 3) return [];
 
-  for (let index = 0; index < vectors.length; index += 1) {
-    const currentVector = vectors[index];
-    const nextVector = vectors[(index + 1) % vectors.length];
-    const currentVisible = currentVector.z > horizon;
-    const nextVisible = nextVector.z > horizon;
+  const clipped = [];
+  for (let index = 0; index < source.length; index += 1) {
+    const current = source[index];
+    const next = source[(index + 1) % source.length];
+    const currentInside = current.z >= horizon;
+    const nextInside = next.z >= horizon;
 
-    if (currentVisible) current.push(currentVector);
-    if (currentVisible !== nextVisible) {
-      const horizonPoint = interpolateHorizonPoint(currentVector, nextVector);
-      if (currentVisible) {
-        current.push(horizonPoint);
-        if (current.length >= 3) segments.push(current);
-        current = [];
-      } else {
-        current = [horizonPoint];
-      }
+    if (currentInside && nextInside) {
+      clipped.push(next);
+      continue;
+    }
+
+    const intersection = getHorizonIntersection(current, next, horizon);
+    if (currentInside && !nextInside) {
+      if (intersection) clipped.push(intersection);
+    } else if (!currentInside && nextInside) {
+      if (intersection) clipped.push(intersection);
+      clipped.push(next);
     }
   }
 
-  if (current.length >= 3) {
-    if (segments.length && vectors[0]?.z > horizon) {
-      segments[0] = current.concat(segments[0]);
+  return clipped.filter((vector, index, vectors) => {
+    const previous = vectors[index - 1];
+    return !previous || Math.hypot(vector.x - previous.x, vector.y - previous.y, vector.z - previous.z) > 0.00001;
+  });
+}
+
+function drawShortestHorizonArc(fromVector, toVector, radius, center) {
+  const startAngle = getVectorCanvasAngle(fromVector);
+  const endAngle = getVectorCanvasAngle(toVector);
+  const clockwiseDistance = normalizeAngle(endAngle - startAngle);
+  const counterClockwise = clockwiseDistance > Math.PI;
+  ctx.arc(center.x, center.y, radius, startAngle, endAngle, counterClockwise);
+}
+
+function drawVisibleHemisphereFill(points, radius, center, fillStyle) {
+  const clipped = clipRingVectorsToVisibleHemisphere(points);
+  if (clipped.length < 3) return false;
+  ctx.beginPath();
+  clipped.forEach((vector, index) => {
+    const previous = clipped[(index - 1 + clipped.length) % clipped.length];
+    const point = projectVector(vector, radius, center.x, center.y);
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+      return;
+    }
+    if (previous?.horizon && vector.horizon) {
+      drawShortestHorizonArc(previous, vector, radius, center);
     } else {
-      segments.push(current);
+      ctx.lineTo(point.x, point.y);
     }
+  });
+  const first = clipped[0];
+  const last = clipped[clipped.length - 1];
+  if (last?.horizon && first?.horizon) {
+    drawShortestHorizonArc(last, first, radius, center);
+  } else {
+    ctx.closePath();
   }
-  return segments.filter((segment) => segment.length >= 3);
-}
-
-function isHorizonVector(vector) {
-  return Math.abs(vector?.z || 0) <= 0.002;
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+  return true;
 }
 
 function getVectorCanvasAngle(vector) {
@@ -2093,102 +2258,6 @@ function getVectorCanvasAngle(vector) {
 
 function normalizeAngle(angle) {
   return (angle + Math.PI * 2) % (Math.PI * 2);
-}
-
-function getMidArcVector(fromVector, toVector, counterClockwise) {
-  const startAngle = normalizeAngle(getVectorCanvasAngle(fromVector));
-  const endAngle = normalizeAngle(getVectorCanvasAngle(toVector));
-  const clockwiseDelta = normalizeAngle(endAngle - startAngle);
-  const delta = counterClockwise ? clockwiseDelta - Math.PI * 2 : clockwiseDelta;
-  const midAngle = startAngle + delta / 2;
-  return { x: Math.cos(midAngle), y: -Math.sin(midAngle), z: 0 };
-}
-
-function rotatedUnitToLonLat(vector) {
-  const tilt = -rotation.lat * DEG;
-  const y0 = vector.y * Math.cos(tilt) + vector.z * Math.sin(tilt);
-  const z0 = -vector.y * Math.sin(tilt) + vector.z * Math.cos(tilt);
-  const lon = normalizeLongitude(Math.atan2(vector.x, z0) / DEG - rotation.lon);
-  const lat = Math.asin(clamp(y0, -1, 1)) / DEG;
-  return [lon, lat];
-}
-
-function nudgeHorizonVectorInsideGlobe(vector) {
-  const nudged = { x: vector.x * 0.996, y: vector.y * 0.996, z: 0.09 };
-  const length = Math.hypot(nudged.x, nudged.y, nudged.z) || 1;
-  return { x: nudged.x / length, y: nudged.y / length, z: nudged.z / length };
-}
-
-function shouldUseCounterClockwiseHorizonArc(fromVector, toVector, ringPoints) {
-  const ccwMid = rotatedUnitToLonLat(nudgeHorizonVectorInsideGlobe(getMidArcVector(fromVector, toVector, true)));
-  const cwMid = rotatedUnitToLonLat(nudgeHorizonVectorInsideGlobe(getMidArcVector(fromVector, toVector, false)));
-  const ccwInside = pointInPolygon(ccwMid[0], ccwMid[1], ringPoints);
-  const cwInside = pointInPolygon(cwMid[0], cwMid[1], ringPoints);
-  if (ccwInside !== cwInside) return ccwInside;
-
-  // Fallback-Regel: Wenn der Punkt-in-Polygon-Test etwa an Datumsgrenzen nicht
-  // eindeutig ist, nehmen wir die kleinere Horizontkappe. Das vermeidet wieder
-  // die großen Wasserübermalungen.
-  const startAngle = normalizeAngle(getVectorCanvasAngle(fromVector));
-  const endAngle = normalizeAngle(getVectorCanvasAngle(toVector));
-  const clockwiseDelta = normalizeAngle(endAngle - startAngle);
-  return clockwiseDelta > Math.PI;
-}
-
-function drawHorizonArc(fromVector, toVector, ringPoints, radius, center) {
-  const startAngle = getVectorCanvasAngle(fromVector);
-  const endAngle = getVectorCanvasAngle(toVector);
-  const drawCounterClockwise = shouldUseCounterClockwiseHorizonArc(fromVector, toVector, ringPoints);
-  // Clipping-Regel: Wenn ein Landpolygon hinter dem Horizont weiterläuft,
-  // muss die sichtbare Teilfläche entlang des Globusrands geschlossen werden.
-  // Eine gerade Schließkante erzeugt sonst die großen diagonalen Keile.
-  ctx.arc(center.x, center.y, radius, startAngle, endAngle, drawCounterClockwise);
-}
-
-function getShortestAngleDistance(a, b) {
-  const delta = Math.abs(normalizeAngle(a) - normalizeAngle(b));
-  return Math.min(delta, Math.PI * 2 - delta);
-}
-
-function isLongHorizonCut(segment) {
-  if (!isHorizonVector(segment[0]) || !isHorizonVector(segment[segment.length - 1])) return false;
-  const startAngle = getVectorCanvasAngle(segment[0]);
-  const endAngle = getVectorCanvasAngle(segment[segment.length - 1]);
-  return getShortestAngleDistance(startAngle, endAngle) > 0.72;
-}
-
-function drawClippedProjectedFill(points, radius, center, fillStyle) {
-  const segments = splitVisibleProjectedSegments(points);
-  if (!segments.length) return;
-  ctx.fillStyle = fillStyle;
-  segments.forEach((segment) => {
-    if (isLongHorizonCut(segment)) {
-      // Renderregel: Lange Horizont-Schnitte würden beim Schließen als
-      // künstliche Diagonalen über den Globus laufen. Solche Randsegmente
-      // bleiben als Küstenlinie sichtbar, werden aber nicht flächig gefüllt.
-      return;
-    }
-    ctx.beginPath();
-    let firstPoint = null;
-    let lastPoint = null;
-    segment.forEach((vector, index) => {
-      const point = projectVector(vector, radius, center.x, center.y);
-      if (index === 0) firstPoint = point;
-      lastPoint = point;
-      if (index === 0) ctx.moveTo(point.x, point.y);
-      else ctx.lineTo(point.x, point.y);
-    });
-    if (firstPoint && lastPoint && isHorizonVector(segment[0]) && isHorizonVector(segment[segment.length - 1])) {
-      // Horizont-Regel: Randbögen sind optisch gefährlich, weil eine falsche
-      // Bogenentscheidung sofort Wasserflächen grau übermalt. Wir schließen
-      // geschnittene Landflächen deshalb nur über die sichtbare Schnittlinie.
-      // Das ist kartografisch konservativer und hält den Ozean stabil hell.
-      ctx.closePath();
-    } else {
-      ctx.closePath();
-    }
-    ctx.fill();
-  });
 }
 
 function drawLandSampleFill(radius, center, alphaBase = 0.56) {
@@ -2608,8 +2677,41 @@ function setEditorTab(tabName) {
 function normalizeSearchText(value) {
   return String(value || "")
     .toLocaleLowerCase("de-DE")
+    .replace(/ß/g, "ss")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeGermanSearchText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("de-DE")
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getSearchNeedles(value) {
+  const raw = String(value || "").trim();
+  return [...new Set([
+    normalizeSearchText(raw),
+    normalizeGermanSearchText(raw),
+  ].filter(Boolean))];
+}
+
+function getNaturalEarthSearchValues(props) {
+  return [
+    props.NAME_DE, props.NAME, props.ADMIN, props.NAME_LONG, props.SOVEREIGNT,
+    props.FORMAL_DE, props.FORMAL_EN, props.NAME_EN, props.NAME_FR, props.NAME_ES,
+    props.NAME_ALT, props.ABBREV, props.POSTAL,
+    props.ISO_A2, props.ISO_A2_EH, props.ISO_A3, props.ISO_A3_EH, props.ADM0_A3,
+  ];
 }
 
 function getNaturalEarthCountryName(feature) {
@@ -2626,17 +2728,17 @@ function getNaturalEarthIso3(feature) {
 }
 
 function searchNaturalEarthCountries(query) {
-  const normalizedQuery = normalizeSearchText(query);
-  const features = window.EarthMapNaturalEarthCountries?.features || [];
-  if (!normalizedQuery) return [];
+  const needles = getSearchNeedles(query);
+  const dataset = getNaturalEarthCountryDataset();
+  const features = dataset.features;
+  if (!needles.length) return [];
   return features
     .filter((feature) => {
       const props = feature.properties || {};
-      const haystack = [
-        props.NAME_DE, props.NAME, props.ADMIN, props.NAME_LONG, props.SOVEREIGNT,
-        props.ISO_A3, props.ISO_A3_EH, props.ADM0_A3,
-      ].map(normalizeSearchText).join(" ");
-      return haystack.includes(normalizedQuery);
+      const haystack = getNaturalEarthSearchValues(props)
+        .flatMap(getSearchNeedles)
+        .join(" ");
+      return needles.some((needle) => haystack.includes(needle));
     })
     .slice(0, 8)
     .map((feature) => ({
@@ -2644,35 +2746,19 @@ function searchNaturalEarthCountries(query) {
       name: getNaturalEarthCountryName(feature),
       source: "Natural Earth",
       level: "ADM0 · Land",
-      detail: "110m · lokale Grunddaten",
+      detail: `${dataset.label} · lokale Grunddaten`,
       license: "Public Domain",
       iso3: getNaturalEarthIso3(feature),
+      datasetDetail: dataset.detail,
+      datasetUrl: dataset.sourceUrl,
       importStatus: "bereit",
     }));
 }
 
-function buildGeoBoundariesCandidates(naturalEarthResults, query) {
-  const directIso = query.trim().toUpperCase();
-  const isoCandidates = new Set();
-  if (/^[A-Z]{3}$/.test(directIso)) isoCandidates.add(directIso);
-  naturalEarthResults.forEach((result) => {
-    if (/^[A-Z]{3}$/.test(result.iso3)) isoCandidates.add(result.iso3);
-  });
-  return [...isoCandidates].flatMap((iso3) => ["ADM0", "ADM1", "ADM2"].map((adm) => ({
-    id: `geoboundaries-${iso3}-${adm}`,
-    name: `${iso3} · ${adm}`,
-    source: "geoBoundaries",
-    level: adm,
-    detail: adm === "ADM0" ? "Staatsgrenze" : "Verwaltungsebene",
-    license: "gbOpen · CC BY 4.0",
-    iso3,
-    apiUrl: `https://www.geoboundaries.org/api/current/gbOpen/${iso3}/${adm}/`,
-    importStatus: "online abrufbar",
-  })));
-}
-
 function createLayerItemFromSearchResult(result) {
   const isNaturalEarth = result.source === "Natural Earth";
+  const dataset = getNaturalEarthCountryDataset();
+  const detail = result.datasetDetail || dataset.detail;
   return normalizeLibraryItem({
     id: `layer-${result.source.toLowerCase().replace(/\W+/g, "-")}-${result.iso3 || result.id}-${Date.now()}`,
     kind: "boundary-map",
@@ -2682,9 +2768,9 @@ function createLayerItemFromSearchResult(result) {
     adminLevel: result.level,
     detail: result.detail,
     license: result.license,
-    sourceUrl: result.apiUrl || (isNaturalEarth ? `${NATURAL_EARTH_ASSET_BASE}110m/ne_110m_admin_0_countries.geojson` : ""),
+    sourceUrl: isNaturalEarth ? (result.datasetUrl || dataset.sourceUrl) : "",
     temporalCoverage: {
-      label: isNaturalEarth ? "gegenwärtige Natural-Earth-Grundkarte" : "gegenwärtige geoBoundaries-Grenzfassung",
+      label: "gegenwärtige Natural-Earth-Grundkarte",
       from: "",
       to: "",
     },
@@ -2693,8 +2779,8 @@ function createLayerItemFromSearchResult(result) {
       color: "#c6a86a",
     },
     geometryRef: isNaturalEarth
-      ? { provider: "natural-earth", detail: "110m", dataset: "admin_0_countries", iso3: result.iso3 }
-      : { provider: "geoboundaries", apiUrl: result.apiUrl, iso3: result.iso3, level: result.level },
+      ? { provider: "natural-earth", detail, dataset: "admin_0_countries", iso3: result.iso3 }
+      : null,
   });
 }
 
@@ -2745,7 +2831,6 @@ function createBoundarySearchCard(result) {
 function renderBoundarySearchResults() {
   const query = ui.boundarySearchInput?.value?.trim() || "";
   const useNaturalEarth = Boolean(document.getElementById("sourceNaturalEarth")?.checked);
-  const useGeoBoundaries = Boolean(document.getElementById("sourceGeoBoundaries")?.checked);
   if (!query) {
     const note = document.createElement("p");
     note.className = "empty-state";
@@ -2754,13 +2839,11 @@ function renderBoundarySearchResults() {
     return;
   }
 
-  const naturalEarthResults = useNaturalEarth ? searchNaturalEarthCountries(query) : [];
-  const geoBoundariesResults = useGeoBoundaries ? buildGeoBoundariesCandidates(naturalEarthResults, query) : [];
-  const results = [...naturalEarthResults, ...geoBoundariesResults];
+  const results = useNaturalEarth ? searchNaturalEarthCountries(query) : [];
   if (!results.length) {
     const note = document.createElement("p");
     note.className = "empty-state";
-    note.textContent = "Keine Treffer gefunden. Tipp: Für geoBoundaries kann direkt ein ISO-3-Code wie DEU, FRA oder BRA gesucht werden.";
+    note.textContent = "Keine Natural-Earth-Treffer gefunden. Tipp: Auch ISO-3-Codes wie DEU, FRA oder BRA funktionieren.";
     ui.boundarySearchResults.replaceChildren(note);
     return;
   }
@@ -2861,8 +2944,9 @@ ui.globe.addEventListener("pointermove", (event) => {
   // leicht überlinear gedämpft, damit die Karte auch tief im Zoom unter dem
   // Mauszeiger bleibt und nicht schneller "davonläuft" als die Handbewegung.
   const dragSensitivity = 1 / Math.max(1, globeZoom ** 1.32);
+  const latitudeLimit = getLatitudeNavigationLimit();
   rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * 0.45 * dragSensitivity;
-  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * 0.28 * dragSensitivity, -58, 58);
+  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * 0.28 * dragSensitivity, -latitudeLimit, latitudeLimit);
   scheduleGlobeRender();
 });
 
@@ -2871,15 +2955,17 @@ ui.globe.addEventListener("wheel", (event) => {
   markGlobeNavigationActive();
   const zoomFactor = Math.exp(-event.deltaY * 0.0014);
   globeZoom = clamp(globeZoom * zoomFactor, MIN_GLOBE_ZOOM, MAX_GLOBE_ZOOM);
+  const latitudeLimit = getLatitudeNavigationLimit();
+  rotation.lat = clamp(rotation.lat, -latitudeLimit, latitudeLimit);
   scheduleGlobeRender();
-  scheduleNaturalEarthDetailUpdate(760);
+  scheduleNaturalEarthDetailUpdate(980);
 }, { passive: false });
 
 ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
   ui.globe.addEventListener(type, () => {
     dragState = null;
     markGlobeNavigationActive();
-    scheduleNaturalEarthDetailUpdate(160);
+    scheduleNaturalEarthDetailUpdate(760);
   });
 });
 
