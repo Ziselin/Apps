@@ -2078,35 +2078,46 @@ function drawGeographicLayer(radius, center) {
 }
 
 function drawProjectBoundaryLayers(radius, center) {
-  if (!hasD3Geo) return false;
   const items = getVisibleBoundaryMapItems();
   if (!items.length) return false;
-  const projection = createOrthographicProjection(radius, center);
-  const path = window.d3.geoPath(projection, ctx);
   let drewLayer = false;
 
   items.forEach((item) => {
     const feature = getRenderableBoundaryFeature(item);
     if (!feature) return;
 
-    const featureCollection = orientGeoJsonForD3({ type: "FeatureCollection", features: [feature] });
-    const color = item.display?.color || "#c6a86a";
-
-    ctx.beginPath();
-    path(featureCollection);
-    ctx.fillStyle = hexToRgba(color, 0.78);
-    ctx.fill("evenodd");
-
-    ctx.beginPath();
-    path(featureCollection);
-    ctx.strokeStyle = hexToRgba(color, 0.98);
-    ctx.lineWidth = getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
-    ctx.stroke();
-
-    drewLayer = true;
+    const color = normalizeColorValue(item.display?.color, "#c6a86a") || "#c6a86a";
+    if (drawBoundaryFeatureVector(feature, radius, center, color)) {
+      drewLayer = true;
+    }
   });
 
   return drewLayer;
+}
+
+function drawBoundaryFeatureVector(feature, radius, center, color) {
+  const featureCollection = { type: "FeatureCollection", features: [feature] };
+  const rings = extractLandRings(featureCollection);
+  if (!rings.length) return false;
+  const fillStyle = hexToRgba(color, 0.84);
+  const strokeStyle = hexToRgba(color, 0.98);
+  const lineWidth = getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
+  const density = globeZoom > 7 ? 0.35 : 0.75;
+
+  // Layer-Regel: importierte Länder/Regionen müssen denselben
+  // horizontgeschnittenen Vektorpfad nutzen wie die Grundkarte. D3s
+  // sphärische Füllung kann bei bestimmten Rotationen das Komplement füllen
+  // (ganzer Planet farbig, eigentliche Fläche ausgespart). Diese Funktion
+  // hält die Farbebene deshalb explizit an die sichtbare Hemisphäre gebunden.
+  rings.forEach((ring) => {
+    drawVisibleHemisphereFill(densifyRing(ring, density), radius, center, fillStyle);
+  });
+
+  rings.forEach((ring) => {
+    drawProjectedLine(densifyRing(ring, density), radius, center, strokeStyle, lineWidth);
+  });
+
+  return true;
 }
 
 function drawProjectedLine(points, radius, center, strokeStyle, lineWidth) {
@@ -2711,15 +2722,15 @@ function getNaturalEarthSearchValues(props) {
     props.FORMAL_DE, props.FORMAL_EN, props.NAME_EN, props.NAME_FR, props.NAME_ES,
     props.NAME_ALT, props.ABBREV, props.POSTAL,
     props.ISO_A2, props.ISO_A2_EH, props.ISO_A3, props.ISO_A3_EH, props.ADM0_A3,
-  ];
+  ].map(repairLegacyText);
 }
 
 function getNaturalEarthCountryName(feature) {
-  return feature?.properties?.NAME_DE
+  return repairLegacyText(feature?.properties?.NAME_DE
     || feature?.properties?.NAME
     || feature?.properties?.ADMIN
     || feature?.properties?.NAME_LONG
-    || "Unbenanntes Land";
+    || "Unbenanntes Land");
 }
 
 function getNaturalEarthIso3(feature) {

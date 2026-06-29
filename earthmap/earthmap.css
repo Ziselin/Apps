@@ -188,14 +188,24 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   min-height: 48px;
   border: 0;
   border-top: 1px solid var(--line);
-  background: rgba(250,248,240,.82);
-  color: var(--muted);
+  background: rgba(45, 53, 59, 0.96);
+  color: rgba(217, 222, 226, 0.45);
   cursor: pointer;
   backdrop-filter: blur(16px);
 }
 .workspace-strip-top { top: 0; bottom: auto; border-top: 0; border-bottom: 1px solid var(--line); }
-.workspace-strip span { font-size: .78rem; font-weight: 400; letter-spacing: .11em; text-transform: uppercase; }
-.workspace-strip:hover { color: var(--ink); background: rgba(250,248,240,.96); }
+.workspace-strip span {
+  color: #a8b2ba;
+  font-size: .78rem;
+  font-weight: 400;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.workspace-strip:hover {
+  background: rgba(50, 59, 66, 0.98);
+  color: rgba(217, 222, 226, 0.68);
+}
+.workspace-strip:hover span { color: #d9dee2; }
 
 .workspace-stage { height: 100dvh; display: grid; grid-template-columns: minmax(330px,.86fr) minmax(430px,1.14fr); gap: 20px; padding: 72px 22px 22px; overflow: hidden; }
 .workspace-panel {
