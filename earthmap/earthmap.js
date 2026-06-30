@@ -1,14 +1,16 @@
 ﻿const ui = Object.fromEntries([
   "globeApp", "menuButton", "menuCloseButton", "menuOverlay", "sideMenu",
-  "exportProjectButton", "exportMenu",
+  "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu",
   "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
-  "newProjectButton", "projectBrowserList", "libraryBrowserList", "boundarySummary", "boundaryLevelList",
+  "browserActionsMenuButton", "browserActionsMenu",
+  "newProjectButton", "projectBrowserList", "libraryBrowserList",
   "boundarySearchInput", "boundarySearchButton", "boundarySearchResults",
   "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerColorInput", "layerColorPaletteButton", "layerMetaList",
 ].map((id) => [id, document.getElementById(id)]));
 
 const STORAGE_KEY = "earthmap-projects-v1";
 const LEGACY_STORAGE_KEY = "globemap-projects-v1";
+const THEME_STORAGE_KEY = "earthmap-theme";
 const NATURAL_EARTH_ASSET_BASE = "../assets/geojson/natural-earth/";
 const boundaryFeatureRenderCache = new Map();
 
@@ -54,20 +56,6 @@ function createDefaultLibraryFolders() {
       type: "boundary-maps",
       title: "Länderkarten",
       description: "Importierte Länder- und Grenzkarten dieses Projekts.",
-      items: [],
-    },
-    {
-      id: "folder-datasets",
-      type: "datasets",
-      title: "Datenbanken",
-      description: "Tabellenwerte, die später auf Grenzlayer projiziert werden.",
-      items: [],
-    },
-    {
-      id: "folder-map-collections",
-      type: "map-collections",
-      title: "Kartensammlungen",
-      description: "Zusammenstellungen mehrerer Layer für bestimmte Ansichten.",
       items: [],
     },
   ];
@@ -204,11 +192,17 @@ const state = {
   projects: loadProjects(),
   activeProjectId: "",
   openProjectBrowserMenuId: null,
+  openLayerBrowserMenuId: null,
+  browserActionsMenuOpen: false,
+  collapsedBrowserNodeIds: [],
+  detailsLayoutMode: "normal",
+  detailsLayoutStep: 0,
 };
 
 state.activeProjectId = state.projects[0]?.id || "";
 const PROJECT_DELETE_HOLD_MS = 820;
 let projectDeleteHoldState = null;
+let layerDeleteHoldState = null;
 
 function persistProjects() {
   try {
@@ -238,6 +232,18 @@ function getActiveLibraryItem(project = getActiveProject()) {
     if (item) return item;
   }
   return null;
+}
+
+function isBrowserNodeCollapsed(nodeId) {
+  return state.collapsedBrowserNodeIds.includes(nodeId);
+}
+
+function toggleBrowserNode(nodeId) {
+  const collapsed = new Set(state.collapsedBrowserNodeIds);
+  if (collapsed.has(nodeId)) collapsed.delete(nodeId);
+  else collapsed.add(nodeId);
+  state.collapsedBrowserNodeIds = [...collapsed];
+  renderProjectBrowser();
 }
 
 function getVisibleBoundaryMapItems(project = getActiveProject()) {
@@ -512,6 +518,40 @@ function downloadBlob(blob, filename) {
 function setWorkspaceMode(mode) {
   ui.globeApp.classList.toggle("workspace-mode-details", mode === "details");
   ui.globeApp.classList.toggle("workspace-mode-preview", mode !== "details");
+  if (mode === "details") setDetailsLayoutMode(state.detailsLayoutMode);
+}
+
+function isNarrowDetailsViewport() {
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+function normalizeDetailsLayoutMode(mode) {
+  if (isNarrowDetailsViewport()) return mode === "editor" ? "editor" : "browser";
+  return ["normal", "browser", "editor"].includes(mode) ? mode : "normal";
+}
+
+function setDetailsLayoutMode(mode) {
+  const normalizedMode = normalizeDetailsLayoutMode(mode);
+  state.detailsLayoutMode = normalizedMode;
+  ui.globeApp?.classList.toggle("details-layout-normal", normalizedMode === "normal");
+  ui.globeApp?.classList.toggle("details-layout-browser", normalizedMode === "browser");
+  ui.globeApp?.classList.toggle("details-layout-editor", normalizedMode === "editor");
+}
+
+function cycleDetailsLayoutMode() {
+  if (isNarrowDetailsViewport()) {
+    setDetailsLayoutMode(state.detailsLayoutMode === "browser" ? "editor" : "browser");
+    return;
+  }
+  const order = ["normal", "browser", "normal", "editor"];
+  state.detailsLayoutStep = (state.detailsLayoutStep + 1) % order.length;
+  setDetailsLayoutMode(order[state.detailsLayoutStep]);
+}
+
+function setBrowserActionsMenuOpen(isOpen) {
+  state.browserActionsMenuOpen = Boolean(isOpen);
+  if (ui.browserActionsMenu) ui.browserActionsMenu.hidden = !state.browserActionsMenuOpen;
+  ui.browserActionsMenuButton?.setAttribute("aria-expanded", state.browserActionsMenuOpen ? "true" : "false");
 }
 
 function setMenuOpen(isOpen) {
@@ -530,6 +570,37 @@ function setMenuOpen(isOpen) {
 function setExportMenuOpen(isOpen) {
   if (ui.exportMenu) ui.exportMenu.hidden = !isOpen;
   ui.exportProjectButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function setTheme(theme, persist = true) {
+  const isDark = theme === "dark";
+  document.body.classList.toggle("earthmap-theme-dark", isDark);
+  ui.themeToggleButton?.setAttribute("aria-pressed", isDark ? "true" : "false");
+  ui.themeToggleButton?.setAttribute("aria-label", isDark ? "Hellen Modus aktivieren" : "Dunklen Modus aktivieren");
+  if (ui.themeToggleIcon) {
+    ui.themeToggleIcon.src = isDark
+      ? "https://api.iconify.design/boxicons/sun-bright.svg?color=%23ffb347"
+      : "https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633";
+  }
+  if (persist) {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
+    } catch (error) {
+      console.warn("EarthMap theme preference could not be saved", error);
+    }
+  }
+}
+
+function getStoredTheme() {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+  } catch (error) {
+    return "light";
+  }
+}
+
+function toggleTheme() {
+  setTheme(document.body.classList.contains("earthmap-theme-dark") ? "light" : "dark");
 }
 
 function getEarthMapExportTitle() {
@@ -1948,10 +2019,12 @@ function buildLandSamplesDeferred() {
 }
 
 let dragState = null;
+const activeGlobePointers = new Map();
+let pinchState = null;
 let rotation = { lon: -18, lat: -8 };
 let globeZoom = 1;
 const MIN_GLOBE_ZOOM = 1;
-const MAX_GLOBE_ZOOM = 24;
+const MAX_GLOBE_ZOOM = 180;
 let renderFrameId = 0;
 let detailLoadTimer = 0;
 let navigationSettledTimer = 0;
@@ -1970,6 +2043,42 @@ function getLatitudeNavigationLimit() {
   const t = clamp((globeZoom - 1) / 5, 0, 1);
   const eased = 1 - ((1 - t) ** 2);
   return 58 + eased * 31.2;
+}
+
+function getActiveGlobePointerList() {
+  return [...activeGlobePointers.values()];
+}
+
+function getPointerDistance(pointerA, pointerB) {
+  return Math.hypot(pointerA.x - pointerB.x, pointerA.y - pointerB.y);
+}
+
+function beginPinchZoomIfReady() {
+  const pointers = getActiveGlobePointerList();
+  if (pointers.length < 2) {
+    pinchState = null;
+    return false;
+  }
+  const distance = Math.max(1, getPointerDistance(pointers[0], pointers[1]));
+  pinchState = {
+    startDistance: distance,
+    startZoom: globeZoom,
+  };
+  dragState = null;
+  return true;
+}
+
+function resetSinglePointerDragFrom(pointer) {
+  if (!pointer) {
+    dragState = null;
+    return;
+  }
+  dragState = {
+    pointerId: pointer.id,
+    startX: pointer.x,
+    startY: pointer.y,
+    startRotation: { ...rotation },
+  };
 }
 
 function normalizeLonDelta(delta) {
@@ -2478,6 +2587,97 @@ function cancelProjectDeleteHold(event) {
   resetProjectDeleteHold();
 }
 
+function resetLayerDeleteHold() {
+  if (!layerDeleteHoldState) return;
+  const { button, frame, pointerId } = layerDeleteHoldState;
+  if (frame) cancelAnimationFrame(frame);
+  if (button) {
+    button.classList.remove("is-hold-active", "is-hold-ready");
+    button.style.removeProperty("--hold-progress");
+    if (Number.isFinite(pointerId) && button.hasPointerCapture?.(pointerId)) {
+      try {
+        button.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture may already be released by the browser.
+      }
+    }
+  }
+  layerDeleteHoldState = null;
+}
+
+function tickLayerDeleteHold() {
+  if (!layerDeleteHoldState) return;
+  const elapsed = performance.now() - layerDeleteHoldState.startedAt;
+  const progress = Math.max(0, Math.min(1, elapsed / PROJECT_DELETE_HOLD_MS));
+  layerDeleteHoldState.button.style.setProperty("--hold-progress", `${progress * 100}%`);
+  if (progress >= 1) {
+    layerDeleteHoldState.armed = true;
+    layerDeleteHoldState.button.classList.add("is-hold-ready");
+    layerDeleteHoldState.frame = null;
+    return;
+  }
+  layerDeleteHoldState.frame = requestAnimationFrame(tickLayerDeleteHold);
+}
+
+function deleteLayerById(projectId, layerId) {
+  const project = state.projects.find((candidate) => candidate.id === projectId);
+  const folder = getLibraryFolder(project, "boundary-maps");
+  if (!folder) return;
+  const index = folder.items.findIndex((item) => item.id === layerId);
+  if (index < 0) return;
+  folder.items.splice(index, 1);
+  if (project.activeLibraryItemId === layerId) {
+    project.activeLibraryItemId = folder.items[Math.max(0, index - 1)]?.id || folder.items[0]?.id || "";
+  }
+  state.openLayerBrowserMenuId = null;
+  persistProjects();
+  renderWorkspace();
+  renderGlobe();
+}
+
+function beginLayerDeleteHold(event) {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLButtonElement)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resetLayerDeleteHold();
+  const projectId = String(button.dataset.projectId || "").trim();
+  const layerId = String(button.dataset.layerId || "").trim();
+  if (!projectId || !layerId) return;
+  layerDeleteHoldState = {
+    button,
+    projectId,
+    layerId,
+    pointerId: Number.isFinite(event.pointerId) ? event.pointerId : null,
+    startedAt: performance.now(),
+    armed: false,
+    frame: null,
+  };
+  button.setPointerCapture?.(event.pointerId);
+  button.classList.add("is-hold-active");
+  button.style.setProperty("--hold-progress", "0%");
+  layerDeleteHoldState.frame = requestAnimationFrame(tickLayerDeleteHold);
+}
+
+function finishLayerDeleteHold(event) {
+  if (!layerDeleteHoldState) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const { button, projectId, layerId } = layerDeleteHoldState;
+  const releaseTarget = document.elementFromPoint(event.clientX, event.clientY);
+  const releasedOnButton = Boolean(releaseTarget && button && (releaseTarget === button || button.contains(releaseTarget)));
+  const shouldDelete = layerDeleteHoldState.armed === true && releasedOnButton;
+  resetLayerDeleteHold();
+  if (shouldDelete) deleteLayerById(projectId, layerId);
+}
+
+function cancelLayerDeleteHold(event) {
+  if (!layerDeleteHoldState) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resetLayerDeleteHold();
+}
+
 function createProjectCardMenu(project) {
   const shell = document.createElement("div");
   shell.className = "project-card-menu-shell";
@@ -2492,6 +2692,8 @@ function createProjectCardMenu(project) {
     event.preventDefault();
     event.stopPropagation();
     resetProjectDeleteHold();
+    resetLayerDeleteHold();
+    state.openLayerBrowserMenuId = null;
     state.openProjectBrowserMenuId = state.openProjectBrowserMenuId === project.id ? null : project.id;
     renderProjectBrowser();
   });
@@ -2526,10 +2728,53 @@ function renderProjectBrowser() {
 
   ui.projectBrowserList.replaceChildren(...state.projects.map((project) => {
     const boundarySet = getActiveBoundarySet(project);
+    const layers = getLibraryFolder(project, "boundary-maps")?.items || [];
+    const projectNodeId = `project:${project.id}`;
+    const layersNodeId = `layers:${project.id}`;
+    const projectCollapsed = isBrowserNodeCollapsed(projectNodeId);
+    const layersCollapsed = isBrowserNodeCollapsed(layersNodeId);
+    const visibleLayerCount = layers.filter((item) => item.display?.visible !== false).length;
     const card = document.createElement("article");
     card.className = "project-card";
     if (project.id === state.activeProjectId) card.classList.add("is-active");
     card.dataset.projectId = project.id;
+
+    const row = document.createElement("div");
+    row.className = "project-browser-row project-row";
+    row.dataset.projectId = project.id;
+
+    const visibility = document.createElement("input");
+    visibility.type = "checkbox";
+    visibility.className = "browser-visibility-checkbox";
+    visibility.checked = !layers.length || visibleLayerCount === layers.length;
+    visibility.indeterminate = visibleLayerCount > 0 && visibleLayerCount < layers.length;
+    visibility.title = "Alle Länderkarten dieses Projekts ein-/ausblenden";
+    visibility.addEventListener("click", (event) => event.stopPropagation());
+    visibility.addEventListener("change", () => {
+      layers.forEach((item) => {
+        item.display = item.display || {};
+        item.display.visible = visibility.checked;
+      });
+      persistProjects();
+      renderWorkspace();
+      renderGlobe();
+    });
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "browser-tree-toggle";
+    toggle.textContent = projectCollapsed ? "▸" : "▾";
+    toggle.setAttribute("aria-label", `${project.title} ${projectCollapsed ? "aufklappen" : "zuklappen"}`);
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleBrowserNode(projectNodeId);
+    });
+
+    const icon = document.createElement("span");
+    icon.className = "browser-row-icon browser-row-icon-project";
+    icon.setAttribute("aria-hidden", "true");
+
     const main = document.createElement("button");
     main.type = "button";
     main.className = "project-card-main";
@@ -2539,74 +2784,183 @@ function renderProjectBrowser() {
     const meta = document.createElement("span");
     meta.textContent = [
       boundarySet?.label || "ohne Grenzgrundlage",
-      `${boundarySet?.detailStrategy?.length || 0} Detailstufen`,
+      `${layers.length} Länderkarten`,
       project.status,
     ].join(" · ");
     main.append(title, meta);
-    card.append(main, createProjectCardMenu(project));
+    row.append(visibility, toggle, icon, main, createProjectCardMenu(project));
+    card.append(row);
+    if (!projectCollapsed) card.append(createProjectLayerTree(project, layers, layersNodeId, layersCollapsed));
     return card;
   }));
 }
 
-function renderLibraryBrowser() {
-  const project = getActiveProject();
-  if (!ui.libraryBrowserList) return;
-  if (!project) {
-    ui.libraryBrowserList.replaceChildren();
-    return;
-  }
+function createProjectLayerTree(project, items, nodeId, isCollapsed) {
+  const layerTree = document.createElement("div");
+  layerTree.className = "project-layer-tree";
+  const visibleLayerCount = items.filter((item) => item.display?.visible !== false).length;
+  const row = document.createElement("div");
+  row.className = "project-browser-row layer-folder-row";
 
-  const heading = document.createElement("div");
-  heading.className = "library-browser-heading";
-  heading.innerHTML = "<span class=\"label\">Projektbibliothek</span><strong>Ordner</strong>";
-
-  const folderCards = (project.libraryFolders || []).map((folder) => {
-    const wrapper = document.createElement("section");
-    wrapper.className = "library-folder-card";
-
-    const head = document.createElement("div");
-    head.className = "library-folder-head";
-    const title = document.createElement("strong");
-    title.textContent = folder.title;
-    const meta = document.createElement("span");
-    meta.textContent = `${folder.items?.length || 0} Einträge · ${folder.description}`;
-    head.append(title, meta);
-    wrapper.append(head);
-
-    const list = document.createElement("div");
-    list.className = "library-item-list";
-    const items = Array.isArray(folder.items) ? folder.items : [];
-    if (!items.length) {
-      const empty = document.createElement("p");
-      empty.className = "library-empty";
-      empty.textContent = folder.type === "boundary-maps"
-        ? "Noch keine Länderkarten hinzugefügt."
-        : "Noch leer.";
-      list.append(empty);
-    } else {
-      items.forEach((item) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "library-item-card";
-        button.dataset.libraryItemId = item.id;
-        button.classList.toggle("is-active", item.id === project.activeLibraryItemId);
-        button.style.setProperty("--layer-color", item.display?.color || "#c6a86a");
-        const itemTitle = document.createElement("strong");
-        itemTitle.textContent = item.name;
-        const itemMeta = document.createElement("span");
-        itemMeta.textContent = [item.source, item.adminLevel, item.detail].filter(Boolean).join(" · ");
-        button.append(itemTitle, itemMeta);
-        list.append(button);
-      });
-    }
-    wrapper.append(list);
-    return wrapper;
+  const visibility = document.createElement("input");
+  visibility.type = "checkbox";
+  visibility.className = "browser-visibility-checkbox";
+  visibility.checked = !items.length || visibleLayerCount === items.length;
+  visibility.indeterminate = visibleLayerCount > 0 && visibleLayerCount < items.length;
+  visibility.title = "Alle Länderkarten ein-/ausblenden";
+  visibility.addEventListener("click", (event) => event.stopPropagation());
+  visibility.addEventListener("change", () => {
+    items.forEach((item) => {
+      item.display = item.display || {};
+      item.display.visible = visibility.checked;
+    });
+    persistProjects();
+    renderWorkspace();
+    renderGlobe();
   });
 
-  ui.libraryBrowserList.replaceChildren(heading, ...folderCards);
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "browser-tree-toggle";
+  toggle.textContent = isCollapsed ? "▸" : "▾";
+  toggle.setAttribute("aria-label", `Länderkarten ${isCollapsed ? "aufklappen" : "zuklappen"}`);
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleBrowserNode(nodeId);
+  });
+
+  const icon = document.createElement("span");
+  icon.className = "browser-row-icon browser-row-icon-layers";
+  icon.setAttribute("aria-hidden", "true");
+
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "project-card-main layer-folder-main";
+  copy.innerHTML = `<strong>Länderkarten</strong><span>${items.length} hinzugefügt, ${visibleLayerCount} sichtbar</span>`;
+  copy.addEventListener("click", (event) => {
+    event.preventDefault();
+    toggleBrowserNode(nodeId);
+  });
+
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "project-card-menu-trigger layer-folder-menu-trigger";
+  menuButton.setAttribute("aria-label", "Länderkarten-Aktionen");
+  menuButton.innerHTML = "<span class=\"project-card-menu-dots\" aria-hidden=\"true\"></span>";
+
+  row.append(visibility, toggle, icon, copy, menuButton);
+  layerTree.append(row);
+
+  if (isCollapsed) return layerTree;
+
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "library-empty";
+    empty.textContent = "Noch keine Länderkarten hinzugefügt.";
+    layerTree.append(empty);
+    return layerTree;
+  }
+
+  const list = document.createElement("div");
+  list.className = "library-item-list";
+  items.forEach((item) => {
+    list.append(createLibraryItemButton(item, project));
+  });
+  layerTree.append(list);
+  return layerTree;
+}
+
+function getLayerBrowserDetailLabel(item) {
+  const raw = [item?.detail, item?.adminLevel].filter(Boolean).join(" · ");
+  const match = raw.match(/\b(?:10m|50m|110m)\b/i);
+  return match ? match[0].toLowerCase() : repairLegacyText(item?.detail || "");
+}
+
+function createLibraryItemButton(item, project) {
+  const button = document.createElement("div");
+  button.setAttribute("role", "button");
+  button.tabIndex = 0;
+  button.className = "library-item-card";
+  button.dataset.libraryItemId = item.id;
+  button.classList.toggle("is-active", item.id === project.activeLibraryItemId);
+  button.classList.toggle("is-hidden-layer", item.display?.visible === false);
+  button.style.setProperty("--layer-color", item.display?.color || "#c6a86a");
+
+  const visibility = document.createElement("input");
+  visibility.type = "checkbox";
+  visibility.className = "browser-visibility-checkbox";
+  visibility.checked = item.display?.visible !== false;
+  visibility.title = `${item.name} ein-/ausblenden`;
+  visibility.addEventListener("click", (event) => event.stopPropagation());
+  visibility.addEventListener("change", () => {
+    item.display = item.display || {};
+    item.display.visible = visibility.checked;
+    persistProjects();
+    renderWorkspace();
+    renderGlobe();
+  });
+
+  const spacer = document.createElement("span");
+  spacer.className = "browser-tree-toggle browser-tree-toggle-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+
+  const glyph = document.createElement("span");
+  glyph.className = "browser-row-icon library-item-glyph";
+  glyph.setAttribute("aria-hidden", "true");
+  const itemTitle = document.createElement("strong");
+  itemTitle.textContent = item.name;
+  const itemMeta = document.createElement("span");
+  itemMeta.textContent = [item.source, getLayerBrowserDetailLabel(item)].filter(Boolean).join(" · ");
+  const copy = document.createElement("span");
+  copy.className = "library-item-copy";
+  copy.append(itemTitle, itemMeta);
+  const menuShell = document.createElement("div");
+  menuShell.className = "layer-row-menu-shell";
+
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "layer-row-menu-trigger";
+  menuButton.setAttribute("aria-label", `${item.name}: Aktionen`);
+  menuButton.setAttribute("aria-expanded", state.openLayerBrowserMenuId === item.id ? "true" : "false");
+  menuButton.innerHTML = "<span class=\"layer-row-menu-dots\" aria-hidden=\"true\"></span>";
+  menuButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resetLayerDeleteHold();
+    state.openProjectBrowserMenuId = null;
+    state.openLayerBrowserMenuId = state.openLayerBrowserMenuId === item.id ? null : item.id;
+    renderProjectBrowser();
+  });
+
+  const menu = document.createElement("div");
+  menu.className = "layer-row-menu";
+  menu.hidden = state.openLayerBrowserMenuId !== item.id;
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "project-card-menu-action project-card-menu-action-delete";
+  deleteButton.textContent = "Löschen";
+  deleteButton.dataset.projectId = project.id;
+  deleteButton.dataset.layerId = item.id;
+  deleteButton.addEventListener("pointerdown", beginLayerDeleteHold);
+  deleteButton.addEventListener("pointerup", finishLayerDeleteHold);
+  deleteButton.addEventListener("pointercancel", cancelLayerDeleteHold);
+  deleteButton.addEventListener("lostpointercapture", cancelLayerDeleteHold);
+
+  menu.append(deleteButton);
+  menuShell.append(menuButton, menu);
+  button.append(visibility, spacer, glyph, copy, menuShell);
+  return button;
+}
+
+function renderLibraryBrowser() {
+  if (!ui.libraryBrowserList) return;
+  ui.libraryBrowserList.replaceChildren();
 }
 
 function renderBoundaryEditor() {
+  if (!ui.boundarySummary || !ui.boundaryLevelList) return;
   const project = getActiveProject();
   const boundarySet = getActiveBoundarySet(project);
   if (!project || !boundarySet) {
@@ -2865,6 +3219,7 @@ function renderBoundarySearchResults() {
 ui.menuButton.addEventListener("click", () => setMenuOpen(ui.menuButton.getAttribute("aria-expanded") !== "true"));
 ui.menuCloseButton.addEventListener("click", () => setMenuOpen(false));
 ui.menuOverlay.addEventListener("click", () => setMenuOpen(false));
+ui.themeToggleButton?.addEventListener("click", toggleTheme);
 ui.exportProjectButton?.addEventListener("click", (event) => {
   event.stopPropagation();
   setExportMenuOpen(ui.exportProjectButton.getAttribute("aria-expanded") !== "true");
@@ -2878,6 +3233,12 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
     setExportMenuOpen(false);
+    setBrowserActionsMenuOpen(false);
+    if (state.openLayerBrowserMenuId) {
+      state.openLayerBrowserMenuId = null;
+      resetLayerDeleteHold();
+      renderProjectBrowser();
+    }
     if (state.openProjectBrowserMenuId) {
       state.openProjectBrowserMenuId = null;
       resetProjectDeleteHold();
@@ -2888,7 +3249,15 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest(".export-control")) return;
   if (event.target instanceof Element && event.target.closest(".project-card-menu-shell")) return;
+  if (event.target instanceof Element && event.target.closest(".layer-row-menu-shell")) return;
+  if (event.target instanceof Element && event.target.closest(".browser-actions-menu-shell")) return;
   setExportMenuOpen(false);
+  setBrowserActionsMenuOpen(false);
+  if (state.openLayerBrowserMenuId) {
+    state.openLayerBrowserMenuId = null;
+    resetLayerDeleteHold();
+    renderProjectBrowser();
+  }
   if (state.openProjectBrowserMenuId) {
     state.openProjectBrowserMenuId = null;
     resetProjectDeleteHold();
@@ -2907,7 +3276,16 @@ ui.boundarySearchInput?.addEventListener("keydown", (event) => {
 
 ui.openWorkspaceButton.addEventListener("click", () => setWorkspaceMode("details"));
 ui.returnPreviewButton.addEventListener("click", () => setWorkspaceMode("preview"));
-ui.newProjectButton.addEventListener("click", () => {
+ui.browserActionsMenuButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  setBrowserActionsMenuOpen(!state.browserActionsMenuOpen);
+});
+document.querySelectorAll("[data-layout-cycle-button]").forEach((button) => {
+  button.addEventListener("click", cycleDetailsLayoutMode);
+});
+ui.newProjectButton?.addEventListener("click", () => {
+  setBrowserActionsMenuOpen(false);
   const project = normalizeProject(createEarthMapProject());
   state.projects.push(project);
   state.activeProjectId = project.id;
@@ -2917,13 +3295,33 @@ ui.newProjectButton.addEventListener("click", () => {
 });
 ui.projectBrowserList.addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest(".project-card-menu-shell")) return;
+  const layerCard = event.target.closest("[data-library-item-id]");
+  if (layerCard) {
+    const project = getActiveProject();
+    if (!project) return;
+    project.activeLibraryItemId = layerCard.dataset.libraryItemId || "";
+    persistProjects();
+    renderWorkspace();
+    renderGlobe();
+    setEditorTab("layer-editor");
+    return;
+  }
   const card = event.target.closest("[data-project-id]");
   if (!card) return;
   state.activeProjectId = card.dataset.projectId;
   state.openProjectBrowserMenuId = null;
+  state.openLayerBrowserMenuId = null;
   resetProjectDeleteHold();
+  resetLayerDeleteHold();
   persistProjects();
   renderWorkspace();
+});
+ui.projectBrowserList.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const layerCard = event.target instanceof Element ? event.target.closest("[data-library-item-id]") : null;
+  if (!layerCard) return;
+  event.preventDefault();
+  layerCard.click();
 });
 ui.libraryBrowserList?.addEventListener("click", (event) => {
   const card = event.target.closest("[data-library-item-id]");
@@ -2943,21 +3341,43 @@ setupLayerColorPalette();
 
 ui.globe.addEventListener("pointerdown", (event) => {
   markGlobeNavigationActive();
-  dragState = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startRotation: { ...rotation } };
+  activeGlobePointers.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY });
+  if (!beginPinchZoomIfReady()) {
+    resetSinglePointerDragFrom(activeGlobePointers.get(event.pointerId));
+  }
   ui.globe.setPointerCapture?.(event.pointerId);
 });
 
 ui.globe.addEventListener("pointermove", (event) => {
+  if (activeGlobePointers.has(event.pointerId)) {
+    activeGlobePointers.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY });
+  }
+  if (pinchState && activeGlobePointers.size >= 2) {
+    markGlobeNavigationActive();
+    const pointers = getActiveGlobePointerList();
+    const distance = Math.max(1, getPointerDistance(pointers[0], pointers[1]));
+    const zoomFactor = distance / Math.max(1, pinchState.startDistance);
+    globeZoom = clamp(pinchState.startZoom * zoomFactor, MIN_GLOBE_ZOOM, MAX_GLOBE_ZOOM);
+    const latitudeLimit = getLatitudeNavigationLimit();
+    rotation.lat = clamp(rotation.lat, -latitudeLimit, latitudeLimit);
+    scheduleGlobeRender();
+    scheduleNaturalEarthDetailUpdate(980);
+    return;
+  }
   if (!dragState || dragState.pointerId !== event.pointerId) return;
   markGlobeNavigationActive();
-  // Bedienregel: Beim Orthographic-Zoom wächst die Bildschirmbewegung pro
-  // Rotationsgrad mit der Projektionsskala. Die Drag-Übersetzung wird deshalb
-  // leicht überlinear gedämpft, damit die Karte auch tief im Zoom unter dem
-  // Mauszeiger bleibt und nicht schneller "davonläuft" als die Handbewegung.
-  const dragSensitivity = 1 / Math.max(1, globeZoom ** 1.32);
+  // Bedienregel: Dragging orientiert sich an der sichtbaren Kugeloberfläche,
+  // nicht an einer festen Grad-pro-Pixel-Konstante. Ein Maus-Pixel wird aus dem
+  // aktuellen Projektionsradius in Rotationsgrade übersetzt; dadurch läuft die
+  // Karte bei kleinem Zoom nicht voraus und bleibt im Tiefzoom nah an der Hand.
+  const rect = ui.globe.getBoundingClientRect();
+  const baseSize = Math.max(1, Math.min(rect.width || 1, rect.height || 1));
+  const radius = Math.max(1, baseSize * 0.47 * globeZoom);
+  const degreesPerPixel = 1 / (radius * DEG);
+  const lonLatitudeFactor = 1 / Math.max(0.38, Math.cos(rotation.lat * DEG));
   const latitudeLimit = getLatitudeNavigationLimit();
-  rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * 0.45 * dragSensitivity;
-  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * 0.28 * dragSensitivity, -latitudeLimit, latitudeLimit);
+  rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * degreesPerPixel * lonLatitudeFactor;
+  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * degreesPerPixel, -latitudeLimit, latitudeLimit);
   scheduleGlobeRender();
 });
 
@@ -2973,14 +3393,27 @@ ui.globe.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 ["pointerup", "pointercancel", "lostpointercapture"].forEach((type) => {
-  ui.globe.addEventListener(type, () => {
-    dragState = null;
+  ui.globe.addEventListener(type, (event) => {
+    activeGlobePointers.delete(event.pointerId);
+    if (activeGlobePointers.size >= 2) {
+      beginPinchZoomIfReady();
+    } else if (activeGlobePointers.size === 1) {
+      pinchState = null;
+      resetSinglePointerDragFrom(getActiveGlobePointerList()[0]);
+    } else {
+      pinchState = null;
+      dragState = null;
+    }
     markGlobeNavigationActive();
     scheduleNaturalEarthDetailUpdate(760);
   });
 });
 
-window.addEventListener("resize", scheduleGlobeRender);
+window.addEventListener("resize", () => {
+  setDetailsLayoutMode(state.detailsLayoutMode);
+  scheduleGlobeRender();
+});
+setTheme(getStoredTheme(), false);
 renderWorkspace();
 renderGlobe();
 scheduleNaturalEarthDetailUpdate(40);

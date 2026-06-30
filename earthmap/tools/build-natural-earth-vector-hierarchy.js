@@ -223,13 +223,36 @@ function buildHierarchy(source) {
     // schaltet die Schwellwerte jetzt etwa dreimal früher frei, damit beim
     // Hineinzoomen schneller mehr Geometrie sichtbar wird, ohne mehr MB zu
     // erzeugen.
+    // Aktuelle Regel: Die Freigabe läuft bis Zoom 24 weiter; dort werden alle
+    // Punkte des 10m-Masters sichtbar. Die alte "dreimal früher"-Kurve endete
+    // schon bei Zoom 6.33 und ließ den Tiefzoom dadurch künstlich grob.
     thresholds: [
-      0.52, 0.38, 0.27, 0.19, 0.13, 0.09, 0.062, 0.043, 0.030,
-      0.021, 0.015, 0.0105, 0.0074, 0.0052, 0.0037, 0.0026, 0.0018,
-    ].map((importance, index) => ({
-      zoom: Number((1 + index / 3).toFixed(3)),
-      importance,
-    })),
+      [1, 0.52],
+      [1.3, 0.38],
+      [1.6, 0.27],
+      [2, 0.19],
+      [2.4, 0.13],
+      [2.8, 0.09],
+      [3.2, 0.062],
+      [3.7, 0.043],
+      [4.2, 0.03],
+      [4.8, 0.021],
+      [5.5, 0.015],
+      [6.3, 0.0105],
+      [7.2, 0.0074],
+      [8.2, 0.0052],
+      [9.4, 0.0037],
+      [10.7, 0.0026],
+      [12.1, 0.0018],
+      [13.7, 0.00125],
+      [15.2, 0.00086],
+      [16.6, 0.00058],
+      [18, 0.00038],
+      [19.5, 0.00025],
+      [21, 0.00016],
+      [22.5, 0.00008],
+      [24, 0],
+    ].map(([zoom, importance]) => ({ zoom, importance })),
     global: { key: "global", file: globalFile, featureCount: globalFeatures.length },
     tiles: nonEmptyTiles.map(({ key, minLon, maxLon, minLat, maxLat, file, features }) => ({
       key,

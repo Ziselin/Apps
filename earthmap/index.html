@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f3efe5">
   <title>Earth Map</title>
   <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
-  <link rel="stylesheet" href="earthmap.css?v=20260629a">
+  <link rel="stylesheet" href="earthmap.css?v=20260630g">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
@@ -24,6 +24,9 @@
           </div>
         </div>
         <div class="topbar-actions">
+          <button type="button" id="themeToggleButton" class="header-icon-button topbar-icon-button theme-toggle-button" aria-label="Dunklen Modus aktivieren" aria-pressed="false">
+            <img id="themeToggleIcon" src="https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633" alt="" aria-hidden="true">
+          </button>
           <div class="export-control">
             <button type="button" id="exportProjectButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
               <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
@@ -88,46 +91,43 @@
       </button>
       <main class="workspace-stage">
         <section class="workspace-panel browser-panel">
-          <div class="panel-head"><div><span class="label">Browser</span><h2>Projekte</h2></div></div>
-          <div class="browser-actions">
-            <button type="button" id="newProjectButton" class="secondary-button">Neues Earth-Map-Projekt</button>
-            <button type="button" class="secondary-button">Importieren</button>
-            <button type="button" class="secondary-button">Exportieren</button>
+          <div class="panel-head">
+            <div><span class="label">Browser</span><h2>Projekte</h2></div>
+            <div class="browser-header-actions">
+              <div class="browser-actions-menu-shell">
+                <button type="button" id="browserActionsMenuButton" class="browser-actions-menu-trigger" aria-label="Projektaktionen" aria-expanded="false" aria-controls="browserActionsMenu">
+                  <span class="browser-actions-menu-dots" aria-hidden="true"></span>
+                </button>
+                <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
+                  <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
+                  <button type="button" role="menuitem">Importieren</button>
+                  <button type="button" role="menuitem">Exportieren</button>
+                </div>
+              </div>
+              <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+                <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+              </button>
+            </div>
           </div>
           <div id="projectBrowserList" class="project-browser-list" aria-label="Earth-Map-Projekte"></div>
           <div id="libraryBrowserList" class="library-browser-list" aria-label="Projektbibliothek"></div>
         </section>
 
         <section class="workspace-panel editor-panel">
-          <div class="panel-head"><div><span class="label">Editor</span><h2>Earth-Map-Konzept</h2></div></div>
+          <div class="panel-head">
+            <div><span class="label">Editor</span><h2>Earth-Map-Editor</h2></div>
+            <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
+              <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
+            </button>
+          </div>
           <div class="editor-tabs" role="tablist" aria-label="Earth-Map-Editorbereiche">
-            <button type="button" class="editor-tab is-active" id="tabConcept" data-editor-tab="concept" role="tab" aria-selected="true" aria-controls="panelConcept">Konzept</button>
-            <button type="button" class="editor-tab" id="tabBoundarySearch" data-editor-tab="boundary-search" role="tab" aria-selected="false" aria-controls="panelBoundarySearch">Grenzlayer suchen</button>
+            <button type="button" class="editor-tab is-active" id="tabBoundarySearch" data-editor-tab="boundary-search" role="tab" aria-selected="true" aria-controls="panelBoundarySearch">Hinzufügen</button>
             <button type="button" class="editor-tab" id="tabLayerEditor" data-editor-tab="layer-editor" role="tab" aria-selected="false" aria-controls="panelLayerEditor">Karteneditor</button>
           </div>
 
-          <section id="panelConcept" class="editor-tab-panel is-active" data-editor-panel="concept" role="tabpanel" aria-labelledby="tabConcept">
+          <section id="panelBoundarySearch" class="editor-tab-panel is-active" data-editor-panel="boundary-search" role="tabpanel" aria-labelledby="tabBoundarySearch">
             <div class="editor-section">
-              <h3>Geografische Grundlage</h3>
-              <p id="boundarySummary" class="boundary-summary">Neue Projekte erhalten automatisch Natural Earth 10m als moderne geografische Master-Geometrie. Die sichtbaren Detailstufen werden daraus abhängig vom Zoom abgeleitet.</p>
-              <div id="boundaryLevelList" class="boundary-level-list"></div>
-              <p>Hier werden später Globusprojektion, Grenzlayer, Datenquelle und Gültigkeitszeitraum ausgewählt.</p>
-            </div>
-            <div class="editor-section">
-              <h3>Datenbasis</h3>
-              <p>Geplant ist eine Zuordnung von Tabellenwerten zu geografischen Einheiten, etwa Staat, Landkreis, Gemeinde oder Wahlkreis.</p>
-            </div>
-            <div class="editor-section">
-              <h3>Klassierung</h3>
-              <div class="class-row"><span>0–10</span><i></i></div>
-              <div class="class-row"><span>11–50</span><i></i></div>
-              <div class="class-row"><span>51–200</span><i></i></div>
-            </div>
-          </section>
-
-          <section id="panelBoundarySearch" class="editor-tab-panel" data-editor-panel="boundary-search" role="tabpanel" aria-labelledby="tabBoundarySearch" hidden>
-            <div class="editor-section">
-              <h3>Grenzlayer suchen</h3>
+              <h3>Hinzufügen</h3>
               <p>Suche in Natural Earth nach Ländern und Grenzräumen. Treffer werden als Layer mit Quelle, Lizenz und Abrufdatum im Projekt gespeichert.</p>
               <label class="search-field">
                 <span>Suchbegriff</span>
@@ -174,9 +174,9 @@
   </main>
 
   <script src="../assets/vendor/d3.v7.min.js?v=20260627a"></script>
-  <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260628i"></script>
+  <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260630a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
   <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260629a"></script>
+  <script src="earthmap.js?v=20260630k"></script>
 </body>
 </html>
