@@ -731,7 +731,16 @@ body.earthmap-theme-dark .secondary-button {
   .brand-name { font-size: 1.4rem; }
   .brand-home-link,
   .brand-bird { width: 44px; height: 44px; }
-  .globe-stage { padding: 0 14px 60px; }
+  .globe-stage { padding: 0 14px calc(82px + env(safe-area-inset-bottom, 0px)); }
+  .preview-view > .workspace-strip:not(.workspace-strip-top) {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 28;
+    min-height: calc(52px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
   .workspace-stage { padding: 66px 8px 10px; gap: 10px; }
   .workspace-panel { border-radius: 16px; padding: 16px; }
 }
