@@ -6,7 +6,8 @@
   <meta name="theme-color" content="#f3efe5">
   <title>Earth Map</title>
   <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
-  <link rel="stylesheet" href="earthmap.css?v=20260630g">
+  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260701g">
+  <link rel="stylesheet" href="earthmap.css?v=20260701h">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
@@ -24,9 +25,6 @@
           </div>
         </div>
         <div class="topbar-actions">
-          <button type="button" id="themeToggleButton" class="header-icon-button topbar-icon-button theme-toggle-button" aria-label="Dunklen Modus aktivieren" aria-pressed="false">
-            <img id="themeToggleIcon" src="https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633" alt="" aria-hidden="true">
-          </button>
           <div class="export-control">
             <button type="button" id="exportProjectButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
               <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
@@ -42,6 +40,9 @@
               </button>
             </div>
           </div>
+          <button type="button" id="themeToggleButton" class="header-icon-button topbar-icon-button theme-toggle-button" aria-label="Dunklen Modus aktivieren" aria-pressed="false">
+            <img id="themeToggleIcon" src="https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633" alt="" aria-hidden="true">
+          </button>
         </div>
       </header>
 
@@ -100,7 +101,6 @@
                 </button>
                 <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
                   <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
-                  <button type="button" role="menuitem">Importieren</button>
                   <button type="button" role="menuitem">Exportieren</button>
                 </div>
               </div>
@@ -111,11 +111,12 @@
           </div>
           <div id="projectBrowserList" class="project-browser-list" aria-label="Earth-Map-Projekte"></div>
           <div id="libraryBrowserList" class="library-browser-list" aria-label="Projektbibliothek"></div>
+          <input id="boundarySetImportInput" type="file" accept=".json,.geojson,.kml,.kmz,application/json,application/geo+json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden>
         </section>
 
         <section class="workspace-panel editor-panel">
-          <div class="panel-head">
-            <div><span class="label">Editor</span><h2>Earth-Map-Editor</h2></div>
+          <div class="panel-head editor-panel-head">
+            <div></div>
             <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
               <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
             </button>
@@ -151,15 +152,6 @@
               <h3 id="layerEditorTitle">Keine Karte ausgewählt</h3>
               <p id="layerEditorSummary" class="empty-state">Wähle links in der Projektbibliothek eine hinzugefügte Länderkarte aus.</p>
               <div id="layerEditorContent" class="layer-editor-content" hidden>
-                <label class="color-field">
-                  <span>Anzeigefarbe</span>
-                  <div class="layer-color-controls">
-                    <input id="layerColorInput" type="color" value="#c6a86a" aria-label="Freie Farbe wählen">
-                    <button type="button" id="layerColorPaletteButton" class="color-picker-button" aria-label="Projektfarben wählen">
-                      <span class="color-picker-icon" aria-hidden="true"></span>
-                    </button>
-                  </div>
-                </label>
                 <dl id="layerMetaList" class="layer-meta-list"></dl>
               </div>
             </div>
@@ -177,6 +169,6 @@
   <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260630a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
   <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260630k"></script>
+  <script src="earthmap.js?v=20260701g"></script>
 </body>
 </html>

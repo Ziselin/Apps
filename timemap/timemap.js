@@ -576,12 +576,14 @@ const ui = {
   projectCategoryItalicInput: document.getElementById("projectCategoryItalicInput"),
   projectCategoryColorLabel: document.getElementById("projectCategoryColorLabel"),
   projectCategoryColorInput: document.getElementById("projectCategoryColorInput"),
+  projectCategoryColorCustomButton: document.getElementById("projectCategoryColorCustomButton"),
   projectCategoryColorPicker: document.getElementById("projectCategoryColorPicker"),
   projectCategoryColorPaletteButton: document.getElementById("projectCategoryColorPaletteButton"),
   projectCategoryIconLabel: document.getElementById("projectCategoryIconLabel"),
   projectCategoryIconField: document.getElementById("projectCategoryIconField"),
   projectCategoryIconColorLabel: document.getElementById("projectCategoryIconColorLabel"),
   projectCategoryIconColorInput: document.getElementById("projectCategoryIconColorInput"),
+  projectCategoryIconColorCustomButton: document.getElementById("projectCategoryIconColorCustomButton"),
   projectCategoryIconColorPicker: document.getElementById("projectCategoryIconColorPicker"),
   projectCategoryIconColorPaletteButton: document.getElementById("projectCategoryIconColorPaletteButton"),
   projectCategoryIconColorFollowTextInput: document.getElementById("projectCategoryIconColorFollowTextInput"),
@@ -12198,32 +12200,38 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
   label.className = "field compact-color-field";
 
   const controlsRow = document.createElement("div");
-  controlsRow.className = "compact-color-row";
+  controlsRow.className = "compact-color-row z-color-choice-surface";
   const titleText = document.createElement("span");
+  titleText.className = "z-color-choice-label";
   titleText.textContent = labelText;
   controlsRow.appendChild(titleText);
+  textInput.classList.add("z-color-choice-code");
 
   const pickerButton = document.createElement("button");
   pickerButton.type = "button";
-  pickerButton.className = "color-picker-button";
-  pickerButton.setAttribute("aria-label", `${labelText} ${t("color_pick_aria")}`);
+  pickerButton.className = "z-color-choice-button z-color-choice-palette-button color-picker-button";
+  pickerButton.setAttribute("aria-label", `${labelText}: Projektfarben wählen`);
   const preview = document.createElement("span");
-  preview.className = "color-preview";
+  preview.className = "z-color-choice-button z-color-choice-custom-button color-preview";
   preview.tabIndex = 0;
   preview.setAttribute("role", "button");
-  preview.setAttribute("aria-label", `${labelText} RGB`);
+  preview.setAttribute("aria-label", `${labelText}: individuelle Farbe wählen`);
 
   const nativeColorInput = document.createElement("input");
   nativeColorInput.type = "color";
-  nativeColorInput.className = "native-color-input";
+  nativeColorInput.className = "z-color-choice-native native-color-input";
   nativeColorInput.tabIndex = -1;
 
   const pickerIcon = document.createElement("span");
-  pickerIcon.className = "color-picker-icon";
+  pickerIcon.className = "z-color-choice-button-icon color-picker-icon";
   pickerIcon.textContent = "";
+  const customIcon = document.createElement("span");
+  customIcon.className = "z-color-choice-button-icon";
+  customIcon.setAttribute("aria-hidden", "true");
+  preview.appendChild(customIcon);
 
   const palette = document.createElement("div");
-  palette.className = "color-palette";
+  palette.className = "z-color-choice-palette color-palette";
   palette.hidden = true;
 
   const renderPaletteSwatches = () => {
@@ -12231,8 +12239,8 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
     collectSuggestedPaletteColors(textInput.value).forEach((value) => {
       const swatch = document.createElement("button");
       swatch.type = "button";
-      swatch.className = "color-swatch";
-      swatch.style.background = value;
+      swatch.className = "z-color-choice-swatch color-swatch";
+      swatch.style.setProperty("--z-color-swatch", value);
       swatch.setAttribute("aria-label", `Farbe ${value}`);
       swatch.addEventListener("click", (event) => {
         event.preventDefault();
@@ -12260,6 +12268,7 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
   const updatePreview = () => {
     const value = String(textInput.value ?? "").trim();
     const normalizedColor = normalizeColorInputValue(value || "#c96f4a");
+    controlsRow.style.setProperty("--z-color-current", value || "currentColor");
     preview.style.setProperty("--preview-color", value || "transparent");
     nativeColorInput.value = normalizedColor;
     preview.classList.toggle("is-empty", !value);
@@ -12269,12 +12278,14 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
 
   const closePalette = () => {
     palette.hidden = true;
+    pickerButton.setAttribute("aria-expanded", "false");
     document.removeEventListener("mousedown", handleDocumentPointerDown, true);
   };
 
   const openPalette = () => {
     renderPaletteSwatches();
     palette.hidden = false;
+    pickerButton.setAttribute("aria-expanded", "true");
     document.addEventListener("mousedown", handleDocumentPointerDown, true);
   };
 
@@ -12342,7 +12353,7 @@ function setupColorPaletteButton(button, textInput, applyValue, options = {}) {
     onClose = null,
   } = options;
   const palette = document.createElement("div");
-  palette.className = "color-palette";
+  palette.className = "z-color-choice-palette color-palette";
   palette.hidden = true;
   (anchor || button.parentElement || button).appendChild(palette);
 
@@ -12351,8 +12362,8 @@ function setupColorPaletteButton(button, textInput, applyValue, options = {}) {
     collectSuggestedPaletteColors(getExtraColors()).forEach((value) => {
       const swatch = document.createElement("button");
       swatch.type = "button";
-      swatch.className = "color-swatch";
-      swatch.style.background = value;
+      swatch.className = "z-color-choice-swatch color-swatch";
+      swatch.style.setProperty("--z-color-swatch", value);
       swatch.setAttribute("aria-label", `Farbe ${value}`);
       swatch.addEventListener("click", (event) => {
         event.preventDefault();
@@ -12381,6 +12392,7 @@ function setupColorPaletteButton(button, textInput, applyValue, options = {}) {
   const closePalette = () => {
     if (palette.hidden) return;
     palette.hidden = true;
+    button.setAttribute("aria-expanded", "false");
     document.removeEventListener("mousedown", handleDocumentPointerDown, true);
     if (typeof onClose === "function") onClose();
   };
@@ -12388,6 +12400,7 @@ function setupColorPaletteButton(button, textInput, applyValue, options = {}) {
   const openPalette = () => {
     renderPalette();
     palette.hidden = false;
+    button.setAttribute("aria-expanded", "true");
     document.addEventListener("mousedown", handleDocumentPointerDown, true);
     if (typeof onOpen === "function") onOpen();
   };
@@ -12403,6 +12416,29 @@ function setupColorPaletteButton(button, textInput, applyValue, options = {}) {
   });
 
   return { close: closePalette };
+}
+
+function setupColorChoiceCustomButton(button, nativeColorInput, textInput, fallback = "#c96f4a") {
+  if (!button || !nativeColorInput || !textInput) return;
+  const scope = button.parentElement || button;
+  const updateCurrentColor = () => {
+    const value = String(textInput.value || "").trim();
+    const normalized = normalizeColorInputValue(value || fallback, fallback);
+    nativeColorInput.value = normalized;
+    scope.style.setProperty("--z-color-current", value || "currentColor");
+    button.classList.toggle("is-empty", !value);
+  };
+  const openNativeColorPicker = (event) => {
+    event.preventDefault();
+    if (typeof nativeColorInput.showPicker === "function") nativeColorInput.showPicker();
+    else nativeColorInput.click();
+  };
+  button.addEventListener("click", openNativeColorPicker);
+  nativeColorInput.addEventListener("input", updateCurrentColor);
+  nativeColorInput.addEventListener("change", updateCurrentColor);
+  textInput.addEventListener("input", updateCurrentColor);
+  textInput.addEventListener("change", updateCurrentColor);
+  updateCurrentColor();
 }
 
 function createLineStylePreviewField(labelText, options = {}) {
@@ -34189,6 +34225,12 @@ function syncProjectCategoryIconColorUi() {
       );
     }
   }
+  const textColor = String(ui.projectCategoryColorInput?.value || "").trim();
+  const iconColor = String(ui.projectCategoryIconColorInput?.value || "").trim();
+  ui.projectCategoryColorCustomButton?.parentElement?.style.setProperty("--z-color-current", textColor || "currentColor");
+  ui.projectCategoryIconColorCustomButton?.parentElement?.style.setProperty("--z-color-current", iconColor || "currentColor");
+  ui.projectCategoryColorCustomButton?.classList.toggle("is-empty", !textColor);
+  ui.projectCategoryIconColorCustomButton?.classList.toggle("is-empty", !iconColor);
 }
 
 function openProjectCategoryModal(groupItem, categoryItem = null, options = {}) {
@@ -34693,6 +34735,20 @@ if (ui.projectCategoryIconColorFollowTextInput) {
     renderProjectCategoryIconField();
   });
 }
+
+setupColorChoiceCustomButton(
+  ui.projectCategoryColorCustomButton,
+  ui.projectCategoryColorPicker,
+  ui.projectCategoryColorInput,
+  getProjectCategoryDefaultDisplayColor(),
+);
+
+setupColorChoiceCustomButton(
+  ui.projectCategoryIconColorCustomButton,
+  ui.projectCategoryIconColorPicker,
+  ui.projectCategoryIconColorInput,
+  getProjectCategoryDefaultDisplayColor(),
+);
 
 setupColorPaletteButton(
   ui.projectCategoryColorPaletteButton,

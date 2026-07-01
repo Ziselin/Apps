@@ -20,6 +20,13 @@
   --csv-code-bg: rgba(16, 20, 24, 0.92);
   --csv-code-border: rgba(125, 184, 201, 0.22);
   --csv-code-text: #dce6ef;
+  --z-color-choice-surface: rgba(255, 255, 255, 0.035);
+  --z-color-choice-line: rgba(255, 255, 255, 0.08);
+  --z-color-choice-code-bg: rgba(255, 255, 255, 0.04);
+  --z-color-choice-code-line: rgba(255, 255, 255, 0.10);
+  --z-color-choice-label: var(--muted);
+  --z-color-choice-code-text: rgba(238, 243, 246, 0.78);
+  --z-color-choice-focus-ring: rgba(255, 179, 71, 0.14);
 }
 
 body.theme-light,
@@ -32,6 +39,12 @@ body[data-theme="light"],
   --csv-code-source: #B08800;
   --csv-code-comma: #6A737D;
   --csv-code-error: #D73A49;
+  --z-color-choice-surface: rgba(255, 255, 255, 0.52);
+  --z-color-choice-line: rgba(33, 54, 51, 0.12);
+  --z-color-choice-code-bg: rgba(255, 255, 255, 0.66);
+  --z-color-choice-code-line: rgba(33, 54, 51, 0.14);
+  --z-color-choice-code-text: rgba(33, 54, 51, 0.74);
+  --z-color-choice-focus-ring: rgba(33, 54, 51, 0.09);
 }
 
 * {
@@ -1999,6 +2012,49 @@ button:focus-visible {
   min-height: 30px;
 }
 
+/*
+  Gemeinsame Farbauswahl-Vorlage:
+  TimeMap behält sein kompaktes Zeilenraster und die nach oben öffnende
+  Palette, nutzt aber dieselbe Button- und Icon-Sprache wie EarthMap und
+  zukünftige Apps. Die Funktionslogik bleibt in JS projektspezifisch.
+*/
+.compact-color-row.z-color-choice-surface {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 34px 34px 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+}
+
+.z-color-choice-button.color-picker-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.z-color-choice-button.color-preview {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.z-color-choice-button-icon.color-picker-icon {
+  width: 19px;
+  height: 19px;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.z-color-choice-swatch.color-swatch {
+  border-radius: 999px;
+  background: var(--z-color-swatch, transparent);
+}
+
 .field input,
 .field select,
 .field textarea,
@@ -2264,10 +2320,12 @@ button:focus-visible {
 
 .project-category-color-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 42px 42px;
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
   gap: 10px;
   align-items: center;
   position: relative;
+  padding: 10px 14px;
+  border-radius: 14px;
 }
 
 .project-category-color-row input[type="color"] {
@@ -2278,8 +2336,8 @@ button:focus-visible {
 }
 
 .project-category-color-row .color-picker-button {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border-radius: 10px;
 }

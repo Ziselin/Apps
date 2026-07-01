@@ -3,10 +3,117 @@
   "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu",
   "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
   "browserActionsMenuButton", "browserActionsMenu",
-  "newProjectButton", "projectBrowserList", "libraryBrowserList",
+  "newProjectButton", "importBoundarySetButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
   "boundarySearchInput", "boundarySearchButton", "boundarySearchResults",
-  "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerColorInput", "layerColorPaletteButton", "layerMetaList",
+  "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerMetaList",
 ].map((id) => [id, document.getElementById(id)]));
+
+const DEFAULT_LAYER_FILL_COLOR = "#c6a86a";
+const DEFAULT_LAYER_OUTLINE_COLOR = "#8f9690";
+
+function initializeEarthMapEditorShell() {
+  const editorPanel = document.querySelector(".editor-panel");
+  const tabs = editorPanel?.querySelector(".editor-tabs");
+  const searchPanel = document.getElementById("panelBoundarySearch");
+  const layerPanel = document.getElementById("panelLayerEditor");
+  if (!editorPanel || !tabs || !searchPanel) return;
+
+  const makeTab = (id, panel, label, active = false) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `editor-tab${active ? " is-active" : ""}`;
+    button.id = id;
+    button.dataset.editorTab = panel;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    button.setAttribute("aria-controls", `panel-${panel}`);
+    button.textContent = label;
+    return button;
+  };
+
+  tabs.replaceChildren(
+    makeTab("tabBackground", "background", "Hintergrund", true),
+    makeTab("tabSingleMaps", "single-maps", "Einzelkarten"),
+    makeTab("tabCollections", "collections", "Sammlungen"),
+    makeTab("tabAnimations", "animations", "Animationen"),
+  );
+
+  const backgroundPanel = document.createElement("section");
+  backgroundPanel.id = "panelBackground";
+  backgroundPanel.className = "editor-tab-panel is-active";
+  backgroundPanel.dataset.editorPanel = "background";
+  backgroundPanel.setAttribute("role", "tabpanel");
+  backgroundPanel.setAttribute("aria-labelledby", "tabBackground");
+  backgroundPanel.innerHTML = `
+    <div class="editor-section">
+      <h3>Kontinentalkarten</h3>
+      <p>Hier werden die Hintergrund- und Kontinentalkarten des aktiven Projekts bearbeitet. Die Natural-Earth-10m-Küstenlinien liegen bereits im Browser unter Kontinentalkarten und können dort ein- oder ausgeschaltet werden.</p>
+    </div>
+  `;
+
+  searchPanel.id = "panelSingleMaps";
+  searchPanel.dataset.editorPanel = "single-maps";
+  searchPanel.setAttribute("aria-labelledby", "tabSingleMaps");
+  searchPanel.classList.remove("is-active");
+  searchPanel.hidden = true;
+  const firstSearchHeading = searchPanel.querySelector(".editor-section h3");
+  if (firstSearchHeading) firstSearchHeading.textContent = "Suche";
+  searchPanel.querySelectorAll(":scope > .editor-section").forEach((section) => {
+    section.classList.add("single-map-tool-section");
+  });
+  if (layerPanel) {
+    const objectEditor = document.createElement("div");
+    objectEditor.id = "mapObjectEditor";
+    objectEditor.className = "map-object-editor";
+    objectEditor.hidden = true;
+    while (layerPanel.firstChild) objectEditor.appendChild(layerPanel.firstChild);
+    searchPanel.appendChild(objectEditor);
+    layerPanel.remove();
+  }
+
+  const collectionsPanel = document.createElement("section");
+  collectionsPanel.id = "panelCollections";
+  collectionsPanel.className = "editor-tab-panel";
+  collectionsPanel.dataset.editorPanel = "collections";
+  collectionsPanel.setAttribute("role", "tabpanel");
+  collectionsPanel.setAttribute("aria-labelledby", "tabCollections");
+  collectionsPanel.hidden = true;
+  collectionsPanel.innerHTML = `
+    <div class="editor-section collection-tool-section">
+      <h3>Importieren</h3>
+      <p>Lade GeoJSON, KML, KMZ oder ein Ziselin-Boundary-Set. Die Sammlung wird zuerst hier geprüft, in unser GeoJSON-Modell normalisiert und erst mit „Zum Projekt hinzufügen“ in das aktive Projekt übernommen.</p>
+      <button type="button" id="importBoundarySetButton" class="secondary-button">Vom Desktop importieren</button>
+    </div>
+    <div class="editor-section collection-tool-section">
+      <h3 id="collectionImportTitle">Keine Sammlung geladen</h3>
+      <p id="collectionImportSummary" class="empty-state">Importiere eine Kartensammlung, um Quelle, Lizenz, Einheiten und Kompatibilität zu prüfen.</p>
+      <div id="collectionImportContent" class="layer-editor-content" hidden>
+        <dl id="collectionImportMetaList" class="layer-meta-list"></dl>
+        <button type="button" id="addCollectionToProjectButton" class="secondary-button">Zum Projekt hinzufügen</button>
+      </div>
+    </div>
+  `;
+
+  const animationsPanel = document.createElement("section");
+  animationsPanel.id = "panelAnimations";
+  animationsPanel.className = "editor-tab-panel";
+  animationsPanel.dataset.editorPanel = "animations";
+  animationsPanel.setAttribute("role", "tabpanel");
+  animationsPanel.setAttribute("aria-labelledby", "tabAnimations");
+  animationsPanel.hidden = true;
+  animationsPanel.innerHTML = `<div class="editor-section"><p class="empty-state">Animationen werden vorbereitet.</p></div>`;
+
+  tabs.insertAdjacentElement("afterend", backgroundPanel);
+  searchPanel.insertAdjacentElement("afterend", collectionsPanel);
+  collectionsPanel.insertAdjacentElement("afterend", animationsPanel);
+
+  Object.assign(ui, Object.fromEntries([
+    "mapObjectEditor", "importBoundarySetButton", "collectionImportTitle", "collectionImportSummary",
+    "collectionImportContent", "collectionImportMetaList", "addCollectionToProjectButton",
+  ].map((id) => [id, document.getElementById(id)])));
+}
+
+initializeEarthMapEditorShell();
 
 const STORAGE_KEY = "earthmap-projects-v1";
 const LEGACY_STORAGE_KEY = "globemap-projects-v1";
@@ -52,13 +159,57 @@ function createDefaultBoundarySets() {
 function createDefaultLibraryFolders() {
   return [
     {
+      id: "folder-continental-maps",
+      type: "continental-maps",
+      title: "Kontinentalkarten",
+      description: "Grundkarten für Kontinente, Küstenlinien und großräumige Landflächen.",
+      items: [createDefaultContinentalMapItem()],
+    },
+    {
       id: "folder-boundary-maps",
       type: "boundary-maps",
       title: "Länderkarten",
       description: "Importierte Länder- und Grenzkarten dieses Projekts.",
       items: [],
     },
+    {
+      id: "folder-boundary-collections",
+      type: "boundary-collections",
+      title: "Kartensammlungen",
+      description: "Standardisierte Boundary-Sets mit einzeln referenzierbaren Flächen.",
+      items: [],
+    },
   ];
+}
+
+function createDefaultContinentalMapItem() {
+  return {
+    id: "continental-natural-earth-10m-land",
+    kind: "continental-map",
+    name: "Natural Earth 10m Küstenlinien",
+    source: "Natural Earth",
+    adminLevel: "Landflächen / Küstenlinien",
+    detail: "10m",
+    license: "Public Domain",
+    sourceUrl: `${NATURAL_EARTH_ASSET_BASE}10m/ne_10m_land.geojson`,
+    importedAt: "system-default",
+    temporalCoverage: {
+      label: "gegenwärtige Natural-Earth-Grundkarte",
+      from: "",
+      to: "",
+    },
+    display: {
+      visible: true,
+      color: "#b8b8b4",
+      outlineColor: "#8f9690",
+    },
+    geometryRef: {
+      provider: "natural-earth",
+      detail: "10m",
+      dataset: "land",
+    },
+    locked: true,
+  };
 }
 
 function createEarthMapProject(title = "Neues Earth-Map-Projekt") {
@@ -114,9 +265,12 @@ function normalizeLibraryItem(item) {
     },
     display: {
       visible: item?.display?.visible !== false,
-      color: item?.display?.color || "#c6a86a",
+      color: item?.display?.color || DEFAULT_LAYER_FILL_COLOR,
+      outlineColor: item?.display?.outlineColor || item?.display?.strokeColor || DEFAULT_LAYER_OUTLINE_COLOR,
     },
     geometryRef: item?.geometryRef || null,
+    boundarySet: item?.boundarySet || null,
+    locked: item?.locked === true,
   };
 }
 
@@ -125,12 +279,34 @@ function normalizeLibraryFolders(folders) {
   const incoming = Array.isArray(folders) ? folders : [];
   return defaults.map((folder) => {
     const existing = incoming.find((candidate) => candidate?.type === folder.type || candidate?.id === folder.id) || {};
+    let items = Array.isArray(existing.items)
+      ? existing.items.map(normalizeLibraryItem)
+      : (folder.items || []).map(normalizeLibraryItem);
+    if (folder.type === "continental-maps") {
+      const defaultItem = normalizeLibraryItem(createDefaultContinentalMapItem());
+      const existingDefault = items.find((item) => item.id === defaultItem.id);
+      if (existingDefault) {
+        Object.assign(existingDefault, {
+          kind: defaultItem.kind,
+          source: existingDefault.source || defaultItem.source,
+          adminLevel: existingDefault.adminLevel || defaultItem.adminLevel,
+          detail: existingDefault.detail || defaultItem.detail,
+          license: existingDefault.license || defaultItem.license,
+          sourceUrl: existingDefault.sourceUrl || defaultItem.sourceUrl,
+          temporalCoverage: existingDefault.temporalCoverage || defaultItem.temporalCoverage,
+          geometryRef: existingDefault.geometryRef || defaultItem.geometryRef,
+          locked: true,
+        });
+      } else {
+        items = [defaultItem, ...items];
+      }
+    }
     return {
       ...folder,
       ...existing,
       title: repairLegacyText(existing.title || folder.title),
       description: repairLegacyText(existing.description || folder.description),
-      items: Array.isArray(existing.items) ? existing.items.map(normalizeLibraryItem) : [],
+      items,
     };
   });
 }
@@ -188,18 +364,35 @@ function loadProjects() {
   return [];
 }
 
+function createInitialCollapsedBrowserNodeIds(projects) {
+  // Browserregel: Beim Start oder Refresh beginnt die Projektbibliothek
+  // aufgeräumt. Die geöffneten Baumzustände sind reine Sitzungsgesten und
+  // werden bewusst nicht dauerhaft gespeichert.
+  return (projects || []).flatMap((project) => [
+    `project:${project.id}`,
+    ...(project.libraryFolders || []).map((folder) => `${folder.type}:${project.id}`),
+  ]);
+}
+
 const state = {
   projects: loadProjects(),
   activeProjectId: "",
   openProjectBrowserMenuId: null,
+  openFolderBrowserMenuId: null,
   openLayerBrowserMenuId: null,
   browserActionsMenuOpen: false,
   collapsedBrowserNodeIds: [],
   detailsLayoutMode: "normal",
   detailsLayoutStep: 0,
+  pendingBoundarySetImport: null,
+  editorMode: "tool",
+  activeEditorTab: "background",
+  activeEditorItemId: "",
+  activeEditorChapterKey: "",
 };
 
 state.activeProjectId = state.projects[0]?.id || "";
+state.collapsedBrowserNodeIds = createInitialCollapsedBrowserNodeIds(state.projects);
 const PROJECT_DELETE_HOLD_MS = 820;
 let projectDeleteHoldState = null;
 let layerDeleteHoldState = null;
@@ -207,8 +400,10 @@ let layerDeleteHoldState = null;
 function persistProjects() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects: state.projects }));
+    return true;
   } catch (error) {
     console.warn("Earth-Map-Projekte konnten nicht gespeichert werden.", error);
+    return false;
   }
 }
 
@@ -249,6 +444,32 @@ function toggleBrowserNode(nodeId) {
 function getVisibleBoundaryMapItems(project = getActiveProject()) {
   const folder = getLibraryFolder(project, "boundary-maps");
   return (folder?.items || []).filter((item) => item.display?.visible !== false);
+}
+
+function getVisibleBoundaryCollectionItems(project = getActiveProject()) {
+  const folder = getLibraryFolder(project, "boundary-collections");
+  return (folder?.items || []).filter((item) => item.display?.visible !== false);
+}
+
+function getVisibleProjectBoundaryItems(project = getActiveProject()) {
+  return [
+    ...getVisibleBoundaryMapItems(project),
+    ...getVisibleBoundaryCollectionItems(project),
+  ];
+}
+
+function getContinentalMapItems(project = getActiveProject()) {
+  const folder = getLibraryFolder(project, "continental-maps");
+  return folder?.items || [];
+}
+
+function shouldRenderContinentalBaseMap(project = getActiveProject()) {
+  // Architekturregel: Die neutrale Start-Erde bleibt sichtbar, solange noch kein
+  // Projekt geladen ist. Sobald ein Projekt aktiv ist, steuert dessen
+  // Kontinentalkarten-Ordner die Grundkarte ausdrücklich über die Browser-Checkbox.
+  if (!project) return true;
+  const defaultMap = getContinentalMapItems(project).find((item) => item.id === "continental-natural-earth-10m-land" || item.geometryRef?.dataset === "land");
+  return defaultMap ? defaultMap.display?.visible !== false : true;
 }
 
 function getNaturalEarthCountryFeatureByIso3(iso3) {
@@ -356,6 +577,25 @@ function getRenderableBoundaryFeature(item) {
   return simplifyBoundaryFeatureForZoom(feature, dataset.detail);
 }
 
+function getRenderableBoundaryFeatures(item) {
+  if (item?.boundarySet?.features?.length) {
+    return item.boundarySet.features
+      .map((feature) => ({
+        type: "Feature",
+        properties: {
+          ...(feature.properties || {}),
+          ziselin_id: feature.id,
+          name: feature.name,
+          wikidata_id: feature.wikidata_id || "",
+        },
+        geometry: feature.geometry,
+      }))
+      .filter((feature) => feature.geometry);
+  }
+  const feature = getRenderableBoundaryFeature(item);
+  return feature ? [feature] : [];
+}
+
 function hexToRgba(hex, alpha = 1) {
   const value = String(hex || "").trim();
   const match = value.match(/^#?([0-9a-f]{6})$/i);
@@ -405,84 +645,17 @@ function collectProjectPaletteColors(project = getActiveProject(), extraColors =
   // Projektfarben. Die Palette sammelt deshalb nur Farben, die im aktuellen
   // Projekt bereits semantisch verwendet werden, statt globale Appfarben
   // ungezielt anzubieten.
-  pushColor("#c6a86a");
+  pushColor(DEFAULT_LAYER_FILL_COLOR);
+  pushColor(DEFAULT_LAYER_OUTLINE_COLOR);
   (project?.classification?.breaks || []).forEach((entry) => pushColor(entry?.color));
   (project?.libraryFolders || []).forEach((folder) => {
-    (folder.items || []).forEach((item) => pushColor(item?.display?.color));
+    (folder.items || []).forEach((item) => {
+      pushColor(item?.display?.color);
+      pushColor(item?.display?.outlineColor);
+    });
   });
   (Array.isArray(extraColors) ? extraColors : [extraColors]).forEach(pushColor);
   return palette.slice(0, 12);
-}
-
-function applyLayerColor(value) {
-  const project = getActiveProject();
-  const item = getActiveLibraryItem(project);
-  if (!item) return;
-  const color = normalizeColorValue(value, "#c6a86a");
-  item.display = { ...(item.display || {}), color };
-  if (ui.layerColorInput) ui.layerColorInput.value = color;
-  persistProjects();
-  renderLibraryBrowser();
-  renderGlobe();
-}
-
-function setupLayerColorPalette() {
-  const button = ui.layerColorPaletteButton;
-  const anchor = button?.parentElement;
-  if (!button || !anchor) return;
-  const palette = document.createElement("div");
-  palette.className = "color-palette layer-color-palette";
-  palette.hidden = true;
-  anchor.appendChild(palette);
-
-  const closePalette = () => {
-    if (palette.hidden) return;
-    palette.hidden = true;
-    document.removeEventListener("mousedown", handleDocumentPointerDown, true);
-  };
-
-  function handleDocumentPointerDown(event) {
-    if (anchor.contains(event.target)) return;
-    closePalette();
-  }
-
-  const renderPalette = () => {
-    const currentColor = ui.layerColorInput?.value || "";
-    const colors = collectProjectPaletteColors(getActiveProject(), [currentColor]);
-    if (!colors.length) {
-      const note = document.createElement("p");
-      note.className = "palette-empty";
-      note.textContent = "Noch keine Projektfarben.";
-      palette.replaceChildren(note);
-      return;
-    }
-    palette.replaceChildren(...colors.map((color) => {
-      const swatch = document.createElement("button");
-      swatch.type = "button";
-      swatch.className = "color-swatch";
-      swatch.style.background = color;
-      swatch.setAttribute("aria-label", `Farbe ${color}`);
-      swatch.classList.toggle("is-active", normalizeColorValue(currentColor) === color);
-      swatch.addEventListener("click", (event) => {
-        event.preventDefault();
-        applyLayerColor(color);
-        closePalette();
-      });
-      return swatch;
-    }));
-  };
-
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    if (!getActiveLibraryItem()) return;
-    if (palette.hidden) {
-      renderPalette();
-      palette.hidden = false;
-      document.addEventListener("mousedown", handleDocumentPointerDown, true);
-    } else {
-      closePalette();
-    }
-  });
 }
 
 function formatDateTime(value) {
@@ -582,6 +755,7 @@ function setTheme(theme, persist = true) {
       ? "https://api.iconify.design/boxicons/sun-bright.svg?color=%23ffb347"
       : "https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633";
   }
+  if (ui.globeCanvas) renderGlobe();
   if (persist) {
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, isDark ? "dark" : "light");
@@ -666,18 +840,21 @@ function getEarthMapHtmlExportState() {
   // Exportregel: Das HTML ist ein eigenständiger, interaktiver Minimalviewer.
   // Auch hier gilt die 10m-Masterregel: Exportiert wird die aktuell geladene
   // 10m-Ableitung, nicht eine fremde 110m/50m-Ersatzgeometrie.
-  const land = getInteractiveNaturalEarthSource()
-    || activeNaturalEarthSource
-    || { type: "FeatureCollection", features: [] };
+  const land = shouldRenderContinentalBaseMap(project)
+    ? getInteractiveNaturalEarthSource()
+      || activeNaturalEarthSource
+      || { type: "FeatureCollection", features: [] }
+    : { type: "FeatureCollection", features: [] };
   const landRings = extractLandRings(land);
-  const layers = getVisibleBoundaryMapItems(project).map((item) => {
-    const feature = getRenderableBoundaryFeature(item);
-    if (!feature) return null;
-    const layerFeature = cloneFeatureForExport(feature);
+  const layers = getVisibleProjectBoundaryItems(project).map((item) => {
+    const features = getRenderableBoundaryFeatures(item);
+    if (!features.length) return null;
+    const layerFeature = cloneFeatureCollectionForExport({ type: "FeatureCollection", features });
     return {
       id: item.id,
       name: item.name,
-      color: normalizeColorValue(item.display?.color, "#c6a86a") || "#c6a86a",
+      color: normalizeColorValue(item.display?.color, DEFAULT_LAYER_FILL_COLOR) || DEFAULT_LAYER_FILL_COLOR,
+      outlineColor: normalizeColorValue(item.display?.outlineColor, DEFAULT_LAYER_OUTLINE_COLOR) || DEFAULT_LAYER_OUTLINE_COLOR,
       feature: layerFeature,
       samples: createLandSamples(extractLandRings(layerFeature), 0.55),
     };
@@ -925,10 +1102,10 @@ function buildEarthMapHtmlExport() {
         drawFeatureLines(EXPORT_STATE.land, "rgba(126,130,128,.44)", Math.max(.55, view.radius * .001));
       }
       for (const layer of EXPORT_STATE.layers || []) {
-        const layerRendered = drawD3Feature(layer.feature, colorWithAlpha(layer.color, .78), colorWithAlpha(layer.color, .98), Math.max(.7, view.radius * .0013));
+        const layerRendered = drawD3Feature(layer.feature, colorWithAlpha(layer.color, .78), colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
         if (!layerRendered) {
           drawSurfaceSamples(layer.samples, colorWithAlpha(layer.color, .82), .0058, 1.15);
-          drawFeatureLines(layer.feature, colorWithAlpha(layer.color, .98), Math.max(.7, view.radius * .0013));
+          drawFeatureLines(layer.feature, colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
         }
       }
       const gradient = ctx.createRadialGradient(
@@ -1314,19 +1491,19 @@ function updateWebglLandMesh() {
 function getLayerMeshSignature(items) {
   const dataset = getNaturalEarthCountryDataset();
   const threshold = dataset.detail === "10m" ? getNaturalEarth10mDetailThreshold().toFixed(5) : "fallback";
-  return items.map((item) => `${item.id}:${item.iso3}:${item.display?.color || ""}`).join("|") + `|${dataset.detail}|${threshold}`;
+  return items.map((item) => `${item.id}:${item.iso3}:${item.boundarySet?.features?.length || 0}:${item.display?.color || ""}`).join("|") + `|${dataset.detail}|${threshold}`;
 }
 
 function updateWebglLayerMeshes() {
-  const items = getVisibleBoundaryMapItems();
+  const items = getVisibleProjectBoundaryItems();
   const signature = getLayerMeshSignature(items);
   if (signature === webglState.layerSignature) return;
   webglState.layerMeshes.forEach(deleteWebglMesh);
   webglState.layerMeshes.clear();
   items.forEach((item) => {
-    const feature = getRenderableBoundaryFeature(item);
-    if (!feature) return;
-    const mesh = createWebglMesh(geoJsonToSphereVertices({ type: "FeatureCollection", features: [feature] }, 1.008));
+    const features = getRenderableBoundaryFeatures(item);
+    if (!features.length) return;
+    const mesh = createWebglMesh(geoJsonToSphereVertices({ type: "FeatureCollection", features }, 1.008));
     if (mesh) webglState.layerMeshes.set(item.id, { mesh, color: normalizeColorValue(item.display?.color, "#d9dc8c") || "#d9dc8c" });
   });
   webglState.layerSignature = signature;
@@ -1404,20 +1581,21 @@ function drawWebglMapOutlines(radius, center) {
   // Bewegung verzichten wir darauf; die Vektorflächen liefern bereits eine
   // saubere Lesefassung, die feinen Linien erscheinen nach der Ruhephase.
   if (isNavigatingGlobe && globeZoom > 1.35) return;
-  const source = getRenderableLandGeoJson();
+  const source = shouldRenderContinentalBaseMap() ? getRenderableLandGeoJson() : null;
   if (source) {
     drawProjectedOutlineRings(source, radius, center, "rgba(116,121,117,.58)", 1.05, 0.85);
   }
 
-  getVisibleBoundaryMapItems().forEach((item) => {
-    const feature = getRenderableBoundaryFeature(item);
-    if (!feature) return;
+  getVisibleProjectBoundaryItems().forEach((item) => {
+    const features = getRenderableBoundaryFeatures(item);
+    if (!features.length) return;
     const color = normalizeColorValue(item.display?.color, "#d9dc8c") || "#d9dc8c";
-    drawProjectedOutlineRings({ type: "FeatureCollection", features: [feature] }, radius, center, hexToRgba(color, 0.95), 1.25, 0.65);
+    drawProjectedOutlineRings({ type: "FeatureCollection", features }, radius, center, hexToRgba(color, 0.95), 1.25, 0.65);
   });
 }
 
 function drawVectorMapSurface(radius, center) {
+  if (!shouldRenderContinentalBaseMap()) return false;
   if (!hasD3Geo) return false;
   const source = getRenderableLandGeoJson();
   if (!source?.features?.length) return false;
@@ -2135,16 +2313,21 @@ function getStableGlobeStrokeWidth(radius, factor, minWidth) {
   return Math.max(minWidth, fittedRadius * factor);
 }
 
+function getThemeMapColor(name, fallback) {
+  const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 function drawSphere(size, radius, center) {
   // Darstellungsregel: Wasser ist die stabile helle Grundfläche. Frühere
   // Radialverläufe wurden beim tiefen Zoom zu grauen Kartenflächen und ließen
   // Ozean und Kontinente optisch ineinanderlaufen.
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = "#fbfbf8";
+  ctx.fillStyle = getThemeMapColor("--sea", "#fbfbf8");
   ctx.fill();
   ctx.lineWidth = Math.max(2, size * 0.006);
-  ctx.strokeStyle = "rgba(154,158,154,.42)";
+  ctx.strokeStyle = getThemeMapColor("--sphere-outline", "rgba(154,158,154,.42)");
   ctx.stroke();
 }
 
@@ -2170,7 +2353,7 @@ function drawGeographicLayer(radius, center) {
   // wieder das sphärische Komplement füllen zu lassen.
   rings.forEach((ring) => {
     const denseRing = densifyRing(ring, globeZoom > 7 ? 0.45 : 0.9);
-    drawVisibleHemisphereFill(denseRing, radius, center, "#c4c4c0");
+    drawVisibleHemisphereFill(denseRing, radius, center, getThemeMapColor("--land", "#c4c4c0"));
   });
 
   rings.forEach((ring) => {
@@ -2178,7 +2361,7 @@ function drawGeographicLayer(radius, center) {
       densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85),
       radius,
       center,
-      "rgba(92,96,94,.46)",
+      getThemeMapColor("--land-outline", "rgba(92,96,94,.46)"),
       getStableGlobeStrokeWidth(radius, 0.0018, 0.7),
     );
   });
@@ -2187,16 +2370,17 @@ function drawGeographicLayer(radius, center) {
 }
 
 function drawProjectBoundaryLayers(radius, center) {
-  const items = getVisibleBoundaryMapItems();
+  const items = getVisibleProjectBoundaryItems();
   if (!items.length) return false;
   let drewLayer = false;
 
   items.forEach((item) => {
-    const feature = getRenderableBoundaryFeature(item);
-    if (!feature) return;
+    const features = getRenderableBoundaryFeatures(item);
+    if (!features.length) return;
 
-    const color = normalizeColorValue(item.display?.color, "#c6a86a") || "#c6a86a";
-    if (drawBoundaryFeatureVector(feature, radius, center, color)) {
+    const color = normalizeColorValue(item.display?.color, DEFAULT_LAYER_FILL_COLOR) || DEFAULT_LAYER_FILL_COLOR;
+    const outlineColor = normalizeColorValue(item.display?.outlineColor, DEFAULT_LAYER_OUTLINE_COLOR) || DEFAULT_LAYER_OUTLINE_COLOR;
+    if (drawBoundaryFeatureVector({ type: "FeatureCollection", features }, radius, center, color, outlineColor)) {
       drewLayer = true;
     }
   });
@@ -2204,12 +2388,12 @@ function drawProjectBoundaryLayers(radius, center) {
   return drewLayer;
 }
 
-function drawBoundaryFeatureVector(feature, radius, center, color) {
-  const featureCollection = { type: "FeatureCollection", features: [feature] };
+function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR) {
+  const featureCollection = feature?.type === "FeatureCollection" ? feature : { type: "FeatureCollection", features: [feature] };
   const rings = extractLandRings(featureCollection);
   if (!rings.length) return false;
   const fillStyle = hexToRgba(color, 0.84);
-  const strokeStyle = hexToRgba(color, 0.98);
+  const strokeStyle = hexToRgba(outlineColor, 0.98);
   const lineWidth = getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
   const density = globeZoom > 7 ? 0.35 : 0.75;
 
@@ -2383,6 +2567,7 @@ function normalizeAngle(angle) {
 function drawLandSampleFill(radius, center, alphaBase = 0.56) {
   if (!geoState.samplesReady || !geoState.landSamples.length) return;
   const dotRadius = Math.max(1.6, getStableGlobeStrokeWidth(radius, 0.0085, 1.6));
+  const landColor = getThemeMapColor("--land", "#c4c4c0");
   geoState.landSamples.forEach(({ lon, lat }) => {
     const vector = toRotatedUnit(lon, lat);
     if (vector.z <= 0.012) return;
@@ -2390,7 +2575,7 @@ function drawLandSampleFill(radius, center, alphaBase = 0.56) {
     const alpha = clamp(alphaBase + vector.z * 0.18, 0.52, 0.78);
     ctx.beginPath();
     ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(178,178,176,${alpha})`;
+    ctx.fillStyle = hexToRgba(landColor, alpha);
     ctx.fill();
   });
 }
@@ -2428,12 +2613,13 @@ function drawLand(radius, center) {
   geoState.landRings.forEach((ring) => {
     const denseRing = densifyRing(ring, 1.4);
     if (ringIsFullyVisible(denseRing)) {
-      drawProjectedFill(denseRing, radius, center, "rgba(176,176,174,.72)");
+      drawProjectedFill(denseRing, radius, center, hexToRgba(getThemeMapColor("--land", "#c4c4c0"), .72));
     }
   });
 
   if (geoState.samplesReady) {
     const dotRadius = Math.max(1.85, radius * 0.011);
+    const landColor = getThemeMapColor("--land", "#c4c4c0");
     geoState.landSamples.forEach(({ lon, lat }) => {
       const vector = toRotatedUnit(lon, lat);
       if (vector.z <= 0.01) return;
@@ -2441,13 +2627,13 @@ function drawLand(radius, center) {
       const alpha = clamp(0.48 + vector.z * 0.24, 0.44, 0.76);
       ctx.beginPath();
       ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(178,178,176,${alpha})`;
+      ctx.fillStyle = hexToRgba(landColor, alpha);
       ctx.fill();
     });
   }
 
   geoState.landRings.forEach((ring) => {
-    drawProjectedLine(densifyRing(ring, 1.2), radius, center, "rgba(92,96,94,.5)", getStableGlobeStrokeWidth(radius, 0.002, 0.7));
+    drawProjectedLine(densifyRing(ring, 1.2), radius, center, getThemeMapColor("--land-outline", "rgba(92,96,94,.5)"), getStableGlobeStrokeWidth(radius, 0.002, 0.7));
   });
 }
 
@@ -2464,7 +2650,7 @@ function drawAtmosphere(size, radius, center) {
   ctx.fillStyle = shade;
   ctx.fill();
   ctx.lineWidth = Math.max(1, size * 0.004);
-  ctx.strokeStyle = "rgba(92,96,94,.28)";
+  ctx.strokeStyle = getThemeMapColor("--sphere-outline", "rgba(92,96,94,.28)");
   ctx.stroke();
 }
 
@@ -2492,9 +2678,11 @@ function renderGlobe() {
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.clip();
-  const usedGeographicProjection = drawGeographicLayer(radius, center);
-  if (!usedGeographicProjection) {
-    drawLand(radius, center);
+  if (shouldRenderContinentalBaseMap()) {
+    const usedGeographicProjection = drawGeographicLayer(radius, center);
+    if (!usedGeographicProjection) {
+      drawLand(radius, center);
+    }
   }
   drawProjectBoundaryLayers(radius, center);
   drawAtmosphere(baseSize, radius, center);
@@ -2621,10 +2809,11 @@ function tickLayerDeleteHold() {
 
 function deleteLayerById(projectId, layerId) {
   const project = state.projects.find((candidate) => candidate.id === projectId);
-  const folder = getLibraryFolder(project, "boundary-maps");
+  const folder = (project?.libraryFolders || []).find((candidate) => candidate.items?.some((item) => item.id === layerId));
   if (!folder) return;
   const index = folder.items.findIndex((item) => item.id === layerId);
   if (index < 0) return;
+  if (folder.items[index]?.locked) return;
   folder.items.splice(index, 1);
   if (project.activeLibraryItemId === layerId) {
     project.activeLibraryItemId = folder.items[Math.max(0, index - 1)]?.id || folder.items[0]?.id || "";
@@ -2694,6 +2883,7 @@ function createProjectCardMenu(project) {
     resetProjectDeleteHold();
     resetLayerDeleteHold();
     state.openLayerBrowserMenuId = null;
+    state.openFolderBrowserMenuId = null;
     state.openProjectBrowserMenuId = state.openProjectBrowserMenuId === project.id ? null : project.id;
     renderProjectBrowser();
   });
@@ -2728,15 +2918,14 @@ function renderProjectBrowser() {
 
   ui.projectBrowserList.replaceChildren(...state.projects.map((project) => {
     const boundarySet = getActiveBoundarySet(project);
-    const layers = getLibraryFolder(project, "boundary-maps")?.items || [];
+    const boundaryLayers = getLibraryFolder(project, "boundary-maps")?.items || [];
+    const boundaryCollections = getLibraryFolder(project, "boundary-collections")?.items || [];
     const projectNodeId = `project:${project.id}`;
-    const layersNodeId = `layers:${project.id}`;
     const projectCollapsed = isBrowserNodeCollapsed(projectNodeId);
-    const layersCollapsed = isBrowserNodeCollapsed(layersNodeId);
-    const visibleLayerCount = layers.filter((item) => item.display?.visible !== false).length;
+    const isActiveProject = project.id === state.activeProjectId;
     const card = document.createElement("article");
     card.className = "project-card";
-    if (project.id === state.activeProjectId) card.classList.add("is-active");
+    if (isActiveProject) card.classList.add("is-active");
     card.dataset.projectId = project.id;
 
     const row = document.createElement("div");
@@ -2746,15 +2935,23 @@ function renderProjectBrowser() {
     const visibility = document.createElement("input");
     visibility.type = "checkbox";
     visibility.className = "browser-visibility-checkbox";
-    visibility.checked = !layers.length || visibleLayerCount === layers.length;
-    visibility.indeterminate = visibleLayerCount > 0 && visibleLayerCount < layers.length;
-    visibility.title = "Alle Länderkarten dieses Projekts ein-/ausblenden";
+    visibility.checked = isActiveProject;
+    visibility.title = "Dieses Projekt aktivieren";
     visibility.addEventListener("click", (event) => event.stopPropagation());
     visibility.addEventListener("change", () => {
-      layers.forEach((item) => {
-        item.display = item.display || {};
-        item.display.visible = visibility.checked;
-      });
+      // Projektregel: Der Haken auf Projektebene ist kein Sichtbarkeitsschalter
+      // für Layer, sondern wählt genau ein aktives Earth-Map-Projekt. Die
+      // Sichtbarkeit der Karten bleibt darunter in Kontinental-/Länderkarten.
+      if (!visibility.checked && state.activeProjectId === project.id) {
+        visibility.checked = true;
+        return;
+      }
+      state.activeProjectId = project.id;
+      state.openProjectBrowserMenuId = null;
+      state.openFolderBrowserMenuId = null;
+      state.openLayerBrowserMenuId = null;
+      resetProjectDeleteHold();
+      resetLayerDeleteHold();
       persistProjects();
       renderWorkspace();
       renderGlobe();
@@ -2784,18 +2981,39 @@ function renderProjectBrowser() {
     const meta = document.createElement("span");
     meta.textContent = [
       boundarySet?.label || "ohne Grenzgrundlage",
-      `${layers.length} Länderkarten`,
+      `${boundaryLayers.length} Länderkarten`,
+      `${boundaryCollections.length} Kartensammlungen`,
       project.status,
     ].join(" · ");
     main.append(title, meta);
     row.append(visibility, toggle, icon, main, createProjectCardMenu(project));
     card.append(row);
-    if (!projectCollapsed) card.append(createProjectLayerTree(project, layers, layersNodeId, layersCollapsed));
+    if (!projectCollapsed) {
+      card.append(
+        createProjectLayerTree(project, "continental-maps", {
+          iconClass: "browser-row-icon-continental",
+          emptyText: "Noch keine Kontinentalkarten hinzugefügt.",
+        }),
+        createProjectLayerTree(project, "boundary-maps", {
+          iconClass: "browser-row-icon-layers",
+          emptyText: "Noch keine Länderkarten hinzugefügt.",
+        }),
+        createProjectLayerTree(project, "boundary-collections", {
+          iconClass: "browser-row-icon-collections",
+          emptyText: "Noch keine Kartensammlungen importiert.",
+        }),
+      );
+    }
     return card;
   }));
 }
 
-function createProjectLayerTree(project, items, nodeId, isCollapsed) {
+function createProjectLayerTree(project, folderType, options = {}) {
+  const folder = getLibraryFolder(project, folderType);
+  if (!folder) return document.createDocumentFragment();
+  const items = folder.items || [];
+  const nodeId = `${folderType}:${project.id}`;
+  const isCollapsed = isBrowserNodeCollapsed(nodeId);
   const layerTree = document.createElement("div");
   layerTree.className = "project-layer-tree";
   const visibleLayerCount = items.filter((item) => item.display?.visible !== false).length;
@@ -2807,7 +3025,7 @@ function createProjectLayerTree(project, items, nodeId, isCollapsed) {
   visibility.className = "browser-visibility-checkbox";
   visibility.checked = !items.length || visibleLayerCount === items.length;
   visibility.indeterminate = visibleLayerCount > 0 && visibleLayerCount < items.length;
-  visibility.title = "Alle Länderkarten ein-/ausblenden";
+  visibility.title = `Alle ${folder.title} ein-/ausblenden`;
   visibility.addEventListener("click", (event) => event.stopPropagation());
   visibility.addEventListener("change", () => {
     items.forEach((item) => {
@@ -2823,7 +3041,7 @@ function createProjectLayerTree(project, items, nodeId, isCollapsed) {
   toggle.type = "button";
   toggle.className = "browser-tree-toggle";
   toggle.textContent = isCollapsed ? "▸" : "▾";
-  toggle.setAttribute("aria-label", `Länderkarten ${isCollapsed ? "aufklappen" : "zuklappen"}`);
+  toggle.setAttribute("aria-label", `${folder.title} ${isCollapsed ? "aufklappen" : "zuklappen"}`);
   toggle.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -2831,25 +3049,59 @@ function createProjectLayerTree(project, items, nodeId, isCollapsed) {
   });
 
   const icon = document.createElement("span");
-  icon.className = "browser-row-icon browser-row-icon-layers";
+  icon.className = `browser-row-icon ${options.iconClass || "browser-row-icon-layers"}`;
   icon.setAttribute("aria-hidden", "true");
 
   const copy = document.createElement("button");
   copy.type = "button";
   copy.className = "project-card-main layer-folder-main";
-  copy.innerHTML = `<strong>Länderkarten</strong><span>${items.length} hinzugefügt, ${visibleLayerCount} sichtbar</span>`;
+  copy.innerHTML = `<strong>${folder.title}</strong><span>${items.length} hinzugefügt, ${visibleLayerCount} sichtbar</span>`;
   copy.addEventListener("click", (event) => {
     event.preventDefault();
     toggleBrowserNode(nodeId);
   });
 
+  const menuId = `${project.id}:${folderType}`;
+  const menuShell = document.createElement("div");
+  menuShell.className = "project-card-menu-shell";
+
   const menuButton = document.createElement("button");
   menuButton.type = "button";
   menuButton.className = "project-card-menu-trigger layer-folder-menu-trigger";
-  menuButton.setAttribute("aria-label", "Länderkarten-Aktionen");
+  menuButton.setAttribute("aria-label", `${folder.title}-Aktionen`);
+  menuButton.setAttribute("aria-expanded", state.openFolderBrowserMenuId === menuId ? "true" : "false");
   menuButton.innerHTML = "<span class=\"project-card-menu-dots\" aria-hidden=\"true\"></span>";
+  menuButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resetProjectDeleteHold();
+    resetLayerDeleteHold();
+    state.openProjectBrowserMenuId = null;
+    state.openLayerBrowserMenuId = null;
+    state.openFolderBrowserMenuId = state.openFolderBrowserMenuId === menuId ? null : menuId;
+    renderProjectBrowser();
+  });
 
-  row.append(visibility, toggle, icon, copy, menuButton);
+  const menu = document.createElement("div");
+  menu.className = "project-card-menu";
+  menu.hidden = state.openFolderBrowserMenuId !== menuId;
+
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "project-card-menu-action";
+  addButton.textContent = "Hinzufügen";
+  addButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    state.openFolderBrowserMenuId = null;
+    renderProjectBrowser();
+    setEditorTab(folderType === "boundary-collections" ? "collections" : "single-maps");
+    if (folderType !== "boundary-collections") ui.boundarySearchInput?.focus();
+  });
+  menu.append(addButton);
+  menuShell.append(menuButton, menu);
+
+  row.append(visibility, toggle, icon, copy, menuShell);
   layerTree.append(row);
 
   if (isCollapsed) return layerTree;
@@ -2857,7 +3109,7 @@ function createProjectLayerTree(project, items, nodeId, isCollapsed) {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "library-empty";
-    empty.textContent = "Noch keine Länderkarten hinzugefügt.";
+    empty.textContent = options.emptyText || "Noch keine Karten hinzugefügt.";
     layerTree.append(empty);
     return layerTree;
   }
@@ -2885,7 +3137,7 @@ function createLibraryItemButton(item, project) {
   button.dataset.libraryItemId = item.id;
   button.classList.toggle("is-active", item.id === project.activeLibraryItemId);
   button.classList.toggle("is-hidden-layer", item.display?.visible === false);
-  button.style.setProperty("--layer-color", item.display?.color || "#c6a86a");
+  button.style.setProperty("--layer-color", item.display?.color || DEFAULT_LAYER_FILL_COLOR);
 
   const visibility = document.createElement("input");
   visibility.type = "checkbox";
@@ -2929,6 +3181,7 @@ function createLibraryItemButton(item, project) {
     event.stopPropagation();
     resetLayerDeleteHold();
     state.openProjectBrowserMenuId = null;
+    state.openFolderBrowserMenuId = null;
     state.openLayerBrowserMenuId = state.openLayerBrowserMenuId === item.id ? null : item.id;
     renderProjectBrowser();
   });
@@ -2937,18 +3190,26 @@ function createLibraryItemButton(item, project) {
   menu.className = "layer-row-menu";
   menu.hidden = state.openLayerBrowserMenuId !== item.id;
 
-  const deleteButton = document.createElement("button");
-  deleteButton.type = "button";
-  deleteButton.className = "project-card-menu-action project-card-menu-action-delete";
-  deleteButton.textContent = "Löschen";
-  deleteButton.dataset.projectId = project.id;
-  deleteButton.dataset.layerId = item.id;
-  deleteButton.addEventListener("pointerdown", beginLayerDeleteHold);
-  deleteButton.addEventListener("pointerup", finishLayerDeleteHold);
-  deleteButton.addEventListener("pointercancel", cancelLayerDeleteHold);
-  deleteButton.addEventListener("lostpointercapture", cancelLayerDeleteHold);
-
-  menu.append(deleteButton);
+  if (item.locked) {
+    const lockedNote = document.createElement("button");
+    lockedNote.type = "button";
+    lockedNote.className = "project-card-menu-action layer-row-menu-action-disabled";
+    lockedNote.textContent = "Standardkarte";
+    lockedNote.disabled = true;
+    menu.append(lockedNote);
+  } else {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "project-card-menu-action project-card-menu-action-delete";
+    deleteButton.textContent = "Löschen";
+    deleteButton.dataset.projectId = project.id;
+    deleteButton.dataset.layerId = item.id;
+    deleteButton.addEventListener("pointerdown", beginLayerDeleteHold);
+    deleteButton.addEventListener("pointerup", finishLayerDeleteHold);
+    deleteButton.addEventListener("pointercancel", cancelLayerDeleteHold);
+    deleteButton.addEventListener("lostpointercapture", cancelLayerDeleteHold);
+    menu.append(deleteButton);
+  }
   menuShell.append(menuButton, menu);
   button.append(visibility, spacer, glyph, copy, menuShell);
   return button;
@@ -2987,30 +3248,624 @@ function renderLayerEditor() {
   if (!ui.layerEditorTitle || !ui.layerEditorSummary || !ui.layerEditorContent || !ui.layerMetaList) return;
   if (!item) {
     ui.layerEditorTitle.textContent = "Keine Karte ausgewählt";
-    ui.layerEditorSummary.textContent = "Wähle links in der Projektbibliothek eine hinzugefügte Länderkarte aus.";
+    ui.layerEditorSummary.textContent = "Wähle links in der Projektbibliothek eine Karte aus.";
     ui.layerEditorContent.hidden = true;
-    if (ui.layerColorPaletteButton) ui.layerColorPaletteButton.disabled = true;
     ui.layerMetaList.replaceChildren();
     return;
   }
 
-  ui.layerEditorTitle.textContent = item.name;
-  ui.layerEditorSummary.textContent = "Anzeigeoptionen und Herkunftsdaten dieser Karte.";
-  ui.layerEditorContent.hidden = false;
-  if (ui.layerColorPaletteButton) ui.layerColorPaletteButton.disabled = false;
-  if (ui.layerColorInput) ui.layerColorInput.value = item.display?.color || "#c6a86a";
+  if (state.activeEditorItemId !== item.id) {
+    state.activeEditorItemId = item.id;
+    state.activeEditorChapterKey = "";
+  }
 
-  const rows = [
-    ["Quelle", item.source || "—"],
-    ["ISO-3", item.iso3 || "—"],
-    ["Ebene", item.adminLevel || "—"],
-    ["Detailtiefe", item.detail || "—"],
-    ["Zeitspanne", item.temporalCoverage?.label || "gegenwärtig / aktuell"],
-    ["Lizenz", item.license || "—"],
-    ["Importiert", formatDateTime(item.importedAt) || "—"],
-    ["Referenz", item.sourceUrl || item.geometryRef?.path || "—"],
+  ui.layerEditorTitle.textContent = item.name;
+  ui.layerEditorSummary.textContent = getLayerEditorSummary(item);
+  ui.layerEditorContent.hidden = false;
+  ui.layerMetaList.className = "structured-editor";
+  ui.layerMetaList.replaceChildren(...createLayerEditorSections(item, project));
+}
+
+function getLayerEditorSummary(item) {
+  if (item?.kind === "boundary-collection") {
+    return "Kartensammlung mit referenzierbaren Einzelflächen, Quellen-, Lizenz- und Gültigkeitsdaten.";
+  }
+  if (item?.kind === "continental-map") {
+    return "Hintergrund- und Kontinentalkarte des aktiven Projekts.";
+  }
+  return "Einzelkarte mit Anzeigeoptionen, Herkunftsdaten und Referenzen.";
+}
+
+function ensureBoundarySetShape(item) {
+  if (!item.boundarySet) return null;
+  item.boundarySet.source = item.boundarySet.source || {};
+  item.boundarySet.license = item.boundarySet.license || createInternalLicenseMetadata();
+  item.boundarySet.license.compatibility = item.boundarySet.license.compatibility || {};
+  item.boundarySet.features = Array.isArray(item.boundarySet.features) ? item.boundarySet.features : [];
+  return item.boundarySet;
+}
+
+function setObjectValue(target, path, value) {
+  const parts = path.split(".");
+  let cursor = target;
+  parts.slice(0, -1).forEach((part) => {
+    cursor[part] = cursor[part] && typeof cursor[part] === "object" ? cursor[part] : {};
+    cursor = cursor[part];
+  });
+  cursor[parts.at(-1)] = value;
+}
+
+function syncItemFromBoundarySet(item) {
+  const boundarySet = item.boundarySet;
+  if (!boundarySet) return;
+  item.name = repairLegacyText(boundarySet.title || item.name);
+  item.source = repairLegacyText(boundarySet.source?.label || item.source);
+  item.iso3 = boundarySet.country_iso3 || item.iso3 || "";
+  item.adminLevel = repairLegacyText(boundarySet.admin_level || boundarySet.boundary_type || item.adminLevel || "");
+  item.detail = `${boundarySet.features?.length || 0} Einheiten`;
+  item.license = repairLegacyText(boundarySet.license?.label || item.license || "");
+  item.sourceUrl = boundarySet.source?.url || item.sourceUrl || "";
+  item.temporalCoverage = {
+    ...(item.temporalCoverage || {}),
+    label: [boundarySet.valid_from ? `seit ${boundarySet.valid_from}` : "", boundarySet.valid_to ? `bis ${boundarySet.valid_to}` : ""].filter(Boolean).join(" · ") || boundarySet.year_represented || item.temporalCoverage?.label || "Gültigkeit nicht geprüft",
+    from: boundarySet.valid_from || "",
+    to: boundarySet.valid_to || "",
+  };
+}
+
+function persistEditorMutation(item, options = {}) {
+  if (item.boundarySet) syncItemFromBoundarySet(item);
+  persistProjects();
+  if (options.renderBrowser) renderProjectBrowser();
+  if (options.renderGlobe) renderGlobe();
+  if (ui.layerEditorTitle) ui.layerEditorTitle.textContent = item.name || "Karte";
+  if (ui.layerEditorSummary) ui.layerEditorSummary.textContent = getLayerEditorSummary(item);
+}
+
+function createEditorSection(title, description = "", options = {}) {
+  const key = options.key || slugifyBoundaryId(title);
+  const section = document.createElement("section");
+  const isOpen = state.activeEditorChapterKey === key;
+  section.className = "structured-editor-section";
+  section.classList.toggle("is-open", isOpen);
+  section.dataset.editorChapter = key;
+
+  const header = document.createElement("button");
+  header.type = "button";
+  header.className = "structured-editor-section-header";
+  header.setAttribute("aria-expanded", String(isOpen));
+  header.addEventListener("click", () => {
+    state.activeEditorChapterKey = state.activeEditorChapterKey === key ? "" : key;
+    renderLayerEditor();
+    updateEditorModeView();
+  });
+
+  const icon = document.createElement("span");
+  icon.className = "structured-editor-section-icon";
+  icon.style.setProperty("--section-icon", `url("${options.icon || "https://api.iconify.design/mdi/form-select.svg"}")`);
+  icon.setAttribute("aria-hidden", "true");
+
+  const copy = document.createElement("span");
+  copy.className = "structured-editor-section-copy";
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  copy.append(heading);
+
+  const chevron = document.createElement("span");
+  chevron.className = "structured-editor-section-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  chevron.textContent = isOpen ? "▾" : "▸";
+  header.append(icon, copy, chevron);
+
+  const body = document.createElement("div");
+  body.className = "structured-editor-section-body";
+  body.hidden = !isOpen;
+  if (description) {
+    const descriptionNode = document.createElement("p");
+    descriptionNode.className = "structured-editor-section-description";
+    descriptionNode.textContent = description;
+    body.append(descriptionNode);
+  }
+
+  section.append(header, body);
+  section.append = (...nodes) => {
+    body.append(...nodes);
+    return section;
+  };
+  return section;
+}
+
+function createTextInputField(label, value, onChange, options = {}) {
+  const field = document.createElement("label");
+  field.className = "structured-editor-field";
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  const input = document.createElement(options.multiline ? "textarea" : "input");
+  if (!options.multiline) input.type = options.type || "text";
+  input.value = value ?? "";
+  input.placeholder = options.placeholder || "";
+  input.readOnly = options.readonly === true;
+  input.addEventListener("change", () => onChange(input.value));
+  field.append(caption, input);
+  return field;
+}
+
+function createColorPickerField(label, value, onChange, options = {}) {
+  const field = document.createElement("label");
+  field.className = "z-color-choice-field structured-editor-color-field";
+  const caption = document.createElement("span");
+  caption.className = "z-color-choice-label";
+  caption.textContent = label;
+
+  const controls = document.createElement("div");
+  controls.className = "z-color-choice-surface layer-color-controls";
+  const input = document.createElement("input");
+  input.type = "color";
+  input.className = "z-color-choice-native";
+  input.value = normalizeColorValue(value, options.fallback || DEFAULT_LAYER_FILL_COLOR) || options.fallback || DEFAULT_LAYER_FILL_COLOR;
+  input.setAttribute("aria-label", `${label}: freie Farbe wählen`);
+  controls.style.setProperty("--z-color-current", input.value);
+
+  const codeInput = document.createElement("input");
+  codeInput.type = "text";
+  codeInput.className = "z-color-choice-code";
+  codeInput.value = input.value;
+  codeInput.placeholder = options.fallback || DEFAULT_LAYER_FILL_COLOR;
+  codeInput.autocomplete = "off";
+  codeInput.spellcheck = false;
+  codeInput.setAttribute("aria-label", `${label}: Farbcode`);
+
+  const applyColorValue = (rawValue, { normalizeOnInvalid = false } = {}) => {
+    const normalized = normalizeColorValue(rawValue, "");
+    if (!normalized) {
+      if (normalizeOnInvalid) codeInput.value = input.value;
+      return false;
+    }
+    input.value = normalized;
+    codeInput.value = normalized;
+    controls.style.setProperty("--z-color-current", normalized);
+    onChange(normalized);
+    return true;
+  };
+
+  const customButton = document.createElement("button");
+  customButton.type = "button";
+  customButton.className = "z-color-choice-button z-color-choice-custom-button";
+  customButton.setAttribute("aria-label", `${label}: individuelle Farbe wählen`);
+  const customIcon = document.createElement("span");
+  customIcon.className = "z-color-choice-button-icon";
+  customIcon.setAttribute("aria-hidden", "true");
+  customButton.append(customIcon);
+  customButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    input.click();
+  });
+
+  input.addEventListener("input", () => {
+    applyColorValue(input.value);
+  });
+  codeInput.addEventListener("input", () => {
+    applyColorValue(codeInput.value);
+  });
+  codeInput.addEventListener("change", () => {
+    applyColorValue(codeInput.value, { normalizeOnInvalid: true });
+  });
+
+  const paletteButton = document.createElement("button");
+  paletteButton.type = "button";
+  paletteButton.className = "z-color-choice-button z-color-choice-palette-button color-picker-button";
+  paletteButton.setAttribute("aria-label", `${label}: Projektfarben wählen`);
+  const paletteIcon = document.createElement("span");
+  paletteIcon.className = "z-color-choice-button-icon color-picker-icon";
+  paletteIcon.setAttribute("aria-hidden", "true");
+  paletteButton.append(paletteIcon);
+
+  const palette = document.createElement("div");
+  palette.className = "z-color-choice-palette color-palette layer-color-palette";
+  palette.hidden = true;
+
+  const closePalette = () => {
+    if (palette.hidden) return;
+    palette.hidden = true;
+    paletteButton.setAttribute("aria-expanded", "false");
+    document.removeEventListener("mousedown", handleDocumentPointerDown, true);
+  };
+
+  function handleDocumentPointerDown(event) {
+    if (controls.contains(event.target)) return;
+    closePalette();
+  }
+
+  const renderPalette = () => {
+    const colors = collectProjectPaletteColors(getActiveProject(), [input.value, options.fallback]);
+    if (!colors.length) {
+      const note = document.createElement("p");
+      note.className = "z-color-choice-empty palette-empty";
+      note.textContent = "Noch keine Projektfarben.";
+      palette.replaceChildren(note);
+      return;
+    }
+    palette.replaceChildren(...colors.map((color) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "z-color-choice-swatch color-swatch";
+      swatch.style.setProperty("--z-color-swatch", color);
+      swatch.setAttribute("aria-label", `Farbe ${color}`);
+      swatch.classList.toggle("is-active", normalizeColorValue(input.value) === color);
+      swatch.addEventListener("click", (event) => {
+        event.preventDefault();
+        applyColorValue(color);
+        closePalette();
+      });
+      return swatch;
+    }));
+  };
+
+  paletteButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (palette.hidden) {
+      renderPalette();
+      palette.hidden = false;
+      paletteButton.setAttribute("aria-expanded", "true");
+      document.addEventListener("mousedown", handleDocumentPointerDown, true);
+    } else {
+      closePalette();
+    }
+  });
+
+  controls.append(caption, codeInput, input, customButton, paletteButton, palette);
+  field.append(controls);
+  return field;
+}
+
+function createSelectField(label, value, choices, onChange) {
+  const field = document.createElement("label");
+  field.className = "structured-editor-field";
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  const select = document.createElement("select");
+  const normalizedChoices = [...choices];
+  if (value && !normalizedChoices.some((choice) => choice.value === value)) {
+    normalizedChoices.push({ value, label: `Importierter Wert · ${value}` });
+  }
+  normalizedChoices.forEach((choice) => {
+    const option = document.createElement("option");
+    option.value = choice.value;
+    option.textContent = choice.label;
+    select.append(option);
+  });
+  select.value = value || choices[0]?.value || "";
+  select.addEventListener("change", () => onChange(select.value));
+  field.append(caption, select);
+  return field;
+}
+
+function getIso3CountryChoices() {
+  const features = getNaturalEarthCountryDataset()?.features || [];
+  const choices = features
+    .map((feature) => ({
+      value: getNaturalEarthIso3(feature),
+      label: `${getNaturalEarthIso3(feature)} · ${getNaturalEarthCountryName(feature)}`,
+    }))
+    .filter((choice) => choice.value)
+    .sort((a, b) => a.label.localeCompare(b.label, "de"));
+  return [{ value: "", label: "—" }, ...choices];
+}
+
+function createSearchableSelectField(label, value, choices, onChange) {
+  const field = document.createElement("label");
+  field.className = "structured-editor-field";
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  const input = document.createElement("input");
+  const list = document.createElement("datalist");
+  const listId = `list-${slugifyBoundaryId(label)}-${Math.random().toString(36).slice(2, 8)}`;
+  list.id = listId;
+  input.setAttribute("list", listId);
+  input.value = value || "";
+  choices.forEach((choice) => {
+    const option = document.createElement("option");
+    option.value = choice.value;
+    option.label = choice.label;
+    option.textContent = choice.label;
+    list.append(option);
+  });
+  input.addEventListener("change", () => onChange(input.value.trim()));
+  field.append(caption, input, list);
+  return field;
+}
+
+function getBoundaryLevelChoices() {
+  return [
+    { value: "", label: "—" },
+    { value: "ADM0", label: "ADM0 · Staat / Land" },
+    { value: "ADM1", label: "ADM1 · Bundesland / Region" },
+    { value: "ADM2", label: "ADM2 · Kreis / Bezirk" },
+    { value: "ADM3", label: "ADM3 · Gemeindeebene / Unterbezirk" },
+    { value: "ADM4", label: "ADM4 · lokale Verwaltungsebene" },
+    { value: "ADM5", label: "ADM5 · feinste Verwaltungsebene" },
+    { value: "electoral_district", label: "Wahlkreis" },
+    { value: "municipality", label: "Gemeinde" },
+    { value: "continent", label: "Kontinent / Landfläche" },
+    { value: "coastline", label: "Küstenlinie" },
+    { value: "custom", label: "Benutzerdefiniert" },
   ];
-  ui.layerMetaList.replaceChildren(...rows.flatMap(([term, description]) => {
+}
+
+function createCheckboxField(label, checked, onChange) {
+  const field = document.createElement("label");
+  field.className = "structured-editor-check";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = checked === true;
+  input.addEventListener("change", () => onChange(input.checked));
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  field.append(input, caption);
+  return field;
+}
+
+function createLayerEditorSections(item) {
+  const boundarySet = ensureBoundarySetShape(item);
+  const sections = [];
+  const availableChapterKeys = new Set(["display", "identity", "source", "time"]);
+  if (boundarySet) availableChapterKeys.add("features");
+  if (state.activeEditorChapterKey && !availableChapterKeys.has(state.activeEditorChapterKey)) {
+    state.activeEditorChapterKey = "";
+  }
+
+  const display = createEditorSection("Anzeige", "Diese Werte steuern, wie die Karte im aktiven Projekt erscheint.", {
+    key: "display",
+    icon: "https://api.iconify.design/mdi/eye-outline.svg",
+  });
+  display.append(
+    createColorPickerField("Anzeigefarbe", item.display?.color || DEFAULT_LAYER_FILL_COLOR, (value) => {
+      item.display = item.display || {};
+      item.display.color = normalizeColorValue(value, DEFAULT_LAYER_FILL_COLOR);
+      persistEditorMutation(item, { renderBrowser: true, renderGlobe: true });
+    }, { fallback: DEFAULT_LAYER_FILL_COLOR }),
+    createColorPickerField("Outline-Farbe", item.display?.outlineColor || DEFAULT_LAYER_OUTLINE_COLOR, (value) => {
+      item.display = item.display || {};
+      item.display.outlineColor = normalizeColorValue(value, DEFAULT_LAYER_OUTLINE_COLOR);
+      persistEditorMutation(item, { renderGlobe: true });
+    }, { fallback: DEFAULT_LAYER_OUTLINE_COLOR }),
+    createTextInputField("Titel im Browser", item.name || "", (value) => {
+      item.name = repairLegacyText(value);
+      if (boundarySet) boundarySet.title = item.name;
+      persistEditorMutation(item, { renderBrowser: true });
+    }),
+    createCheckboxField("Sichtbar", item.display?.visible !== false, (checked) => {
+      item.display = item.display || {};
+      item.display.visible = checked;
+      persistEditorMutation(item, { renderBrowser: true, renderGlobe: true });
+    }),
+  );
+  sections.push(display);
+
+  const identity = createEditorSection("Identität", "Stabile IDs, Typen und Codes. Diese Werte sind wichtig für spätere Tabellenzuordnung.", {
+    key: "identity",
+    icon: "https://api.iconify.design/mdi/identifier.svg",
+  });
+  if (boundarySet) {
+    identity.append(
+      createTextInputField("Boundary-Set-ID", boundarySet.id || "", (value) => {
+        boundarySet.id = slugifyBoundaryId(value, boundarySet.id || "boundary-set");
+        item.geometryRef = { ...(item.geometryRef || {}), boundarySetId: boundarySet.id };
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createSelectField("Kartentyp", boundarySet.boundary_type || "unknown", [
+        { value: "unknown", label: "Unbestimmt" },
+        { value: "administrative", label: "Administrative Grenzen" },
+        { value: "electoral_districts", label: "Wahlkreise" },
+        { value: "municipalities", label: "Gemeinden" },
+        { value: "historical_boundaries", label: "Historische Grenzen" },
+        { value: "other", label: "Andere" },
+      ], (value) => {
+        boundarySet.boundary_type = value;
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createSearchableSelectField("Land ISO-3", boundarySet.country_iso3 || "", getIso3CountryChoices(), (value) => {
+        boundarySet.country_iso3 = value.trim().toUpperCase();
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createSelectField("Ebene", boundarySet.admin_level || "", getBoundaryLevelChoices(), (value) => {
+        boundarySet.admin_level = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Provider", boundarySet.provider || "", (value) => {
+        boundarySet.provider = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Provider-ID", boundarySet.provider_boundary_id || "", (value) => {
+        boundarySet.provider_boundary_id = repairLegacyText(value);
+        persistEditorMutation(item);
+      }),
+      createSelectField("Review-Status", boundarySet.review_status || "imported", [
+        { value: "imported", label: "Importiert" },
+        { value: "normalized", label: "Normalisiert" },
+        { value: "reviewed", label: "Geprüft" },
+        { value: "canonical", label: "Kanonisch" },
+        { value: "blocked", label: "Gesperrt" },
+      ], (value) => {
+        boundarySet.review_status = value;
+        persistEditorMutation(item);
+      }),
+    );
+  } else {
+    identity.append(
+      createTextInputField("Layer-ID", item.id || "", () => {}, { readonly: true }),
+      createTextInputField("Typ", item.kind || "", () => {}, { readonly: true }),
+      createSearchableSelectField("ISO-3", item.iso3 || "", getIso3CountryChoices(), (value) => {
+        item.iso3 = value.trim().toUpperCase();
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createSelectField("Ebene", item.adminLevel || "", getBoundaryLevelChoices(), (value) => {
+        item.adminLevel = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Detail", item.detail || "", (value) => {
+        item.detail = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+    );
+  }
+  sections.push(identity);
+
+  const source = createEditorSection("Quelle und Lizenz", "Diese Felder entscheiden später, ob eine Karte nur intern nutzbar oder veröffentlichungsfähig ist.", {
+    key: "source",
+    icon: "https://api.iconify.design/material-symbols/source-notes-outline.svg",
+  });
+  if (boundarySet) {
+    source.append(
+      createTextInputField("Quelle", boundarySet.source.label || "", (value) => {
+        boundarySet.source.label = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Quell-URL", boundarySet.source.url || "", (value) => {
+        boundarySet.source.url = value.trim();
+        persistEditorMutation(item);
+      }),
+      createTextInputField("Abrufdatum", boundarySet.source.accessed_at || "", (value) => {
+        boundarySet.source.accessed_at = value.trim();
+        persistEditorMutation(item);
+      }, { type: "date" }),
+      createTextInputField("Lizenz-ID", boundarySet.license.id || "", (value) => {
+        boundarySet.license.id = repairLegacyText(value);
+        persistEditorMutation(item);
+      }),
+      createTextInputField("Lizenz", boundarySet.license.label || "", (value) => {
+        boundarySet.license.label = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Lizenz-URL", boundarySet.license.url || "", (value) => {
+        boundarySet.license.url = value.trim();
+        persistEditorMutation(item);
+      }),
+      createTextInputField("Lizenzhinweis", boundarySet.license.detail || "", (value) => {
+        boundarySet.license.detail = repairLegacyText(value);
+        persistEditorMutation(item);
+      }, { multiline: true }),
+      createCheckboxField("Wikimedia-kompatibel", boundarySet.license.compatibility.wikimedia === true, (checked) => {
+        boundarySet.license.compatibility.wikimedia = checked;
+        persistEditorMutation(item);
+      }),
+      createCheckboxField("OpenStreetMap-kompatibel", boundarySet.license.compatibility.openstreetmap === true, (checked) => {
+        boundarySet.license.compatibility.openstreetmap = checked;
+        persistEditorMutation(item);
+      }),
+      createCheckboxField("Namensnennung erforderlich", boundarySet.license.compatibility.attribution_required === true, (checked) => {
+        boundarySet.license.compatibility.attribution_required = checked;
+        persistEditorMutation(item);
+      }),
+    );
+  } else {
+    source.append(
+      createTextInputField("Quelle", item.source || "", (value) => {
+        item.source = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Referenz", item.sourceUrl || "", (value) => {
+        item.sourceUrl = value.trim();
+        persistEditorMutation(item);
+      }),
+      createTextInputField("Lizenz", item.license || "", (value) => {
+        item.license = repairLegacyText(value);
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+    );
+  }
+  sections.push(source);
+
+  const time = createEditorSection("Zeit und Gültigkeit", "Gültigkeiten helfen später, historische oder politische Boundary-Sets korrekt zu wählen.", {
+    key: "time",
+    icon: "https://api.iconify.design/mdi/calendar-clock-outline.svg",
+  });
+  if (boundarySet) {
+    time.append(
+      createTextInputField("Repräsentiertes Jahr", boundarySet.year_represented || "", (value) => {
+        boundarySet.year_represented = value.trim();
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+      createTextInputField("Gültig seit", boundarySet.valid_from || "", (value) => {
+        boundarySet.valid_from = value.trim();
+        persistEditorMutation(item, { renderBrowser: true });
+      }, { type: "date" }),
+      createTextInputField("Gültig bis", boundarySet.valid_to || "", (value) => {
+        boundarySet.valid_to = value.trim() || null;
+        persistEditorMutation(item, { renderBrowser: true });
+      }, { type: "date" }),
+    );
+  } else {
+    time.append(
+      createTextInputField("Zeitspanne", item.temporalCoverage?.label || "", (value) => {
+        item.temporalCoverage = { ...(item.temporalCoverage || {}), label: repairLegacyText(value) };
+        persistEditorMutation(item, { renderBrowser: true });
+      }),
+    );
+  }
+  sections.push(time);
+
+  if (boundarySet) {
+    const content = createEditorSection("Einzelflächen", "Die Geometrien bleiben erhalten; hier prüfen wir zunächst Identität, Namen und Wikidata-Bezüge.", {
+      key: "features",
+      icon: "https://api.iconify.design/mdi/vector-polygon.svg",
+    });
+    const unitList = document.createElement("div");
+    unitList.className = "boundary-feature-list";
+    boundarySet.features.slice(0, 80).forEach((feature) => {
+      const row = document.createElement("div");
+      row.className = "boundary-feature-row";
+      const title = document.createElement("strong");
+      title.textContent = feature.name || feature.id;
+      const meta = document.createElement("span");
+      meta.textContent = [feature.id, feature.wikidata_id].filter(Boolean).join(" · ") || "ohne ID";
+      row.append(title, meta);
+      unitList.append(row);
+    });
+    if (boundarySet.features.length > 80) {
+      const note = document.createElement("p");
+      note.className = "empty-state";
+      note.textContent = `Weitere ${boundarySet.features.length - 80} Einheiten sind importiert, werden hier aber aus Performancegründen nicht vollständig gelistet.`;
+      unitList.append(note);
+    }
+    content.append(unitList);
+    sections.push(content);
+  }
+
+  return sections;
+}
+
+function renderCollectionImportEditor() {
+  if (!ui.collectionImportTitle || !ui.collectionImportSummary || !ui.collectionImportContent || !ui.collectionImportMetaList) return;
+  const pending = state.pendingBoundarySetImport;
+  if (!pending?.boundarySet) {
+    ui.collectionImportTitle.textContent = "Keine Sammlung geladen";
+    ui.collectionImportSummary.textContent = "Importiere eine Kartensammlung, um Quelle, Lizenz, Einheiten und Kompatibilität zu prüfen.";
+    ui.collectionImportContent.hidden = true;
+    ui.collectionImportMetaList.replaceChildren();
+    if (ui.addCollectionToProjectButton) ui.addCollectionToProjectButton.disabled = true;
+    return;
+  }
+
+  const boundarySet = pending.boundarySet;
+  ui.collectionImportTitle.textContent = boundarySet.title || pending.fileName || "Kartensammlung";
+  ui.collectionImportSummary.textContent = `${boundarySet.features?.length || 0} Einheiten · ${boundarySet.boundary_type || "Typ ungeklärt"} · ${boundarySet.review_status || "imported"}`;
+  ui.collectionImportContent.hidden = false;
+  if (ui.addCollectionToProjectButton) ui.addCollectionToProjectButton.disabled = false;
+  const rows = [
+    ["Datei", pending.fileName || "—"],
+    ["Schema", boundarySet.schema || "—"],
+    ["ID", boundarySet.id || "—"],
+    ["Typ", boundarySet.boundary_type || "—"],
+    ["ISO-3", boundarySet.country_iso3 || "—"],
+    ["Einheiten", String(boundarySet.features?.length || 0)],
+    ["Quelle", boundarySet.source?.label || "—"],
+    ["Lizenz", boundarySet.license?.label || "—"],
+    ["Wikimedia", boundarySet.license?.compatibility?.wikimedia === true ? "kompatibel" : "nicht geprüft/Nein"],
+    ["OpenStreetMap", boundarySet.license?.compatibility?.openstreetmap === true ? "kompatibel" : "nicht geprüft/Nein"],
+    ["Gültigkeit", [boundarySet.valid_from ? `seit ${boundarySet.valid_from}` : "", boundarySet.valid_to ? `bis ${boundarySet.valid_to}` : ""].filter(Boolean).join(" · ") || "nicht geprüft"],
+  ];
+  ui.collectionImportMetaList.replaceChildren(...rows.flatMap(([term, description]) => {
     const dt = document.createElement("dt");
     dt.textContent = term;
     const dd = document.createElement("dd");
@@ -3024,9 +3879,39 @@ function renderWorkspace() {
   renderLibraryBrowser();
   renderBoundaryEditor();
   renderLayerEditor();
+  renderCollectionImportEditor();
+  updateEditorModeView();
 }
 
-function setEditorTab(tabName) {
+function getEditorTabForLibraryItem(item) {
+  if (item?.kind === "boundary-collection") return "collections";
+  if (item?.kind === "continental-map") return "background";
+  return "single-maps";
+}
+
+function updateEditorModeView() {
+  const activeTab = state.activeEditorTab;
+  const objectMode = state.editorMode === "object";
+  document.querySelectorAll(".single-map-tool-section").forEach((section) => {
+    section.hidden = activeTab === "single-maps" && objectMode;
+  });
+  document.querySelectorAll(".collection-tool-section").forEach((section) => {
+    section.hidden = activeTab === "collections" && objectMode;
+  });
+  if (ui.mapObjectEditor) {
+    const item = getActiveLibraryItem();
+    const targetPanel = document.querySelector(`[data-editor-panel="${activeTab}"]`);
+    const canShowObjectEditor = objectMode && item && targetPanel && activeTab === getEditorTabForLibraryItem(item);
+    ui.mapObjectEditor.hidden = !canShowObjectEditor;
+    if (canShowObjectEditor && ui.mapObjectEditor.parentElement !== targetPanel) {
+      targetPanel.appendChild(ui.mapObjectEditor);
+    }
+  }
+}
+
+function setEditorTab(tabName, options = {}) {
+  state.activeEditorTab = tabName;
+  state.editorMode = options.mode || "tool";
   document.querySelectorAll("[data-editor-tab]").forEach((tab) => {
     const isActive = tab.dataset.editorTab === tabName;
     tab.classList.toggle("is-active", isActive);
@@ -3037,6 +3922,11 @@ function setEditorTab(tabName) {
     panel.classList.toggle("is-active", isActive);
     panel.hidden = !isActive;
   });
+  updateEditorModeView();
+}
+
+function openLibraryItemEditor(item = getActiveLibraryItem()) {
+  setEditorTab(getEditorTabForLibraryItem(item), { mode: "object" });
 }
 
 function normalizeSearchText(value) {
@@ -3120,6 +4010,390 @@ function searchNaturalEarthCountries(query) {
     }));
 }
 
+function slugifyBoundaryId(value, fallback = "boundary") {
+  return String(value || fallback)
+    .toLocaleLowerCase("de-DE")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96) || fallback;
+}
+
+function getFeatureDisplayName(feature, index) {
+  const props = feature?.properties || {};
+  return repairLegacyText(
+    props.name
+    || props.NAME
+    || props.Name
+    || props.GEN
+    || props.label
+    || props.WKR_NAME
+    || props.wahlkreis_name
+    || props.Wahlkreis
+    || `Einheit ${index + 1}`,
+  );
+}
+
+function getFeatureStableId(feature, index, setId) {
+  const props = feature?.properties || {};
+  return String(
+    feature?.id
+    || props.id
+    || props.ID
+    || props.iso_3166_2
+    || props.ISO3166_2
+    || props.ags
+    || props.AGS
+    || props.WKR_NR
+    || props.wahlkreis_nr
+    || `${setId}-${index + 1}`,
+  );
+}
+
+function getFileExtension(fileName = "") {
+  const match = String(fileName).toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match ? match[1] : "";
+}
+
+function getXmlChildrenByLocalName(node, localName) {
+  return [...(node?.children || [])].filter((child) => child.localName === localName);
+}
+
+function getFirstXmlText(node, localName) {
+  const match = node?.getElementsByTagNameNS?.("*", localName)?.[0]
+    || node?.getElementsByTagName?.(localName)?.[0];
+  return repairLegacyText(match?.textContent?.trim() || "");
+}
+
+function parseKmlCoordinateText(text) {
+  const coordinates = String(text || "")
+    .trim()
+    .split(/\s+/)
+    .map((tuple) => {
+      const [lon, lat] = tuple.split(",").map(Number);
+      return Number.isFinite(lon) && Number.isFinite(lat) ? [lon, lat] : null;
+    })
+    .filter(Boolean);
+  if (coordinates.length < 3) return [];
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push([...first]);
+  return coordinates;
+}
+
+function parseKmlPolygon(polygonNode) {
+  const rings = [];
+  const outer = polygonNode.getElementsByTagNameNS("*", "outerBoundaryIs")?.[0]
+    || polygonNode.getElementsByTagName("outerBoundaryIs")?.[0];
+  const outerCoordinates = outer?.getElementsByTagNameNS?.("*", "coordinates")?.[0]?.textContent
+    || outer?.getElementsByTagName?.("coordinates")?.[0]?.textContent
+    || "";
+  const outerRing = parseKmlCoordinateText(outerCoordinates);
+  if (outerRing.length >= 4) rings.push(outerRing);
+
+  const innerBoundaries = [
+    ...polygonNode.getElementsByTagNameNS("*", "innerBoundaryIs"),
+    ...polygonNode.getElementsByTagName("innerBoundaryIs"),
+  ];
+  [...new Set(innerBoundaries)].forEach((inner) => {
+    const innerCoordinates = inner.getElementsByTagNameNS?.("*", "coordinates")?.[0]?.textContent
+      || inner.getElementsByTagName?.("coordinates")?.[0]?.textContent
+      || "";
+    const innerRing = parseKmlCoordinateText(innerCoordinates);
+    if (innerRing.length >= 4) rings.push(innerRing);
+  });
+
+  return rings.length ? rings : null;
+}
+
+function readKmlExtendedData(placemark) {
+  const props = {};
+  const dataNodes = [
+    ...placemark.getElementsByTagNameNS("*", "Data"),
+    ...placemark.getElementsByTagName("Data"),
+  ];
+  [...new Set(dataNodes)].forEach((dataNode) => {
+    const name = dataNode.getAttribute("name");
+    const value = getFirstXmlText(dataNode, "value");
+    if (name && value) props[name] = value;
+  });
+  const simpleDataNodes = [
+    ...placemark.getElementsByTagNameNS("*", "SimpleData"),
+    ...placemark.getElementsByTagName("SimpleData"),
+  ];
+  [...new Set(simpleDataNodes)].forEach((dataNode) => {
+    const name = dataNode.getAttribute("name");
+    const value = repairLegacyText(dataNode.textContent?.trim() || "");
+    if (name && value) props[name] = value;
+  });
+  return props;
+}
+
+function kmlToGeoJson(kmlText, fileName = "kartensammlung.kml") {
+  const parser = new DOMParser();
+  const documentXml = parser.parseFromString(kmlText, "application/xml");
+  if (documentXml.getElementsByTagName("parsererror").length) {
+    throw new Error("Die KML-Datei konnte nicht als XML gelesen werden.");
+  }
+  const placemarks = [
+    ...documentXml.getElementsByTagNameNS("*", "Placemark"),
+    ...documentXml.getElementsByTagName("Placemark"),
+  ];
+  const features = [...new Set(placemarks)].map((placemark, index) => {
+    const polygons = [...new Set([
+      ...placemark.getElementsByTagNameNS("*", "Polygon"),
+      ...placemark.getElementsByTagName("Polygon"),
+    ])].map(parseKmlPolygon).filter(Boolean);
+    if (!polygons.length) return null;
+    const properties = {
+      ...readKmlExtendedData(placemark),
+      name: getFirstXmlText(placemark, "name") || `Einheit ${index + 1}`,
+      description: getFirstXmlText(placemark, "description"),
+    };
+    return {
+      type: "Feature",
+      properties,
+      geometry: polygons.length === 1
+        ? { type: "Polygon", coordinates: polygons[0] }
+        : { type: "MultiPolygon", coordinates: polygons },
+    };
+  }).filter(Boolean);
+
+  return {
+    type: "FeatureCollection",
+    name: fileName.replace(/\.[^.]+$/, ""),
+    features,
+  };
+}
+
+function findZipEndOfCentralDirectory(view) {
+  for (let offset = view.byteLength - 22; offset >= Math.max(0, view.byteLength - 66000); offset -= 1) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  return -1;
+}
+
+async function inflateRawZipEntry(bytes) {
+  if (!("DecompressionStream" in window)) {
+    throw new Error("KMZ benötigt Deflate-Dekompression. Dieser Browser unterstützt sie nicht.");
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function extractKmlTextFromKmz(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  const decoder = new TextDecoder("utf-8");
+  const eocdOffset = findZipEndOfCentralDirectory(view);
+  if (eocdOffset < 0) throw new Error("Die KMZ-Datei enthält kein lesbares ZIP-Verzeichnis.");
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  let cursor = view.getUint32(eocdOffset + 16, true);
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) break;
+    const method = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const fileNameLength = view.getUint16(cursor + 28, true);
+    const extraLength = view.getUint16(cursor + 30, true);
+    const commentLength = view.getUint16(cursor + 32, true);
+    const localHeaderOffset = view.getUint32(cursor + 42, true);
+    const fileName = decoder.decode(new Uint8Array(arrayBuffer, cursor + 46, fileNameLength));
+    cursor += 46 + fileNameLength + extraLength + commentLength;
+    if (!fileName.toLowerCase().endsWith(".kml")) continue;
+
+    if (view.getUint32(localHeaderOffset, true) !== 0x04034b50) throw new Error("Die KMZ-Datei enthält einen beschädigten KML-Eintrag.");
+    const localNameLength = view.getUint16(localHeaderOffset + 26, true);
+    const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+    const dataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength;
+    const compressed = new Uint8Array(arrayBuffer, dataOffset, compressedSize);
+    const data = method === 0 ? compressed : method === 8 ? await inflateRawZipEntry(compressed) : null;
+    if (!data) throw new Error(`KMZ-Kompressionsmethode ${method} wird noch nicht unterstützt.`);
+    return decoder.decode(data);
+  }
+
+  throw new Error("In der KMZ-Datei wurde keine KML-Datei gefunden.");
+}
+
+async function readBoundaryImportFile(file) {
+  const extension = getFileExtension(file.name);
+  if (extension === "kml") {
+    return normalizeImportedBoundarySet(kmlToGeoJson(await file.text(), file.name), file.name);
+  }
+  if (extension === "kmz") {
+    const kmlText = await extractKmlTextFromKmz(await file.arrayBuffer());
+    return normalizeImportedBoundarySet(kmlToGeoJson(kmlText, file.name), file.name);
+  }
+  const raw = JSON.parse(await file.text());
+  return normalizeImportedBoundarySet(raw, file.name);
+}
+
+function createInternalLicenseMetadata() {
+  return {
+    id: "unknown-internal-use-only",
+    label: "Lizenz ungeklärt · nur intern nutzbar",
+    url: "",
+    detail: "Die Lizenz wurde beim Import nicht eindeutig erkannt. Vor Veröffentlichung oder Weitergabe muss sie geprüft werden.",
+    source: "",
+    compatibility: {
+      wikimedia: false,
+      openstreetmap: false,
+      commercial_use: false,
+      share_alike_required: false,
+      attribution_required: true,
+    },
+  };
+}
+
+function normalizeImportedBoundarySet(raw, fileName = "kartensammlung.geojson") {
+  if (!raw || typeof raw !== "object") throw new Error("Die Datei enthält kein lesbares JSON-Objekt.");
+  if (raw.schema === "ziselin-boundary-set-v1" && Array.isArray(raw.features)) {
+    return {
+      ...raw,
+      review_status: raw.review_status || "imported",
+      features: raw.features.map((feature, index) => ({
+        ...feature,
+        id: String(feature.id || `${raw.id}-${index + 1}`),
+        name: repairLegacyText(feature.name || `Einheit ${index + 1}`),
+        aliases: Array.isArray(feature.aliases) ? feature.aliases.map(repairLegacyText) : [],
+        match_tokens: Array.isArray(feature.match_tokens) ? feature.match_tokens.map(repairLegacyText) : [],
+        properties: feature.properties || {},
+      })),
+    };
+  }
+
+  if (raw.type !== "FeatureCollection" || !Array.isArray(raw.features)) {
+    throw new Error("Bitte eine GeoJSON FeatureCollection oder ein Ziselin-Boundary-Set-v1 importieren.");
+  }
+
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+  const setId = `import-${slugifyBoundaryId(baseName)}-${Date.now()}`;
+  const importedAt = new Date().toISOString();
+  return {
+    schema: "ziselin-boundary-set-v1",
+    id: setId,
+    title: repairLegacyText(baseName || "Importierte Kartensammlung"),
+    description: "Aus GeoJSON importierte Kartensammlung. Metadaten, Lizenz und Wikidata-IDs sollten im nächsten Schritt geprüft und ergänzt werden.",
+    provider: "manual-import",
+    provider_boundary_id: "",
+    boundary_type: "unknown",
+    country_iso3: "",
+    admin_level: "",
+    year_represented: "",
+    valid_from: "",
+    valid_to: null,
+    source: {
+      label: "Manueller GeoJSON-Import",
+      url: "",
+      accessed_at: importedAt,
+      source_data_update_date: "",
+      build_date: "",
+    },
+    license: createInternalLicenseMetadata(),
+    review_status: "imported",
+    features: raw.features
+      .filter((feature) => feature?.geometry)
+      .map((feature, index) => {
+        const name = getFeatureDisplayName(feature, index);
+        const id = getFeatureStableId(feature, index, setId);
+        return {
+          id: String(id),
+          name,
+          wikidata_id: String(feature.properties?.wikidata_id || feature.properties?.WIKIDATA || feature.properties?.wikidata || ""),
+          identifiers: {},
+          names: { de: name },
+          aliases: [],
+          match_tokens: [id, name].map((token) => normalizeSearchText(token)).filter(Boolean),
+          valid_from: "",
+          valid_to: null,
+          source_ref: "",
+          geometry: feature.geometry,
+          properties: feature.properties || {},
+        };
+      }),
+  };
+}
+
+function createBoundaryCollectionItem(boundarySet, fileName = "") {
+  return normalizeLibraryItem({
+    id: `collection-${slugifyBoundaryId(boundarySet.id || boundarySet.title || fileName)}-${Date.now()}`,
+    kind: "boundary-collection",
+    name: repairLegacyText(boundarySet.title || fileName || "Kartensammlung"),
+    source: repairLegacyText(boundarySet.source?.label || boundarySet.provider || "Import"),
+    iso3: boundarySet.country_iso3 || "",
+    adminLevel: repairLegacyText(boundarySet.admin_level || boundarySet.boundary_type || "Boundary-Set"),
+    detail: `${boundarySet.features?.length || 0} Einheiten`,
+    license: repairLegacyText(boundarySet.license?.label || "Lizenz ungeklärt"),
+    sourceUrl: boundarySet.source?.url || "",
+    temporalCoverage: {
+      label: [boundarySet.valid_from ? `seit ${boundarySet.valid_from}` : "", boundarySet.valid_to ? `bis ${boundarySet.valid_to}` : ""].filter(Boolean).join(" · ") || boundarySet.year_represented || "Gültigkeit nicht geprüft",
+      from: boundarySet.valid_from || "",
+      to: boundarySet.valid_to || "",
+    },
+    display: {
+      visible: true,
+      color: "#d9dc8c",
+      outlineColor: DEFAULT_LAYER_OUTLINE_COLOR,
+    },
+    geometryRef: {
+      provider: "ziselin-geo-archive",
+      schema: "ziselin-boundary-set-v1",
+      boundarySetId: boundarySet.id,
+    },
+    boundarySet,
+  });
+}
+
+async function importBoundarySetFile(file) {
+  try {
+    const boundarySet = await readBoundaryImportFile(file);
+    if (!boundarySet.features.length) throw new Error("Die Kartensammlung enthält keine importierbaren Geometrien.");
+    state.pendingBoundarySetImport = {
+      fileName: file.name,
+      importedAt: new Date().toISOString(),
+      boundarySet,
+    };
+    renderCollectionImportEditor();
+    setEditorTab("collections");
+  } catch (error) {
+    console.error("Kartensammlung konnte nicht geladen werden.", error);
+    window.alert(`Kartensammlung konnte nicht geladen werden: ${error?.message || "unbekannter Fehler"}`);
+  }
+}
+
+function addPendingBoundarySetToProject() {
+  const project = getActiveProject();
+  const folder = getLibraryFolder(project, "boundary-collections");
+  if (!project || !folder) {
+    window.alert("Bitte zuerst ein Earth-Map-Projekt anlegen oder aktivieren.");
+    return;
+  }
+  const pending = state.pendingBoundarySetImport;
+  if (!pending?.boundarySet) {
+    window.alert("Bitte zuerst eine Kartensammlung importieren.");
+    return;
+  }
+  try {
+    const boundarySet = pending.boundarySet;
+    const item = createBoundaryCollectionItem(boundarySet, pending.fileName);
+    folder.items.push(item);
+    project.activeLibraryItemId = item.id;
+    state.openFolderBrowserMenuId = null;
+    if (!persistProjects()) {
+      folder.items = folder.items.filter((candidate) => candidate.id !== item.id);
+      project.activeLibraryItemId = "";
+      throw new Error("Die Datei ist für den aktuellen Browser-Speicher zu groß. Für große Kartensammlungen brauchen wir als nächsten Schritt IndexedDB oder ein echtes Archiv-Dateisystem.");
+    }
+    renderWorkspace();
+    renderGlobe();
+    openLibraryItemEditor(item);
+  } catch (error) {
+    console.error("Kartensammlung konnte nicht übernommen werden.", error);
+    window.alert(`Kartensammlung konnte nicht übernommen werden: ${error?.message || "unbekannter Fehler"}`);
+  }
+}
+
 function createLayerItemFromSearchResult(result) {
   const isNaturalEarth = result.source === "Natural Earth";
   const dataset = getNaturalEarthCountryDataset();
@@ -3141,7 +4415,8 @@ function createLayerItemFromSearchResult(result) {
     },
     display: {
       visible: true,
-      color: "#c6a86a",
+      color: DEFAULT_LAYER_FILL_COLOR,
+      outlineColor: DEFAULT_LAYER_OUTLINE_COLOR,
     },
     geometryRef: isNaturalEarth
       ? { provider: "natural-earth", detail, dataset: "admin_0_countries", iso3: result.iso3 }
@@ -3166,7 +4441,7 @@ function addBoundaryLayerFromSearchResult(result) {
   persistProjects();
   renderWorkspace();
   renderGlobe();
-  setEditorTab("layer-editor");
+  openLibraryItemEditor(activeItem);
 }
 
 function createBoundarySearchCard(result) {
@@ -3244,6 +4519,10 @@ document.addEventListener("keydown", (event) => {
       resetProjectDeleteHold();
       renderProjectBrowser();
     }
+    if (state.openFolderBrowserMenuId) {
+      state.openFolderBrowserMenuId = null;
+      renderProjectBrowser();
+    }
   }
 });
 document.addEventListener("click", (event) => {
@@ -3261,6 +4540,10 @@ document.addEventListener("click", (event) => {
   if (state.openProjectBrowserMenuId) {
     state.openProjectBrowserMenuId = null;
     resetProjectDeleteHold();
+    renderProjectBrowser();
+  }
+  if (state.openFolderBrowserMenuId) {
+    state.openFolderBrowserMenuId = null;
     renderProjectBrowser();
   }
 });
@@ -3293,23 +4576,43 @@ ui.newProjectButton?.addEventListener("click", () => {
   renderWorkspace();
   renderGlobe();
 });
+ui.importBoundarySetButton?.addEventListener("click", () => {
+  setBrowserActionsMenuOpen(false);
+  ui.boundarySetImportInput?.click();
+});
+ui.boundarySetImportInput?.addEventListener("change", async () => {
+  const file = ui.boundarySetImportInput.files?.[0];
+  ui.boundarySetImportInput.value = "";
+  if (!file) return;
+  await importBoundarySetFile(file);
+});
+ui.addCollectionToProjectButton?.addEventListener("click", addPendingBoundarySetToProject);
 ui.projectBrowserList.addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest(".project-card-menu-shell")) return;
+  if (event.target instanceof Element && event.target.closest(".browser-visibility-checkbox")) return;
   const layerCard = event.target.closest("[data-library-item-id]");
   if (layerCard) {
-    const project = getActiveProject();
+    const projectCard = layerCard.closest("[data-project-id]");
+    const project = state.projects.find((candidate) => candidate.id === projectCard?.dataset.projectId) || getActiveProject();
     if (!project) return;
+    state.activeProjectId = project.id;
     project.activeLibraryItemId = layerCard.dataset.libraryItemId || "";
+    state.openProjectBrowserMenuId = null;
+    state.openFolderBrowserMenuId = null;
+    state.openLayerBrowserMenuId = null;
+    resetProjectDeleteHold();
+    resetLayerDeleteHold();
     persistProjects();
     renderWorkspace();
     renderGlobe();
-    setEditorTab("layer-editor");
+    openLibraryItemEditor(project.activeLibraryItemId ? getActiveLibraryItem(project) : null);
     return;
   }
   const card = event.target.closest("[data-project-id]");
   if (!card) return;
   state.activeProjectId = card.dataset.projectId;
   state.openProjectBrowserMenuId = null;
+  state.openFolderBrowserMenuId = null;
   state.openLayerBrowserMenuId = null;
   resetProjectDeleteHold();
   resetLayerDeleteHold();
@@ -3332,12 +4635,8 @@ ui.libraryBrowserList?.addEventListener("click", (event) => {
   persistProjects();
   renderWorkspace();
   renderGlobe();
-  setEditorTab("layer-editor");
+  openLibraryItemEditor(getActiveLibraryItem(project));
 });
-ui.layerColorInput?.addEventListener("input", () => {
-  applyLayerColor(ui.layerColorInput.value || "#c6a86a");
-});
-setupLayerColorPalette();
 
 ui.globe.addEventListener("pointerdown", (event) => {
   markGlobeNavigationActive();

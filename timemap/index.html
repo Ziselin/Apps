@@ -8,7 +8,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TimeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/timemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="timemap.css?v=20260614c">
+  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260701g">
+  <link rel="stylesheet" href="timemap.css?v=20260701d">
 </head>
 <body>
   <main class="app-frame workspace-mode-timeline">
@@ -676,10 +677,11 @@
       </div>
       <label class="field">
         <span id="projectCategoryColorLabel">Farbwert</span>
-        <div class="project-category-color-row">
-          <input id="projectCategoryColorInput" class="prompt-modal-input" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
-          <input id="projectCategoryColorPicker" type="color" value="#a4b0b8">
-          <button type="button" id="projectCategoryColorPaletteButton" class="color-picker-button" aria-label="Projektfarben wählen"><span class="color-picker-icon"></span></button>
+        <div class="project-category-color-row z-color-choice-surface">
+          <input id="projectCategoryColorInput" class="prompt-modal-input z-color-choice-code" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
+          <button type="button" id="projectCategoryColorCustomButton" class="z-color-choice-button z-color-choice-custom-button color-preview" aria-label="Farbwert: individuelle Farbe wählen"><span class="z-color-choice-button-icon"></span></button>
+          <input id="projectCategoryColorPicker" class="z-color-choice-native native-color-input" type="color" value="#a4b0b8">
+          <button type="button" id="projectCategoryColorPaletteButton" class="z-color-choice-button z-color-choice-palette-button color-picker-button" aria-label="Projektfarben wählen"><span class="z-color-choice-button-icon color-picker-icon"></span></button>
         </div>
       </label>
       <div class="field">
@@ -688,10 +690,11 @@
       </div>
       <label class="field">
         <span id="projectCategoryIconColorLabel">Icon-Farbwert</span>
-        <div class="project-category-color-row">
-          <input id="projectCategoryIconColorInput" class="prompt-modal-input" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
-          <input id="projectCategoryIconColorPicker" type="color" value="#a4b0b8">
-          <button type="button" id="projectCategoryIconColorPaletteButton" class="color-picker-button" aria-label="Projektfarben wählen"><span class="color-picker-icon"></span></button>
+        <div class="project-category-color-row z-color-choice-surface">
+          <input id="projectCategoryIconColorInput" class="prompt-modal-input z-color-choice-code" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
+          <button type="button" id="projectCategoryIconColorCustomButton" class="z-color-choice-button z-color-choice-custom-button color-preview" aria-label="Icon-Farbwert: individuelle Farbe wählen"><span class="z-color-choice-button-icon"></span></button>
+          <input id="projectCategoryIconColorPicker" class="z-color-choice-native native-color-input" type="color" value="#a4b0b8">
+          <button type="button" id="projectCategoryIconColorPaletteButton" class="z-color-choice-button z-color-choice-palette-button color-picker-button" aria-label="Projektfarben wählen"><span class="z-color-choice-button-icon color-picker-icon"></span></button>
         </div>
         <label class="field checkbox-field project-category-icon-color-link">
           <input id="projectCategoryIconColorFollowTextInput" type="checkbox" checked>
@@ -802,7 +805,7 @@
       }
     }, 10000);
   </script>
-<script src="timemap.js?v=20260616c"></script>
+<script src="timemap.js?v=20260701b"></script>
 </body>
 </html>
 
