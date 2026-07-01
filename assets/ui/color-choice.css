@@ -1,0 +1,169 @@
+/*
+  Ziselin-Farbwahlvorlage.
+
+  Fachliche Absicht: Alle Apps, die zwischen freier Farbauswahl und bereits
+  genutzten Projektfarben unterscheiden, sollen diese gemeinsame Oberfläche
+  verwenden. So bleibt die Funktionalität projektspezifisch, aber die
+  Bedienlogik und Symbolsprache appübergreifend gleich.
+*/
+
+.z-color-choice-field {
+  display: block;
+}
+
+.z-color-choice-surface {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 34px 34px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--z-color-choice-line, var(--line, var(--surface-line, rgba(0, 0, 0, .16))));
+  border-radius: 14px;
+  background: var(
+    --z-color-choice-surface,
+    color-mix(in srgb, var(--paper-soft, var(--surface-soft, #fff)) 58%, transparent)
+  );
+}
+
+.z-color-choice-label {
+  color: var(--z-color-choice-label, var(--muted, currentColor));
+  font-size: .78rem;
+  font-weight: 500;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+
+.z-color-choice-code {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--z-color-choice-code-line, var(--z-color-choice-line, var(--line, var(--surface-line, rgba(0, 0, 0, .16)))));
+  border-radius: 10px;
+  background: var(
+    --z-color-choice-code-bg,
+    color-mix(in srgb, var(--paper-soft, var(--surface-soft, #fff)) 72%, transparent)
+  );
+  color: var(--z-color-choice-code-text, var(--ink-soft, var(--text, currentColor)));
+  font-family: "Source Code Pro", Consolas, "Courier New", monospace;
+  font-size: .86rem;
+  font-weight: 400;
+  letter-spacing: -.01em;
+}
+
+.z-color-choice-code:focus {
+  outline: none;
+  border-color: var(--z-color-choice-code-focus-line, var(--line-strong, var(--z-color-choice-line, var(--line, currentColor))));
+  box-shadow: 0 0 0 2px var(
+    --z-color-choice-focus-ring,
+    color-mix(in srgb, var(--ink, var(--text, currentColor)) 8%, transparent)
+  );
+}
+
+.z-color-choice-native {
+  position: absolute;
+  inline-size: 0;
+  block-size: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.z-color-choice-button {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink, currentColor);
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.z-color-choice-button:hover,
+.z-color-choice-button:focus-visible,
+.z-color-choice-button[aria-expanded="true"] {
+  border-color: var(--line, currentColor);
+  background: color-mix(in srgb, var(--ink, currentColor) 6%, transparent);
+  outline: none;
+}
+
+.z-color-choice-button:disabled {
+  opacity: .42;
+  cursor: default;
+}
+
+.z-color-choice-button-icon {
+  pointer-events: none;
+  display: block;
+  width: 19px;
+  height: 19px;
+  background: currentColor;
+  -webkit-mask: var(--z-color-choice-icon) center / contain no-repeat;
+  mask: var(--z-color-choice-icon) center / contain no-repeat;
+}
+
+.z-color-choice-custom-button {
+  background: transparent !important;
+  color: var(--ink, currentColor);
+}
+
+.z-color-choice-custom-button.is-empty {
+  color: var(--muted, currentColor);
+}
+
+.z-color-choice-custom-button .z-color-choice-button-icon {
+  --z-color-choice-icon: url("https://api.iconify.design/ion/color-fill.svg");
+  background: var(--z-color-current, currentColor);
+}
+
+.z-color-choice-palette-button .z-color-choice-button-icon {
+  --z-color-choice-icon: url("https://api.iconify.design/mdi/color.svg");
+}
+
+.z-color-choice-palette {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line, rgba(0, 0, 0, .16));
+  border-radius: 13px;
+  background: var(--paper-soft, #fff);
+  box-shadow: 0 14px 32px var(--shadow, rgba(0, 0, 0, .16));
+}
+
+.z-color-choice-palette[hidden] {
+  display: none !important;
+}
+
+.z-color-choice-swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink, #000) 18%, transparent);
+  border-radius: 999px;
+  background: var(--z-color-swatch, transparent);
+  cursor: pointer;
+}
+
+.z-color-choice-swatch:hover,
+.z-color-choice-swatch.is-active {
+  outline: 2px solid color-mix(in srgb, var(--ink, #000) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.z-color-choice-empty {
+  grid-column: 1 / -1;
+  min-width: 160px;
+  margin: 0;
+  color: var(--muted, currentColor);
+}
