@@ -1,0 +1,279 @@
+/*
+  Ziselin-Browserbaum.
+
+  Fachliche Absicht: Der Objektbrowser der TimeMap ist die Referenz für
+  hierarchische Browser in den Apps. Diese Vorlage beschreibt die gemeinsame
+  visuelle Logik: ruhige Karten, kompakte Zeilen, dezente Akzentfarbe,
+  klare Auf-/Zuklapp- und Aktionsflächen. Die App liefert weiterhin die
+  Datenstruktur, Icons, Texte und Menüaktionen.
+
+  Übergang: Neue Browser können direkt z-browser-*-Klassen verwenden.
+  Bestehende EarthMap-Klassen sind hier bewusst als Aliase angebunden, damit
+  die Gestaltung vereinheitlicht wird, ohne die Browserlogik umzubauen.
+*/
+
+.z-browser-scope :where(.z-browser-list, .project-browser-list) {
+  display: grid;
+  gap: 4px;
+}
+
+.z-browser-scope :where(.z-browser-card, .project-card) {
+  --z-browser-accent-rgb: var(--z-browser-card-accent-rgb, 255, 179, 71);
+  --z-browser-border: var(--z-browser-card-border, rgba(var(--z-browser-accent-rgb), .16));
+  --z-browser-bg-top: var(--z-browser-card-bg-top, rgba(255, 255, 255, .026));
+  --z-browser-bg-bottom: var(--z-browser-card-bg-bottom, rgba(255, 255, 255, .014));
+  position: relative;
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--z-browser-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--z-browser-bg-top), var(--z-browser-bg-bottom));
+  overflow: visible;
+  box-shadow: none;
+  text-align: left;
+}
+
+.z-browser-scope :where(.z-browser-card, .project-card).is-active,
+.z-browser-scope :where(.z-browser-card, .project-card).is-open {
+  border-color: var(--z-browser-active-border, rgba(var(--z-browser-accent-rgb), .24));
+  background: linear-gradient(
+    180deg,
+    var(--z-browser-active-bg-top, rgba(var(--z-browser-accent-rgb), .075)),
+    var(--z-browser-active-bg-bottom, rgba(var(--z-browser-accent-rgb), .035))
+  );
+}
+
+.z-browser-scope :where(.z-browser-row, .project-browser-row, .library-item-card) {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  min-height: 50px;
+  padding: 7px 10px;
+  border-radius: 10px;
+}
+
+.z-browser-scope :where(.z-browser-child-row, .layer-folder-row) {
+  min-height: 44px;
+  border-radius: 8px;
+  background: var(--z-browser-child-bg, rgba(255, 255, 255, .012));
+}
+
+.z-browser-scope :where(.z-browser-row, .project-browser-row, .library-item-card):hover,
+.z-browser-scope :where(.z-browser-card, .project-card):hover > :where(.z-browser-row, .project-row) {
+  background: var(--z-browser-row-hover-bg, rgba(255, 255, 255, .035));
+}
+
+.z-browser-scope :where(.z-browser-toggle, .browser-tree-toggle) {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--z-browser-muted, var(--muted, currentColor));
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.z-browser-scope :where(.z-browser-toggle, .browser-tree-toggle):hover:not(:disabled):not(.browser-tree-toggle-spacer) {
+  background: var(--z-browser-button-hover-bg, rgba(255, 255, 255, .055));
+  color: var(--z-browser-text, var(--ink, currentColor));
+}
+
+.z-browser-scope :where(.z-browser-checkbox, .browser-visibility-checkbox) {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--z-browser-checkbox-accent, #2f8cff);
+  justify-self: center;
+}
+
+.z-browser-scope :where(.z-browser-main, .project-card-main, .library-item-copy) {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.z-browser-scope :where(.z-browser-main, .project-card-main)[role="button"],
+.z-browser-scope :where(button.z-browser-main, button.project-card-main) {
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.z-browser-scope :where(.z-browser-main, .project-card-main, .library-item-copy) strong {
+  color: var(--z-browser-title, var(--ink, currentColor));
+  font-size: .98rem;
+  line-height: 1.16;
+}
+
+.z-browser-scope :where(.z-browser-main, .project-card-main, .library-item-copy) span {
+  color: var(--z-browser-muted, var(--muted, currentColor));
+  font-size: .74rem;
+  line-height: 1.35;
+}
+
+.z-browser-scope :where(.z-browser-card, .project-card).is-active :where(.z-browser-main, .project-card-main) strong,
+.z-browser-scope :where(.library-item-card).is-active strong {
+  color: var(--z-browser-active-title, rgb(var(--z-browser-accent-rgb)));
+}
+
+.z-browser-scope :where(.z-browser-icon, .browser-row-icon) {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--z-browser-icon-color, rgb(var(--z-browser-accent-rgb)));
+}
+
+.z-browser-scope :where(.z-browser-color-rail, .library-item-glyph) {
+  display: inline-flex !important;
+  width: 2px;
+  height: 28px;
+  border-radius: 2px;
+  background: var(--layer-color, var(--z-browser-active-title, rgb(var(--z-browser-accent-rgb))));
+  box-shadow: none;
+  justify-self: center;
+}
+
+.z-browser-scope :where(.z-browser-color-rail, .library-item-glyph)::before {
+  content: none;
+}
+
+.z-browser-scope :where(.z-browser-menu-shell, .project-card-menu-shell, .layer-row-menu-shell) {
+  position: relative;
+  display: inline-flex;
+  justify-self: end;
+  justify-content: flex-end;
+}
+
+.z-browser-scope :where(.z-browser-row-action, .browser-row-action) {
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--z-browser-row-action-color, var(--z-browser-active-title, rgb(var(--z-browser-accent-rgb))));
+  cursor: pointer;
+  transition: opacity 140ms ease, border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.z-browser-scope :where(.z-browser-row-action, .browser-row-action):hover,
+.z-browser-scope :where(.z-browser-row-action, .browser-row-action):focus-visible {
+  border-color: var(--z-browser-row-action-border, rgba(255, 255, 255, .12));
+  background: var(--z-browser-row-action-bg, rgba(255, 255, 255, .045));
+  color: var(--z-browser-text, currentColor);
+}
+
+.z-browser-scope :where(.z-browser-row-action-glyph, .browser-row-action-glyph) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 18px 18px;
+  mask-size: 18px 18px;
+}
+
+.z-browser-scope :where(.z-browser-row-action.is-add-folder, .browser-row-action.is-add-folder)
+  :where(.z-browser-row-action-glyph, .browser-row-action-glyph) {
+  -webkit-mask-image: url("https://api.iconify.design/mdi/folder-add-outline.svg");
+  mask-image: url("https://api.iconify.design/mdi/folder-add-outline.svg");
+}
+
+.z-browser-scope :where(.z-browser-menu-trigger, .project-card-menu-trigger, .layer-row-menu-trigger) {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--z-browser-menu-trigger, rgba(214, 222, 231, .82));
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.z-browser-scope :where(.z-browser-menu-trigger, .project-card-menu-trigger, .layer-row-menu-trigger):hover,
+.z-browser-scope :where(.z-browser-menu-trigger, .project-card-menu-trigger, .layer-row-menu-trigger)[aria-expanded="true"] {
+  border-color: var(--z-browser-menu-trigger-border, rgba(255, 255, 255, .12));
+  background: var(--z-browser-menu-trigger-bg, rgba(255, 255, 255, .045));
+  color: var(--z-browser-text, var(--ink, currentColor));
+}
+
+.z-browser-scope :where(.z-browser-menu, .project-card-menu, .layer-row-menu) {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 198px;
+  padding: 5px;
+  border: 1px solid var(--z-browser-menu-border, rgba(255, 255, 255, .1));
+  border-radius: 12px;
+  background: var(--z-browser-menu-bg, rgba(43, 49, 55, .98));
+  box-shadow: 0 16px 36px var(--z-browser-menu-shadow, rgba(0, 0, 0, .34));
+  backdrop-filter: blur(10px);
+}
+
+.z-browser-scope :where(.z-browser-menu, .project-card-menu, .layer-row-menu)[hidden] {
+  display: none !important;
+}
+
+.z-browser-scope :where(.z-browser-menu-action, .project-card-menu-action) {
+  position: relative;
+  overflow: hidden;
+  width: auto;
+  min-width: 168px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--z-browser-menu-text, var(--z-browser-text, currentColor));
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.z-browser-scope :where(.z-browser-menu-action, .project-card-menu-action):hover {
+  background: var(--z-browser-menu-action-hover-bg, rgba(255, 255, 255, .06));
+}
+
+.z-browser-scope :where(.z-browser-menu-action-delete, .project-card-menu-action-delete) {
+  --hold-progress: 0%;
+}
+
+.z-browser-scope :where(.z-browser-menu-action-delete, .project-card-menu-action-delete).is-hold-active,
+.z-browser-scope :where(.z-browser-menu-action-delete, .project-card-menu-action-delete).is-hold-ready {
+  background:
+    linear-gradient(
+      90deg,
+      var(--z-browser-delete-progress, rgba(255, 179, 71, .92)) 0%,
+      var(--z-browser-delete-progress, rgba(255, 179, 71, .92)) var(--hold-progress),
+      transparent var(--hold-progress),
+      transparent 100%
+    ),
+    var(--z-browser-menu-action-hover-bg, rgba(255, 255, 255, .06));
+  color: var(--z-browser-delete-text, #182126);
+}

@@ -1,0 +1,140 @@
+/*
+  Ziselin-Editor-Tabs.
+
+  Fachliche Absicht: Editorbereiche werden appübergreifend als ruhige
+  Segmentleiste dargestellt. Die App liefert nur Tab-Namen, Zielpanels und
+  Icon-Zuordnung; Verhalten, responsive Verdichtung und aktive Markierung
+  bleiben Teil dieser gemeinsamen Vorlage.
+
+  Responsive Regel: Die Leiste darf nicht mit dem Fensterrand kollidieren.
+  Bei mittlerer Breite wandert die Beschriftung unter das Icon. Bei sehr
+  schmaler Breite bleiben nur die Icons sichtbar.
+*/
+
+.editor-tabs,
+.z-editor-tabs {
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0;
+  max-width: 100%;
+  margin-top: var(--z-editor-tabs-margin-top, 18px);
+  padding: 9px 12px 0;
+  border: 1px solid var(--z-editor-tabs-line, var(--line, rgba(0, 0, 0, .14)));
+  border-radius: 10px;
+  background: var(
+    --z-editor-tabs-surface,
+    color-mix(in srgb, var(--paper-soft, #fff) 62%, transparent)
+  );
+  box-shadow: 0 14px 34px var(--z-editor-tabs-shadow, rgba(33, 54, 51, .08));
+  overflow: hidden;
+}
+
+.editor-tab,
+.z-editor-tab {
+  position: relative;
+  min-width: 0;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 0;
+  padding: 8px 12px 13px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--z-editor-tab-text, var(--ink-soft, currentColor));
+  font: inherit;
+  font-size: .92rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.editor-tab::before,
+.z-editor-tab::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  background: currentColor;
+  opacity: .88;
+  -webkit-mask: var(--editor-tab-icon, var(--z-editor-tab-icon)) center / contain no-repeat;
+  mask: var(--editor-tab-icon, var(--z-editor-tab-icon)) center / contain no-repeat;
+}
+
+.editor-tab::after,
+.z-editor-tab::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+}
+
+.editor-tab:hover,
+.editor-tab:focus-visible,
+.z-editor-tab:hover,
+.z-editor-tab:focus-visible {
+  color: var(--z-editor-tab-hover-text, var(--ink, currentColor));
+  background: var(--z-editor-tab-hover-surface, color-mix(in srgb, currentColor 4%, transparent));
+  outline: none;
+}
+
+.editor-tab.is-active,
+.z-editor-tab.is-active {
+  color: var(--z-editor-tab-active-text, var(--ink, currentColor));
+}
+
+.editor-tab.is-active::after,
+.z-editor-tab.is-active::after {
+  background: var(--z-editor-tab-active-line, var(--ink-soft, currentColor));
+}
+
+.editor-tabs:has(.editor-tab:only-child) .editor-tab,
+.z-editor-tabs:has(.z-editor-tab:only-child) .z-editor-tab {
+  flex: 0 0 auto;
+  min-width: min(190px, 100%);
+}
+
+@container (max-width: 520px) {
+  .editor-tab,
+  .z-editor-tab {
+    min-height: 54px;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 8px 12px;
+    font-size: .68rem;
+    letter-spacing: .01em;
+    line-height: 1.08;
+    text-align: center;
+    white-space: normal;
+  }
+}
+
+@container (max-width: 340px) {
+  .editor-tabs,
+  .z-editor-tabs {
+    padding-inline: 8px;
+  }
+
+  .editor-tab,
+  .z-editor-tab {
+    min-height: 42px;
+    padding: 8px 6px 12px;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+
+  .editor-tab::before,
+  .z-editor-tab::before {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+}
