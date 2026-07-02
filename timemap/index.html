@@ -8,8 +8,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TimeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/timemap-favicon.svg?v=20260613a">
-  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260701g">
-  <link rel="stylesheet" href="timemap.css?v=20260701d">
+  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260702a">
+  <link rel="stylesheet" href="../assets/ui/editor-tabs.css?v=20260701c">
+  <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260701c">
+  <link rel="stylesheet" href="timemap.css?v=20260702a">
 </head>
 <body>
   <main class="app-frame workspace-mode-timeline">
@@ -280,10 +282,10 @@
 
         <div id="detailsSideEditorHost" class="details-side-editor-host" hidden></div>
         <div id="searchModeContent" class="details-side-search">
-        <div class="data-mode-switch" id="dataModeSwitch" role="tablist" aria-label="Datenmodus">
-          <button type="button" id="modeEventsButton" class="data-mode-button">Ereignisse</button>
-          <button type="button" id="modeChartsButton" class="data-mode-button">Charts</button>
-          <button type="button" id="modeSourcesButton" class="data-mode-button">Quellen</button>
+        <div class="data-mode-switch z-editor-tabs" id="dataModeSwitch" role="tablist" aria-label="Datenmodus">
+          <button type="button" id="modeEventsButton" class="data-mode-button z-editor-tab" data-editor-tab="events" role="tab" aria-selected="false">Ereignisse</button>
+          <button type="button" id="modeChartsButton" class="data-mode-button z-editor-tab" data-editor-tab="charts" role="tab" aria-selected="false">Charts</button>
+          <button type="button" id="modeSourcesButton" class="data-mode-button z-editor-tab" data-editor-tab="sources" role="tab" aria-selected="false">Quellen</button>
         </div>
 
         <div id="eventsModePanel" class="data-mode-panel" hidden>
@@ -679,6 +681,7 @@
         <span id="projectCategoryColorLabel">Farbwert</span>
         <div class="project-category-color-row z-color-choice-surface">
           <input id="projectCategoryColorInput" class="prompt-modal-input z-color-choice-code" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
+          <button type="button" id="projectCategoryColorResetButton" class="z-color-choice-button z-color-choice-reset-button" aria-label="Farbwert: Farbe entfernen" aria-pressed="false"><span class="z-color-choice-button-icon"></span></button>
           <button type="button" id="projectCategoryColorCustomButton" class="z-color-choice-button z-color-choice-custom-button color-preview" aria-label="Farbwert: individuelle Farbe wählen"><span class="z-color-choice-button-icon"></span></button>
           <input id="projectCategoryColorPicker" class="z-color-choice-native native-color-input" type="color" value="#a4b0b8">
           <button type="button" id="projectCategoryColorPaletteButton" class="z-color-choice-button z-color-choice-palette-button color-picker-button" aria-label="Projektfarben wählen"><span class="z-color-choice-button-icon color-picker-icon"></span></button>
@@ -692,6 +695,7 @@
         <span id="projectCategoryIconColorLabel">Icon-Farbwert</span>
         <div class="project-category-color-row z-color-choice-surface">
           <input id="projectCategoryIconColorInput" class="prompt-modal-input z-color-choice-code" type="text" placeholder="#a4b0b8" autocomplete="off" spellcheck="false">
+          <button type="button" id="projectCategoryIconColorResetButton" class="z-color-choice-button z-color-choice-reset-button" aria-label="Icon-Farbwert: Farbe entfernen" aria-pressed="false"><span class="z-color-choice-button-icon"></span></button>
           <button type="button" id="projectCategoryIconColorCustomButton" class="z-color-choice-button z-color-choice-custom-button color-preview" aria-label="Icon-Farbwert: individuelle Farbe wählen"><span class="z-color-choice-button-icon"></span></button>
           <input id="projectCategoryIconColorPicker" class="z-color-choice-native native-color-input" type="color" value="#a4b0b8">
           <button type="button" id="projectCategoryIconColorPaletteButton" class="z-color-choice-button z-color-choice-palette-button color-picker-button" aria-label="Projektfarben wählen"><span class="z-color-choice-button-icon color-picker-icon"></span></button>
@@ -805,7 +809,7 @@
       }
     }, 10000);
   </script>
-<script src="timemap.js?v=20260701b"></script>
+<script src="timemap.js?v=20260702a"></script>
 </body>
 </html>
 

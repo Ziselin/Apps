@@ -576,6 +576,7 @@ const ui = {
   projectCategoryItalicInput: document.getElementById("projectCategoryItalicInput"),
   projectCategoryColorLabel: document.getElementById("projectCategoryColorLabel"),
   projectCategoryColorInput: document.getElementById("projectCategoryColorInput"),
+  projectCategoryColorResetButton: document.getElementById("projectCategoryColorResetButton"),
   projectCategoryColorCustomButton: document.getElementById("projectCategoryColorCustomButton"),
   projectCategoryColorPicker: document.getElementById("projectCategoryColorPicker"),
   projectCategoryColorPaletteButton: document.getElementById("projectCategoryColorPaletteButton"),
@@ -583,6 +584,7 @@ const ui = {
   projectCategoryIconField: document.getElementById("projectCategoryIconField"),
   projectCategoryIconColorLabel: document.getElementById("projectCategoryIconColorLabel"),
   projectCategoryIconColorInput: document.getElementById("projectCategoryIconColorInput"),
+  projectCategoryIconColorResetButton: document.getElementById("projectCategoryIconColorResetButton"),
   projectCategoryIconColorCustomButton: document.getElementById("projectCategoryIconColorCustomButton"),
   projectCategoryIconColorPicker: document.getElementById("projectCategoryIconColorPicker"),
   projectCategoryIconColorPaletteButton: document.getElementById("projectCategoryIconColorPaletteButton"),
@@ -3737,6 +3739,9 @@ function updateDataModeUi() {
   ui.modeEventsButton?.classList.toggle("is-active", state.activeDataMode === "events");
   ui.modeChartsButton?.classList.toggle("is-active", state.activeDataMode === "charts");
   ui.modeSourcesButton?.classList.toggle("is-active", state.activeDataMode === "sources");
+  ui.modeEventsButton?.setAttribute("aria-selected", state.activeDataMode === "events" ? "true" : "false");
+  ui.modeChartsButton?.setAttribute("aria-selected", state.activeDataMode === "charts" ? "true" : "false");
+  ui.modeSourcesButton?.setAttribute("aria-selected", state.activeDataMode === "sources" ? "true" : "false");
   if (state.activeDataMode === "charts" && state.chartsModeAction === "generate") {
     renderChartsGenerateArea();
   }
@@ -12211,6 +12216,15 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
   pickerButton.type = "button";
   pickerButton.className = "z-color-choice-button z-color-choice-palette-button color-picker-button";
   pickerButton.setAttribute("aria-label", `${labelText}: Projektfarben wählen`);
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  resetButton.className = "z-color-choice-button z-color-choice-reset-button";
+  resetButton.setAttribute("aria-label", `${labelText}: ${t("color_none")}`);
+  resetButton.setAttribute("aria-pressed", "false");
+  const resetIcon = document.createElement("span");
+  resetIcon.className = "z-color-choice-button-icon";
+  resetIcon.setAttribute("aria-hidden", "true");
+  resetButton.appendChild(resetIcon);
   const preview = document.createElement("span");
   preview.className = "z-color-choice-button z-color-choice-custom-button color-preview";
   preview.tabIndex = 0;
@@ -12259,7 +12273,11 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
     palette.appendChild(noneButton);
   };
 
+  let lastColorValue = normalizeColorInputValue(textInput.value || "#c96f4a", "#c96f4a");
+
   const applyPaletteValue = (value) => {
+    const normalized = String(value || "").trim();
+    if (normalized) lastColorValue = normalizeColorInputValue(normalized, lastColorValue || "#c96f4a");
     textInput.value = value;
     onColorChange(value);
     updatePreview();
@@ -12268,10 +12286,13 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
   const updatePreview = () => {
     const value = String(textInput.value ?? "").trim();
     const normalizedColor = normalizeColorInputValue(value || "#c96f4a");
+    if (value) lastColorValue = normalizedColor;
     controlsRow.style.setProperty("--z-color-current", value || "currentColor");
     preview.style.setProperty("--preview-color", value || "transparent");
     nativeColorInput.value = normalizedColor;
     preview.classList.toggle("is-empty", !value);
+    resetButton.classList.toggle("is-active", !value);
+    resetButton.setAttribute("aria-pressed", String(!value));
   };
 
   renderPaletteSwatches();
@@ -12334,11 +12355,19 @@ function createColorField(labelText, textInput, onColorChange, options = {}) {
       openNativeColorPicker(event);
     }
   });
+  resetButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (String(textInput.value || "").trim()) {
+      applyPaletteValue("");
+    } else {
+      applyPaletteValue(lastColorValue || normalizeColorInputValue(options.fallback || "#c96f4a", "#c96f4a"));
+    }
+  });
 
   textInput.addEventListener("input", updatePreview);
   textInput.addEventListener("change", updatePreview);
   pickerButton.appendChild(pickerIcon);
-  controlsRow.append(textInput, preview, pickerButton, nativeColorInput);
+  controlsRow.append(textInput, resetButton, preview, pickerButton, nativeColorInput);
   label.append(controlsRow, palette);
   updatePreview();
   return label;
@@ -28201,7 +28230,8 @@ function createSourceCollectionInlineEditor(collection) {
   editor.dataset.sourceCollectionId = collection.id;
 
   const tabs = document.createElement("div");
-  tabs.className = "chart-values-toolbar source-collection-tabs";
+  tabs.className = "source-collection-tabs z-editor-tabs";
+  tabs.setAttribute("role", "tablist");
   const content = document.createElement("div");
   content.className = "chart-editor-tabs-shell source-collection-editor-shell";
 
@@ -28216,7 +28246,10 @@ function createSourceCollectionInlineEditor(collection) {
     ].forEach(([tabId, label]) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "secondary-button chart-values-mode-button";
+      button.className = "z-editor-tab";
+      button.dataset.editorTab = tabId;
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", collection.activeTab === tabId ? "true" : "false");
       button.textContent = label;
       button.classList.toggle("is-active", collection.activeTab === tabId);
       button.addEventListener("click", () => {
@@ -33817,6 +33850,8 @@ const projectCategoryModalState = {
   groupId: null,
   categoryId: "",
   selectedIconName: "",
+  lastTextColor: getProjectCategoryDefaultDisplayColor(),
+  lastIconColor: getProjectCategoryDefaultDisplayColor(),
 };
 
 const customFlagModalState = {
@@ -34227,10 +34262,16 @@ function syncProjectCategoryIconColorUi() {
   }
   const textColor = String(ui.projectCategoryColorInput?.value || "").trim();
   const iconColor = String(ui.projectCategoryIconColorInput?.value || "").trim();
+  if (textColor) projectCategoryModalState.lastTextColor = normalizeColorInputValue(textColor, projectCategoryModalState.lastTextColor || getProjectCategoryDefaultDisplayColor());
+  if (iconColor) projectCategoryModalState.lastIconColor = normalizeColorInputValue(iconColor, projectCategoryModalState.lastIconColor || getProjectCategoryDefaultDisplayColor());
   ui.projectCategoryColorCustomButton?.parentElement?.style.setProperty("--z-color-current", textColor || "currentColor");
   ui.projectCategoryIconColorCustomButton?.parentElement?.style.setProperty("--z-color-current", iconColor || "currentColor");
   ui.projectCategoryColorCustomButton?.classList.toggle("is-empty", !textColor);
   ui.projectCategoryIconColorCustomButton?.classList.toggle("is-empty", !iconColor);
+  ui.projectCategoryColorResetButton?.classList.toggle("is-active", !textColor);
+  ui.projectCategoryColorResetButton?.setAttribute("aria-pressed", String(!textColor));
+  ui.projectCategoryIconColorResetButton?.classList.toggle("is-active", !iconColor);
+  ui.projectCategoryIconColorResetButton?.setAttribute("aria-pressed", String(!iconColor));
 }
 
 function openProjectCategoryModal(groupItem, categoryItem = null, options = {}) {
@@ -34260,6 +34301,7 @@ function openProjectCategoryModal(groupItem, categoryItem = null, options = {}) 
   if (ui.projectCategoryBoldInput) ui.projectCategoryBoldInput.checked = normalizedCategory?.bold === true;
   if (ui.projectCategoryItalicInput) ui.projectCategoryItalicInput.checked = normalizedCategory?.italic === true;
   const categoryColor = normalizedCategory?.color || "";
+  projectCategoryModalState.lastTextColor = normalizeColorInputValue(categoryColor || getProjectCategoryDefaultDisplayColor(), getProjectCategoryDefaultDisplayColor());
   if (ui.projectCategoryColorInput) ui.projectCategoryColorInput.value = categoryColor;
   if (ui.projectCategoryColorPicker) {
     ui.projectCategoryColorPicker.value = normalizeColorInputValue(
@@ -34268,6 +34310,7 @@ function openProjectCategoryModal(groupItem, categoryItem = null, options = {}) 
     );
   }
   const categoryIconColor = normalizedCategory?.iconColor || "";
+  projectCategoryModalState.lastIconColor = normalizeColorInputValue(categoryIconColor || categoryColor || getProjectCategoryDefaultDisplayColor(), getProjectCategoryDefaultDisplayColor());
   if (ui.projectCategoryIconColorInput) ui.projectCategoryIconColorInput.value = categoryIconColor;
   if (ui.projectCategoryIconColorPicker) {
     ui.projectCategoryIconColorPicker.value = normalizeColorInputValue(
@@ -34697,6 +34740,19 @@ if (ui.projectCategoryColorInput && ui.projectCategoryColorPicker) {
   });
 }
 
+if (ui.projectCategoryColorResetButton && ui.projectCategoryColorInput) {
+  ui.projectCategoryColorResetButton.addEventListener("click", () => {
+    const current = String(ui.projectCategoryColorInput?.value || "").trim();
+    const nextValue = current ? "" : projectCategoryModalState.lastTextColor || getProjectCategoryDefaultDisplayColor();
+    ui.projectCategoryColorInput.value = nextValue;
+    if (ui.projectCategoryColorPicker) {
+      ui.projectCategoryColorPicker.value = normalizeColorInputValue(nextValue || projectCategoryModalState.lastTextColor || getProjectCategoryDefaultDisplayColor(), getProjectCategoryDefaultDisplayColor());
+    }
+    syncProjectCategoryIconColorUi();
+    renderProjectCategoryIconField();
+  });
+}
+
 if (ui.projectCategoryIconColorPicker && ui.projectCategoryIconColorInput) {
   ui.projectCategoryIconColorPicker.addEventListener("input", () => {
     if (ui.projectCategoryIconColorFollowTextInput?.checked) {
@@ -34723,6 +34779,22 @@ if (ui.projectCategoryIconColorInput && ui.projectCategoryIconColorPicker) {
     const value = String(ui.projectCategoryIconColorInput.value || "").trim();
     if (/^#([0-9a-f]{6})$/i.test(value)) {
       ui.projectCategoryIconColorPicker.value = value;
+    }
+    syncProjectCategoryIconColorUi();
+    renderProjectCategoryIconField();
+  });
+}
+
+if (ui.projectCategoryIconColorResetButton && ui.projectCategoryIconColorInput) {
+  ui.projectCategoryIconColorResetButton.addEventListener("click", () => {
+    if (ui.projectCategoryIconColorFollowTextInput?.checked) {
+      ui.projectCategoryIconColorFollowTextInput.checked = false;
+    }
+    const current = String(ui.projectCategoryIconColorInput?.value || "").trim();
+    const nextValue = current ? "" : projectCategoryModalState.lastIconColor || getProjectCategoryDefaultDisplayColor();
+    ui.projectCategoryIconColorInput.value = nextValue;
+    if (ui.projectCategoryIconColorPicker) {
+      ui.projectCategoryIconColorPicker.value = normalizeColorInputValue(nextValue || projectCategoryModalState.lastIconColor || getProjectCategoryDefaultDisplayColor(), getProjectCategoryDefaultDisplayColor());
     }
     syncProjectCategoryIconColorUi();
     renderProjectCategoryIconField();

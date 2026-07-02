@@ -27,6 +27,14 @@
   --z-color-choice-label: var(--muted);
   --z-color-choice-code-text: rgba(238, 243, 246, 0.78);
   --z-color-choice-focus-ring: rgba(255, 179, 71, 0.14);
+  --z-editor-tabs-surface: rgba(255, 255, 255, 0.035);
+  --z-editor-tabs-line: rgba(255, 255, 255, 0.08);
+  --z-editor-tabs-shadow: rgba(0, 0, 0, 0.22);
+  --z-editor-tab-text: rgba(214, 222, 231, 0.78);
+  --z-editor-tab-hover-text: var(--text);
+  --z-editor-tab-hover-surface: rgba(255, 255, 255, 0.04);
+  --z-editor-tab-active-text: var(--highlight);
+  --z-editor-tab-active-line: var(--highlight);
 }
 
 body.theme-light,
@@ -45,6 +53,14 @@ body[data-theme="light"],
   --z-color-choice-code-line: rgba(33, 54, 51, 0.14);
   --z-color-choice-code-text: rgba(33, 54, 51, 0.74);
   --z-color-choice-focus-ring: rgba(33, 54, 51, 0.09);
+  --z-editor-tabs-surface: rgba(255, 255, 255, 0.52);
+  --z-editor-tabs-line: rgba(33, 54, 51, 0.12);
+  --z-editor-tabs-shadow: rgba(33, 54, 51, 0.08);
+  --z-editor-tab-text: rgba(33, 54, 51, 0.68);
+  --z-editor-tab-hover-text: rgba(33, 54, 51, 0.96);
+  --z-editor-tab-hover-surface: rgba(33, 54, 51, 0.035);
+  --z-editor-tab-active-text: #9a6419;
+  --z-editor-tab-active-line: #9a6419;
 }
 
 * {
@@ -1558,23 +1574,21 @@ button:focus-visible {
 }
 
 .data-mode-switch {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 4px;
-  align-self: flex-start;
+  --z-editor-tabs-margin-top: 0;
+  margin-bottom: 16px;
+  align-self: stretch;
 }
 
-.data-mode-button {
-  min-width: 108px;
-  min-height: 40px;
-  padding: 8px 16px;
+.data-mode-button[data-editor-tab="events"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/mdi/timeline-clock-outline.svg");
 }
 
-.data-mode-button.is-active {
-  border-color: rgba(255, 179, 71, 0.45);
-  color: var(--highlight);
-  background: rgba(255, 179, 71, 0.12);
+.data-mode-button[data-editor-tab="charts"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/fe/line-chart.svg");
+}
+
+.data-mode-button[data-editor-tab="sources"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/material-symbols/source-outline.svg");
 }
 
 .data-mode-panel {
@@ -1894,7 +1908,7 @@ button:focus-visible {
 
 .compact-color-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 18px 28px 0;
+  grid-template-columns: auto minmax(0, 1fr) 34px 34px 34px 0;
   gap: 8px;
   align-items: center;
 }
@@ -2020,9 +2034,7 @@ button:focus-visible {
 */
 .compact-color-row.z-color-choice-surface {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 34px 34px 0;
-  padding: 10px 14px;
-  border-radius: 14px;
+  grid-template-columns: auto minmax(0, 1fr) 34px 34px 34px 0;
 }
 
 .z-color-choice-button.color-picker-button {
@@ -2065,6 +2077,32 @@ button:focus-visible {
   color: var(--text);
   padding: 6px 8px;
   font: inherit;
+}
+
+/*
+  Die Farbauswahl-Vorlage besitzt ihren Zeilenrahmen selbst. Diese gezielte
+  Rücknahme verhindert, dass generische TimeMap-Formularregeln einen zweiten
+  Eingaberahmen oder eine andere Schrift in die gemeinsame Vorlage zeichnen.
+*/
+.field input.z-color-choice-code,
+.project-category-color-row input.z-color-choice-code {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 0;
+  color: var(--z-color-choice-code-text);
+  font-family: "Source Code Pro", Consolas, "Courier New", monospace;
+  font-size: .86rem;
+  font-weight: 400;
+  letter-spacing: -.01em;
+  box-shadow: none;
+}
+
+.field input.z-color-choice-code:focus,
+.project-category-color-row input.z-color-choice-code:focus {
+  outline: none;
+  box-shadow: inset 0 -1px 0 var(--z-color-choice-code-focus-line, var(--line-strong)),
+    0 2px 0 -1px var(--z-color-choice-focus-ring);
 }
 
 .field select {
@@ -2320,12 +2358,10 @@ button:focus-visible {
 
 .project-category-color-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px 34px;
+  grid-template-columns: minmax(0, 1fr) 34px 34px 34px;
   gap: 10px;
   align-items: center;
   position: relative;
-  padding: 10px 14px;
-  border-radius: 14px;
 }
 
 .project-category-color-row input[type="color"] {
@@ -4902,7 +4938,20 @@ button:focus-visible {
 }
 
 .source-collection-tabs {
+  --z-editor-tabs-margin-top: 0;
   margin-bottom: 12px;
+}
+
+.source-collection-tabs .z-editor-tab[data-editor-tab="general"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/mdi/form-select.svg");
+}
+
+.source-collection-tabs .z-editor-tab[data-editor-tab="sources"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/material-symbols/source-outline.svg");
+}
+
+.source-collection-tabs .z-editor-tab[data-editor-tab="csv"] {
+  --z-editor-tab-icon: url("https://api.iconify.design/mdi/code-json.svg");
 }
 
 .source-collection-pane {
@@ -5064,6 +5113,14 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   width: 24px;
+}
+
+.event-row-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #2f8cff;
+  cursor: pointer;
 }
 
 .event-row-main {

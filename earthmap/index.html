@@ -6,16 +6,19 @@
   <meta name="theme-color" content="#f3efe5">
   <title>Earth Map</title>
   <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
-  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260701g">
-  <link rel="stylesheet" href="earthmap.css?v=20260701h">
+  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260702a">
+  <link rel="stylesheet" href="../assets/ui/editor-tabs.css?v=20260701c">
+  <link rel="stylesheet" href="earthmap.css?v=20260702h">
+  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260702a">
+  <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260701c">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
     <section class="preview-view" aria-label="Earth Map Ansicht">
       <header class="topbar">
         <div class="brand-plate">
-          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
-            <span class="menu-lines" aria-hidden="true"></span>
+          <button type="button" id="menuButton" class="header-icon-button menu-button app-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <img id="menuButtonIcon" src="https://api.iconify.design/material-symbols/menu.svg?color=%23213633" alt="" aria-hidden="true">
           </button>
           <div class="brand-mark">
             <a class="brand-home-link" href="../index.html" aria-label="Zur Atlas-Startseite">
@@ -91,7 +94,7 @@
         <span>Earth Map</span>
       </button>
       <main class="workspace-stage">
-        <section class="workspace-panel browser-panel">
+        <section class="workspace-panel browser-panel z-browser-scope">
           <div class="panel-head">
             <div><span class="label">Browser</span><h2>Projekte</h2></div>
             <div class="browser-header-actions">
@@ -111,12 +114,14 @@
           </div>
           <div id="projectBrowserList" class="project-browser-list" aria-label="Earth-Map-Projekte"></div>
           <div id="libraryBrowserList" class="library-browser-list" aria-label="Projektbibliothek"></div>
-          <input id="boundarySetImportInput" type="file" accept=".json,.geojson,.kml,.kmz,application/json,application/geo+json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" hidden>
+          <input id="boundarySetImportInput" type="file" accept=".json,.geojson,.kml,.kmz,.zip,.shp,application/json,application/geo+json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip" hidden>
         </section>
 
         <section class="workspace-panel editor-panel">
           <div class="panel-head editor-panel-head">
-            <div></div>
+            <button type="button" id="editorBackButton" class="editor-back-button" hidden aria-label="Zurück zur Werkzeugauswahl">
+              <span class="editor-back-button-icon" aria-hidden="true"></span>
+            </button>
             <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
               <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
             </button>
@@ -150,14 +155,10 @@
           <section id="panelLayerEditor" class="editor-tab-panel" data-editor-panel="layer-editor" role="tabpanel" aria-labelledby="tabLayerEditor" hidden>
             <div class="editor-section">
               <h3 id="layerEditorTitle">Keine Karte ausgewählt</h3>
-              <p id="layerEditorSummary" class="empty-state">Wähle links in der Projektbibliothek eine hinzugefügte Länderkarte aus.</p>
+              <p id="layerEditorSummary" class="empty-state">Wähle links im Browser eine einfache oder komplexe Karte aus.</p>
               <div id="layerEditorContent" class="layer-editor-content" hidden>
                 <dl id="layerMetaList" class="layer-meta-list"></dl>
               </div>
-            </div>
-            <div class="editor-section">
-              <h3>Bibliothekslogik</h3>
-              <p>Importierte Geometrien liegen im aktuellen Projekt in eigenen Ordnern. Später kann daraus eine kuratierte GeoJSON-Bibliothek wachsen: wiederverwendbar, zitierbar und mit klarer Quelle, Lizenz, Zeitspanne und Detailtiefe.</p>
             </div>
           </section>
         </section>
@@ -169,6 +170,6 @@
   <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260630a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
   <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260701g"></script>
+  <script src="earthmap.js?v=20260702j"></script>
 </body>
 </html>
