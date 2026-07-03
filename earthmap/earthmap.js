@@ -4,7 +4,7 @@
   "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
   "browserActionsMenuButton", "browserActionsMenu",
   "editorBackButton",
-  "newProjectButton", "importBoundarySetButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
+  "newProjectButton", "importBoundarySetButton", "importBoundarySetFromFolderButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
   "boundarySearchInput", "boundarySearchButton", "boundarySearchResults",
   "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerMetaList",
 ].map((id) => [id, document.getElementById(id)]));
@@ -13,6 +13,9 @@ const DEFAULT_LAYER_FILL_COLOR = "#c6a86a";
 const DEFAULT_LAYER_OUTLINE_COLOR = "#8f9690";
 const DEFAULT_CONTINENTAL_MAP_ID = "continental-natural-earth-10m-land";
 const OSM_TOPOGRAPHIC_MAP_ID = "continental-osm-topographic-unlabeled";
+const EARTHMAP_ARCHIVE_DB_NAME = "ziselin-earthmap-archive";
+const EARTHMAP_ARCHIVE_DB_VERSION = 1;
+const EARTHMAP_BOUNDARY_FEATURE_STORE = "boundarySetFeatures";
 const CONTINENTAL_MAP_OPTIONS = [
   {
     value: "none",
@@ -29,10 +32,117 @@ const CONTINENTAL_MAP_OPTIONS = [
   {
     value: OSM_TOPOGRAPHIC_MAP_ID,
     label: "OSM topografisch · unbeschriftet",
-    detail: "Vorbereitete Option für eine einfache, unbeschriftete topografische OSM-Grundkarte. Die dafür nötigen Offline-/Tile-Daten sind noch nicht im Projektarchiv.",
-    renderable: false,
+    detail: "Lokaler, unbeschrifteter topografischer Grundkartenstil auf der vorhandenen Vektor-Geometrie. Echte OSM-Offline-Tiles können später als Datenquelle ergänzt werden.",
+    renderable: true,
   },
 ];
+
+const MAP_TYPE_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht fachlich zugeordnet." },
+  { value: "state", label: "1 · Staat / Großverband", description: "Souveräner oder quasi-souveräner Staat bzw. Großverband, z. B. Königreich Frankreich, Republik Venedig, Osmanisches Reich." },
+  { value: "composite_realm", label: "2 · Zusammengesetzter Rechtsraum", description: "Übergeordneter Rechts-, Reichs- oder Ordnungsraum, der nicht zwingend ein moderner Zentralstaat ist, z. B. HRR, Deutscher Bund, Habsburgermonarchie." },
+  { value: "constituent_state", label: "3 · Gliedstaat / Teilstaat", description: "Gliedstaat, Teilstaat oder privilegierter Akteur innerhalb eines größeren Verbandes, z. B. Kurfürstentum Sachsen, Kanton, Bundesstaat." },
+  { value: "territorial_holding", label: "4 · Besitz- oder Herrschaftsraum", description: "Konkreter Besitz- oder Herrschaftsraum eines Akteurs, auch wenn er administrativ nicht sauber eingegliedert ist." },
+  { value: "administrative_division", label: "5 · Verwaltungseinheit", description: "Normale Verwaltungseinheit innerhalb eines Staates oder Teilstaates, z. B. Provinz, Gouvernement, Département, Kreis." },
+  { value: "jurisdictional_region", label: "6 · Rechts- oder Organisationsraum", description: "Rechts-, Gerichts-, Steuer-, Militär- oder Organisationsraum, der keine allgemeine Verwaltungseinheit ist, z. B. Reichskreis." },
+  { value: "dependent_polity", label: "7 · Abhängiges Gemeinwesen", description: "Gemeinwesen mit eigener Herrschaftsstruktur, aber begrenzter Außen- oder Innenautonomie, z. B. Vasall, Protektorat, Tributstaat." },
+  { value: "colony_or_overseas_possession", label: "8 · Kolonie / Überseegebiet", description: "Kolonie, Handelsstützpunkt, Überseegebiet oder Besitzung außerhalb des Kernraums." },
+  { value: "personal_union_member", label: "9 · Personalunionsglied", description: "Gebiet, das über eine Person mit anderen Herrschaften verbunden ist, rechtlich aber getrennt bleibt." },
+  { value: "claimed_or_disputed_area", label: "10 · Anspruchs- oder Streitgebiet", description: "Beanspruchtes, umstrittenes, nominell kontrolliertes oder nur teilweise kontrolliertes Gebiet." },
+];
+
+const MAP_RANK_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht hierarchisch eingeordnet." },
+  { value: "0", label: "0 · Makro-/Zivilisationsraum", description: "Sehr großer Ordnungs-, Kultur- oder Zivilisationsraum, z. B. Christendom, Dar al-Islam, Sinosphere." },
+  { value: "1", label: "1 · Staat / Reich / Großverband", description: "Souveräner Hauptakteur oder oberste politische Ordnung, z. B. Frankreich, Osmanisches Reich, HRR." },
+  { value: "2", label: "2 · Teilstaat / große Abhängigkeit", description: "Teilstaat, Kronland, Reichsstand, Kolonie oder abhängiger Staat, z. B. Kurbrandenburg, Böhmen, Britisch-Indien." },
+  { value: "3", label: "3 · regionale Division / Jurisdiktion", description: "Provinz, Kreis, Gouvernement, Département oder Reichskreis." },
+  { value: "4", label: "4 · lokale Einheit", description: "Lokale Verwaltungseinheit, Stadtgebiet, Distrikt, Grafschaft, Amt oder Herrschaft." },
+];
+
+const PROJECT_RANK_OUTLINE_DEFAULTS = {
+  "0": { strokeColor: DEFAULT_LAYER_OUTLINE_COLOR, strokeWidth: 1.9, strokeStyle: "solid" },
+  "1": { strokeColor: DEFAULT_LAYER_OUTLINE_COLOR, strokeWidth: 1.65, strokeStyle: "solid" },
+  "2": { strokeColor: DEFAULT_LAYER_OUTLINE_COLOR, strokeWidth: 1.4, strokeStyle: "solid" },
+  "3": { strokeColor: DEFAULT_LAYER_OUTLINE_COLOR, strokeWidth: 1.15, strokeStyle: "solid" },
+  "4": { strokeColor: DEFAULT_LAYER_OUTLINE_COLOR, strokeWidth: 0.95, strokeStyle: "solid" },
+};
+
+const PROJECT_STROKE_STYLE_CHOICES = [
+  { value: "solid", label: "Durchgezogen" },
+  { value: "dashed", label: "Gestrichelt" },
+  { value: "dotted", label: "Punktiert" },
+  { value: "dash_dot", label: "Strich-Punkt" },
+];
+
+const SOVEREIGNTY_STATUS_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht hinsichtlich politisch-rechtlicher Eigenständigkeit eingeordnet." },
+  { value: "sovereign", label: "1 · Souverän", description: "Eigenständiger Staat mit eigener Außenhoheit." },
+  { value: "composite_sovereign", label: "2 · Zusammengesetzt souverän", description: "Zusammengesetzter Großstaat oder Reich mit mehreren Rechtskörpern, z. B. HRR, Habsburgermonarchie, Polen-Litauen." },
+  { value: "supranational", label: "3 · Supranational", description: "Institutionenraum oberhalb souveräner Mitgliedstaaten mit übertragenen Hoheitsrechten, z. B. EU oder EG." },
+  { value: "semi_sovereign", label: "4 · Halbsouverän", description: "Weitgehend eigenständig, aber in eine übergeordnete Ordnung eingebunden, z. B. Reichsstand im HRR." },
+  { value: "autonomous", label: "5 · Autonom", description: "Interne Selbstverwaltung ohne volle Souveränität." },
+  { value: "dependent", label: "6 · Abhängig", description: "Abhängig von Schutz-, Tribut-, Vasallen- oder Kolonialmacht." },
+  { value: "non_sovereign", label: "7 · Nicht souverän", description: "Reine Verwaltungs-, Rechts- oder Organisationsregion." },
+  { value: "occupied", label: "8 · Besetzt", description: "Militärisch oder faktisch besetzt, ohne stabile rechtliche Eingliederung." },
+  { value: "disputed", label: "9 · Umstritten", description: "Gebiet mit konkurrierenden Herrschaftsansprüchen oder unklarem Status." },
+  { value: "claimed", label: "10 · Beansprucht", description: "Beansprucht, aber nicht oder kaum kontrolliert." },
+];
+
+const RELATION_TO_PARENT_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht bestimmt." },
+  { value: "none", label: "1 · Kein Parent", description: "Oberste Ebene ohne übergeordnetes Gebiet." },
+  { value: "part_of", label: "2 · Teil von", description: "Generisches Teil-von-Verhältnis, wenn nichts Spezifischeres passt." },
+  { value: "member", label: "3 · Mitglied", description: "Verfassungsrechtliches Mitglied eines Verbandes, z. B. Reichsstand, Kanton, Bundesstaat." },
+  { value: "administrative_subdivision", label: "4 · Verwaltungsgliederung", description: "Normale Verwaltungseinheit, z. B. Provinz, Département, Gouvernement." },
+  { value: "jurisdictional", label: "5 · Jurisdiktion", description: "Rechts-, Gerichts-, Steuer-, Militär- oder Organisationsraum." },
+  { value: "dynastic_union", label: "6 · Dynastischer Verbund", description: "Mehrere Gebiete unter einem Herrscherhaus oder Besitzverbund." },
+  { value: "personal_union", label: "7 · Personalunion", description: "Rechtlich getrennte Gebiete mit demselben Monarchen." },
+  { value: "vassalage_or_tributary", label: "8 · Vasall / Tribut", description: "Vasallen-, Lehns-, Tribut- oder Suzeränitätsverhältnis." },
+  { value: "protectorate", label: "9 · Protektorat", description: "Schutzverhältnis mit eingeschränkter Souveränität." },
+  { value: "colonial_possession", label: "10 · Kolonialbesitz", description: "Koloniale Besitz- oder Herrschaftsbeziehung." },
+  { value: "military_occupation", label: "11 · Militärische Besetzung", description: "Faktische militärische Kontrolle." },
+  { value: "claim_or_dispute", label: "12 · Anspruch / Streit", description: "Anspruch, Streitgebiet oder nicht final kontrollierter Raum." },
+];
+
+const GEOMETRY_SCOPE_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht bestimmt, was die Geometrie genau abbildet." },
+  { value: "de_jure_extent", label: "1 · Rechtlicher Geltungsraum", description: "Rechtlich anerkannter oder beanspruchter Geltungsbereich einer politischen Ordnung." },
+  { value: "de_facto_control", label: "2 · Faktische Kontrolle", description: "Tatsächlich kontrolliertes Gebiet, unabhängig vom Rechtsanspruch." },
+  { value: "full_territorial_extent", label: "3 · Gesamter territorialer Umfang", description: "Gesamter territorialer Umfang einer Entität, inklusive verstreuter Besitzungen." },
+  { value: "core_territory", label: "4 · Kerngebiet", description: "Kernland ohne Außenbesitzungen, Kolonien oder abhängige Gebiete." },
+  { value: "administrative_extent", label: "5 · Verwaltungsgebiet", description: "Gebiet einer konkreten Verwaltungseinheit." },
+  { value: "jurisdictional_extent", label: "6 · Geltungsraum einer Ordnung", description: "Geltungsraum einer Rechts-, Gerichts-, Steuer-, Zoll-, Militär- oder Organisationsordnung." },
+  { value: "dynastic_possession", label: "7 · Dynastischer Besitz", description: "Besitzkomplex eines Hauses oder Herrschers, nicht zwingend ein einheitlicher Staat." },
+  { value: "inside_parent_only", label: "8 · Nur innerhalb des Parents", description: "Nur der Teil einer Entität, der innerhalb des Parent-Gebiets liegt." },
+  { value: "outside_parent_only", label: "9 · Nur außerhalb des Parents", description: "Nur der Teil einer Entität außerhalb des Parent-Gebiets." },
+  { value: "claimed_extent", label: "10 · Beanspruchter Raum", description: "Beanspruchtes, aber nicht zwingend kontrolliertes Gebiet." },
+  { value: "disputed_extent", label: "11 · Strittiger Raum", description: "Gebiet mit konkurrierender oder strittiger Zuordnung." },
+  { value: "sphere_of_influence", label: "12 · Einflussraum", description: "Einflussraum ohne direkte territoriale Eingliederung oder Verwaltung." },
+];
+
+function normalizeProjectStrokeStyle(value) {
+  return PROJECT_STROKE_STYLE_CHOICES.some((choice) => choice.value === value) ? value : "solid";
+}
+
+function normalizeProjectRankKey(value) {
+  const key = String(value ?? "");
+  return Object.prototype.hasOwnProperty.call(PROJECT_RANK_OUTLINE_DEFAULTS, key) ? key : "3";
+}
+
+function createDefaultRankOutlineStyles(existing = {}) {
+  return Object.fromEntries(Object.entries(PROJECT_RANK_OUTLINE_DEFAULTS).map(([rank, defaults]) => {
+    const source = existing?.[rank] || {};
+    const width = Number(source.strokeWidth);
+    return [rank, {
+      strokeColor: source && Object.prototype.hasOwnProperty.call(source, "strokeColor")
+        ? normalizeColorValue(source.strokeColor, "") || ""
+        : defaults.strokeColor,
+      strokeWidth: Number.isFinite(width) && width >= 0 ? width : defaults.strokeWidth,
+      strokeStyle: normalizeProjectStrokeStyle(source.strokeStyle || defaults.strokeStyle),
+    }];
+  }));
+}
 
 function createEditorTabButton(id, panel, label, active = false) {
   const button = document.createElement("button");
@@ -67,8 +177,8 @@ function renderEditorTabs() {
   }
   tabs.replaceChildren(
     createEditorTabButton("tabBackground", "background", "Hintergrund", state.activeEditorTab === "background"),
-    createEditorTabButton("tabSingleMaps", "single-maps", "einfache Karten", state.activeEditorTab === "single-maps"),
-    createEditorTabButton("tabCollections", "collections", "komplexe Karten", state.activeEditorTab === "collections"),
+    createEditorTabButton("tabSingleMaps", "single-maps", "Suchen", state.activeEditorTab === "single-maps"),
+    createEditorTabButton("tabCollections", "collections", "Importieren", state.activeEditorTab === "collections"),
     createEditorTabButton("tabAnimations", "animations", "Animationen", state.activeEditorTab === "animations"),
   );
 }
@@ -82,8 +192,8 @@ function initializeEarthMapEditorShell() {
 
   tabs.replaceChildren(
     createEditorTabButton("tabBackground", "background", "Hintergrund", true),
-    createEditorTabButton("tabSingleMaps", "single-maps", "einfache Karten"),
-    createEditorTabButton("tabCollections", "collections", "komplexe Karten"),
+    createEditorTabButton("tabSingleMaps", "single-maps", "Suchen"),
+    createEditorTabButton("tabCollections", "collections", "Importieren"),
     createEditorTabButton("tabAnimations", "animations", "Animationen"),
   );
 
@@ -140,7 +250,11 @@ function initializeEarthMapEditorShell() {
     <div class="editor-section collection-tool-section">
       <h3>Importieren</h3>
       <p>Lade GeoJSON, KML, KMZ, gezippte Shapefiles oder ein Ziselin-Boundary-Set. Die Sammlung wird zuerst hier geprüft, in unser GeoJSON-Modell normalisiert und erst mit „Zum Projekt hinzufügen“ in das aktive Projekt übernommen.</p>
-      <button type="button" id="importBoundarySetButton" class="secondary-button">Vom Desktop importieren</button>
+      <div class="collection-import-actions">
+        <button type="button" id="importBoundarySetButton" class="secondary-button">Vom Desktop importieren</button>
+        <button type="button" id="importBoundarySetFromFolderButton" class="secondary-button">Aus Importordner importieren</button>
+      </div>
+      <p class="structured-editor-field-help">Importordner: <code>earthmap/imports</code>. Lege dort GeoJSON, KML/KMZ oder gezippte Shapefiles ab.</p>
     </div>
     <div class="editor-section collection-tool-section">
       <h3 id="collectionImportTitle">Keine Sammlung geladen</h3>
@@ -167,7 +281,7 @@ function initializeEarthMapEditorShell() {
   collectionsPanel.insertAdjacentElement("afterend", animationsPanel);
 
   Object.assign(ui, Object.fromEntries([
-    "mapObjectEditor", "importBoundarySetButton", "collectionImportTitle", "collectionImportSummary",
+    "mapObjectEditor", "importBoundarySetButton", "importBoundarySetFromFolderButton", "collectionImportTitle", "collectionImportSummary",
     "collectionImportContent", "collectionImportMetaList", "addCollectionToProjectButton", "backgroundMapList",
   ].map((id) => [id, document.getElementById(id)])));
 }
@@ -278,26 +392,26 @@ function createOsmTopographicMapItem() {
     id: OSM_TOPOGRAPHIC_MAP_ID,
     kind: "continental-map",
     name: "OSM topografisch · unbeschriftet",
-    source: "OpenStreetMap",
-    adminLevel: "Topografische Hintergrundkarte",
-    detail: "vorbereitet",
-    license: "ODbL / OSM-Datenlizenz",
+    source: "OpenStreetMap-Stil · lokale Vektorgrundkarte",
+    adminLevel: "Topografische Hintergrundkarte ohne Beschriftung",
+    detail: "lokal gerendert",
+    license: "Natural Earth Public Domain; OSM-Stilreferenz ohne Tile-Daten",
     sourceUrl: "https://www.openstreetmap.org/copyright",
     importedAt: "system-prepared",
     temporalCoverage: {
-      label: "gegenwärtige OSM-Grunddaten",
+      label: "gegenwärtige topografische Grunddarstellung",
       from: "",
       to: "",
     },
     display: {
-      visible: false,
-      color: "#ecebe4",
-      outlineColor: "#aeb5af",
+      visible: true,
+      color: "#e7e2d1",
+      outlineColor: "#9fa79f",
     },
     geometryRef: {
-      provider: "openstreetmap",
+      provider: "local-osm-style",
       dataset: "topographic-unlabeled",
-      status: "prepared",
+      status: "renderable",
     },
     locked: true,
   };
@@ -452,6 +566,7 @@ function normalizeProject(project) {
     continentalMapId: normalizeContinentalMapId(normalized.displaySettings?.continentalMapId
       || (legacyContinentalMap?.display?.visible === false ? "none" : DEFAULT_CONTINENTAL_MAP_ID),
     ),
+    rankOutlineStyles: createDefaultRankOutlineStyles(normalized.displaySettings?.rankOutlineStyles),
   };
   normalized.boundarySets = normalized.boundarySets.map((boundarySet) => ({
     ...boundarySet,
@@ -538,6 +653,8 @@ const state = {
   activeEditorItemId: "",
   activeEditorChapterKey: "",
   activeSubfolderRef: null,
+  boundarySetFeatureCache: new Map(),
+  loadingBoundarySetIds: new Set(),
 };
 
 state.activeProjectId = state.projects[0]?.id || "";
@@ -554,6 +671,76 @@ function persistProjects() {
     console.warn("Earth-Map-Projekte konnten nicht gespeichert werden.", error);
     return false;
   }
+}
+
+function openEarthMapArchiveDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB ist in diesem Browser nicht verfügbar."));
+      return;
+    }
+    const request = window.indexedDB.open(EARTHMAP_ARCHIVE_DB_NAME, EARTHMAP_ARCHIVE_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(EARTHMAP_BOUNDARY_FEATURE_STORE)) {
+        db.createObjectStore(EARTHMAP_BOUNDARY_FEATURE_STORE, { keyPath: "id" });
+      }
+    };
+    request.onerror = () => reject(request.error || new Error("EarthMap-Archiv konnte nicht geöffnet werden."));
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function saveBoundarySetFeaturesToArchive(boundarySet) {
+  const features = Array.isArray(boundarySet?.features) ? boundarySet.features : [];
+  if (!boundarySet?.id || !features.length) return null;
+  const db = await openEarthMapArchiveDb();
+  await new Promise((resolve, reject) => {
+    const transaction = db.transaction(EARTHMAP_BOUNDARY_FEATURE_STORE, "readwrite");
+    const store = transaction.objectStore(EARTHMAP_BOUNDARY_FEATURE_STORE);
+    store.put({
+      id: boundarySet.id,
+      features,
+      updatedAt: new Date().toISOString(),
+    });
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error || new Error("Geometrien konnten nicht im EarthMap-Archiv gespeichert werden."));
+    transaction.onabort = () => reject(transaction.error || new Error("Geometriespeicherung wurde abgebrochen."));
+  });
+  db.close();
+  state.boundarySetFeatureCache.set(boundarySet.id, features);
+  return {
+    provider: "indexeddb",
+    database: EARTHMAP_ARCHIVE_DB_NAME,
+    store: EARTHMAP_BOUNDARY_FEATURE_STORE,
+    key: boundarySet.id,
+    featureCount: features.length,
+    storedAt: new Date().toISOString(),
+  };
+}
+
+async function loadBoundarySetFeaturesFromArchive(key) {
+  if (!key) return [];
+  const db = await openEarthMapArchiveDb();
+  const record = await new Promise((resolve, reject) => {
+    const transaction = db.transaction(EARTHMAP_BOUNDARY_FEATURE_STORE, "readonly");
+    const request = transaction.objectStore(EARTHMAP_BOUNDARY_FEATURE_STORE).get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error || new Error("Geometrien konnten nicht aus dem EarthMap-Archiv gelesen werden."));
+  });
+  db.close();
+  return Array.isArray(record?.features) ? record.features : [];
+}
+
+async function ensureArchivedBoundarySetFeatures(item) {
+  const storage = item?.boundarySet?.geometryStorage;
+  const key = storage?.key || item?.boundarySet?.id || "";
+  if (storage?.provider !== "indexeddb" || !key) return [];
+  const cached = state.boundarySetFeatureCache.get(key);
+  if (cached?.length) return cached;
+  const features = await loadBoundarySetFeaturesFromArchive(key);
+  state.boundarySetFeatureCache.set(key, features);
+  return features;
 }
 
 function getActiveProject() {
@@ -680,7 +867,7 @@ function getSelectedContinentalMapOption(project = getActiveProject()) {
       value: item.id,
       label: item.name,
       detail: [item.source, item.detail, item.license].filter(Boolean).join(" · "),
-      renderable: item.id === DEFAULT_CONTINENTAL_MAP_ID,
+      renderable: item.id === DEFAULT_CONTINENTAL_MAP_ID || item.id === OSM_TOPOGRAPHIC_MAP_ID,
     };
   }
   return CONTINENTAL_MAP_OPTIONS.find((option) => option.value === selectedId)
@@ -694,8 +881,44 @@ function shouldRenderContinentalBaseMap(project = getActiveProject()) {
   // Darstellungseigenschaft die Grundkarte; sie ist kein Browserobjekt mehr.
   if (!project) return true;
   const option = getSelectedContinentalMapOption(project);
-  return option?.value === DEFAULT_CONTINENTAL_MAP_ID && getContinentalMapItems(project)
-    .find((item) => item.id === DEFAULT_CONTINENTAL_MAP_ID)?.display?.visible !== false;
+  return [DEFAULT_CONTINENTAL_MAP_ID, OSM_TOPOGRAPHIC_MAP_ID].includes(option?.value) && option.renderable !== false;
+}
+
+function getActiveContinentalMapId(project = getActiveProject()) {
+  if (!project) return DEFAULT_CONTINENTAL_MAP_ID;
+  return getSelectedContinentalMapOption(project)?.value || DEFAULT_CONTINENTAL_MAP_ID;
+}
+
+function isOsmTopographicBaseMap(project = getActiveProject()) {
+  return getActiveContinentalMapId(project) === OSM_TOPOGRAPHIC_MAP_ID;
+}
+
+function getContinentalRenderStyle(project = getActiveProject()) {
+  const dark = document.body.classList.contains("earthmap-theme-dark");
+  if (isOsmTopographicBaseMap(project)) {
+    return dark
+      ? {
+        sea: "#20282b",
+        land: "#46493f",
+        outline: "rgba(229,220,184,.46)",
+        contour: "rgba(255,179,71,.18)",
+        shade: "rgba(255,255,255,.035)",
+      }
+      : {
+        sea: "#eef2ef",
+        land: "#e8e2ce",
+        outline: "rgba(95,104,98,.46)",
+        contour: "rgba(155,132,82,.24)",
+        shade: "rgba(82,92,86,.08)",
+      };
+  }
+  return {
+    sea: getThemeMapColor("--sea", "#fbfbf8"),
+    land: getThemeMapColor("--land", "#c4c4c0"),
+    outline: getThemeMapColor("--land-outline", "rgba(92,96,94,.46)"),
+    contour: "",
+    shade: "",
+  };
 }
 
 function getNaturalEarthCountryFeatureByIso3(iso3) {
@@ -803,20 +1026,50 @@ function getRenderableBoundaryFeature(item) {
   return simplifyBoundaryFeatureForZoom(feature, dataset.detail);
 }
 
+function normalizeBoundarySetFeaturesForRender(features) {
+  return (features || [])
+    .map((feature) => ({
+      type: "Feature",
+      properties: {
+        ...(feature.properties || {}),
+        ziselin_id: feature.id,
+        name: feature.name,
+        wikidata_id: feature.wikidata_id || "",
+      },
+      geometry: feature.geometry,
+    }))
+    .filter((feature) => feature.geometry);
+}
+
+function requestArchivedBoundarySetFeatures(item) {
+  const storage = item?.boundarySet?.geometryStorage;
+  const key = storage?.key || item?.boundarySet?.id || "";
+  if (storage?.provider !== "indexeddb" || !key || state.loadingBoundarySetIds.has(key)) return;
+  state.loadingBoundarySetIds.add(key);
+  loadBoundarySetFeaturesFromArchive(key)
+    .then((features) => {
+      state.boundarySetFeatureCache.set(key, features);
+      renderObjectEditor();
+      renderGlobe();
+    })
+    .catch((error) => {
+      console.warn("Archivierte EarthMap-Geometrien konnten nicht geladen werden.", error);
+    })
+    .finally(() => {
+      state.loadingBoundarySetIds.delete(key);
+    });
+}
+
 function getRenderableBoundaryFeatures(item) {
   if (item?.boundarySet?.features?.length) {
-    return item.boundarySet.features
-      .map((feature) => ({
-        type: "Feature",
-        properties: {
-          ...(feature.properties || {}),
-          ziselin_id: feature.id,
-          name: feature.name,
-          wikidata_id: feature.wikidata_id || "",
-        },
-        geometry: feature.geometry,
-      }))
-      .filter((feature) => feature.geometry);
+    return normalizeBoundarySetFeaturesForRender(item.boundarySet.features);
+  }
+  const archiveKey = item?.boundarySet?.geometryStorage?.key;
+  if (archiveKey) {
+    const cached = state.boundarySetFeatureCache.get(archiveKey);
+    if (cached?.length) return normalizeBoundarySetFeaturesForRender(cached);
+    requestArchivedBoundarySetFeatures(item);
+    return [];
   }
   const feature = getRenderableBoundaryFeature(item);
   return feature ? [feature] : [];
@@ -1084,6 +1337,140 @@ function cloneFeatureCollectionForExport(geojson) {
   }
   const feature = cloneFeatureForExport(geojson);
   return { type: "FeatureCollection", features: feature ? [feature] : [] };
+}
+
+function cloneFeatureForGeoJsonExport(feature, extraProperties = {}) {
+  const geometry = cloneGeometryForExport(feature?.geometry || feature);
+  if (!geometry) return null;
+  return {
+    type: "Feature",
+    properties: {
+      ...(feature?.properties || {}),
+      ...extraProperties,
+    },
+    geometry,
+  };
+}
+
+function getGeoJsonExportFeatures(item) {
+  if (item?.boundarySet?.features?.length) {
+    return item.boundarySet.features
+      .map((feature) => ({
+        type: "Feature",
+        properties: {
+          ...(feature.properties || {}),
+          ziselin_id: feature.id,
+          name: feature.name,
+          wikidata_id: feature.wikidata_id || "",
+        },
+        geometry: feature.geometry,
+      }))
+      .filter((feature) => feature.geometry);
+  }
+  const archiveKey = item?.boundarySet?.geometryStorage?.key;
+  if (archiveKey && state.boundarySetFeatureCache.has(archiveKey)) {
+    return (state.boundarySetFeatureCache.get(archiveKey) || [])
+      .map((feature) => ({
+        type: "Feature",
+        properties: {
+          ...(feature.properties || {}),
+          ziselin_id: feature.id,
+          name: feature.name,
+          wikidata_id: feature.wikidata_id || "",
+        },
+        geometry: feature.geometry,
+      }))
+      .filter((feature) => feature.geometry);
+  }
+  const provider = item?.geometryRef?.provider || "";
+  if (provider === "natural-earth" || item?.source === "Natural Earth") {
+    const feature = getNaturalEarthCountryFeatureByIso3(item.geometryRef?.iso3 || item.iso3);
+    return feature ? [feature] : [];
+  }
+  return getRenderableBoundaryFeatures(item);
+}
+
+function getSubfolderItemEntries(project, folderType, subfolderId) {
+  if (!project || !subfolderId) return [];
+  if (folderType === "project-layers") {
+    return getProjectSubfolderItems(project, subfolderId);
+  }
+  const folder = getLibraryFolder(project, folderType);
+  const subfolder = (folder?.subfolders || []).find((candidate) => candidate.id === subfolderId);
+  return (subfolder?.items || []).map((item) => ({ item, folderType }));
+}
+
+function buildSubfolderGeoJsonExport(project, folderType, subfolder) {
+  const folder = folderType === "project-layers"
+    ? { type: "project-layers", title: "Projektkarten" }
+    : getLibraryFolder(project, folderType);
+  const entries = getSubfolderItemEntries(project, folderType, subfolder?.id);
+  const features = [];
+
+  // Exportregel: Unterordner werden als Standard-GeoJSON exportiert. Ziselin-
+  // Metadaten werden vorerst in properties geschrieben, damit GIS-Tools die
+  // Datei direkt öffnen können. Welche fachlichen Attribute dauerhaft in den
+  // Export gehören, schärfen wir später am Boundary-Set-Standard nach.
+  entries.forEach(({ item, folderType: itemFolderType }, itemIndex) => {
+    const classification = item.boundarySet || item.classification || {};
+    getGeoJsonExportFeatures(item).forEach((feature, featureIndex) => {
+      const cloned = cloneFeatureForGeoJsonExport(feature, {
+        ziselin_project_id: project.id,
+        ziselin_project_title: project.title,
+        ziselin_subfolder_id: subfolder.id,
+        ziselin_subfolder_title: subfolder.title,
+        ziselin_folder_type: itemFolderType || folderType,
+        ziselin_folder_title: getLibraryFolder(project, itemFolderType || folderType)?.title || folder.title || "",
+        ziselin_layer_id: item.id,
+        ziselin_layer_name: item.name,
+        ziselin_layer_source: item.source || "",
+        ziselin_layer_detail: item.detail || "",
+        ziselin_layer_license: item.license || "",
+        ziselin_layer_color: item.display?.color || "",
+        ziselin_layer_outline_color: item.display?.outlineColor || "",
+        ziselin_type: classification.type || "",
+        ziselin_rank: classification.rank ?? "",
+        ziselin_sovereignty_status: classification.sovereignty_status || "",
+        ziselin_relation_to_parent: classification.relation_to_parent || "",
+        ziselin_parent_id: classification.parent_id || "",
+        ziselin_geometry_scope: classification.geometry_scope || "",
+        ziselin_item_index: itemIndex,
+        ziselin_feature_index: featureIndex,
+      });
+      if (cloned) features.push(cloned);
+    });
+  });
+
+  return {
+    type: "FeatureCollection",
+    name: subfolder?.title || "Unterordner",
+    properties: {
+      ziselin_schema: "earthmap-subfolder-export-v1",
+      exported_at: new Date().toISOString(),
+      project_id: project.id,
+      project_title: project.title,
+      folder_type: folderType,
+      folder_title: folder?.title || "",
+      subfolder_id: subfolder?.id || "",
+      subfolder_title: subfolder?.title || "",
+      layer_count: entries.length,
+      feature_count: features.length,
+    },
+    features,
+  };
+}
+
+async function exportLibrarySubfolder(project, folderType, subfolder) {
+  const entries = getSubfolderItemEntries(project, folderType, subfolder?.id);
+  await Promise.all(entries.map(({ item }) => ensureArchivedBoundarySetFeatures(item)));
+  const geojson = buildSubfolderGeoJsonExport(project, folderType, subfolder);
+  if (!geojson.features.length) {
+    window.alert("Der Unterordner enthält keine exportierbaren Karten.");
+    return;
+  }
+  const filename = `${slugifyFilename(project?.title, "earth-map")}-${slugifyFilename(subfolder?.title, "unterordner")}.geojson`;
+  const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json;charset=utf-8" });
+  downloadBlob(blob, filename);
 }
 
 function getEarthMapHtmlExportState() {
@@ -1671,7 +2058,7 @@ function createEarthMapTextureCanvas(textureWidth = getWebglTextureSize()) {
   canvas.width = textureWidth;
   canvas.height = Math.floor(textureWidth / 2);
   const textureContext = canvas.getContext("2d");
-  textureContext.fillStyle = "#fbfbf8";
+  textureContext.fillStyle = getContinentalRenderStyle().sea;
   textureContext.fillRect(0, 0, canvas.width, canvas.height);
   return canvas;
 }
@@ -1679,7 +2066,7 @@ function createEarthMapTextureCanvas(textureWidth = getWebglTextureSize()) {
 function updateWebglMapTexture() {
   const gl = webglState.gl;
   const textureSize = getWebglTextureSize();
-  const signature = `water-sphere|${textureSize}`;
+  const signature = `water-sphere|${textureSize}|${getActiveContinentalMapId()}|${document.body.classList.contains("earthmap-theme-dark") ? "dark" : "light"}`;
   if (signature === webglState.mapTextureSignature && webglState.mapTexture) return;
   const textureCanvas = createEarthMapTextureCanvas(textureSize);
   if (!webglState.mapTexture) webglState.mapTexture = gl.createTexture();
@@ -1835,7 +2222,7 @@ function drawWebglMapOutlines(radius, center) {
   if (isNavigatingGlobe && globeZoom > 1.35) return;
   const source = shouldRenderContinentalBaseMap() ? getRenderableLandGeoJson() : null;
   if (source) {
-    drawProjectedOutlineRings(source, radius, center, "rgba(116,121,117,.58)", 1.05, 0.85);
+    drawProjectedOutlineRings(source, radius, center, getContinentalRenderStyle().outline, 1.05, 0.85);
   }
 
   getVisibleProjectBoundaryItems().forEach((item) => {
@@ -2600,7 +2987,7 @@ function drawSphere(size, radius, center) {
   // Ozean und Kontinente optisch ineinanderlaufen.
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = getThemeMapColor("--sea", "#fbfbf8");
+  ctx.fillStyle = getContinentalRenderStyle().sea;
   ctx.fill();
   ctx.lineWidth = Math.max(2, size * 0.006);
   ctx.strokeStyle = getThemeMapColor("--sphere-outline", "rgba(154,158,154,.42)");
@@ -2621,6 +3008,7 @@ function drawGeographicLayer(radius, center) {
   if (!hasD3Geo || !renderSource) return false;
   const rings = extractLandRings(renderSource);
   if (!rings.length) return false;
+  const style = getContinentalRenderStyle();
 
   // Renderregel: Die Basislandmasse wird nicht mehr mit D3s sphärischer
   // Polygonfüllung gefüllt. Wasser ist die unveränderliche Basis; Land wird
@@ -2629,15 +3017,19 @@ function drawGeographicLayer(radius, center) {
   // wieder das sphärische Komplement füllen zu lassen.
   rings.forEach((ring) => {
     const denseRing = densifyRing(ring, globeZoom > 7 ? 0.45 : 0.9);
-    drawVisibleHemisphereFill(denseRing, radius, center, getThemeMapColor("--land", "#c4c4c0"));
+    drawVisibleHemisphereFill(denseRing, radius, center, style.land);
   });
+
+  if (isOsmTopographicBaseMap()) {
+    drawTopographicReliefOverlay(rings, radius, center, style);
+  }
 
   rings.forEach((ring) => {
     drawProjectedLine(
       densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85),
       radius,
       center,
-      getThemeMapColor("--land-outline", "rgba(92,96,94,.46)"),
+      style.outline,
       getStableGlobeStrokeWidth(radius, 0.0018, 0.7),
     );
   });
@@ -2645,7 +3037,44 @@ function drawGeographicLayer(radius, center) {
   return true;
 }
 
+function drawTopographicReliefOverlay(rings, radius, center, style) {
+  if (!rings.length) return;
+  ctx.save();
+  ctx.beginPath();
+  let hasClip = false;
+  rings.forEach((ring) => {
+    if (addVisibleHemisphereRingPath(densifyRing(ring, globeZoom > 7 ? 0.75 : 1.15), radius, center)) hasClip = true;
+  });
+  if (!hasClip) {
+    ctx.restore();
+    return;
+  }
+  ctx.clip("evenodd");
+
+  const shade = ctx.createLinearGradient(center.x - radius * 0.7, center.y - radius * 0.85, center.x + radius * 0.55, center.y + radius * 0.65);
+  shade.addColorStop(0, "rgba(255,255,255,.12)");
+  shade.addColorStop(0.45, "rgba(255,255,255,0)");
+  shade.addColorStop(1, style.shade || "rgba(82,92,86,.07)");
+  ctx.fillStyle = shade;
+  ctx.fillRect(center.x - radius, center.y - radius, radius * 2, radius * 2);
+
+  const contourStep = globeZoom > 7 ? 5 : globeZoom > 3.5 ? 7.5 : 10;
+  const maxStep = globeZoom > 7 ? 1.6 : 2.8;
+  ctx.strokeStyle = style.contour || "rgba(155,132,82,.22)";
+  ctx.lineWidth = getStableGlobeStrokeWidth(radius, 0.0012, 0.42);
+  for (let lat = -80; lat <= 80; lat += contourStep) {
+    const points = [];
+    for (let lon = -180; lon <= 180; lon += maxStep) {
+      const wave = Math.sin((lon * 1.7 + lat * 2.2) * DEG) * 0.65 + Math.sin((lon * 0.45 - lat * 3.1) * DEG) * 0.35;
+      points.push([lon, clamp(lat + wave, -84, 84)]);
+    }
+    drawProjectedLine(points, radius, center, ctx.strokeStyle, ctx.lineWidth);
+  }
+  ctx.restore();
+}
+
 function drawProjectBoundaryLayers(radius, center) {
+  const project = getActiveProject();
   const items = getVisibleProjectBoundaryItems();
   if (!items.length) return false;
   let drewLayer = false;
@@ -2655,8 +3084,11 @@ function drawProjectBoundaryLayers(radius, center) {
     if (!features.length) return;
 
     const color = normalizeColorValue(item.display?.color, "");
-    const outlineColor = normalizeColorValue(item.display?.outlineColor, "");
-    if (drawBoundaryFeatureVector({ type: "FeatureCollection", features }, radius, center, color, outlineColor)) {
+    const outlineStyle = getProjectBoundaryOutlineStyle(project, item);
+    const outlineColor = outlineStyle && Object.prototype.hasOwnProperty.call(outlineStyle, "strokeColor")
+      ? normalizeColorValue(outlineStyle.strokeColor, "")
+      : normalizeColorValue(item.display?.outlineColor, "");
+    if (drawBoundaryFeatureVector({ type: "FeatureCollection", features }, radius, center, color, outlineColor, outlineStyle)) {
       drewLayer = true;
     }
   });
@@ -2664,14 +3096,30 @@ function drawProjectBoundaryLayers(radius, center) {
   return drewLayer;
 }
 
-function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR) {
+function getProjectBoundaryOutlineStyle(project, item) {
+  const boundarySet = item?.boundarySet || null;
+  const rank = normalizeProjectRankKey(boundarySet?.rank ?? item?.classification?.rank ?? "");
+  return (project?.displaySettings?.rankOutlineStyles || PROJECT_RANK_OUTLINE_DEFAULTS)[rank] || PROJECT_RANK_OUTLINE_DEFAULTS[rank];
+}
+
+function getLineDashForStrokeStyle(strokeStyle, lineWidth) {
+  const width = Math.max(0.8, Number(lineWidth) || 1);
+  if (strokeStyle === "dashed") return [width * 5, width * 3];
+  if (strokeStyle === "dotted") return [width * 1.1, width * 2.4];
+  if (strokeStyle === "dash_dot") return [width * 5, width * 2.6, width * 1.1, width * 2.6];
+  return [];
+}
+
+function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR, outlineStyle = {}) {
   const featureCollection = feature?.type === "FeatureCollection" ? feature : { type: "FeatureCollection", features: [feature] };
   const polygons = extractLandPolygons(featureCollection);
   const rings = polygons.flat();
   if (!polygons.length || !rings.length) return false;
   const fillStyle = color ? hexToRgba(color, 0.84) : "";
   const strokeStyle = outlineColor ? hexToRgba(outlineColor, 0.98) : "";
-  const lineWidth = getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
+  const configuredLineWidth = Number(outlineStyle.strokeWidth);
+  const lineWidth = Number.isFinite(configuredLineWidth) ? Math.max(0, configuredLineWidth) : getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
+  const lineDash = getLineDashForStrokeStyle(normalizeProjectStrokeStyle(outlineStyle.strokeStyle), lineWidth);
   const density = globeZoom > 7 ? 0.35 : 0.75;
 
   // Layer-Regel: importierte Länder/Regionen müssen denselben
@@ -2690,18 +3138,19 @@ function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor 
     });
   }
 
-  if (strokeStyle) {
+  if (strokeStyle && lineWidth > 0) {
     rings.forEach((ring) => {
-      drawProjectedLine(densifyRing(ring, density), radius, center, strokeStyle, lineWidth);
+      drawProjectedLine(densifyRing(ring, density), radius, center, strokeStyle, lineWidth, lineDash);
     });
   }
 
-  return Boolean(fillStyle || strokeStyle);
+  return Boolean(fillStyle || (strokeStyle && lineWidth > 0));
 }
 
-function drawProjectedLine(points, radius, center, strokeStyle, lineWidth) {
+function drawProjectedLine(points, radius, center, strokeStyle, lineWidth, lineDash = []) {
   let drawing = false;
   ctx.beginPath();
+  ctx.setLineDash(Array.isArray(lineDash) ? lineDash : []);
   points.forEach(([lon, lat]) => {
     const point = project(lon, lat, radius, center.x, center.y);
     if (point.z <= 0) {
@@ -2718,6 +3167,7 @@ function drawProjectedLine(points, radius, center, strokeStyle, lineWidth) {
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function drawProjectedFill(points, radius, center, fillStyle) {
@@ -2922,13 +3372,13 @@ function drawLand(radius, center) {
   geoState.landRings.forEach((ring) => {
     const denseRing = densifyRing(ring, 1.4);
     if (ringIsFullyVisible(denseRing)) {
-      drawProjectedFill(denseRing, radius, center, hexToRgba(getThemeMapColor("--land", "#c4c4c0"), .72));
+      drawProjectedFill(denseRing, radius, center, hexToRgba(getContinentalRenderStyle().land, .72));
     }
   });
 
   if (geoState.samplesReady) {
     const dotRadius = Math.max(1.85, radius * 0.011);
-    const landColor = getThemeMapColor("--land", "#c4c4c0");
+    const landColor = getContinentalRenderStyle().land;
     geoState.landSamples.forEach(({ lon, lat }) => {
       const vector = toRotatedUnit(lon, lat);
       if (vector.z <= 0.01) return;
@@ -2942,7 +3392,7 @@ function drawLand(radius, center) {
   }
 
   geoState.landRings.forEach((ring) => {
-    drawProjectedLine(densifyRing(ring, 1.2), radius, center, getThemeMapColor("--land-outline", "rgba(92,96,94,.5)"), getStableGlobeStrokeWidth(radius, 0.002, 0.7));
+    drawProjectedLine(densifyRing(ring, 1.2), radius, center, getContinentalRenderStyle().outline, getStableGlobeStrokeWidth(radius, 0.002, 0.7));
   });
 }
 
@@ -3322,6 +3772,20 @@ function createProjectCardMenu(project) {
   menu.className = "project-card-menu";
   menu.hidden = state.openProjectBrowserMenuId !== project.id;
 
+  const propertiesButton = document.createElement("button");
+  propertiesButton.type = "button";
+  propertiesButton.className = "project-card-menu-action";
+  propertiesButton.textContent = "Eigenschaften";
+  propertiesButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    state.openProjectBrowserMenuId = null;
+    state.activeProjectId = project.id;
+    persistProjects();
+    renderProjectBrowser();
+    openProjectEditor(project);
+  });
+
   const addSubfolderButton = document.createElement("button");
   addSubfolderButton.type = "button";
   addSubfolderButton.className = "project-card-menu-action";
@@ -3343,7 +3807,7 @@ function createProjectCardMenu(project) {
   deleteButton.addEventListener("pointercancel", cancelProjectDeleteHold);
   deleteButton.addEventListener("lostpointercapture", cancelProjectDeleteHold);
 
-  menu.append(addSubfolderButton, deleteButton);
+  menu.append(propertiesButton, addSubfolderButton, deleteButton);
   shell.append(trigger, menu);
   return shell;
 }
@@ -3728,8 +4192,27 @@ function createLibrarySubfolderRow(subfolder, project, folderType) {
     && state.activeSubfolderRef?.subfolderId === subfolder.id;
   row.classList.toggle("is-active", isActive);
 
-  const visibilitySpacer = document.createElement("span");
-  visibilitySpacer.className = "browser-checkbox-spacer";
+  const subfolderItems = folderType === "project-layers"
+    ? getProjectSubfolderItems(project, subfolder.id).map((entry) => entry.item)
+    : (Array.isArray(subfolder.items) ? subfolder.items : []);
+  const visibleItemCount = subfolderItems.filter((item) => item.display?.visible !== false).length;
+
+  const visibility = document.createElement("input");
+  visibility.type = "checkbox";
+  visibility.className = "browser-visibility-checkbox";
+  visibility.checked = !subfolderItems.length || visibleItemCount === subfolderItems.length;
+  visibility.indeterminate = visibleItemCount > 0 && visibleItemCount < subfolderItems.length;
+  visibility.title = `${subfolder.title} ein-/ausblenden`;
+  visibility.addEventListener("click", (event) => event.stopPropagation());
+  visibility.addEventListener("change", () => {
+    subfolderItems.forEach((item) => {
+      item.display = item.display || {};
+      item.display.visible = visibility.checked;
+    });
+    persistProjects();
+    renderWorkspace();
+    renderGlobe();
+  });
 
   const toggle = document.createElement("button");
   toggle.type = "button";
@@ -3751,11 +4234,56 @@ function createLibrarySubfolderRow(subfolder, project, folderType) {
   const title = document.createElement("strong");
   title.textContent = subfolder.title;
   const meta = document.createElement("span");
-  const items = Array.isArray(subfolder.items) ? subfolder.items : [];
-  meta.textContent = `${items.length} Karten`;
+  meta.textContent = `${subfolderItems.length} Karten`;
   copy.append(title, meta);
 
-  row.append(visibilitySpacer, toggle, icon, copy);
+  const menuId = `subfolder:${project.id}:${folderType}:${subfolder.id}`;
+  const menuShell = document.createElement("div");
+  menuShell.className = "project-card-menu-shell";
+
+  const menuButton = document.createElement("button");
+  menuButton.type = "button";
+  menuButton.className = "project-card-menu-trigger";
+  menuButton.setAttribute("aria-label", `${subfolder.title}-Aktionen`);
+  menuButton.setAttribute("aria-expanded", state.openFolderBrowserMenuId === menuId ? "true" : "false");
+  menuButton.innerHTML = "<span class=\"project-card-menu-dots\" aria-hidden=\"true\"></span>";
+  menuButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resetProjectDeleteHold();
+    resetLayerDeleteHold();
+    state.openProjectBrowserMenuId = null;
+    state.openLayerBrowserMenuId = null;
+    state.openFolderBrowserMenuId = state.openFolderBrowserMenuId === menuId ? null : menuId;
+    renderProjectBrowser();
+  });
+
+  const menu = document.createElement("div");
+  menu.className = "project-card-menu";
+  menu.hidden = state.openFolderBrowserMenuId !== menuId;
+
+  const exportButton = document.createElement("button");
+  exportButton.type = "button";
+  exportButton.className = "project-card-menu-action";
+  exportButton.textContent = "Exportieren";
+  exportButton.disabled = !subfolderItems.length;
+  exportButton.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    state.openFolderBrowserMenuId = null;
+    renderProjectBrowser();
+    try {
+      await exportLibrarySubfolder(project, folderType, subfolder);
+    } catch (error) {
+      console.error("Unterordner-Export fehlgeschlagen.", error);
+      window.alert(`Unterordner-Export fehlgeschlagen: ${error?.message || "unbekannter Fehler"}`);
+    }
+  });
+
+  menu.append(exportButton);
+  menuShell.append(menuButton, menu);
+
+  row.append(visibility, toggle, icon, copy, menuShell);
   return row;
 }
 
@@ -3767,6 +4295,7 @@ function getLayerBrowserDetailLabel(item) {
 
 function getLibraryItemFeatureCount(item) {
   if (Array.isArray(item?.boundarySet?.features)) return item.boundarySet.features.length;
+  if (Number.isFinite(item?.boundarySet?.geometryStorage?.featureCount)) return item.boundarySet.geometryStorage.featureCount;
   const features = getRenderableBoundaryFeatures(item);
   return features.length || 1;
 }
@@ -4057,6 +4586,12 @@ function ensureBoundarySetShape(item) {
   item.boundarySet.license.compatibility = item.boundarySet.license.compatibility || {};
   item.boundarySet.features = Array.isArray(item.boundarySet.features) ? item.boundarySet.features : [];
   item.boundarySet.wikidata_id = normalizeWikidataId(item.boundarySet.wikidata_id || item.wikidataId || "");
+  item.boundarySet.type = item.boundarySet.type || item.boundarySet.boundary_type || "";
+  item.boundarySet.rank = item.boundarySet.rank == null ? "" : String(item.boundarySet.rank);
+  item.boundarySet.sovereignty_status = item.boundarySet.sovereignty_status || "";
+  item.boundarySet.relation_to_parent = item.boundarySet.relation_to_parent || "";
+  item.boundarySet.parent_id = item.boundarySet.parent_id || "";
+  item.boundarySet.geometry_scope = item.boundarySet.geometry_scope || "";
   return item.boundarySet;
 }
 
@@ -4073,12 +4608,13 @@ function setObjectValue(target, path, value) {
 function syncItemFromBoundarySet(item) {
   const boundarySet = item.boundarySet;
   if (!boundarySet) return;
+  const featureCount = getLibraryItemFeatureCount(item);
   item.name = repairLegacyText(boundarySet.title || item.name);
   item.source = repairLegacyText(boundarySet.source?.label || item.source);
   item.iso3 = boundarySet.country_iso3 || item.iso3 || "";
   item.wikidataId = normalizeWikidataId(boundarySet.wikidata_id || item.wikidataId || "");
   item.adminLevel = repairLegacyText(boundarySet.admin_level || boundarySet.boundary_type || item.adminLevel || "");
-  item.detail = `${boundarySet.features?.length || 0} Einheiten`;
+  item.detail = `${featureCount || 0} Einheiten`;
   item.license = repairLegacyText(boundarySet.license?.label || item.license || "");
   item.sourceUrl = boundarySet.source?.url || item.sourceUrl || "";
   item.temporalCoverage = {
@@ -4087,6 +4623,12 @@ function syncItemFromBoundarySet(item) {
     from: boundarySet.valid_from || "",
     to: boundarySet.valid_to || "",
   };
+}
+
+function getMapClassificationTarget(item, boundarySet) {
+  if (boundarySet) return boundarySet;
+  item.classification = item.classification || {};
+  return item.classification;
 }
 
 function persistEditorMutation(item, options = {}) {
@@ -4104,6 +4646,7 @@ function persistProjectMutation(project, options = {}) {
   project.iconColor = normalizeColorValue(project.iconColor, "#9a6419") || "#9a6419";
   project.displaySettings = project.displaySettings || {};
   project.displaySettings.continentalMapId = normalizeContinentalMapId(project.displaySettings.continentalMapId || DEFAULT_CONTINENTAL_MAP_ID);
+  project.displaySettings.rankOutlineStyles = createDefaultRankOutlineStyles(project.displaySettings.rankOutlineStyles);
   persistProjects();
   if (options.renderBrowser !== false) renderProjectBrowser();
   if (options.renderGlobe) renderGlobe();
@@ -4186,6 +4729,9 @@ function createTextInputField(label, value, onChange, options = {}) {
   caption.textContent = label;
   const input = document.createElement(options.multiline ? "textarea" : "input");
   if (!options.multiline) input.type = options.type || "text";
+  if (!options.multiline && options.min != null) input.min = String(options.min);
+  if (!options.multiline && options.max != null) input.max = String(options.max);
+  if (!options.multiline && options.step != null) input.step = String(options.step);
   input.value = value ?? "";
   input.placeholder = options.placeholder || "";
   input.readOnly = options.readonly === true;
@@ -4251,7 +4797,7 @@ function createProjectEditorSections(project) {
     icon: "https://api.iconify.design/mdi/folder-outline.svg",
   });
   general.append(
-    createTextInputField("Ordnername", project.title || "", (value) => {
+    createTextInputField("Bezeichnung", project.title || "", (value) => {
       project.title = repairLegacyText(value.trim() || "Earth-Map-Projekt");
       persistProjectMutation(project, { renderBrowser: true });
     }),
@@ -4266,6 +4812,52 @@ function createProjectEditorSections(project) {
   const optionNote = document.createElement("p");
   optionNote.className = "structured-editor-section-description";
   optionNote.textContent = selectedOption?.detail || "";
+  const rankStyleList = document.createElement("div");
+  rankStyleList.className = "project-rank-style-list";
+  const rankStyleHint = document.createElement("p");
+  rankStyleHint.className = "structured-editor-field-help";
+  rankStyleHint.textContent = "Diese Projektregel bestimmt die Outline aller Kartenobjekte nach ihrem kategorialen Rang. Die Einzelkarte behält ihre eigene Farbe; Dicke und Art der Linie kommen aus dem Projektordner.";
+  rankStyleList.append(rankStyleHint);
+  project.displaySettings = project.displaySettings || {};
+  project.displaySettings.rankOutlineStyles = createDefaultRankOutlineStyles(project.displaySettings.rankOutlineStyles);
+  MAP_RANK_CHOICES.filter((choice) => choice.value !== "").forEach((choice) => {
+    const rank = choice.value;
+    const style = project.displaySettings.rankOutlineStyles[rank] || PROJECT_RANK_OUTLINE_DEFAULTS[rank];
+    const row = document.createElement("div");
+    row.className = "project-rank-style-row";
+
+    const label = document.createElement("div");
+    label.className = "project-rank-style-label";
+    const title = document.createElement("strong");
+    title.textContent = choice.label;
+    const description = document.createElement("span");
+    description.textContent = choice.description;
+    label.append(title, description);
+
+    row.append(
+      label,
+      createColorPickerField("Strichfarbe", style.strokeColor, (value) => {
+        project.displaySettings = project.displaySettings || {};
+        project.displaySettings.rankOutlineStyles = createDefaultRankOutlineStyles(project.displaySettings.rankOutlineStyles);
+        project.displaySettings.rankOutlineStyles[rank].strokeColor = value ? normalizeColorValue(value, DEFAULT_LAYER_OUTLINE_COLOR) : "";
+        persistProjectMutation(project, { renderGlobe: true });
+      }, { fallback: DEFAULT_LAYER_OUTLINE_COLOR }),
+      createTextInputField("Strichdicke", style.strokeWidth, (value) => {
+        const parsed = Number(value);
+        project.displaySettings = project.displaySettings || {};
+        project.displaySettings.rankOutlineStyles = createDefaultRankOutlineStyles(project.displaySettings.rankOutlineStyles);
+        project.displaySettings.rankOutlineStyles[rank].strokeWidth = Number.isFinite(parsed) && parsed >= 0 ? parsed : PROJECT_RANK_OUTLINE_DEFAULTS[rank].strokeWidth;
+        persistProjectMutation(project, { renderGlobe: true });
+      }, { type: "number", min: 0, step: 0.1 }),
+      createSelectField("Strichart", style.strokeStyle, PROJECT_STROKE_STYLE_CHOICES, (value) => {
+        project.displaySettings = project.displaySettings || {};
+        project.displaySettings.rankOutlineStyles = createDefaultRankOutlineStyles(project.displaySettings.rankOutlineStyles);
+        project.displaySettings.rankOutlineStyles[rank].strokeStyle = normalizeProjectStrokeStyle(value);
+        persistProjectMutation(project, { renderGlobe: true });
+      }),
+    );
+    rankStyleList.append(row);
+  });
   display.append(
     createSelectField("Kontinentalkarte", normalizeContinentalMapId(project.displaySettings?.continentalMapId || DEFAULT_CONTINENTAL_MAP_ID), getContinentalMapChoices(project), (value) => {
       project.displaySettings = project.displaySettings || {};
@@ -4275,6 +4867,7 @@ function createProjectEditorSections(project) {
       renderObjectEditor();
     }),
     optionNote,
+    rankStyleList,
   );
   return [general, display];
 }
@@ -4457,7 +5050,7 @@ function createColorPickerField(label, value, onChange, options = {}) {
   return field;
 }
 
-function createSelectField(label, value, choices, onChange) {
+function createSelectField(label, value, choices, onChange, options = {}) {
   const field = document.createElement("label");
   field.className = "structured-editor-field";
   const caption = document.createElement("span");
@@ -4474,8 +5067,19 @@ function createSelectField(label, value, choices, onChange) {
     select.append(option);
   });
   select.value = value || choices[0]?.value || "";
-  select.addEventListener("change", () => onChange(select.value));
-  field.append(caption, select);
+  const help = document.createElement("p");
+  help.className = "structured-editor-field-help";
+  const updateHelp = () => {
+    const choice = normalizedChoices.find((candidate) => candidate.value === select.value);
+    help.textContent = choice?.description || options.help || "";
+    help.hidden = !help.textContent;
+  };
+  select.addEventListener("change", () => {
+    updateHelp();
+    onChange(select.value);
+  });
+  updateHelp();
+  field.append(caption, select, help);
   return field;
 }
 
@@ -4546,8 +5150,9 @@ function createCheckboxField(label, checked, onChange) {
 
 function createLayerEditorSections(item) {
   const boundarySet = ensureBoundarySetShape(item);
+  const classificationTarget = getMapClassificationTarget(item, boundarySet);
   const sections = [];
-  const availableChapterKeys = new Set(["display", "identity", "source", "time"]);
+  const availableChapterKeys = new Set(["display", "identity", "classification", "source", "time"]);
   if (boundarySet) availableChapterKeys.add("features");
   if (state.activeEditorChapterKey && !availableChapterKeys.has(state.activeEditorChapterKey)) {
     state.activeEditorChapterKey = "";
@@ -4659,6 +5264,49 @@ function createLayerEditorSections(item) {
   }
   sections.push(identity);
 
+  const classification = createEditorSection("Kategorisierung", "Diese Werte beschreiben die Rolle der Geometrie im politischen, rechtlichen oder historischen Ordnungsmodell. Sie helfen später bei Suche, Filterung, Tabellenzuordnung und Darstellung.", {
+    key: "classification",
+    icon: "https://api.iconify.design/mdi/shape-outline.svg",
+  });
+  const classificationAssistantHint = document.createElement("p");
+  classificationAssistantHint.className = "structured-editor-field-help structured-editor-assistant-hint";
+  classificationAssistantHint.innerHTML = `Zur Einordnung kann der <a href="https://chatgpt.com/g/g-6a4781e83c5c8191be9ad53cead4f189-earthmap-gebietsklassifizierer" target="_blank" rel="noopener noreferrer">EarthMap-Gebietsklassifizierer</a> helfen.`;
+  const relationToParent = classificationTarget.relation_to_parent || "";
+  const parentIdField = relationToParent && relationToParent !== "none"
+    ? createTextInputField("Parent-ID", classificationTarget.parent_id || "", (value) => {
+      classificationTarget.parent_id = value.trim();
+      persistEditorMutation(item, { renderBrowser: true });
+    }, { placeholder: "z. B. boundary-set-id oder Objekt-ID" })
+    : null;
+  classification.append(
+    classificationAssistantHint,
+    createSelectField("Typ", classificationTarget.type || "", MAP_TYPE_CHOICES, (value) => {
+      classificationTarget.type = value;
+      if (boundarySet) boundarySet.boundary_type = value || boundarySet.boundary_type || "unknown";
+      persistEditorMutation(item, { renderBrowser: true });
+    }),
+    createSelectField("Rang", classificationTarget.rank == null ? "" : String(classificationTarget.rank), MAP_RANK_CHOICES, (value) => {
+      classificationTarget.rank = value === "" ? "" : Number(value);
+      persistEditorMutation(item, { renderBrowser: true });
+    }),
+    createSelectField("Souveränitätsstatus", classificationTarget.sovereignty_status || "", SOVEREIGNTY_STATUS_CHOICES, (value) => {
+      classificationTarget.sovereignty_status = value;
+      persistEditorMutation(item, { renderBrowser: true });
+    }),
+    createSelectField("Beziehung zum Parent", classificationTarget.relation_to_parent || "", RELATION_TO_PARENT_CHOICES, (value) => {
+      classificationTarget.relation_to_parent = value;
+      if (!value || value === "none") classificationTarget.parent_id = "";
+      persistEditorMutation(item, { renderBrowser: true });
+      renderObjectEditor();
+    }),
+    ...(parentIdField ? [parentIdField] : []),
+    createSelectField("Geometrischer Geltungsbereich", classificationTarget.geometry_scope || "", GEOMETRY_SCOPE_CHOICES, (value) => {
+      classificationTarget.geometry_scope = value;
+      persistEditorMutation(item, { renderBrowser: true });
+    }),
+  );
+  sections.push(classification);
+
   const source = createEditorSection("Quelle und Lizenz", "Diese Felder entscheiden später, ob eine Karte nur intern nutzbar oder veröffentlichungsfähig ist.", {
     key: "source",
     icon: "https://api.iconify.design/material-symbols/source-notes-outline.svg",
@@ -4760,7 +5408,18 @@ function createLayerEditorSections(item) {
     });
     const unitList = document.createElement("div");
     unitList.className = "boundary-feature-list";
-    boundarySet.features.slice(0, 80).forEach((feature) => {
+    const featureCount = getLibraryItemFeatureCount(item);
+    const listedFeatures = boundarySet.features?.length
+      ? boundarySet.features
+      : (state.boundarySetFeatureCache.get(boundarySet.geometryStorage?.key) || []);
+    if (!listedFeatures.length && boundarySet.geometryStorage?.provider === "indexeddb") {
+      requestArchivedBoundarySetFeatures(item);
+      const note = document.createElement("p");
+      note.className = "empty-state";
+      note.textContent = `${featureCount} Einheiten sind im EarthMap-Archiv gespeichert und werden geladen.`;
+      unitList.append(note);
+    }
+    listedFeatures.slice(0, 80).forEach((feature) => {
       const row = document.createElement("div");
       row.className = "boundary-feature-row";
       const title = document.createElement("strong");
@@ -4770,10 +5429,10 @@ function createLayerEditorSections(item) {
       row.append(title, meta);
       unitList.append(row);
     });
-    if (boundarySet.features.length > 80) {
+    if (featureCount > 80) {
       const note = document.createElement("p");
       note.className = "empty-state";
-      note.textContent = `Weitere ${boundarySet.features.length - 80} Einheiten sind importiert, werden hier aber aus Performancegründen nicht vollständig gelistet.`;
+      note.textContent = `Weitere ${featureCount - 80} Einheiten sind importiert, werden hier aber aus Performancegründen nicht vollständig gelistet.`;
       unitList.append(note);
     }
     content.append(unitList);
@@ -5678,6 +6337,7 @@ function normalizeImportedBoundarySet(raw, fileName = "kartensammlung.geojson") 
 }
 
 function createBoundaryCollectionItem(boundarySet, fileName = "") {
+  const featureCount = boundarySet.features?.length || boundarySet.geometryStorage?.featureCount || 0;
   return normalizeLibraryItem({
     id: `collection-${slugifyBoundaryId(boundarySet.id || boundarySet.title || fileName)}-${Date.now()}`,
     kind: "boundary-collection",
@@ -5686,7 +6346,7 @@ function createBoundaryCollectionItem(boundarySet, fileName = "") {
     iso3: boundarySet.country_iso3 || "",
     wikidataId: normalizeWikidataId(boundarySet.wikidata_id || ""),
     adminLevel: repairLegacyText(boundarySet.admin_level || boundarySet.boundary_type || "Boundary-Set"),
-    detail: `${boundarySet.features?.length || 0} Einheiten`,
+    detail: `${featureCount} Einheiten`,
     license: repairLegacyText(boundarySet.license?.label || "Lizenz ungeklärt"),
     sourceUrl: boundarySet.source?.url || "",
     temporalCoverage: {
@@ -5725,7 +6385,36 @@ async function importBoundarySetFile(file) {
   }
 }
 
-function addPendingBoundarySetToProject() {
+async function openBoundarySetImportFolderPicker() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        id: "earthmap-imports",
+        multiple: false,
+        excludeAcceptAllOption: false,
+        types: [{
+          description: "EarthMap Kartenimporte",
+          accept: {
+            "application/geo+json": [".geojson"],
+            "application/json": [".json"],
+            "application/vnd.google-earth.kml+xml": [".kml"],
+            "application/vnd.google-earth.kmz": [".kmz"],
+            "application/zip": [".zip"],
+          },
+        }],
+      });
+      if (!handle) return;
+      await importBoundarySetFile(await handle.getFile());
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.warn("EarthMap Importordner-Picker konnte nicht geöffnet werden.", error);
+    }
+  }
+  ui.boundarySetImportInput?.click();
+}
+
+async function addPendingBoundarySetToProject() {
   const project = getActiveProject();
   const folder = getLibraryFolder(project, "boundary-collections");
   if (!project || !folder) {
@@ -5739,15 +6428,22 @@ function addPendingBoundarySetToProject() {
   }
   try {
     const boundarySet = pending.boundarySet;
-    const item = createBoundaryCollectionItem(boundarySet, pending.fileName);
+    const geometryStorage = await saveBoundarySetFeaturesToArchive(boundarySet);
+    const lightweightBoundarySet = {
+      ...boundarySet,
+      geometryStorage,
+      features: [],
+    };
+    const item = createBoundaryCollectionItem(lightweightBoundarySet, pending.fileName);
     folder.items.push(item);
     project.activeLibraryItemId = item.id;
     state.openFolderBrowserMenuId = null;
     if (!persistProjects()) {
       folder.items = folder.items.filter((candidate) => candidate.id !== item.id);
       project.activeLibraryItemId = "";
-      throw new Error("Die Datei ist für den aktuellen Browser-Speicher zu groß. Für große komplexe Karten brauchen wir als nächsten Schritt IndexedDB oder ein echtes Archiv-Dateisystem.");
+      throw new Error("Die Metadaten konnten nicht im Browser-Projektindex gespeichert werden. Die Geometrien liegen bereits im EarthMap-Archiv; bitte Projektindex prüfen.");
     }
+    state.pendingBoundarySetImport = null;
     renderWorkspace();
     renderGlobe();
     openLibraryItemEditor(item);
@@ -5943,6 +6639,10 @@ ui.newProjectButton?.addEventListener("click", () => {
 ui.importBoundarySetButton?.addEventListener("click", () => {
   setBrowserActionsMenuOpen(false);
   ui.boundarySetImportInput?.click();
+});
+ui.importBoundarySetFromFolderButton?.addEventListener("click", () => {
+  setBrowserActionsMenuOpen(false);
+  openBoundarySetImportFolderPicker();
 });
 ui.boundarySetImportInput?.addEventListener("change", async () => {
   const file = ui.boundarySetImportInput.files?.[0];

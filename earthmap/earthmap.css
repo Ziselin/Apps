@@ -500,10 +500,10 @@ body.earthmap-theme-dark .export-menu {
   --editor-tab-icon: url("https://api.iconify.design/mdi/earth.svg");
 }
 .editor-tab[data-editor-tab="single-maps"] {
-  --editor-tab-icon: url("https://api.iconify.design/ri/treasure-map-line.svg");
+  --editor-tab-icon: url("https://api.iconify.design/mdi/magnify.svg");
 }
 .editor-tab[data-editor-tab="collections"] {
-  --editor-tab-icon: url("https://api.iconify.design/fa-solid/atlas.svg");
+  --editor-tab-icon: url("https://api.iconify.design/mdi/file-import-outline.svg");
 }
 .editor-tab[data-editor-tab="animations"] {
   --editor-tab-icon: url("https://api.iconify.design/mdi/movie-open-outline.svg");
@@ -687,7 +687,7 @@ body.earthmap-theme-dark .library-subfolder-row.is-drop-target {
 }
 .library-subfolder-list { display: grid; gap: 4px; margin-top: 4px; }
 .library-subfolder-row {
-  grid-template-columns: 22px 24px 22px minmax(0, 1fr);
+  grid-template-columns: 22px 24px 22px minmax(0, 1fr) 28px;
   min-height: 42px;
   margin-left: 34px;
   padding-left: 0;
@@ -695,12 +695,6 @@ body.earthmap-theme-dark .library-subfolder-row.is-drop-target {
 }
 body.earthmap-theme-dark .library-subfolder-row {
   background: rgba(255,255,255,.01);
-}
-.browser-checkbox-spacer {
-  display: block;
-  width: 15px;
-  height: 15px;
-  justify-self: center;
 }
 .browser-row-icon-subfolder { color: #9a6419; }
 body.earthmap-theme-dark .browser-row-icon-subfolder { color: var(--amber); }
@@ -925,6 +919,24 @@ body.earthmap-theme-dark .secondary-button {
 }
 .source-toggle-list { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 14px 0; color: var(--ink-soft); }
 .source-toggle-list label { display: inline-flex; align-items: center; gap: 7px; }
+.collection-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.structured-editor-field-help code {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255,255,248,.52);
+  color: var(--ink-soft);
+  font-family: "Source Code Pro", Consolas, monospace;
+  font-size: .92em;
+}
+body.earthmap-theme-dark .structured-editor-field-help code {
+  background: rgba(255,255,255,.045);
+}
 .search-result-list { display: grid; gap: 10px; margin-top: 12px; }
 .search-result-card {
   display: grid;
@@ -1072,6 +1084,25 @@ body.earthmap-theme-dark .structured-editor-field textarea,
 body.earthmap-theme-dark .structured-editor-field select {
   background: rgba(255,255,255,.045);
 }
+.structured-editor-field-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.36;
+}
+.structured-editor-assistant-hint a {
+  color: #9a6419;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(154, 100, 25, .28);
+}
+.structured-editor-assistant-hint a:hover,
+.structured-editor-assistant-hint a:focus-visible {
+  border-bottom-color: currentColor;
+}
+body.earthmap-theme-dark .structured-editor-assistant-hint a {
+  color: var(--amber);
+  border-bottom-color: rgba(255, 179, 71, .3);
+}
 .structured-editor-check {
   display: flex;
   align-items: center;
@@ -1112,6 +1143,45 @@ body.earthmap-theme-dark .project-icon-field-preview {
   color: var(--muted);
   font-size: .75rem;
   line-height: 1.3;
+}
+.project-rank-style-list {
+  display: grid;
+  gap: 10px;
+}
+.project-rank-style-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 260px) minmax(96px, 120px) minmax(130px, 160px);
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid rgba(33,54,51,.09);
+  border-radius: 12px;
+  background: rgba(255,255,248,.42);
+}
+body.earthmap-theme-dark .project-rank-style-row {
+  border-color: rgba(255,255,255,.08);
+  background: rgba(255,255,255,.035);
+}
+.project-rank-style-label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.project-rank-style-label strong {
+  color: var(--ink);
+  font-size: .84rem;
+  line-height: 1.25;
+}
+.project-rank-style-label span {
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.28;
+}
+@media (max-width: 760px) {
+  .project-rank-style-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
 }
 .boundary-feature-list {
   display: grid;
