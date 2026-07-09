@@ -39,6 +39,10 @@ const ui = {
   menuOverlay: document.getElementById("typeMenuOverlay"),
   sideMenu: document.getElementById("typeSideMenu"),
   appFrame: document.querySelector(".app-frame"),
+  viewToolsDrawer: document.getElementById("viewToolsDrawer"),
+  viewToolsDrawerTab: document.getElementById("viewToolsDrawerTab"),
+  viewToolsDrawerPanel: document.getElementById("viewToolsDrawerPanel"),
+  fullscreenButton: document.getElementById("fullscreenButton"),
   openWorkspaceStrip: document.getElementById("openWorkspaceStrip"),
   returnPreviewStrip: document.getElementById("returnPreviewStrip"),
   layoutCycleButton: document.getElementById("layoutCycleButton"),
@@ -234,6 +238,8 @@ const ui = {
   previewRenderProgressBar: document.getElementById("previewRenderProgressBar"),
   textInputHighlight: document.getElementById("textInputHighlight"),
 };
+
+let viewToolsDrawerCloseTimer = null;
 
 function normalizeMarkdownHeadingText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -6192,6 +6198,71 @@ function handleWorkspaceToggle(event, section) {
   setWorkspaceSection(section);
 }
 
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {
+    // Manche eingebettete Browser blockieren Vollbild; die UI bleibt dann einfach unverändert.
+  }
+}
+
+function updateFullscreenButtonState() {
+  ui.fullscreenButton?.classList.toggle("is-active", Boolean(document.fullscreenElement));
+}
+
+function setViewToolsDrawerOpen(isOpen) {
+  const nextOpen = Boolean(isOpen);
+  ui.viewToolsDrawer?.classList.toggle("is-open", nextOpen);
+  if (ui.viewToolsDrawerPanel) {
+    if (viewToolsDrawerCloseTimer) {
+      window.clearTimeout(viewToolsDrawerCloseTimer);
+      viewToolsDrawerCloseTimer = null;
+    }
+    ui.viewToolsDrawerPanel.classList.remove("is-closing");
+    if (nextOpen) {
+      ui.viewToolsDrawerPanel.hidden = false;
+    } else if (!ui.viewToolsDrawerPanel.hidden) {
+      ui.viewToolsDrawerPanel.classList.add("is-closing");
+      viewToolsDrawerCloseTimer = window.setTimeout(() => {
+        ui.viewToolsDrawerPanel.hidden = true;
+        ui.viewToolsDrawerPanel.classList.remove("is-closing");
+        viewToolsDrawerCloseTimer = null;
+      }, 190);
+    }
+  }
+  ui.viewToolsDrawerTab?.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+}
+
+function bindViewToolsDrawer() {
+  if (!ui.viewToolsDrawer || !ui.viewToolsDrawerTab || !ui.viewToolsDrawerPanel) return;
+  let startY = 0;
+  let wasDrag = false;
+  ui.viewToolsDrawerTab.addEventListener("pointerdown", (event) => {
+    startY = event.clientY;
+    wasDrag = false;
+    ui.viewToolsDrawerTab.setPointerCapture?.(event.pointerId);
+  });
+  ui.viewToolsDrawerTab.addEventListener("pointermove", (event) => {
+    if (!ui.viewToolsDrawerTab.hasPointerCapture?.(event.pointerId)) return;
+    const deltaY = event.clientY - startY;
+    if (Math.abs(deltaY) > 8) wasDrag = true;
+    if (deltaY < -18) setViewToolsDrawerOpen(true);
+    if (deltaY > 18) setViewToolsDrawerOpen(false);
+  });
+  ui.viewToolsDrawerTab.addEventListener("pointerup", (event) => {
+    ui.viewToolsDrawerTab.releasePointerCapture?.(event.pointerId);
+    if (!wasDrag) setViewToolsDrawerOpen(ui.viewToolsDrawerTab.getAttribute("aria-expanded") !== "true");
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".app-view-drawer")) return;
+    setViewToolsDrawerOpen(false);
+  });
+}
+
 function bindMenu() {
   ui.menuButton?.addEventListener("click", () => {
     setMenuOpen(ui.menuButton.getAttribute("aria-expanded") !== "true");
@@ -6219,8 +6290,10 @@ function bindMenu() {
       setExportMenuOpen(false);
       setBrowserActionsMenuOpen(false);
       setSearchDialogOpen(false);
+      setViewToolsDrawerOpen(false);
     }
   });
+  bindViewToolsDrawer();
 }
 
 function bindEditor() {
@@ -6240,6 +6313,15 @@ function bindEditor() {
   ui.openWorkspaceStrip?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") handleWorkspaceToggle(event, "details");
   });
+  ui.fullscreenButton?.addEventListener("pointerup", (event) => {
+    event.stopPropagation();
+  });
+  ui.fullscreenButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void toggleFullscreen();
+  });
+  document.addEventListener("fullscreenchange", updateFullscreenButtonState);
   ui.returnPreviewStrip?.addEventListener("click", (event) => handleWorkspaceToggle(event, "preview"));
   ui.returnPreviewStrip?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") handleWorkspaceToggle(event, "preview");

@@ -1014,6 +1014,113 @@ button:focus-visible {
   background: rgba(34, 39, 43, 0.18);
 }
 
+.app-view-drawer .chart-strip-controls {
+  position: static;
+  transform: none;
+  display: grid;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.app-view-drawer .chart-strip-controls[hidden] {
+  display: none;
+}
+
+.app-view-drawer .chart-strip-button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--z-render-shell-drawer-text, rgba(238, 243, 246, 0.86));
+  font-size: 0.88rem;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.app-view-drawer .chart-strip-button:hover,
+.app-view-drawer .chart-strip-button:focus-visible {
+  background: rgba(255, 255, 255, 0.055);
+  outline: 0;
+}
+
+.app-view-drawer .chart-strip-button svg {
+  grid-column: 1;
+  justify-self: center;
+  width: 18px;
+  height: 18px;
+}
+
+.app-view-drawer .chart-strip-button-letter {
+  grid-column: 1;
+  justify-self: center;
+  color: currentColor;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.76;
+}
+
+.app-view-drawer .chart-strip-button-label {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-view-drawer .chart-strip-button-check {
+  grid-column: 3;
+  justify-self: end;
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: var(--highlight, #ffb347);
+  background: currentColor;
+  opacity: 0;
+  transform: scale(.86);
+  mask-image: url("https://api.iconify.design/material-symbols/check-rounded.svg");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("https://api.iconify.design/material-symbols/check-rounded.svg");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.app-view-drawer .chart-strip-button.is-active .chart-strip-button-check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.app-view-drawer .chart-strip-button.is-muted .chart-strip-button-check {
+  opacity: .42;
+  transform: scale(.92);
+}
+
+.app-view-drawer .chart-strip-button.is-off {
+  color: rgba(238, 243, 246, 0.42);
+  background: transparent;
+}
+
+.app-view-drawer .workspace-fullscreen-button {
+  position: static;
+  transform: none;
+}
+
+.app-view-drawer .workspace-zoom-controls {
+  padding-top: 2px;
+}
+
 #zahlenstrahl {
   display: block;
   width: 100%;
@@ -4080,8 +4187,14 @@ button:focus-visible {
 
 .trash-folder-item {
   --browser-accent-rgb: 168, 176, 186;
-  margin-top: auto;
+  margin-top: 10px;
   padding-top: 0;
+  flex: 0 0 auto;
+}
+
+.browser-footer-spacer {
+  flex: 1 1 auto;
+  min-height: 10px;
 }
 
 .trash-category-folder-item {

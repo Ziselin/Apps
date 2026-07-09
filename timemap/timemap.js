@@ -330,6 +330,9 @@ const ui = {
   zoomInButton: document.getElementById("zoomInButton"),
   zoomOutButton: document.getElementById("zoomOutButton"),
   focusNowButton: document.getElementById("focusNowButton"),
+  viewToolsDrawer: document.getElementById("viewToolsDrawer"),
+  viewToolsDrawerTab: document.getElementById("viewToolsDrawerTab"),
+  viewToolsDrawerPanel: document.getElementById("viewToolsDrawerPanel"),
   openWorkspaceStrip: document.getElementById("openWorkspaceStrip"),
   returnTimelineStrip: document.getElementById("returnTimelineStrip"),
   returnTimelineStripLabel: document.getElementById("returnTimelineStripLabel"),
@@ -600,6 +603,8 @@ const ui = {
   flagListEntries: document.getElementById("flagListEntries"),
   flagListCloseButton: document.getElementById("flagListCloseButton"),
 };
+
+let viewToolsDrawerCloseTimer = null;
 
 const timelineEvents = [];
 const eventGroups = [];
@@ -3791,20 +3796,41 @@ function focusActiveSearchField() {
 
 function updateChartStripControls() {
   if (ui.chartStripControls) {
-    ui.chartStripControls.hidden = chartItems.length === 0;
+    ui.chartStripControls.hidden = false;
   }
+  const setDrawerOptionLabel = (button, label) => {
+    const labelNode = button?.querySelector?.(".chart-strip-button-label");
+    if (labelNode) labelNode.textContent = label;
+  };
   ui.toggleChartsButton?.classList.toggle("is-active", state.chartDisplayMode === "mixed" || state.chartDisplayMode === "chart-focus");
   ui.toggleChartsButton?.classList.toggle("is-muted", state.chartDisplayMode === "events");
   ui.toggleChartsButton?.classList.toggle("is-off", state.chartDisplayMode === "hidden");
+  setDrawerOptionLabel(
+    ui.toggleChartsButton,
+    state.chartDisplayMode === "hidden"
+      ? "Graphen ausgeblendet"
+      : state.chartDisplayMode === "events"
+        ? "Nur Ereignisse anzeigen"
+        : "Graphen anzeigen"
+  );
   ui.toggleLegendButton?.classList.toggle("is-active", state.chartLegendDisplayMode === "full");
   ui.toggleLegendButton?.classList.toggle("is-muted", state.chartLegendDisplayMode === "compact");
   ui.toggleLegendButton?.classList.toggle("is-off", state.chartLegendDisplayMode === "hidden");
+  setDrawerOptionLabel(
+    ui.toggleLegendButton,
+    state.chartLegendDisplayMode === "hidden"
+      ? "Legende ausgeblendet"
+      : state.chartLegendDisplayMode === "compact"
+        ? "Legende kompakt"
+        : "Legende anzeigen"
+  );
   ui.toggleYAxisButton?.classList.toggle("is-active", state.showYAxis);
   ui.toggleChartAxisGroupButton?.classList.toggle("is-active", state.chartAxisGroupToggleEnabled);
   ui.toggleChartAxisGroupButton?.classList.remove("is-muted", "is-off");
   ui.toggleChartPointsButton?.classList.toggle("is-active", !state.chartPointsHidden);
   ui.toggleChartPointsButton?.classList.toggle("is-off", state.chartPointsHidden);
   ui.toggleChartPointsButton?.classList.remove("is-muted");
+  setDrawerOptionLabel(ui.toggleChartPointsButton, state.chartPointsHidden ? "Datenpunkte ausgeblendet" : "Datenpunkte anzeigen");
   ui.toggleChartProbeButton?.classList.toggle("is-active", state.chartProbeEnabled);
   ui.toggleChartProbeButton?.classList.remove("is-muted", "is-off");
   ui.toggleChartProbeSourceButton?.classList.toggle("is-active", state.chartProbeSourceEnabled);
@@ -30746,6 +30772,13 @@ function createTrashFolderBrowserItem() {
   return container;
 }
 
+function createBrowserFooterSpacer() {
+  const spacer = document.createElement("div");
+  spacer.className = "browser-footer-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+  return spacer;
+}
+
 function renderEventList() {
   const editorPanelScrollTop = ui.editorPanel?.scrollTop ?? null;
   const searchPanelScrollTop = ui.searchPanel?.scrollTop ?? null;
@@ -30810,6 +30843,7 @@ function renderEventList() {
     const loadingState = state.folderImportLoading?.groupId === groupItem.id ? state.folderImportLoading : null;
     ui.eventList.appendChild(createGroupBrowserItem(groupItem, { loadingState }));
   });
+  ui.eventList.appendChild(createBrowserFooterSpacer());
   ui.eventList.appendChild(createTrashFolderBrowserItem());
   updateRenderLibraryButtonState();
   renderDetailsSidePanel();
@@ -35487,7 +35521,57 @@ function createNewChartToCsvCodeTab() {
   scrollToDetails("auto");
 }
 
+function setViewToolsDrawerOpen(isOpen) {
+  const nextOpen = Boolean(isOpen);
+  ui.viewToolsDrawer?.classList.toggle("is-open", nextOpen);
+  if (ui.viewToolsDrawerPanel) {
+    if (viewToolsDrawerCloseTimer) {
+      window.clearTimeout(viewToolsDrawerCloseTimer);
+      viewToolsDrawerCloseTimer = null;
+    }
+    ui.viewToolsDrawerPanel.classList.remove("is-closing");
+    if (nextOpen) {
+      ui.viewToolsDrawerPanel.hidden = false;
+    } else if (!ui.viewToolsDrawerPanel.hidden) {
+      ui.viewToolsDrawerPanel.classList.add("is-closing");
+      viewToolsDrawerCloseTimer = window.setTimeout(() => {
+        ui.viewToolsDrawerPanel.hidden = true;
+        ui.viewToolsDrawerPanel.classList.remove("is-closing");
+        viewToolsDrawerCloseTimer = null;
+      }, 190);
+    }
+  }
+  ui.viewToolsDrawerTab?.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+}
+
+function bindViewToolsDrawer() {
+  if (!ui.viewToolsDrawer || !ui.viewToolsDrawerTab || !ui.viewToolsDrawerPanel) return;
+  let startY = 0;
+  let wasDrag = false;
+  ui.viewToolsDrawerTab.addEventListener("pointerdown", (event) => {
+    startY = event.clientY;
+    wasDrag = false;
+    ui.viewToolsDrawerTab.setPointerCapture?.(event.pointerId);
+  });
+  ui.viewToolsDrawerTab.addEventListener("pointermove", (event) => {
+    if (!ui.viewToolsDrawerTab.hasPointerCapture?.(event.pointerId)) return;
+    const deltaY = event.clientY - startY;
+    if (Math.abs(deltaY) > 8) wasDrag = true;
+    if (deltaY < -18) setViewToolsDrawerOpen(true);
+    if (deltaY > 18) setViewToolsDrawerOpen(false);
+  });
+  ui.viewToolsDrawerTab.addEventListener("pointerup", (event) => {
+    ui.viewToolsDrawerTab.releasePointerCapture?.(event.pointerId);
+    if (!wasDrag) setViewToolsDrawerOpen(ui.viewToolsDrawerTab.getAttribute("aria-expanded") !== "true");
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".app-view-drawer")) return;
+    setViewToolsDrawerOpen(false);
+  });
+}
+
 function bindEvents() {
+  bindViewToolsDrawer();
   svg.addEventListener("wheel", handleWheel, { passive: false });
   svg.addEventListener("pointerdown", handleTimelineTouchPointerDown);
   svg.addEventListener("pointermove", handleTimelineTouchPointerMove);
@@ -35681,6 +35765,9 @@ function bindEvents() {
     }
     if (event.key === "Escape" && state.timelineMenuOpen) {
       setTimelineMenuOpen(false);
+    }
+    if (event.key === "Escape") {
+      setViewToolsDrawerOpen(false);
     }
   });
   ui.openWorkspaceStrip.addEventListener("wheel", (event) => {

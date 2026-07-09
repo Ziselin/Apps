@@ -8,6 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
+  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260709i">
   <link rel="stylesheet" href="typemap.css?v=20260621r">
 </head>
 <body>
@@ -124,8 +125,18 @@
         </article>
       </section>
 
+      <aside id="viewToolsDrawer" class="app-view-drawer" aria-label="Darstellungsoptionen">
+        <button type="button" id="viewToolsDrawerTab" class="app-view-drawer-tab" aria-expanded="false" aria-controls="viewToolsDrawerPanel">
+          <span class="app-view-drawer-tab-grip" aria-hidden="true"></span>
+        </button>
+        <div id="viewToolsDrawerPanel" class="app-view-drawer-panel" hidden>
+          <div class="app-view-drawer-note">Darstellungsoptionen werden hier gesammelt.</div>
+        </div>
+      </aside>
+
       <div id="openWorkspaceStrip" class="workspace-strip" role="button" tabindex="0" aria-label="Browser/Editor">
         <span class="workspace-strip-label">Browser/Editor</span>
+        <button type="button" id="fullscreenButton" class="workspace-fullscreen-button" aria-label="Vollbild umschalten" title="Vollbild umschalten">⛶</button>
       </div>
     </section>
 
@@ -915,7 +926,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260621b"></script>
-  <script src="typemap.js?v=20260621zg"></script>
+  <script src="typemap.js?v=20260709b"></script>
 </body>
 </html>
 
