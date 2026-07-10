@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ziselin.local/schemas/ziselin-boundary-set-v1.schema.json",
+  "title": "Ziselin Boundary Set v1",
+  "type": "object",
+  "required": ["schema", "id", "title", "boundary_type", "source", "license", "features"],
+  "properties": {
+    "schema": {
+      "const": "ziselin-boundary-set-v1"
+    },
+    "id": {
+      "type": "string",
+      "description": "Stabile ID der Kartensammlung."
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Beispiel: geoBoundaries, Natural Earth, Bundeswahlleiterin, Ziselin."
+    },
+    "provider_boundary_id": {
+      "type": "string"
+    },
+    "boundary_type": {
+      "type": "string",
+      "description": "Beispiel: administrative, electoral_districts, municipalities, historical_boundaries."
+    },
+    "country_iso3": {
+      "type": "string"
+    },
+    "admin_level": {
+      "type": "string"
+    },
+    "year_represented": {
+      "type": "string"
+    },
+    "valid_from": {
+      "type": "string"
+    },
+    "valid_to": {
+      "type": ["string", "null"]
+    },
+    "source": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": { "type": "string" },
+        "url": { "type": "string" },
+        "accessed_at": { "type": "string" },
+        "source_data_update_date": { "type": "string" },
+        "build_date": { "type": "string" }
+      }
+    },
+    "license": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "url": { "type": "string" },
+        "detail": { "type": "string" },
+        "source": { "type": "string" },
+        "compatibility": {
+          "type": "object",
+          "properties": {
+            "wikimedia": { "type": "boolean" },
+            "openstreetmap": { "type": "boolean" },
+            "commercial_use": { "type": "boolean" },
+            "share_alike_required": { "type": "boolean" },
+            "attribution_required": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "review_status": {
+      "type": "string",
+      "enum": ["imported", "normalized", "reviewed", "canonical", "blocked"]
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "geometry"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "wikidata_id": { "type": "string" },
+          "identifiers": { "type": "object" },
+          "names": { "type": "object" },
+          "aliases": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "match_tokens": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "valid_from": { "type": "string" },
+          "valid_to": { "type": ["string", "null"] },
+          "source_ref": { "type": "string" },
+          "geometry": {
+            "type": "object",
+            "description": "GeoJSON Geometry."
+          },
+          "properties": { "type": "object" }
+        }
+      }
+    }
+  }
+}
