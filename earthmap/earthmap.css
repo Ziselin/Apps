@@ -17,6 +17,8 @@
   --shadow: rgba(33,54,51,.12);
   --earthmap-topbar-height: 82px;
   --earthmap-footer-height: 48px;
+  --z-render-shell-topbar-height: var(--earthmap-topbar-height);
+  --z-render-shell-footer-height: var(--earthmap-footer-height);
   --z-color-choice-surface: rgba(255,255,248,.46);
   --z-color-choice-line: rgba(33,54,51,.14);
   --z-color-choice-code-bg: rgba(255,255,248,.66);
@@ -365,7 +367,7 @@ body.earthmap-theme-dark .brand-name {
 }
 .header-icon-button:hover,
 .header-icon-button[aria-expanded="true"] { border-color: var(--line); background: rgba(255,255,248,.55); }
-.topbar-actions { gap: 3px; padding-right: 8px; }
+.topbar-actions { flex: 0 0 auto; gap: 3px; padding-right: 8px; }
 .topbar-icon-button {
   width: 38px;
   min-width: 38px;
@@ -1520,14 +1522,43 @@ body.earthmap-theme-dark .boundary-feature-row {
   .app-frame.details-layout-normal .editor-panel { display: none; }
 }
 
+@media (max-width: 760px) {
+  :root { --earthmap-topbar-height: 126px; }
+  .topbar {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 6px 8px;
+  }
+  .brand-plate {
+    flex: 1 1 auto;
+    order: 1;
+  }
+  .topbar-actions {
+    order: 2;
+    margin-left: auto;
+  }
+  .topbar-search {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+    padding: 0 12px 0 58px;
+  }
+  .search-wrap {
+    width: min(520px, 100%);
+  }
+}
+
 @media (max-width: 620px) {
-  :root { --earthmap-footer-height: calc(52px + env(safe-area-inset-bottom, 0px)); }
+  :root {
+    --earthmap-topbar-height: 128px;
+    --earthmap-footer-height: calc(52px + env(safe-area-inset-bottom, 0px));
+  }
   .topbar { padding: 18px 10px 10px 12px; }
   .brand-plate { gap: 8px; padding: 0 4px; }
   .brand-name { font-size: 1.4rem; }
   .brand-home-link,
   .brand-bird { width: 44px; height: 44px; }
-  .topbar-search { min-width: 0; padding: 0 4px; }
+  .topbar-search { min-width: 0; padding: 0 4px 0 50px; }
   .map-search-loader { width: 28px; }
   .map-search-loader l-newtons-cradle { width: 26px; height: 26px; }
   .app-search { height: 38px; padding-left: 62px; font-size: .86rem; }

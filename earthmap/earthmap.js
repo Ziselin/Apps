@@ -17,6 +17,7 @@ let mapSearchRequestSerial = 0;
 let mapSearchOptionCache = null;
 let wikidataMapSearchLoadingCount = 0;
 const wikidataMapSearchCache = new Map();
+const earthMapLazyAssetPromises = new Map();
 
 const DEFAULT_LAYER_FILL_COLOR = "#c6a86a";
 const DEFAULT_LAYER_OUTLINE_COLOR = "#8f9690";
@@ -1174,6 +1175,87 @@ function getNaturalEarthCountryFeatureByIso3(iso3) {
   return features.find((feature) => getNaturalEarthIso3(feature).toUpperCase() === normalizedIso3) || null;
 }
 
+function loadEarthMapScriptAsset(key, src, isReady) {
+  if (typeof isReady === "function" && isReady()) return Promise.resolve(true);
+  if (earthMapLazyAssetPromises.has(key)) return earthMapLazyAssetPromises.get(key);
+  const promise = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve(typeof isReady === "function" ? Boolean(isReady()) : true);
+    script.onerror = () => {
+      console.warn(`EarthMap-Asset konnte nicht geladen werden: ${src}`);
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  }).finally(() => {
+    if (typeof isReady === "function" && !isReady()) earthMapLazyAssetPromises.delete(key);
+  });
+  earthMapLazyAssetPromises.set(key, promise);
+  return promise;
+}
+
+function runWhenIdle(callback, timeout = 1800) {
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(callback, { timeout });
+  } else {
+    window.setTimeout(callback, Math.min(timeout, 900));
+  }
+}
+
+function loadNaturalEarthCountries10m() {
+  return loadEarthMapScriptAsset(
+    "natural-earth-admin0-countries-10m",
+    "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.js?v=20260709b",
+    () => Boolean(window.EarthMapNaturalEarthCountries10m?.features?.length),
+  ).then(() => {
+    mapSearchOptionCache = null;
+    return getNaturalEarthCountryDataset();
+  });
+}
+
+function loadNaturalEarthAdmin0BoundaryLayer() {
+  return loadEarthMapScriptAsset(
+    "natural-earth-admin0-boundaries-10m",
+    "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coastless.boundaries.js?v=20260709c",
+    () => Boolean(window.EarthMapNaturalEarthAdmin0Boundaries10m?.features?.length),
+  ).then(() => {
+    state.naturalEarthAdmin0BoundaryRings = null;
+    scheduleGlobeRender();
+  });
+}
+
+function loadNaturalEarthLakesLayer() {
+  return loadEarthMapScriptAsset(
+    "natural-earth-lakes-10m",
+    "../assets/geojson/natural-earth/10m/ne_10m_lakes.js?v=20260709a",
+    () => Boolean(window.EarthMapNaturalEarthLakes10m?.features?.length),
+  ).then(() => {
+    state.naturalEarthLakePolygons = null;
+    state.naturalEarthLakeRings = null;
+    scheduleGlobeRender();
+  });
+}
+
+function scheduleNaturalEarthBackgroundAssets() {
+  // Performance-Regel: Mobile Geräte bekommen zuerst eine interaktive Kugel.
+  // Schwere Natural-Earth-Zusatzdaten werden in Ruhephasen nachgeladen und
+  // dürfen den ersten Paint nicht blockieren. Explizite Such- und Archivaktionen
+  // rufen dieselben Loader sofort ab.
+  runWhenIdle(() => { void loadNaturalEarthAdmin0BoundaryLayer(); }, 2200);
+  runWhenIdle(() => { void loadNaturalEarthLakesLayer(); }, 2600);
+}
+
+async function ensureNaturalEarthSearchBaseLoaded() {
+  if (window.EarthMapNaturalEarthCountries10m?.features?.length) return;
+  beginWikidataMapSearchLoading();
+  try {
+    await loadNaturalEarthCountries10m();
+  } finally {
+    endWikidataMapSearchLoading();
+  }
+}
+
 function getNaturalEarthCountryDataset() {
   const tenMeter = window.EarthMapNaturalEarthCountries10m;
   if (tenMeter?.features?.length) {
@@ -1194,7 +1276,21 @@ function getNaturalEarthCountryDataset() {
 }
 
 async function loadNaturalEarthAdmin1Dataset() {
-  if (state.naturalEarthAdmin1Dataset || state.naturalEarthAdmin1Loading) return;
+  if (state.naturalEarthAdmin1Dataset) return;
+  if (state.naturalEarthAdmin1Loading) {
+    await earthMapLazyAssetPromises.get("natural-earth-admin1-metadata-10m");
+  }
+  if (!window.EarthMapNaturalEarthAdmin1Metadata10m?.features?.length) {
+    state.naturalEarthAdmin1Loading = true;
+    state.naturalEarthAdmin1Error = "";
+    renderProjectBrowser();
+    await loadEarthMapScriptAsset(
+      "natural-earth-admin1-metadata-10m",
+      "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.metadata.js?v=20260709a",
+      () => Boolean(window.EarthMapNaturalEarthAdmin1Metadata10m?.features?.length),
+    );
+    state.naturalEarthAdmin1Loading = false;
+  }
   const metadata = window.EarthMapNaturalEarthAdmin1Metadata10m;
   if (metadata?.features?.length) {
     state.naturalEarthAdmin1Dataset = {
@@ -1207,13 +1303,11 @@ async function loadNaturalEarthAdmin1Dataset() {
     renderProjectBrowser();
     return;
   }
-  state.naturalEarthAdmin1Loading = true;
   state.naturalEarthAdmin1Error = "";
   renderProjectBrowser();
   // Online-Regel: Die Browserliste arbeitet ausschließlich mit der leichten
   // Metadata-Datei. Fehlt sie, laden wir nicht mehr den früheren 38-MB-
   // Gesamtbestand als Fallback; volle Geometrie kommt nur pro ISO-3-Chunk.
-  state.naturalEarthAdmin1Loading = false;
   state.naturalEarthAdmin1Error = "Gliedstaaten / Provinzen konnten nicht geladen werden.";
   renderProjectBrowser();
 }
@@ -2463,8 +2557,12 @@ function buildEarthMapHtmlExport() {
 </html>`;
 }
 
-function exportEarthMapHtml() {
+async function exportEarthMapHtml() {
   try {
+    await Promise.all([
+      loadNaturalEarthCountries10m(),
+      loadNaturalEarthLakesLayer(),
+    ]);
     renderGlobe();
     const blob = new Blob([buildEarthMapHtmlExport()], { type: "text/html;charset=utf-8" });
     downloadBlob(blob, `${slugifyFilename(getEarthMapExportTitle(), "earth-map")}.html`);
@@ -7454,6 +7552,7 @@ async function findNaturalEarthAdmin1Feature(query, countryFeature = null) {
 async function resolveMapSearchTerm(query) {
   const trimmed = String(query || "").trim();
   if (!trimmed) return null;
+  await ensureNaturalEarthSearchBaseLoaded();
   const unionFeature = findMapSearchUnionFeature(trimmed);
   if (unionFeature) return { kind: "union", feature: unionFeature };
   const countryAliasFeature = findMapSearchCountryAliasFeature(trimmed);
@@ -7531,6 +7630,15 @@ function populateMapSearchOptions(query = "") {
   if (!needles.length) {
     ui.mapSearchOptions.replaceChildren();
     return;
+  }
+  if (!window.EarthMapNaturalEarthCountries10m?.features?.length && !earthMapLazyAssetPromises.has("natural-earth-admin0-countries-10m")) {
+    void loadNaturalEarthCountries10m().then(() => populateMapSearchOptions(ui.mapSearchInput?.value || ""));
+  }
+  if (!window.EarthMapNaturalEarthAdmin1Metadata10m?.features?.length && !earthMapLazyAssetPromises.has("natural-earth-admin1-metadata-10m")) {
+    void loadNaturalEarthAdmin1Dataset().then(() => {
+      mapSearchOptionCache = null;
+      populateMapSearchOptions(ui.mapSearchInput?.value || "");
+    });
   }
   const matches = getMapSearchOptionCache()
     .filter((option) => needles.some((needle) => option.needles.some((value) => value.startsWith(needle) || value.includes(needle))))
@@ -8541,7 +8649,7 @@ function createBoundarySearchCard(result) {
   return card;
 }
 
-function renderBoundarySearchResults() {
+async function renderBoundarySearchResults() {
   const query = ui.boundarySearchInput?.value?.trim() || "";
   const useNaturalEarth = Boolean(document.getElementById("sourceNaturalEarth")?.checked);
   if (!query) {
@@ -8552,6 +8660,7 @@ function renderBoundarySearchResults() {
     return;
   }
 
+  if (useNaturalEarth) await ensureNaturalEarthSearchBaseLoaded();
   const results = useNaturalEarth ? searchNaturalEarthCountries(query) : [];
   if (!results.length) {
     const note = document.createElement("p");
@@ -8911,6 +9020,7 @@ setViewToolsDrawerOpen(false);
 populateMapSearchOptions();
 renderWorkspace();
 renderGlobe();
-scheduleNaturalEarthDetailUpdate(40);
+scheduleNaturalEarthDetailUpdate(window.matchMedia?.("(max-width: 760px)")?.matches ? 900 : 40);
+scheduleNaturalEarthBackgroundAssets();
 if (!hasD3Geo) buildLandSamplesDeferred();
 
