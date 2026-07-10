@@ -47,25 +47,11 @@ const NATURAL_EARTH_ARCHIVE_DATASETS = [
     status: "GeoJSON eingebunden · Küsten an Grundkarte ausgerichtet",
   },
   {
-    id: "admin_0_map_units",
-    label: "Map Units",
-    detail: "10m",
-    path: "../assets/geojson/natural-earth/10m/source-zips/ne_10m_admin_0_map_units.zip",
-    status: "ZIP abgelegt",
-  },
-  {
-    id: "admin_0_sovereignty",
-    label: "Souveränitätsräume",
-    detail: "10m",
-    path: "../assets/geojson/natural-earth/10m/source-zips/ne_10m_admin_0_sovereignty.zip",
-    status: "ZIP abgelegt",
-  },
-  {
     id: "admin_1_states_provinces",
     label: "Gliedstaaten / Provinzen",
     detail: "10m",
-    path: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
-    status: "GeoJSON eingebunden · Küsten an Grundkarte ausgerichtet",
+    path: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.by-country-index.json",
+    status: "GeoJSON nach ISO-3 gekachelt · Küsten an Grundkarte ausgerichtet",
   },
   {
     id: "lakes",
@@ -888,9 +874,8 @@ const state = {
   naturalEarthAdmin1Dataset: null,
   naturalEarthAdmin1Loading: false,
   naturalEarthAdmin1Error: "",
-  naturalEarthAdmin1FullDataset: null,
-  naturalEarthAdmin1FullPromise: null,
-  naturalEarthAdmin1FullError: "",
+  naturalEarthAdmin1CountryChunkCache: new Map(),
+  naturalEarthAdmin1CountryChunkPromises: new Map(),
   naturalEarthAdmin1BoundaryLoading: false,
   naturalEarthAdmin1BoundaryLoaded: false,
   naturalEarthAdmin1BoundaryError: "",
@@ -1225,105 +1210,107 @@ async function loadNaturalEarthAdmin1Dataset() {
   state.naturalEarthAdmin1Loading = true;
   state.naturalEarthAdmin1Error = "";
   renderProjectBrowser();
-  try {
-    const response = await fetch("../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson", { cache: "force-cache" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    state.naturalEarthAdmin1Dataset = {
-      detail: "10m",
-      label: "10m · Natural-Earth-Admin-1",
-      sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
-      features: Array.isArray(data.features) ? data.features : [],
-    };
-  } catch (error) {
-    console.warn("Natural-Earth-Admin-1 konnte nicht geladen werden.", error);
-    state.naturalEarthAdmin1Error = "Gliedstaaten / Provinzen konnten nicht geladen werden.";
-  } finally {
-    state.naturalEarthAdmin1Loading = false;
-    renderProjectBrowser();
-  }
+  // Online-Regel: Die Browserliste arbeitet ausschließlich mit der leichten
+  // Metadata-Datei. Fehlt sie, laden wir nicht mehr den früheren 38-MB-
+  // Gesamtbestand als Fallback; volle Geometrie kommt nur pro ISO-3-Chunk.
+  state.naturalEarthAdmin1Loading = false;
+  state.naturalEarthAdmin1Error = "Gliedstaaten / Provinzen konnten nicht geladen werden.";
+  renderProjectBrowser();
 }
 
-async function loadNaturalEarthAdmin1FullDataset() {
-  if (state.naturalEarthAdmin1FullDataset) return state.naturalEarthAdmin1FullDataset;
-  if (state.naturalEarthAdmin1FullPromise) return state.naturalEarthAdmin1FullPromise;
-  const loadedScriptDataset = window.EarthMapNaturalEarthAdmin1Full10m;
-  if (loadedScriptDataset?.features?.length) {
-    state.naturalEarthAdmin1FullDataset = {
-      detail: "10m",
-      label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
-      sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js",
-      features: loadedScriptDataset.features,
-    };
-    return state.naturalEarthAdmin1FullDataset;
+function getNaturalEarthAdmin1MetadataFeatures() {
+  return state.naturalEarthAdmin1Dataset?.features
+    || window.EarthMapNaturalEarthAdmin1Metadata10m?.features
+    || [];
+}
+
+function getNaturalEarthAdmin1ChunkIndexEntry(iso3) {
+  const normalizedIso = String(iso3 || "").toUpperCase();
+  if (!normalizedIso) return null;
+  return (window.EarthMapNaturalEarthAdmin1ChunkIndex10m?.chunks || [])
+    .find((chunk) => String(chunk.iso3 || "").toUpperCase() === normalizedIso) || null;
+}
+
+function getNaturalEarthAdmin1ChunkFromWindow(iso3) {
+  const normalizedIso = String(iso3 || "").toUpperCase();
+  return window.EarthMapNaturalEarthAdmin1CountryChunks10m?.[normalizedIso] || null;
+}
+
+function toNaturalEarthAdmin1ChunkDataset(iso3, data, sourceUrl) {
+  const normalizedIso = String(iso3 || "").toUpperCase();
+  return {
+    detail: "10m",
+    label: `10m · Natural-Earth-Admin-1 · ${normalizedIso}`,
+    sourceUrl,
+    features: Array.isArray(data?.features) ? data.features : [],
+  };
+}
+
+function loadNaturalEarthAdmin1CountryChunkScript(iso3, entry) {
+  const normalizedIso = String(iso3 || "").toUpperCase();
+  const scriptFile = entry?.scriptFile || String(entry?.file || "").replace(/\.geojson$/i, ".js").replace("admin1-by-country/", "admin1-by-country-js/");
+  if (!normalizedIso || !scriptFile) return Promise.resolve({ type: "FeatureCollection", features: [] });
+  const existing = getNaturalEarthAdmin1ChunkFromWindow(normalizedIso);
+  if (existing?.features?.length) {
+    return Promise.resolve(toNaturalEarthAdmin1ChunkDataset(normalizedIso, existing, `${NATURAL_EARTH_ASSET_BASE}10m/${scriptFile}`));
   }
 
-  // Suchregel: Die Browserliste darf aus leichter Metadaten-JSON kommen.
-  // Für die Kopfzeilensuche brauchen wir jedoch die echte Geometrie, weil ein
-  // Treffer unmittelbar als Kartenfläche hervorgehoben werden soll.
-  state.naturalEarthAdmin1FullError = "";
-  state.naturalEarthAdmin1FullPromise = fetch("../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson", { cache: "force-cache" })
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = `${NATURAL_EARTH_ASSET_BASE}10m/${scriptFile}?v=${entry?.bytes || "1"}`;
+    script.async = true;
+    script.onload = () => {
+      const data = getNaturalEarthAdmin1ChunkFromWindow(normalizedIso);
+      resolve(toNaturalEarthAdmin1ChunkDataset(normalizedIso, data, script.src));
+    };
+    script.onerror = () => {
+      console.warn(`Natural-Earth-Admin-1-Script-Chunk ${normalizedIso} konnte nicht geladen werden.`);
+      resolve({ type: "FeatureCollection", features: [] });
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function loadNaturalEarthAdmin1CountryChunk(iso3) {
+  const normalizedIso = String(iso3 || "").toUpperCase();
+  if (!normalizedIso) return { type: "FeatureCollection", features: [] };
+  if (state.naturalEarthAdmin1CountryChunkCache.has(normalizedIso)) {
+    return state.naturalEarthAdmin1CountryChunkCache.get(normalizedIso);
+  }
+  if (state.naturalEarthAdmin1CountryChunkPromises.has(normalizedIso)) {
+    return state.naturalEarthAdmin1CountryChunkPromises.get(normalizedIso);
+  }
+
+  const entry = getNaturalEarthAdmin1ChunkIndexEntry(normalizedIso);
+  if (!entry) return { type: "FeatureCollection", features: [] };
+  // Online-Regel: Admin-1-Geometrien werden nicht mehr als globaler 38-MB-
+  // Block geladen. Metadata bleibt global, echte Geometrie kommt pro ISO-3-
+  // Chunk nach Bedarf. Das hält GitHub-Dateien klein und Suchinteraktionen
+  // online performant. App-/Dateikontexte können fetch() auf lokalen GeoJSON-
+  // Dateien blockieren; darum gibt es darunter denselben Chunk zusätzlich als
+  // Script-Fallback. So bleibt die Suche nach "Texas; Vereinigte Staaten"
+  // genauso zuverlässig wie die schon per Script geladenen Grundkarten.
+  const promise = fetch(`${NATURAL_EARTH_ASSET_BASE}10m/${entry.file}`, { cache: "force-cache" })
     .then((response) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     })
     .then((data) => {
-      state.naturalEarthAdmin1FullDataset = {
-        detail: "10m",
-        label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
-        sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
-        features: Array.isArray(data.features) ? data.features : [],
-      };
-      return state.naturalEarthAdmin1FullDataset;
+      const dataset = toNaturalEarthAdmin1ChunkDataset(normalizedIso, data, `${NATURAL_EARTH_ASSET_BASE}10m/${entry.file}`);
+      state.naturalEarthAdmin1CountryChunkCache.set(normalizedIso, dataset);
+      return dataset;
     })
-    .catch((error) => {
-      console.warn("Natural-Earth-Admin-1-Geometrien konnten nicht geladen werden.", error);
-      return loadNaturalEarthAdmin1FullDatasetFromScript();
+    .catch(async (error) => {
+      console.warn(`Natural-Earth-Admin-1-GeoJSON-Chunk ${normalizedIso} konnte nicht geladen werden, versuche Script-Fallback.`, error);
+      const dataset = await loadNaturalEarthAdmin1CountryChunkScript(normalizedIso, entry);
+      if (dataset.features?.length) state.naturalEarthAdmin1CountryChunkCache.set(normalizedIso, dataset);
+      return dataset;
     })
     .finally(() => {
-      state.naturalEarthAdmin1FullPromise = null;
+      state.naturalEarthAdmin1CountryChunkPromises.delete(normalizedIso);
     });
-  return state.naturalEarthAdmin1FullPromise;
-}
-
-function loadNaturalEarthAdmin1FullDatasetFromScript() {
-  return new Promise((resolve) => {
-    const existing = window.EarthMapNaturalEarthAdmin1Full10m;
-    if (existing?.features?.length) {
-      state.naturalEarthAdmin1FullDataset = {
-        detail: "10m",
-        label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
-        sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js",
-        features: existing.features,
-      };
-      resolve(state.naturalEarthAdmin1FullDataset);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js?v=20260709a";
-    script.async = true;
-    script.onload = () => {
-      const loaded = window.EarthMapNaturalEarthAdmin1Full10m;
-      if (loaded?.features?.length) {
-        state.naturalEarthAdmin1FullDataset = {
-          detail: "10m",
-          label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
-          sourceUrl: script.src,
-          features: loaded.features,
-        };
-        state.naturalEarthAdmin1FullError = "";
-        resolve(state.naturalEarthAdmin1FullDataset);
-        return;
-      }
-      state.naturalEarthAdmin1FullError = "Gliedstaaten / Provinzen konnten für die Suche nicht geladen werden.";
-      resolve(null);
-    };
-    script.onerror = () => {
-      state.naturalEarthAdmin1FullError = "Gliedstaaten / Provinzen konnten für die Suche nicht geladen werden.";
-      resolve(null);
-    };
-    document.head.appendChild(script);
-  });
+  state.naturalEarthAdmin1CountryChunkPromises.set(normalizedIso, promise);
+  return promise;
 }
 
 function requestNaturalEarthAdmin1BoundaryLayerForZoom() {
@@ -5047,7 +5034,7 @@ function createNaturalEarthArchiveItemDefaults(datasetId, feature) {
     detail: "10m",
     license: "Public Domain",
     sourceUrl: isAdmin1
-      ? "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson"
+      ? "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.by-country-index.json"
       : "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.geojson",
     importedAt: "system-archive",
     temporalCoverage: {
@@ -7219,11 +7206,17 @@ function scoreSearchValues(values, needles) {
   if (!normalizedValues.length || !needles.length) return 0;
   let score = 0;
   normalizedValues.forEach((value) => {
+    const tokens = value.split(" ").filter(Boolean);
     needles.forEach((needle) => {
       if (!needle || !value) return;
       if (value === needle) score = Math.max(score, 100);
+      else if (tokens.includes(needle)) score = Math.max(score, 86);
       else if (value.startsWith(needle)) score = Math.max(score, 72);
-      else if (value.includes(needle)) score = Math.max(score, 44);
+      // Suchregel: Kurze Kürzel wie USA, EU, UK oder UN dürfen nicht als
+      // zufällige Binnenzeichenfolge in langen Wörtern gewinnen. "USA" soll
+      // die Vereinigten Staaten finden, nicht "zUSAmmenarbeit". Unscharfe
+      // Binnen-Treffer sind darum erst bei längeren Suchbegriffen erlaubt.
+      else if (needle.length >= 4 && value.includes(needle)) score = Math.max(score, 44);
     });
   });
   return score;
@@ -7427,13 +7420,30 @@ function isMapSearchFocusInsideContext(focus, contextEntries) {
 }
 
 async function findNaturalEarthAdmin1Feature(query, countryFeature = null) {
-  const dataset = await loadNaturalEarthAdmin1FullDataset();
-  const features = dataset?.features || [];
-  if (!features.length) return null;
   const countryIso = getNaturalEarthIso3(countryFeature).toUpperCase();
-  const scopedFeatures = countryIso
-    ? features.filter((feature) => getNaturalEarthAdmin1CountryIso3(feature) === countryIso)
-    : features;
+  if (countryIso) {
+    const dataset = await loadNaturalEarthAdmin1CountryChunk(countryIso);
+    const features = dataset?.features || [];
+    if (!features.length) return null;
+    return findBestFeatureMatch(
+      features,
+      (props) => getNaturalEarthAdmin1SearchValues(props),
+      query,
+    );
+  }
+
+  const metadataFeatures = getNaturalEarthAdmin1MetadataFeatures();
+  if (!metadataFeatures.length) await loadNaturalEarthAdmin1Dataset();
+  const metadataMatch = findBestFeatureMatch(
+    getNaturalEarthAdmin1MetadataFeatures(),
+    (props) => getNaturalEarthAdmin1SearchValues(props),
+    query,
+  );
+  const inferredIso = getNaturalEarthAdmin1CountryIso3(metadataMatch);
+  if (!inferredIso) return null;
+  const dataset = await loadNaturalEarthAdmin1CountryChunk(inferredIso);
+  const scopedFeatures = dataset?.features || [];
+  if (!scopedFeatures.length) return null;
   return findBestFeatureMatch(
     scopedFeatures,
     (props) => getNaturalEarthAdmin1SearchValues(props),
@@ -7457,14 +7467,33 @@ async function resolveMapSearchTerm(query) {
   return null;
 }
 
-async function resolveMapSearchTermList(rawList) {
+async function resolveMapSearchFocusTerm(query, contextEntries = []) {
+  const trimmed = String(query || "").trim();
+  if (!trimmed) return null;
+
+  // Bei der Relationensuche ist die rechte Seite fachlicher Kontext:
+  // "Bayern; Deutschland" bedeutet, dass Bayern zuerst innerhalb der
+  // deutschen Admin-1-Daten gesucht wird. Das hält die Suche eindeutig
+  // und lädt nur den nötigen Natural-Earth-Länderchunk.
+  for (const context of contextEntries) {
+    if (context.kind !== "country") continue;
+    const admin1Feature = await findNaturalEarthAdmin1Feature(trimmed, context.feature);
+    if (admin1Feature) return { kind: "admin1", feature: admin1Feature };
+  }
+
+  return resolveMapSearchTerm(trimmed);
+}
+
+async function resolveMapSearchTermList(rawList, options = {}) {
   const terms = String(rawList || "")
     .split(",")
     .map((part) => part.trim())
     .filter(Boolean);
   const entries = [];
   for (const term of terms) {
-    const entry = await resolveMapSearchTerm(term);
+    const entry = options.focus
+      ? await resolveMapSearchFocusTerm(term, options.contextEntries || [])
+      : await resolveMapSearchTerm(term);
     if (entry) entries.push(entry);
   }
   return entries;
@@ -7536,6 +7565,73 @@ function clearMapSearchHighlight() {
   scheduleGlobeRender();
 }
 
+function collectFeatureCoordinates(geojson, coordinates = []) {
+  if (!geojson) return coordinates;
+  if (geojson.type === "FeatureCollection") {
+    (geojson.features || []).forEach((feature) => collectFeatureCoordinates(feature, coordinates));
+    return coordinates;
+  }
+  if (geojson.type === "Feature") {
+    collectFeatureCoordinates(geojson.geometry, coordinates);
+    return coordinates;
+  }
+  if (geojson.type === "GeometryCollection") {
+    (geojson.geometries || []).forEach((geometry) => collectFeatureCoordinates(geometry, coordinates));
+    return coordinates;
+  }
+  if (geojson.type === "Point" && Array.isArray(geojson.coordinates)) {
+    coordinates.push(geojson.coordinates);
+    return coordinates;
+  }
+  if (geojson.type === "MultiPoint" || geojson.type === "LineString") {
+    (geojson.coordinates || []).forEach((point) => coordinates.push(point));
+    return coordinates;
+  }
+  if (geojson.type === "MultiLineString" || geojson.type === "Polygon") {
+    (geojson.coordinates || []).forEach((ring) => (ring || []).forEach((point) => coordinates.push(point)));
+    return coordinates;
+  }
+  if (geojson.type === "MultiPolygon") {
+    (geojson.coordinates || []).forEach((polygon) => {
+      (polygon || []).forEach((ring) => (ring || []).forEach((point) => coordinates.push(point)));
+    });
+  }
+  return coordinates;
+}
+
+function getGeoJsonCoordinateCenter(geojson) {
+  const points = collectFeatureCoordinates(geojson)
+    .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
+  if (!points.length) return null;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  points.forEach(([lon, lat]) => {
+    minLon = Math.min(minLon, lon);
+    maxLon = Math.max(maxLon, lon);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  });
+  if (![minLon, maxLon, minLat, maxLat].every(Number.isFinite)) return null;
+  return {
+    lon: normalizeLongitude((minLon + maxLon) / 2),
+    lat: clamp((minLat + maxLat) / 2, -84, 84),
+  };
+}
+
+function orientGlobeToSearchResult(focusEntries, contextEntries, fallbackEntries) {
+  const targetEntry = focusEntries[0] || contextEntries[0] || fallbackEntries[0] || null;
+  const center = getGeoJsonCoordinateCenter(targetEntry?.feature);
+  if (!center) return;
+  // Suchinteraktion: Eine gefundene Fläche muss nach der Suche sichtbar sein.
+  // Bei "Texas; Vereinigte Staaten" liegt Texas sonst auf der Rückseite der
+  // aktuellen Kugelrotation und wirkt fälschlich wie ein nicht erkannter Fokus.
+  rotation.lon = -center.lon;
+  const latitudeLimit = getLatitudeNavigationLimit();
+  rotation.lat = clamp(-center.lat, -latitudeLimit, latitudeLimit);
+}
+
 async function applyMapSearchQuery(rawQuery) {
   const requestSerial = ++mapSearchRequestSerial;
   const query = String(rawQuery || "").trim();
@@ -7557,7 +7653,7 @@ async function applyMapSearchQuery(rawQuery) {
   // bleibt z. B. "Vereinigtes Königreich; EU" fachlich sichtbar falsch:
   // Die EU wird markiert, das Vereinigte Königreich aber nicht hervorgehoben.
   const contextEntries = await resolveMapSearchTermList(contextExpression);
-  const rawFocusEntries = await resolveMapSearchTermList(focusExpression);
+  const rawFocusEntries = await resolveMapSearchTermList(focusExpression, { focus: true, contextEntries });
   const focusEntries = rawFocusEntries.filter((entry) => isMapSearchFocusInsideContext(entry, contextEntries));
   const fallbackEntries = !hasRelationSeparator && !contextEntries.length
     ? await resolveMapSearchTermList(query)
@@ -7580,6 +7676,7 @@ async function applyMapSearchQuery(rawQuery) {
     selectedFeatures: contextEntries.length ? contextEntries.map((entry) => entry.feature) : fallbackEntries.map((entry) => entry.feature),
     focusFeatures: focusEntries.map((entry) => entry.feature),
   };
+  orientGlobeToSearchResult(focusEntries, contextEntries, fallbackEntries);
   scheduleGlobeRender();
 }
 
