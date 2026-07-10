@@ -2,191 +2,942 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f3efe5">
-  <title>Earth Map</title>
-  <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
-  <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260702a">
-  <link rel="stylesheet" href="../assets/ui/editor-tabs.css?v=20260701c">
-  <link rel="stylesheet" href="earthmap.css?v=20260709h">
-  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260709i">
-  <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260709b">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ziselin</title>
+  <meta name="theme-color" content="#f4efe4">
+  <link rel="icon" type="image/svg+xml" href="./assets/ziselin-icon.svg?v=20260628a">
+  <link rel="apple-touch-icon" href="./assets/ziselin-icon.svg?v=20260628a">
+  <link rel="manifest" href="./site.webmanifest?v=20260628a">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3efe6;
+      --paper-light: #fbf8f1;
+      --panel: rgba(255, 253, 248, 0.72);
+      --panel-solid: rgba(255, 254, 250, 0.9);
+      --ink: #213633;
+      --ink-soft: #3d504c;
+      --muted: #7a837d;
+      --quiet: rgba(33, 54, 51, 0.48);
+      --line: rgba(33, 54, 51, 0.14);
+      --line-strong: rgba(33, 54, 51, 0.26);
+      --shadow: rgba(33, 54, 51, 0.1);
+      --shadow-soft: rgba(33, 54, 51, 0.055);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--paper);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.72), transparent 38%),
+        linear-gradient(145deg, var(--paper-light) 0%, var(--paper) 58%, #e8e2d8 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background:
+        repeating-linear-gradient(0deg, rgba(33, 54, 51, 0.018) 0 1px, transparent 1px 8px),
+        repeating-linear-gradient(90deg, rgba(33, 54, 51, 0.014) 0 1px, transparent 1px 12px);
+      opacity: 0.56;
+      pointer-events: none;
+    }
+
+    html.project-schola,
+    body.project-schola {
+      --paper: #ecece5;
+      --paper-light: #f8f8f3;
+      --panel: rgba(248, 248, 242, 0.78);
+      --panel-solid: rgba(246, 246, 239, 0.94);
+      --muted: #747d78;
+      --quiet: rgba(33, 54, 51, 0.43);
+      --line: rgba(33, 54, 51, 0.12);
+      --line-strong: rgba(33, 54, 51, 0.24);
+    }
+
+    html.project-schola {
+      background: #ecece5;
+    }
+
+    body.project-schola {
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 252, 0.9), transparent 40%),
+        linear-gradient(145deg, #fafaf5 0%, #ecece5 58%, #deded5 100%);
+    }
+
+    body.project-schola::before {
+      opacity: 0.34;
+    }
+
+    body.project-schola .topbar,
+    body.project-schola .home-side-menu {
+      background: rgba(246, 246, 239, 0.92);
+    }
+
+    body.project-schola .page-shell::before {
+      opacity: 0.065;
+      filter: brightness(0) saturate(100%) invert(20%) sepia(18%) saturate(673%) hue-rotate(122deg) brightness(92%) contrast(90%);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+      height: 82px;
+      min-height: 82px;
+      padding: 18px 18px 10px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(250, 247, 239, 0.84);
+      box-shadow: 0 10px 30px rgba(33, 54, 51, 0.035);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand-plate {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      align-self: stretch;
+      height: 54px;
+      min-height: 54px;
+      padding: 0 12px;
+      z-index: 1;
+    }
+
+    .brand-mark {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      z-index: 2;
+      overflow: visible;
+    }
+
+    .home-menu-button {
+      width: 36px;
+      height: 34px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      cursor: pointer;
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    .home-menu-button:hover,
+    .home-menu-button[aria-expanded="true"] {
+      border-color: rgba(33, 54, 51, 0.14);
+      background: rgba(33, 54, 51, 0.055);
+    }
+
+    .home-menu-button img {
+      display: block;
+      width: 28px;
+      height: 28px;
+      opacity: 0.94;
+    }
+
+    .brand-bird {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+      filter: brightness(0) saturate(100%) invert(20%) sepia(18%) saturate(673%) hue-rotate(122deg) brightness(92%) contrast(90%);
+      opacity: 0.93;
+    }
+
+    .brand-name {
+      color: var(--ink);
+      font-size: clamp(1.32rem, 2.05vw, 1.82rem);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0;
+      text-transform: lowercase;
+    }
+
+    .topbar-search {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0;
+      flex: 1 1 auto;
+    }
+
+    .search-wrap {
+      position: relative;
+      width: min(460px, 100%);
+    }
+
+    .search-wrap::before {
+      content: "";
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      background: var(--muted);
+      mask: url("https://api.iconify.design/material-symbols/search-rounded.svg") center / contain no-repeat;
+      transform: translateY(-50%);
+      opacity: 0.86;
+      pointer-events: none;
+    }
+
+    .app-search {
+      width: 100%;
+      height: 43px;
+      padding: 0 16px 0 44px;
+      border: 1px solid rgba(33, 54, 51, 0.15);
+      border-radius: 10px;
+      color: var(--ink);
+      background: rgba(255, 254, 250, 0.88);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 9px 20px rgba(33, 54, 51, 0.06);
+      font: inherit;
+      font-size: 0.94rem;
+    }
+
+    .home-menu-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(33, 54, 51, 0.16);
+      backdrop-filter: blur(2px);
+    }
+
+    .home-menu-overlay[hidden] {
+      display: none;
+    }
+
+    .home-side-menu {
+      position: fixed;
+      z-index: 21;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: min(420px, calc(100vw - 32px));
+      padding: 18px;
+      background: rgba(250, 247, 239, 0.96);
+      border-right: 1px solid var(--line);
+      box-shadow: 24px 0 70px rgba(33, 54, 51, 0.18);
+      transform: translateX(-100%);
+      transition: transform 180ms ease;
+    }
+
+    .home-side-menu.is-open {
+      transform: translateX(0);
+    }
+
+    .home-side-menu-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .home-menu-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .home-menu-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--quiet);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .home-menu-title {
+      color: var(--ink);
+      font-size: 1.14rem;
+      font-weight: 700;
+    }
+
+    .home-menu-close {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 254, 250, 0.68);
+      color: var(--ink-soft);
+      font: inherit;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .home-menu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .home-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 10px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .home-menu-item:hover,
+    .home-menu-item.is-active {
+      border-color: var(--line);
+      background: rgba(255, 254, 250, 0.64);
+    }
+
+    .home-menu-icon {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+      opacity: 0.84;
+    }
+
+    .home-menu-panel {
+      display: grid;
+      gap: 14px;
+      margin-top: 2px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 254, 250, 0.62);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+    }
+
+    .home-menu-panel[hidden] {
+      display: none;
+    }
+
+    .home-menu-block {
+      display: grid;
+      gap: 5px;
+    }
+
+    .home-menu-block strong {
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    .home-menu-block p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+      line-height: 1.48;
+    }
+
+    .project-choice-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .project-choice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .project-choice:hover,
+    .project-choice[aria-current="page"] {
+      border-color: var(--line);
+      background: rgba(255, 255, 252, 0.58);
+    }
+
+    .project-choice[aria-current="page"]::after {
+      content: "✓";
+      color: var(--ink-soft);
+      font-weight: 700;
+    }
+
+    .app-search:focus {
+      border-color: var(--line-strong);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(33, 54, 51, 0.1), 0 12px 28px rgba(33, 54, 51, 0.075);
+    }
+
+    .app-search:disabled {
+      cursor: default;
+      opacity: 0.78;
+      background: rgba(249, 249, 244, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .page-shell {
+      position: relative;
+      isolation: isolate;
+      width: min(1180px, calc(100vw - 56px));
+      margin: 0 auto;
+      padding: clamp(42px, 6vw, 78px) 0 48px;
+    }
+
+    .page-shell::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      top: clamp(8px, 4vw, 46px);
+      left: clamp(-220px, -17vw, -96px);
+      width: min(820px, 72vw);
+      aspect-ratio: 1;
+      background: url("./assets/ziselin-bild.svg") left top / contain no-repeat;
+      opacity: 0.145;
+      filter: brightness(0) saturate(100%) invert(67%) sepia(13%) saturate(430%) hue-rotate(9deg) brightness(96%) contrast(90%);
+      pointer-events: none;
+    }
+
+    .hero {
+      position: relative;
+      display: grid;
+      justify-items: start;
+      margin: 0 auto clamp(48px, 7vw, 78px);
+      width: min(960px, 100%);
+    }
+
+    .claim-text {
+      margin: 0;
+      color: var(--ink-soft);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: clamp(3.6rem, 6.1vw, 5.75rem);
+      font-weight: 700;
+      line-height: 1.03;
+      letter-spacing: 0;
+      text-wrap: normal;
+    }
+
+    .app-section {
+      width: min(960px, 100%);
+      margin: 0 auto;
+    }
+
+    .collection-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 28px;
+      justify-content: start;
+      align-items: start;
+    }
+
+    .app-tile {
+      position: relative;
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) 18px;
+      align-items: center;
+      gap: 16px;
+      width: 100%;
+      min-height: 78px;
+      padding: 12px 14px 12px 12px;
+      border: 0;
+      border-radius: 14px;
+      background: transparent;
+      box-shadow: none;
+      text-decoration: none;
+      transition: background 160ms ease, transform 160ms ease;
+    }
+
+    .app-tile::after {
+      content: "";
+      width: 15px;
+      height: 15px;
+      justify-self: end;
+      background: var(--quiet);
+      mask: url("https://api.iconify.design/material-symbols/chevron-right-rounded.svg") center / contain no-repeat;
+      opacity: 0;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .app-tile:hover,
+    .app-tile:focus-visible {
+      outline: none;
+      background: rgba(255, 254, 250, 0.58);
+    }
+
+    .app-tile:hover::after,
+    .app-tile:focus-visible::after {
+      opacity: 1;
+    }
+
+    .app-tile:focus-visible .app-icon {
+      box-shadow: 0 0 0 3px rgba(33, 54, 51, 0.12), 0 10px 24px rgba(33, 54, 51, 0.16);
+    }
+
+    .app-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 12px;
+      object-fit: cover;
+      box-shadow: 0 10px 24px rgba(33, 54, 51, 0.15);
+      transition: box-shadow 160ms ease, transform 160ms ease;
+    }
+
+    .app-tile:hover .app-icon {
+      box-shadow: 0 14px 30px rgba(33, 54, 51, 0.2);
+    }
+
+    .app-copy {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .app-title {
+      color: var(--ink);
+      font-size: 1rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-description {
+      color: var(--muted);
+      font-size: 0.91rem;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-placeholder {
+      min-height: 78px;
+    }
+
+    .empty-state {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 20px;
+      border: 1px dashed rgba(33, 54, 51, 0.22);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 254, 250, 0.5);
+      text-align: center;
+    }
+
+    .collection-grid.has-no-results .empty-state {
+      display: block;
+    }
+
+    [data-search-card][hidden] {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .topbar {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 82px;
+      }
+
+      .topbar-search {
+        justify-content: stretch;
+        padding: 0 18px 14px;
+      }
+
+      .page-shell {
+        padding-top: 38px;
+      }
+
+      .page-shell::before {
+        left: clamp(-170px, -22vw, -64px);
+        width: min(700px, 86vw);
+        opacity: 0.12;
+      }
+
+      .hero {
+        margin-bottom: 48px;
+      }
+
+      .claim-text {
+        font-size: clamp(3rem, 8.6vw, 4.8rem);
+      }
+    }
+
+    @media (max-width: 720px) {
+      .collection-grid {
+        grid-template-columns: minmax(260px, 420px);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page-shell {
+        width: min(100% - 28px, 1180px);
+        padding-top: 42px;
+      }
+
+      .page-shell::before {
+        top: 18px;
+        left: -150px;
+        width: 620px;
+        opacity: 0.105;
+      }
+
+      .brand-plate {
+        padding: 0 12px;
+      }
+
+      .brand-bird {
+        width: 48px;
+        height: 48px;
+      }
+
+      .brand-name {
+        font-size: clamp(1.32rem, 2.05vw, 1.82rem);
+      }
+
+      .claim-text {
+        font-size: clamp(2.65rem, 14vw, 4.25rem);
+      }
+
+      .app-tile {
+        grid-template-columns: 48px minmax(0, 1fr) 18px;
+        min-height: 72px;
+        gap: 14px;
+      }
+
+      .app-icon {
+        width: 48px;
+        height: 48px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <main id="globeApp" class="app-frame workspace-mode-preview">
-    <section class="preview-view" aria-label="Earth Map Ansicht">
-      <header class="topbar">
-        <div class="brand-plate">
-          <button type="button" id="menuButton" class="header-icon-button menu-button app-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
-            <img id="menuButtonIcon" src="https://api.iconify.design/material-symbols/menu.svg?color=%23213633" alt="" aria-hidden="true">
-          </button>
-          <div class="brand-mark">
-            <a class="brand-home-link" href="../index.html" aria-label="Zur Atlas-Startseite">
-              <img class="brand-bird" src="../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
-            </a>
-            <span class="brand-name">earth map</span>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <div class="export-control">
-            <button type="button" id="exportProjectButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
-              <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
-            </button>
-            <div id="exportMenu" class="export-menu" hidden>
-              <button type="button" data-export-format="html">
-                <span class="file-format-icon file-format-icon-html" aria-hidden="true"></span>
-                <span>HTML</span>
-              </button>
-              <button type="button" data-export-format="png">
-                <span class="file-format-icon file-format-icon-png" aria-hidden="true"></span>
-                <span>PNG</span>
-              </button>
-            </div>
-          </div>
-          <button type="button" id="themeToggleButton" class="header-icon-button topbar-icon-button theme-toggle-button" aria-label="Dunklen Modus aktivieren" aria-pressed="false">
-            <img id="themeToggleIcon" src="https://api.iconify.design/material-symbols-light/dark-mode-rounded.svg?color=%23213633" alt="" aria-hidden="true">
-          </button>
-        </div>
-      </header>
-
-      <div id="menuOverlay" class="menu-overlay" hidden></div>
-      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
-        <div class="side-menu-inner">
-          <div class="side-menu-head">
-            <div><span class="label">Menü</span><strong>Earth Map</strong></div>
-            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
-          </div>
-          <div class="side-menu-list">
-            <details>
-              <summary>Projekte</summary>
-              <div class="project-choice-list" aria-label="Projektbereich wechseln">
-                <a class="project-choice" href="../index.html" aria-current="page">Atlas</a>
-                <a class="project-choice" href="../index.html?project=schola">Schola</a>
-              </div>
-            </details>
-            <details>
-              <summary>Funktionsweise</summary>
-              <p>Earth Map soll statistische Daten später auf ausgewählte geografische oder historische Grenzräume projizieren.</p>
-            </details>
-            <details>
-              <summary>Appbeschreibung</summary>
-              <p>Earth Map ist in Vorbereitung. Angelegt sind Globusansicht, Projektbrowser und Editorstruktur; Geodatenquellen, Grenzlayer und Klassierungen folgen.</p>
-            </details>
-          </div>
-        </div>
-      </aside>
-
-      <section class="globe-stage">
-        <section class="globe-card" aria-label="Interaktiver Globus">
-          <div id="globe" class="globe" role="img" aria-label="Interaktiver dreidimensional projizierter Globus">
-            <canvas id="globeCanvas" class="globe-canvas"></canvas>
-          </div>
-        </section>
-      </section>
-
-      <aside id="viewToolsDrawer" class="app-view-drawer" aria-label="Darstellungsoptionen">
-        <button type="button" id="viewToolsDrawerTab" class="app-view-drawer-tab" aria-expanded="false" aria-controls="viewToolsDrawerPanel">
-          <span class="app-view-drawer-tab-grip" aria-hidden="true"></span>
-        </button>
-        <div id="viewToolsDrawerPanel" class="app-view-drawer-panel" hidden>
-          <button type="button" id="graticuleToggle" class="app-view-drawer-option" aria-pressed="false">
-            <span class="app-view-drawer-option-icon app-view-drawer-option-icon-grid" aria-hidden="true"></span>
-            <span class="app-view-drawer-option-label">Koordinatensystem anzeigen</span>
-            <span class="app-view-drawer-option-check" aria-hidden="true"></span>
-          </button>
-        </div>
-      </aside>
-
-      <div id="openWorkspaceButton" class="workspace-strip" role="button" tabindex="0" aria-label="Browser und Editor öffnen">
-        <span>Browser/Editor</span>
-        <button type="button" id="fullscreenButton" class="workspace-fullscreen-button" aria-label="Vollbild umschalten" title="Vollbild umschalten">⛶</button>
+  <header class="topbar">
+    <div class="brand-plate" aria-label="Ziselin">
+      <button type="button" id="homeMenuButton" class="home-menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="homeSideMenu">
+        <img src="https://api.iconify.design/material-symbols/menu.svg?color=%23213633" alt="">
+      </button>
+      <div class="brand-mark">
+        <img class="brand-bird" src="./assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+        <span class="brand-name">ziselin</span>
       </div>
+    </div>
+    <div class="topbar-search">
+      <div class="search-wrap">
+        <input class="app-search" type="search" list="appSearchOptions" placeholder="Apps durchsuchen" aria-label="Apps durchsuchen" autocomplete="off">
+      </div>
+      <datalist id="appSearchOptions">
+        <option value="TimeMap"></option>
+        <option value="TypeMap"></option>
+        <option value="EarthMap"></option>
+        <option value="Sourcerer"></option>
+        <option value="Notenrechner"></option>
+      </datalist>
+    </div>
+  </header>
+
+  <div id="homeMenuOverlay" class="home-menu-overlay" hidden></div>
+  <aside id="homeSideMenu" class="home-side-menu" aria-hidden="true" inert>
+    <div class="home-side-menu-inner">
+      <div class="home-menu-head">
+        <div>
+          <span class="home-menu-label">Menü</span>
+          <strong class="home-menu-title">Ziselin</strong>
+        </div>
+        <button type="button" id="homeMenuCloseButton" class="home-menu-close" aria-label="Menü schließen">×</button>
+      </div>
+      <div class="home-menu-list">
+        <button type="button" class="home-menu-item" data-home-menu-panel="projects" aria-expanded="false">
+          <img class="home-menu-icon" src="https://api.iconify.design/mdi/folder-multiple-outline.svg?color=%23213633" alt="" aria-hidden="true">
+          <span>Projekte</span>
+        </button>
+        <div class="home-menu-panel" data-home-menu-popup="projects" hidden>
+          <div class="project-choice-list" aria-label="Projekt auswählen">
+            <button type="button" class="project-choice" data-project-select="atlas">Atlas</button>
+            <button type="button" class="project-choice" data-project-select="schola">Schola</button>
+          </div>
+        </div>
+        <button type="button" class="home-menu-item" data-home-menu-panel="imprint" aria-expanded="false">
+          <img class="home-menu-icon" src="https://api.iconify.design/mdi/legal.svg?color=%23213633" alt="" aria-hidden="true">
+          <span>Impressum</span>
+        </button>
+        <div class="home-menu-panel" data-home-menu-popup="imprint" hidden>
+          <div class="home-menu-block">
+            <strong>Projektbeschreibung</strong>
+            <p>Ziselin ist eine Plattform für digitale Werkzeuge zur Erstellung und Erprobung interaktiver Wissens- und Präsentationsräume.</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Angaben gemäß § 5 DDG</strong>
+            <p>Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Kontakt</strong>
+            <p>E-Mail: impressum@ziselin.com</p>
+          </div>
+          <div class="home-menu-block">
+            <strong>Verantwortlich für den Inhalt</strong>
+            <p>Martin Graupner<br>Ribnitz-Damgarten<br>Deutschland</p>
+          </div>
+          <div class="home-menu-block" data-schola-only hidden>
+            <strong>Hinweis zu Bewertungsinformationen und Berechnungen</strong>
+            <p>Die in Schola bereitgestellten Bewertungsgrundlagen, Prozentgrenzen und Berechnungsergebnisse dienen als Arbeits- und Orientierungshilfe. Trotz sorgfältiger Erstellung wird keine Gewähr für ihre Richtigkeit, Vollständigkeit oder Aktualität übernommen. Maßgeblich bleiben die jeweils geltenden Rechts- und Verwaltungsvorschriften, schulischen Regelungen und verbindlichen Festlegungen. Ergebnisse sind vor ihrer Verwendung, insbesondere im Rahmen einer Leistungsbewertung, eigenständig zu prüfen.</p>
+          </div>
+          <div class="home-menu-block" data-schola-only hidden>
+            <strong>Haftungsausschluss</strong>
+            <p>Eine Haftung für Schäden, die aus der Nutzung fehlerhafter oder unvollständiger Informationen oder Berechnungen entstehen, ist soweit gesetzlich zulässig ausgeschlossen.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="page-shell">
+    <section class="hero">
+      <h1 class="claim-text" id="homeClaim">Atlas</h1>
     </section>
 
-    <section class="details-view" aria-label="Earth Map Arbeitsbereich">
-      <button type="button" id="returnPreviewButton" class="workspace-strip workspace-strip-top" aria-label="Zur Earth Map Ansicht zurückkehren">
-        <span>Earth Map</span>
-      </button>
-      <main class="workspace-stage">
-        <section class="workspace-panel browser-panel z-browser-scope">
-          <div class="panel-head">
-            <div><span class="label">Browser</span><h2>Projekte</h2></div>
-            <div class="browser-header-actions">
-              <div class="browser-actions-menu-shell">
-                <button type="button" id="browserActionsMenuButton" class="browser-actions-menu-trigger" aria-label="Projektaktionen" aria-expanded="false" aria-controls="browserActionsMenu">
-                  <span class="browser-actions-menu-dots" aria-hidden="true"></span>
-                </button>
-                <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
-                  <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
-                  <button type="button" role="menuitem">Exportieren</button>
-                </div>
-              </div>
-              <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
-                <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
-              </button>
-            </div>
-          </div>
-          <div id="projectBrowserList" class="project-browser-list" aria-label="Earth-Map-Projekte"></div>
-          <div id="libraryBrowserList" class="library-browser-list" aria-label="Projektbibliothek"></div>
-          <input id="boundarySetImportInput" type="file" accept=".json,.geojson,.kml,.kmz,.zip,.shp,application/json,application/geo+json,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip" hidden>
-        </section>
-
-        <section class="workspace-panel editor-panel">
-          <div class="panel-head editor-panel-head">
-            <button type="button" id="editorBackButton" class="editor-back-button" hidden aria-label="Zurück zur Werkzeugauswahl">
-              <span class="editor-back-button-icon" aria-hidden="true"></span>
-            </button>
-            <button type="button" class="panel-layout-button" data-layout-cycle-button aria-label="Ansicht umblättern">
-              <img src="https://api.iconify.design/streamline/map-fold.svg?color=%23ffb347" alt="" aria-hidden="true">
-            </button>
-          </div>
-          <div class="editor-tabs" role="tablist" aria-label="Earth-Map-Editorbereiche">
-            <button type="button" class="editor-tab is-active" id="tabBoundarySearch" data-editor-tab="boundary-search" role="tab" aria-selected="true" aria-controls="panelBoundarySearch">Hinzufügen</button>
-            <button type="button" class="editor-tab" id="tabLayerEditor" data-editor-tab="layer-editor" role="tab" aria-selected="false" aria-controls="panelLayerEditor">Karteneditor</button>
-          </div>
-
-          <section id="panelBoundarySearch" class="editor-tab-panel is-active" data-editor-panel="boundary-search" role="tabpanel" aria-labelledby="tabBoundarySearch">
-            <div class="editor-section">
-              <h3>Hinzufügen</h3>
-              <p>Suche in Natural Earth nach Ländern und Grenzräumen. Treffer werden als Layer mit Quelle, Lizenz und Abrufdatum im Projekt gespeichert.</p>
-              <label class="search-field">
-                <span>Suchbegriff</span>
-                <input id="boundarySearchInput" type="search" placeholder="z. B. Deutschland, Mecklenburg-Vorpommern, France">
-              </label>
-              <div class="source-toggle-list" aria-label="Suchquellen">
-                <label><input type="checkbox" id="sourceNaturalEarth" checked> Natural Earth</label>
-              </div>
-              <button type="button" id="boundarySearchButton" class="secondary-button">Suchen</button>
-            </div>
-            <div class="editor-section">
-              <h3>Suchergebnisse</h3>
-              <div id="boundarySearchResults" class="search-result-list">
-                <p class="empty-state">Noch keine Suche ausgeführt.</p>
-              </div>
-            </div>
-          </section>
-
-          <section id="panelLayerEditor" class="editor-tab-panel" data-editor-panel="layer-editor" role="tabpanel" aria-labelledby="tabLayerEditor" hidden>
-            <div class="editor-section">
-              <h3 id="layerEditorTitle">Keine Karte ausgewählt</h3>
-              <p id="layerEditorSummary" class="empty-state">Wähle links im Browser eine einfache oder komplexe Karte aus.</p>
-              <div id="layerEditorContent" class="layer-editor-content" hidden>
-                <dl id="layerMetaList" class="layer-meta-list"></dl>
-              </div>
-            </div>
-          </section>
-        </section>
-      </main>
+    <section class="app-section" aria-label="App-Sammlungen">
+      <div class="collection-grid">
+        <a class="app-tile" href="./timemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
+          <img class="app-icon" src="./assets/timemap-favicon.svg" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">TimeMap</span>
+            <span class="app-description">Interaktive Zeitstrahlen und Quellenräume</span>
+          </span>
+        </a>
+        <a class="app-tile" href="./typemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
+          <img class="app-icon" src="./assets/typemap-favicon.svg" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">TypeMap</span>
+            <span class="app-description">Textsetzung (experimentell)</span>
+          </span>
+        </a>
+        <a class="app-tile" href="./earthmap/index.html" data-search-card data-app-link data-atlas-app data-search-text="earth map earthmap globus karte grenzen geodaten statistik choropleth daten visualisierung atlas">
+          <img class="app-icon" src="./assets/earthmap-favicon.svg?v=20260628a" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">EarthMap</span>
+            <span class="app-description">(in Vorbereitung)</span>
+          </span>
+        </a>
+        <div class="app-tile app-placeholder" data-search-card data-atlas-app data-search-text="sourcerer quellen recherche source">
+          <img class="app-icon" src="./assets/sourcerer-favicon.svg" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">Sourcerer</span>
+            <span class="app-description">(in Vorbereitung)</span>
+          </span>
+        </div>
+        <a class="app-tile" href="./schola/noten/index.html" data-search-card data-app-link data-schola-app data-search-text="notenrechner schola noten punkte prozent bewertung" hidden>
+          <img class="app-icon" src="./assets/notenrechner-icon.svg?v=20260621b" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">Notenrechner</span>
+            <span class="app-description">(experimentell)</span>
+          </span>
+        </a>
+        <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
+      </div>
     </section>
   </main>
 
-  <script src="../assets/vendor/d3.v7.min.js?v=20260627a"></script>
-  <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260630a"></script>
-  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
-  <script src="../assets/geojson/natural-earth/10m/ne_10m_lakes.js?v=20260709a"></script>
-  <script src="../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a"></script>
-  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.metadata.js?v=20260709a"></script>
-  <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260709o"></script>
+  <script>
+    const homeMenuButton = document.getElementById("homeMenuButton");
+    const homeMenuCloseButton = document.getElementById("homeMenuCloseButton");
+    const homeMenuOverlay = document.getElementById("homeMenuOverlay");
+    const homeSideMenu = document.getElementById("homeSideMenu");
+    const appSearch = document.querySelector(".app-search");
+    const collectionGrid = document.querySelector(".collection-grid");
+    const collectionCards = [...document.querySelectorAll("[data-search-card]")];
+    const homeClaim = document.getElementById("homeClaim");
+    const emptyState = document.querySelector("[data-empty-state]");
+    let activeHomeProject = "atlas";
+
+    function setHomeProject(projectName, options = {}) {
+      activeHomeProject = projectName === "schola" ? "schola" : "atlas";
+      const isSchola = activeHomeProject === "schola";
+      document.documentElement.classList.toggle("project-schola", isSchola);
+      document.body.classList.toggle("project-schola", isSchola);
+      document.title = isSchola ? "Schola · Ziselin" : "Ziselin";
+      if (homeClaim) homeClaim.textContent = isSchola ? "Schola" : "Atlas";
+      if (appSearch) {
+        appSearch.value = "";
+        appSearch.disabled = false;
+        appSearch.placeholder = "Apps durchsuchen";
+      }
+      if (emptyState) {
+        emptyState.textContent = "Keine passende App gefunden.";
+      }
+      document.querySelectorAll("[data-project-select]").forEach((button) => {
+        const isCurrent = button.dataset.projectSelect === activeHomeProject;
+        if (isCurrent) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      });
+      document.querySelectorAll("[data-schola-only]").forEach((element) => {
+        element.hidden = !isSchola;
+      });
+      runSearch();
+      if (options.updateHistory !== false) {
+        const url = new URL(window.location.href);
+        if (isSchola) url.searchParams.set("project", "schola");
+        else url.searchParams.delete("project");
+        window.history.pushState({ project: activeHomeProject }, "", url);
+      }
+    }
+
+    function setHomeMenuOpen(isOpen) {
+      homeSideMenu?.classList.toggle("is-open", isOpen);
+      if (homeMenuOverlay) {
+        homeMenuOverlay.hidden = !isOpen;
+      }
+      homeSideMenu?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      if (homeSideMenu) {
+        homeSideMenu.inert = !isOpen;
+      }
+      homeMenuButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    homeMenuButton?.addEventListener("click", () => {
+      setHomeMenuOpen(homeMenuButton.getAttribute("aria-expanded") !== "true");
+    });
+
+    homeMenuCloseButton?.addEventListener("click", () => {
+      setHomeMenuOpen(false);
+      homeMenuButton?.focus();
+    });
+
+    homeMenuOverlay?.addEventListener("click", () => {
+      setHomeMenuOpen(false);
+    });
+
+    document.querySelectorAll("[data-home-menu-panel]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const panelId = button.dataset.homeMenuPanel;
+        const panel = document.querySelector(`[data-home-menu-popup="${panelId}"]`);
+        const isExpanded = button.getAttribute("aria-expanded") === "true";
+        button.classList.toggle("is-active", !isExpanded);
+        button.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+        if (panel) {
+          panel.hidden = isExpanded;
+        }
+      });
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && homeMenuButton?.getAttribute("aria-expanded") === "true") {
+        setHomeMenuOpen(false);
+        homeMenuButton.focus();
+      }
+    });
+
+    function normalizeSearch(value) {
+      return value.trim().toLowerCase();
+    }
+
+    function runSearch() {
+      const query = normalizeSearch(appSearch?.value ?? "");
+      let visibleCount = 0;
+
+      collectionCards.forEach((card) => {
+        const text = normalizeSearch(card.dataset.searchText ?? card.textContent ?? "");
+        const belongsToProject = activeHomeProject === "schola" ? card.hasAttribute("data-schola-app") : card.hasAttribute("data-atlas-app");
+        const isVisible = belongsToProject && (!query || text.includes(query));
+        card.hidden = !isVisible;
+        if (isVisible) {
+          visibleCount += 1;
+        }
+      });
+
+      collectionGrid?.classList.toggle("has-no-results", visibleCount === 0);
+    }
+
+    appSearch?.addEventListener("input", runSearch);
+
+    document.querySelectorAll("[data-project-select]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setHomeProject(button.dataset.projectSelect);
+        setHomeMenuOpen(false);
+      });
+    });
+
+    window.addEventListener("popstate", () => {
+      const projectName = new URL(window.location.href).searchParams.get("project");
+      setHomeProject(projectName, { updateHistory: false });
+    });
+
+    setHomeProject(new URL(window.location.href).searchParams.get("project"), { updateHistory: false });
+
+    function openApp(link) {
+      const href = link?.getAttribute("href");
+      if (href) {
+        window.location.href = href;
+      }
+    }
+
+    document.querySelectorAll("[data-app-link]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+        event.preventDefault();
+        openApp(link);
+      });
+    });
+
+    appSearch?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+
+      event.preventDefault();
+      const query = normalizeSearch(appSearch.value);
+      const exactMatch = collectionCards.find((card) => {
+        const title = normalizeSearch(card.querySelector(".app-title")?.textContent || "");
+        return title === query && !card.hidden;
+      });
+      if (exactMatch) {
+        openApp(exactMatch);
+      }
+    });
+  </script>
 </body>
 </html>
