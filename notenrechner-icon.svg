@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Notenrechner">
+  <rect width="128" height="128" rx="28" fill="#eeeee7"/>
+  <circle cx="64" cy="64" r="38" fill="#f8f8f3" stroke="#213633" stroke-width="4"/>
+  <text x="64" y="82" fill="#213633" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" text-anchor="middle">1</text>
+</svg>
