@@ -13,8 +13,20 @@
 */
 
 .z-browser-scope :where(.z-browser-list, .project-browser-list) {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 4px;
+  min-height: 0;
+}
+
+.z-browser-scope :where(.z-browser-card, .project-card, .z-browser-row, .project-browser-row) {
+  flex: 0 0 auto;
+}
+
+.z-browser-scope :where(.z-browser-footer-spacer, .browser-footer-spacer) {
+  flex: 1 1 auto;
+  min-height: 10px;
 }
 
 .z-browser-scope :where(.z-browser-card, .project-card) {
@@ -276,4 +288,14 @@
     ),
     var(--z-browser-menu-action-hover-bg, rgba(255, 255, 255, .06));
   color: var(--z-browser-delete-text, #182126);
+}
+
+.z-browser-scope :where(.z-browser-trash-row, .browser-trash-row) {
+  margin-top: 8px;
+  border-top: 1px solid var(--z-browser-card-border, rgba(255, 255, 255, .12));
+  color: var(--z-browser-muted, var(--muted, currentColor));
+}
+
+.z-browser-scope :where(.z-browser-trash-row, .browser-trash-row):hover {
+  background: var(--z-browser-row-hover-bg, rgba(255, 255, 255, .035));
 }
