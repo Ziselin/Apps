@@ -1,0 +1,17 @@
+{
+  "name": "ziselin",
+  "short_name": "ziselin",
+  "description": "Atlas, Schola und weitere digitale Werkzeuge von ziselin.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4efe4",
+  "theme_color": "#f4efe4",
+  "icons": [
+    {
+      "src": "./assets/ziselin-icon.svg?v=20260628a",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
