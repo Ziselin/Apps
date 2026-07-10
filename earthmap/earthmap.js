@@ -1,7 +1,9 @@
 ﻿const ui = Object.fromEntries([
   "globeApp", "menuButton", "menuButtonIcon", "menuCloseButton", "menuOverlay", "sideMenu",
-  "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu",
+  "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu", "fullscreenButton",
+  "mapSearchInput", "mapSearchOptions", "mapSearchLoader", "mapSearchInfoButton", "mapSearchInfoPopup",
   "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
+  "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "graticuleToggle",
   "browserActionsMenuButton", "browserActionsMenu",
   "editorBackButton",
   "newProjectButton", "importBoundarySetButton", "importBoundarySetFromFolderButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
@@ -9,13 +11,77 @@
   "layerEditorTitle", "layerEditorSummary", "layerEditorContent", "layerMetaList",
 ].map((id) => [id, document.getElementById(id)]));
 
+let viewToolsDrawerCloseTimer = null;
+let mapSearchDebounceTimer = null;
+let mapSearchRequestSerial = 0;
+let mapSearchOptionCache = null;
+let wikidataMapSearchLoadingCount = 0;
+const wikidataMapSearchCache = new Map();
+
 const DEFAULT_LAYER_FILL_COLOR = "#c6a86a";
 const DEFAULT_LAYER_OUTLINE_COLOR = "#8f9690";
+const LIGHT_MAP_SELECTED_COLOR = "#9fa29d";
+const LIGHT_MAP_SELECTED_OUTLINE_COLOR = "#6f7571";
+const LIGHT_MAP_SPECIAL_HIGHLIGHT_COLOR = "#b88a3a";
+const LIGHT_MAP_SPECIAL_OUTLINE_COLOR = "#7d602d";
+const DARK_MAP_COASTLINE_COLOR = "#2e8eba";
+const DARK_MAP_WATER_COLOR = "#c8ebff";
+const DARK_MAP_SELECTED_COLOR = "#fefee9";
+const DARK_MAP_UNSELECTED_COLOR = "#e0e0e0";
+const DARK_MAP_SPECIAL_HIGHLIGHT_COLOR = "#c12737";
+const DARK_MAP_BOUNDARY_COLOR = "#666666";
 const DEFAULT_CONTINENTAL_MAP_ID = "continental-natural-earth-10m-land";
 const OSM_TOPOGRAPHIC_MAP_ID = "continental-osm-topographic-unlabeled";
 const EARTHMAP_ARCHIVE_DB_NAME = "ziselin-earthmap-archive";
 const EARTHMAP_ARCHIVE_DB_VERSION = 1;
 const EARTHMAP_BOUNDARY_FEATURE_STORE = "boundarySetFeatures";
+const NATURAL_EARTH_ARCHIVE_ID = "natural-earth-10m-archive";
+const NATURAL_EARTH_ADMIN1_BOUNDARY_LAYER_ZOOM = 3.15;
+const NATURAL_EARTH_ADMIN1_BOUNDARY_LOAD_ZOOM = 2.75;
+const NATURAL_EARTH_ARCHIVE_DATASETS = [
+  {
+    id: "admin_0_countries",
+    label: "Staaten und abhängige Gebiete",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.geojson",
+    status: "GeoJSON eingebunden · Küsten an Grundkarte ausgerichtet",
+  },
+  {
+    id: "admin_0_map_units",
+    label: "Map Units",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/source-zips/ne_10m_admin_0_map_units.zip",
+    status: "ZIP abgelegt",
+  },
+  {
+    id: "admin_0_sovereignty",
+    label: "Souveränitätsräume",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/source-zips/ne_10m_admin_0_sovereignty.zip",
+    status: "ZIP abgelegt",
+  },
+  {
+    id: "admin_1_states_provinces",
+    label: "Gliedstaaten / Provinzen",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
+    status: "GeoJSON eingebunden · Küsten an Grundkarte ausgerichtet",
+  },
+  {
+    id: "lakes",
+    label: "Seen und Gewässerflächen",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/ne_10m_lakes.geojson",
+    status: "GeoJSON eingebunden",
+  },
+  {
+    id: "enclosed_seas",
+    label: "Binnenmeere",
+    detail: "10m",
+    path: "../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.geojson",
+    status: "aus Natural-Earth-Marineflächen extrahiert",
+  },
+];
 const CONTINENTAL_MAP_OPTIONS = [
   {
     value: "none",
@@ -35,6 +101,139 @@ const CONTINENTAL_MAP_OPTIONS = [
     detail: "Lokaler, unbeschrifteter topografischer Grundkartenstil auf der vorhandenen Vektor-Geometrie. Echte OSM-Offline-Tiles können später als Datenquelle ergänzt werden.",
     renderable: true,
   },
+];
+
+const MAP_SEARCH_UNION_ALIASES = [
+  {
+    id: "european-union",
+    names: ["Europäische Union", "EU", "European Union", "Union européenne", "Europaeische Union"],
+    iso3: [
+      "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN",
+      "FRA", "DEU", "GRC", "HUN", "IRL", "ITA", "LVA", "LTU", "LUX",
+      "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE",
+    ],
+  },
+  {
+    id: "united-nations",
+    names: ["Vereinte Nationen", "United Nations", "UN", "UNO", "United Nations Organization"],
+    // UN-Regel: Diese Liste bildet aktuelle Mitgliedstaaten ab, nicht
+    // Gründungsmitglieder. Wikidata führt für Q1065 u. a. P112 (Gründer);
+    // diese Eigenschaft darf hier gerade NICHT als Mitgliedschaftsersatz
+    // verwendet werden, weil sie historische Gründung und aktuelle
+    // Zugehörigkeit vermischt.
+    iso3: [
+      "AFG", "ALB", "DZA", "AND", "AGO", "ATG", "ARG", "ARM", "AUS",
+      "AUT", "AZE", "BHS", "BHR", "BGD", "BRB", "BLR", "BEL", "BLZ",
+      "BEN", "BTN", "BOL", "BIH", "BWA", "BRA", "BRN", "BGR", "BFA",
+      "BDI", "CPV", "KHM", "CMR", "CAN", "CAF", "TCD", "CHL", "CHN",
+      "COL", "COM", "COG", "CRI", "CIV", "HRV", "CUB", "CYP", "CZE",
+      "PRK", "COD", "DNK", "DJI", "DMA", "DOM", "ECU", "EGY", "SLV",
+      "GNQ", "ERI", "EST", "SWZ", "ETH", "FJI", "FIN", "FRA", "GAB",
+      "GMB", "GEO", "DEU", "GHA", "GRC", "GRD", "GTM", "GIN", "GNB",
+      "GUY", "HTI", "HND", "HUN", "ISL", "IND", "IDN", "IRN", "IRQ",
+      "IRL", "ISR", "ITA", "JAM", "JPN", "JOR", "KAZ", "KEN", "KIR",
+      "KWT", "KGZ", "LAO", "LVA", "LBN", "LSO", "LBR", "LBY", "LIE",
+      "LTU", "LUX", "MDG", "MWI", "MYS", "MDV", "MLI", "MLT", "MHL",
+      "MRT", "MUS", "MEX", "FSM", "MDA", "MCO", "MNG", "MNE", "MAR",
+      "MOZ", "MMR", "NAM", "NRU", "NPL", "NLD", "NZL", "NIC", "NER",
+      "NGA", "MKD", "NOR", "OMN", "PAK", "PLW", "PAN", "PNG", "PRY",
+      "PER", "PHL", "POL", "PRT", "QAT", "KOR", "ROU", "RUS", "RWA",
+      "KNA", "LCA", "VCT", "WSM", "SMR", "STP", "SAU", "SEN", "SRB",
+      "SYC", "SLE", "SGP", "SVK", "SVN", "SLB", "SOM", "ZAF", "SSD",
+      "ESP", "LKA", "SDN", "SUR", "SWE", "CHE", "SYR", "TJK", "THA",
+      "TLS", "TGO", "TON", "TTO", "TUN", "TUR", "TKM", "TUV", "UGA",
+      "UKR", "ARE", "GBR", "TZA", "USA", "URY", "UZB", "VUT", "VEN",
+      "VNM", "YEM", "ZMB", "ZWE",
+    ],
+  },
+  {
+    id: "g7",
+    names: ["G7", "Gruppe der Sieben", "Group of Seven"],
+    iso3: ["CAN", "FRA", "DEU", "ITA", "JPN", "GBR", "USA"],
+  },
+  {
+    id: "nato",
+    names: ["NATO", "North Atlantic Treaty Organization", "Organisation des Nordatlantikvertrags", "Nordatlantikpakt"],
+    iso3: [
+      "ALB", "BEL", "BGR", "CAN", "HRV", "CZE", "DNK", "EST", "FIN",
+      "FRA", "DEU", "GRC", "HUN", "ISL", "ITA", "LVA", "LTU", "LUX",
+      "MNE", "NLD", "MKD", "NOR", "POL", "PRT", "ROU", "SVK", "SVN",
+      "ESP", "SWE", "TUR", "GBR", "USA",
+    ],
+  },
+  {
+    id: "asean",
+    names: ["ASEAN", "Verband Südostasiatischer Nationen", "Association of Southeast Asian Nations"],
+    iso3: ["BRN", "KHM", "IDN", "LAO", "MYS", "MMR", "PHL", "SGP", "THA", "TLS", "VNM"],
+  },
+  {
+    id: "brics",
+    names: ["BRICS", "BRICS-Staaten", "BRICS Plus"],
+    iso3: ["BRA", "RUS", "IND", "CHN", "ZAF", "EGY", "ETH", "IDN", "IRN", "ARE"],
+  },
+  {
+    id: "g20",
+    names: ["G20", "Gruppe der Zwanzig", "Group of Twenty"],
+    iso3: [
+      "ARG", "AUS", "BRA", "CAN", "CHN", "FRA", "DEU", "IND", "IDN",
+      "ITA", "JPN", "MEX", "RUS", "SAU", "ZAF", "KOR", "TUR", "GBR", "USA",
+    ],
+  },
+  {
+    id: "oecd",
+    names: ["OECD", "Organisation für wirtschaftliche Zusammenarbeit und Entwicklung"],
+    iso3: [
+      "AUS", "AUT", "BEL", "CAN", "CHL", "COL", "CRI", "CZE", "DNK",
+      "EST", "FIN", "FRA", "DEU", "GRC", "HUN", "ISL", "IRL", "ISR",
+      "ITA", "JPN", "KOR", "LVA", "LTU", "LUX", "MEX", "NLD", "NZL",
+      "NOR", "POL", "PRT", "SVK", "SVN", "ESP", "SWE", "CHE", "TUR",
+      "GBR", "USA",
+    ],
+  },
+  {
+    id: "opec",
+    names: ["OPEC", "Organisation erdölexportierender Länder"],
+    iso3: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "ARE", "VEN"],
+  },
+  {
+    id: "mercosur",
+    names: ["Mercosur", "Mercosul", "Gemeinsamer Markt des Südens"],
+    iso3: ["ARG", "BOL", "BRA", "PRY", "URY"],
+  },
+  {
+    id: "usmca",
+    names: ["USMCA", "CUSMA", "T-MEC", "NAFTA", "Nordamerikanisches Freihandelsabkommen"],
+    iso3: ["CAN", "MEX", "USA"],
+  },
+  {
+    id: "cis",
+    names: ["GUS", "CIS", "Gemeinschaft Unabhängiger Staaten", "Commonwealth of Independent States"],
+    iso3: ["ARM", "AZE", "BLR", "KAZ", "KGZ", "MDA", "RUS", "TJK", "UZB"],
+  },
+  {
+    id: "au",
+    names: ["Afrikanische Union", "AU", "African Union"],
+    iso3: [
+      "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CMR", "CPV", "CAF",
+      "TCD", "COM", "COG", "COD", "CIV", "DJI", "EGY", "GNQ", "ERI",
+      "SWZ", "ETH", "GAB", "GMB", "GHA", "GIN", "GNB", "KEN", "LSO",
+      "LBR", "LBY", "MDG", "MWI", "MLI", "MRT", "MUS", "MAR", "MOZ",
+      "NAM", "NER", "NGA", "RWA", "STP", "SEN", "SYC", "SLE", "SOM",
+      "ZAF", "SSD", "SDN", "TZA", "TGO", "TUN", "UGA", "ZMB", "ZWE",
+      "ESH",
+    ],
+  },
+];
+
+const MAP_SEARCH_COUNTRY_ALIASES = [
+  { names: ["Russische Föderation", "Russian Federation", "Rossijskaja Federazija"], iso3: "RUS" },
+  { names: ["Vereinigte Staaten", "USA", "United States", "United States of America", "US"], iso3: "USA" },
+  { names: ["Vereinigtes Königreich", "UK", "United Kingdom", "Great Britain", "Großbritannien"], iso3: "GBR" },
+  { names: ["Südkorea", "South Korea", "Republik Korea", "Republic of Korea"], iso3: "KOR" },
+  { names: ["Nordkorea", "North Korea", "Demokratische Volksrepublik Korea"], iso3: "PRK" },
+  { names: ["Iran", "Islamische Republik Iran", "Islamic Republic of Iran"], iso3: "IRN" },
+  { names: ["Vereinigte Arabische Emirate", "VAE", "UAE", "United Arab Emirates"], iso3: "ARE" },
+  { names: ["Elfenbeinküste", "Côte d’Ivoire", "Cote d Ivoire", "Ivory Coast"], iso3: "CIV" },
 ];
 
 const MAP_TYPE_CHOICES = [
@@ -170,7 +369,7 @@ function createEditorTabButton(id, panel, label, active = false) {
 function renderEditorTabs() {
   const tabs = document.querySelector(".editor-tabs");
   if (!tabs) return;
-  const propertiesMode = state.editorMode === "object" || state.editorMode === "project" || state.editorMode === "subfolder";
+  const propertiesMode = state.editorMode === "object" || state.editorMode === "archive-object" || state.editorMode === "project" || state.editorMode === "subfolder";
   if (propertiesMode) {
     tabs.replaceChildren(createEditorTabButton("tabProperties", "properties", "Eigenschaften", true));
     return;
@@ -291,6 +490,7 @@ initializeEarthMapEditorShell();
 const STORAGE_KEY = "earthmap-projects-v1";
 const LEGACY_STORAGE_KEY = "globemap-projects-v1";
 const THEME_STORAGE_KEY = "earthmap-theme";
+const VIEW_SETTINGS_STORAGE_KEY = "earthmap-view-settings-v1";
 const NATURAL_EARTH_ASSET_BASE = "../assets/geojson/natural-earth/";
 const boundaryFeatureRenderCache = new Map();
 
@@ -431,6 +631,7 @@ function createEarthMapProject(title = "Neues Earth-Map-Projekt") {
     },
     boundarySets: createDefaultBoundarySets(),
     libraryFolders: createDefaultLibraryFolders(),
+    naturalEarthOverrides: {},
     dataLayers: [],
     classification: {
       mode: "manual-breaks",
@@ -579,6 +780,9 @@ function normalizeProject(project) {
   }));
   normalized.activeBoundarySetId = normalized.activeBoundarySetId || normalized.boundarySets[0]?.id || "";
   normalized.activeLibraryItemId = String(normalized.activeLibraryItemId || "");
+  normalized.naturalEarthOverrides = normalized.naturalEarthOverrides && typeof normalized.naturalEarthOverrides === "object"
+    ? normalized.naturalEarthOverrides
+    : {};
   return normalized;
 }
 
@@ -635,8 +839,30 @@ function createInitialCollapsedBrowserNodeIds(projects) {
   });
 }
 
+function loadViewSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(VIEW_SETTINGS_STORAGE_KEY) || "{}");
+    return {
+      showGraticule: parsed.showGraticule === true,
+    };
+  } catch {
+    return { showGraticule: false };
+  }
+}
+
+function persistViewSettings() {
+  try {
+    localStorage.setItem(VIEW_SETTINGS_STORAGE_KEY, JSON.stringify({
+      showGraticule: state.showGraticule === true,
+    }));
+  } catch (error) {
+    console.warn("EarthMap-Ansichtseinstellungen konnten nicht gespeichert werden.", error);
+  }
+}
+
 const state = {
   projects: loadProjects(),
+  ...loadViewSettings(),
   activeProjectId: "",
   openProjectBrowserMenuId: null,
   openFolderBrowserMenuId: null,
@@ -644,6 +870,7 @@ const state = {
   draggedLibraryItem: null,
   browserActionsMenuOpen: false,
   collapsedBrowserNodeIds: [],
+  expandedArchiveNodeIds: [],
   detailsLayoutMode: "normal",
   detailsLayoutStep: 0,
   pendingBoundarySetImport: null,
@@ -653,8 +880,26 @@ const state = {
   activeEditorItemId: "",
   activeEditorChapterKey: "",
   activeSubfolderRef: null,
+  activeArchiveItem: null,
+  viewToolsDrawerOpen: false,
   boundarySetFeatureCache: new Map(),
   loadingBoundarySetIds: new Set(),
+  mapSearchHighlight: null,
+  naturalEarthAdmin1Dataset: null,
+  naturalEarthAdmin1Loading: false,
+  naturalEarthAdmin1Error: "",
+  naturalEarthAdmin1FullDataset: null,
+  naturalEarthAdmin1FullPromise: null,
+  naturalEarthAdmin1FullError: "",
+  naturalEarthAdmin1BoundaryLoading: false,
+  naturalEarthAdmin1BoundaryLoaded: false,
+  naturalEarthAdmin1BoundaryError: "",
+  naturalEarthAdmin0BoundaryRings: null,
+  naturalEarthAdmin1BoundaryRings: null,
+  naturalEarthLakePolygons: null,
+  naturalEarthLakeRings: null,
+  naturalEarthEnclosedSeaPolygons: null,
+  naturalEarthEnclosedSeaRings: null,
 };
 
 state.activeProjectId = state.projects[0]?.id || "";
@@ -756,6 +1001,7 @@ function getLibraryFolder(project, folderType) {
 }
 
 function getActiveLibraryItem(project = getActiveProject()) {
+  if (state.editorMode === "archive-object") return state.activeArchiveItem || null;
   const activeId = project?.activeLibraryItemId || "";
   if (!activeId) return null;
   for (const folder of project.libraryFolders || []) {
@@ -818,6 +1064,21 @@ function toggleBrowserNode(nodeId) {
   else collapsed.add(nodeId);
   state.collapsedBrowserNodeIds = [...collapsed];
   renderProjectBrowser();
+}
+
+function isArchiveBrowserNodeCollapsed(nodeId) {
+  return !state.expandedArchiveNodeIds.includes(nodeId);
+}
+
+function toggleArchiveBrowserNode(nodeId) {
+  const expanded = new Set(state.expandedArchiveNodeIds);
+  if (expanded.has(nodeId)) expanded.delete(nodeId);
+  else expanded.add(nodeId);
+  state.expandedArchiveNodeIds = [...expanded];
+  renderProjectBrowser();
+  if (expanded.has(nodeId) && nodeId.includes(":admin1:")) {
+    loadNaturalEarthAdmin1Dataset();
+  }
 }
 
 function getVisibleBoundaryMapItems(project = getActiveProject()) {
@@ -898,11 +1159,11 @@ function getContinentalRenderStyle(project = getActiveProject()) {
   if (isOsmTopographicBaseMap(project)) {
     return dark
       ? {
-        sea: "#20282b",
-        land: "#46493f",
-        outline: "rgba(229,220,184,.46)",
-        contour: "rgba(255,179,71,.18)",
-        shade: "rgba(255,255,255,.035)",
+        sea: DARK_MAP_WATER_COLOR,
+        land: DARK_MAP_UNSELECTED_COLOR,
+        outline: DARK_MAP_COASTLINE_COLOR,
+        contour: "rgba(102,102,102,.26)",
+        shade: "rgba(0,0,0,.035)",
       }
       : {
         sea: "#eef2ef",
@@ -913,9 +1174,9 @@ function getContinentalRenderStyle(project = getActiveProject()) {
       };
   }
   return {
-    sea: getThemeMapColor("--sea", "#fbfbf8"),
-    land: getThemeMapColor("--land", "#c4c4c0"),
-    outline: getThemeMapColor("--land-outline", "rgba(92,96,94,.46)"),
+    sea: dark ? DARK_MAP_WATER_COLOR : getThemeMapColor("--sea", "#fbfbf8"),
+    land: dark ? DARK_MAP_UNSELECTED_COLOR : getThemeMapColor("--land", "#c4c4c0"),
+    outline: dark ? DARK_MAP_COASTLINE_COLOR : getThemeMapColor("--land-outline", "rgba(92,96,94,.46)"),
     contour: "",
     shade: "",
   };
@@ -933,8 +1194,8 @@ function getNaturalEarthCountryDataset() {
   if (tenMeter?.features?.length) {
     return {
       detail: "10m",
-      label: "10m · Natural-Earth-Admin-0",
-      sourceUrl: `${NATURAL_EARTH_ASSET_BASE}10m/ne_10m_admin_0_countries.geojson`,
+      label: "10m · Natural-Earth-Admin-0 · küstenausgerichtet",
+      sourceUrl: `${NATURAL_EARTH_ASSET_BASE}10m/ne_10m_admin_0_countries.coast-aligned.geojson`,
       features: tenMeter.features,
     };
   }
@@ -945,6 +1206,161 @@ function getNaturalEarthCountryDataset() {
     sourceUrl: `${NATURAL_EARTH_ASSET_BASE}110m/ne_110m_admin_0_countries.geojson`,
     features: fallback?.features || [],
   };
+}
+
+async function loadNaturalEarthAdmin1Dataset() {
+  if (state.naturalEarthAdmin1Dataset || state.naturalEarthAdmin1Loading) return;
+  const metadata = window.EarthMapNaturalEarthAdmin1Metadata10m;
+  if (metadata?.features?.length) {
+    state.naturalEarthAdmin1Dataset = {
+      detail: "10m",
+      label: "10m · Natural-Earth-Admin-1",
+      sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.metadata.js",
+      features: metadata.features,
+    };
+    state.naturalEarthAdmin1Error = "";
+    renderProjectBrowser();
+    return;
+  }
+  state.naturalEarthAdmin1Loading = true;
+  state.naturalEarthAdmin1Error = "";
+  renderProjectBrowser();
+  try {
+    const response = await fetch("../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson", { cache: "force-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    state.naturalEarthAdmin1Dataset = {
+      detail: "10m",
+      label: "10m · Natural-Earth-Admin-1",
+      sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
+      features: Array.isArray(data.features) ? data.features : [],
+    };
+  } catch (error) {
+    console.warn("Natural-Earth-Admin-1 konnte nicht geladen werden.", error);
+    state.naturalEarthAdmin1Error = "Gliedstaaten / Provinzen konnten nicht geladen werden.";
+  } finally {
+    state.naturalEarthAdmin1Loading = false;
+    renderProjectBrowser();
+  }
+}
+
+async function loadNaturalEarthAdmin1FullDataset() {
+  if (state.naturalEarthAdmin1FullDataset) return state.naturalEarthAdmin1FullDataset;
+  if (state.naturalEarthAdmin1FullPromise) return state.naturalEarthAdmin1FullPromise;
+  const loadedScriptDataset = window.EarthMapNaturalEarthAdmin1Full10m;
+  if (loadedScriptDataset?.features?.length) {
+    state.naturalEarthAdmin1FullDataset = {
+      detail: "10m",
+      label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
+      sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js",
+      features: loadedScriptDataset.features,
+    };
+    return state.naturalEarthAdmin1FullDataset;
+  }
+
+  // Suchregel: Die Browserliste darf aus leichter Metadaten-JSON kommen.
+  // Für die Kopfzeilensuche brauchen wir jedoch die echte Geometrie, weil ein
+  // Treffer unmittelbar als Kartenfläche hervorgehoben werden soll.
+  state.naturalEarthAdmin1FullError = "";
+  state.naturalEarthAdmin1FullPromise = fetch("../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson", { cache: "force-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .then((data) => {
+      state.naturalEarthAdmin1FullDataset = {
+        detail: "10m",
+        label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
+        sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson",
+        features: Array.isArray(data.features) ? data.features : [],
+      };
+      return state.naturalEarthAdmin1FullDataset;
+    })
+    .catch((error) => {
+      console.warn("Natural-Earth-Admin-1-Geometrien konnten nicht geladen werden.", error);
+      return loadNaturalEarthAdmin1FullDatasetFromScript();
+    })
+    .finally(() => {
+      state.naturalEarthAdmin1FullPromise = null;
+    });
+  return state.naturalEarthAdmin1FullPromise;
+}
+
+function loadNaturalEarthAdmin1FullDatasetFromScript() {
+  return new Promise((resolve) => {
+    const existing = window.EarthMapNaturalEarthAdmin1Full10m;
+    if (existing?.features?.length) {
+      state.naturalEarthAdmin1FullDataset = {
+        detail: "10m",
+        label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
+        sourceUrl: "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js",
+        features: existing.features,
+      };
+      resolve(state.naturalEarthAdmin1FullDataset);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.js?v=20260709a";
+    script.async = true;
+    script.onload = () => {
+      const loaded = window.EarthMapNaturalEarthAdmin1Full10m;
+      if (loaded?.features?.length) {
+        state.naturalEarthAdmin1FullDataset = {
+          detail: "10m",
+          label: "10m · Natural-Earth-Admin-1 · küstenausgerichtet",
+          sourceUrl: script.src,
+          features: loaded.features,
+        };
+        state.naturalEarthAdmin1FullError = "";
+        resolve(state.naturalEarthAdmin1FullDataset);
+        return;
+      }
+      state.naturalEarthAdmin1FullError = "Gliedstaaten / Provinzen konnten für die Suche nicht geladen werden.";
+      resolve(null);
+    };
+    script.onerror = () => {
+      state.naturalEarthAdmin1FullError = "Gliedstaaten / Provinzen konnten für die Suche nicht geladen werden.";
+      resolve(null);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function requestNaturalEarthAdmin1BoundaryLayerForZoom() {
+  if (globeZoom < NATURAL_EARTH_ADMIN1_BOUNDARY_LOAD_ZOOM) return;
+  if (state.naturalEarthAdmin1BoundaryLoaded || state.naturalEarthAdmin1BoundaryLoading) return;
+  if (isNavigatingGlobe) return;
+
+  state.naturalEarthAdmin1BoundaryLoading = true;
+  state.naturalEarthAdmin1BoundaryError = "";
+  const script = document.createElement("script");
+  script.src = "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coastless.boundaries.js?v=20260709c";
+  script.async = true;
+  script.onload = () => {
+    state.naturalEarthAdmin1BoundaryLoading = false;
+    state.naturalEarthAdmin1BoundaryLoaded = Boolean(window.EarthMapNaturalEarthAdmin1Boundaries10m?.features?.length);
+    state.naturalEarthAdmin1BoundaryRings = null;
+    scheduleGlobeRender();
+  };
+  script.onerror = () => {
+    state.naturalEarthAdmin1BoundaryLoading = false;
+    state.naturalEarthAdmin1BoundaryError = "Gliedstaaten / Provinzen konnten nicht als Kartenlayer geladen werden.";
+    console.warn(state.naturalEarthAdmin1BoundaryError);
+  };
+
+  const appendScript = () => {
+    if (globeZoom < NATURAL_EARTH_ADMIN1_BOUNDARY_LOAD_ZOOM || isNavigatingGlobe) {
+      state.naturalEarthAdmin1BoundaryLoading = false;
+      scheduleGlobeRender();
+      return;
+    }
+    document.head.appendChild(script);
+  };
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(appendScript, { timeout: 1800 });
+  } else {
+    window.setTimeout(appendScript, 900);
+  }
 }
 
 function getSquaredDistanceToSegment(point, start, end) {
@@ -1097,6 +1513,24 @@ function normalizeColorValue(value, fallback = "") {
   return fallback;
 }
 
+function isEarthMapDarkMode() {
+  return document.body.classList.contains("earthmap-theme-dark");
+}
+
+function getMapLayerFillColor(value) {
+  const color = normalizeColorValue(value, "");
+  if (!isEarthMapDarkMode()) return color;
+  if (!color || color.toLowerCase() === DEFAULT_LAYER_FILL_COLOR.toLowerCase()) return DARK_MAP_SELECTED_COLOR;
+  return color;
+}
+
+function getMapBoundaryColor(value) {
+  const color = normalizeColorValue(value, "");
+  if (!isEarthMapDarkMode()) return color;
+  if (!color || color.toLowerCase() === DEFAULT_LAYER_OUTLINE_COLOR.toLowerCase()) return DARK_MAP_BOUNDARY_COLOR;
+  return color;
+}
+
 function normalizeWikidataId(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -1146,6 +1580,7 @@ function collectProjectPaletteColors(project = getActiveProject(), extraColors =
   // ungezielt anzubieten.
   pushColor(DEFAULT_LAYER_FILL_COLOR);
   pushColor(DEFAULT_LAYER_OUTLINE_COLOR);
+  pushColor(DARK_MAP_SPECIAL_HIGHLIGHT_COLOR);
   (project?.classification?.breaks || []).forEach((entry) => pushColor(entry?.color));
   (project?.libraryFolders || []).forEach((folder) => {
     getLibraryFolderItems(folder).forEach((item) => {
@@ -1244,6 +1679,57 @@ function setExportMenuOpen(isOpen) {
   ui.exportProjectButton?.setAttribute("aria-expanded", isOpen ? "true" : "false");
 }
 
+async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch {
+    // Manche eingebettete Browser blockieren Vollbild; die UI bleibt dann einfach unverändert.
+  }
+}
+
+function updateFullscreenButtonState() {
+  ui.fullscreenButton?.classList.toggle("is-active", Boolean(document.fullscreenElement));
+}
+
+function setViewToolsDrawerOpen(isOpen) {
+  state.viewToolsDrawerOpen = Boolean(isOpen);
+  ui.viewToolsDrawer?.classList.toggle("is-open", state.viewToolsDrawerOpen);
+  if (ui.viewToolsDrawerPanel) {
+    if (viewToolsDrawerCloseTimer) {
+      window.clearTimeout(viewToolsDrawerCloseTimer);
+      viewToolsDrawerCloseTimer = null;
+    }
+    ui.viewToolsDrawerPanel.classList.remove("is-closing");
+    if (state.viewToolsDrawerOpen) {
+      ui.viewToolsDrawerPanel.hidden = false;
+    } else if (!ui.viewToolsDrawerPanel.hidden) {
+      ui.viewToolsDrawerPanel.classList.add("is-closing");
+      viewToolsDrawerCloseTimer = window.setTimeout(() => {
+        ui.viewToolsDrawerPanel.hidden = true;
+        ui.viewToolsDrawerPanel.classList.remove("is-closing");
+        viewToolsDrawerCloseTimer = null;
+      }, 190);
+    }
+  }
+  ui.viewToolsDrawerTab?.setAttribute("aria-expanded", state.viewToolsDrawerOpen ? "true" : "false");
+}
+
+function syncViewToolsControls() {
+  ui.graticuleToggle?.setAttribute("aria-pressed", state.showGraticule === true ? "true" : "false");
+  ui.graticuleToggle?.classList.toggle("is-active", state.showGraticule === true);
+}
+
+function setGraticuleVisible(isVisible) {
+  state.showGraticule = Boolean(isVisible);
+  syncViewToolsControls();
+  persistViewSettings();
+  renderGlobe();
+}
+
 function setTheme(theme, persist = true) {
   const isDark = theme === "dark";
   document.body.classList.toggle("earthmap-theme-dark", isDark);
@@ -1285,19 +1771,51 @@ function getEarthMapExportTitle() {
   return getActiveProject()?.title || "Earth Map";
 }
 
-function getCanvasPngBlob() {
+function getLiveRenderBackgroundColor() {
+  let element = ui.globe;
+  while (element) {
+    const color = window.getComputedStyle(element).backgroundColor;
+    if (color && color !== "rgba(0, 0, 0, 0)" && color !== "transparent") return color;
+    element = element.parentElement;
+  }
+  return window.getComputedStyle(document.body).backgroundColor || "#fff";
+}
+
+function getEarthMapLivePngBlob() {
   return new Promise((resolve, reject) => {
-    const canvas = webglState.ready ? webglState.canvas : ui.globeCanvas;
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("canvas-export-empty"));
+    const baseCanvas = webglState.ready ? webglState.canvas : ui.globeCanvas;
+    if (!baseCanvas?.width || !baseCanvas?.height) {
+      reject(new Error("png-export-empty"));
+      return;
+    }
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = baseCanvas.width;
+    exportCanvas.height = baseCanvas.height;
+    const exportCtx = exportCanvas.getContext("2d");
+    exportCtx.fillStyle = getLiveRenderBackgroundColor();
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+    // PNG-Regel: PNG ist ein Abbild der aktuellen Live-Ansicht. Bei WebGL
+    // besteht diese Ansicht aus zwei Canvas-Ebenen: Kugel/Grundkarte unten und
+    // 2D-Annotationen/Suchmarkierungen oben. Beide Ebenen werden hier bewusst
+    // zusammengeführt, damit Export und Bildschirmbild deckungsgleich bleiben.
+    if (webglState.ready) exportCtx.drawImage(webglState.canvas, 0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(ui.globeCanvas, 0, 0, exportCanvas.width, exportCanvas.height);
+
+    exportCanvas.toBlob((pngBlob) => {
+      if (pngBlob) resolve(pngBlob);
+      else reject(new Error("png-export-empty"));
     }, "image/png");
   });
 }
 
 async function exportEarthMapPng() {
+  // PNG-Regel: Anders als der HTML-Export ist PNG ein Abbild der aktuellen
+  // Live-Ansicht. Es übernimmt also Zoom, Ausschnitt, Theme-Farben und gerade
+  // sichtbare Suchmarkierungen exakt aus dem Renderfenster.
   renderGlobe();
-  const blob = await getCanvasPngBlob();
+  const blob = await getEarthMapLivePngBlob();
   downloadBlob(blob, `${slugifyFilename(getEarthMapExportTitle(), "earth-map")}.png`);
 }
 
@@ -1400,6 +1918,76 @@ function getSubfolderItemEntries(project, folderType, subfolderId) {
   return (subfolder?.items || []).map((item) => ({ item, folderType }));
 }
 
+function getHighestResolutionEarthMapExportLand(project) {
+  if (!shouldRenderContinentalBaseMap(project)) {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  const countries = getNaturalEarthCountryDataset();
+  // Exportregel: Die HTML-Publikationsfassung darf nicht vom gerade sichtbaren
+  // Tile-/Zoomzustand abhängen. Wenn die 10m-Weltgrundlage geladen ist, wird
+  // sie vollständig serialisiert; nur falls sie fehlt, greifen wir auf den
+  // interaktiven Arbeitsstand zurück.
+  if (countries.detail === "10m" && countries.features?.length) {
+    return { type: "FeatureCollection", features: countries.features };
+  }
+
+  return getInteractiveNaturalEarthSource()
+    || activeNaturalEarthSource
+    || { type: "FeatureCollection", features: [] };
+}
+
+function getEarthMapSearchExportHighlights() {
+  const highlight = state.mapSearchHighlight;
+  const selectedFeatures = Array.isArray(highlight?.selectedFeatures)
+    ? highlight.selectedFeatures
+    : [highlight?.countryFeature].filter(Boolean);
+  const focusFeatures = Array.isArray(highlight?.focusFeatures)
+    ? highlight.focusFeatures
+    : [highlight?.provinceFeature].filter(Boolean);
+  const contextColor = getMapSearchSelectedAreaColor();
+  const contextOutlineColor = getMapSearchSelectedOutlineColor();
+  const focusColor = getMapSearchSpecialHighlightColor();
+  const focusOutlineColor = getMapSearchSpecialOutlineColor();
+
+  // Exportregel: Suchmarkierungen sind kein gespeicherter Projektlayer, gehören
+  // aber zum aktuellen Darstellungszustand. Für den HTML-Export werden sie
+  // deshalb separat serialisiert und im Minimalviewer über den Projektkarten
+  // gezeichnet.
+  return [
+    ...selectedFeatures.map((feature, index) => {
+      const featureCollection = cloneFeatureCollectionForExport(feature);
+      return {
+        role: "context",
+        fillMode: index > 0 ? "diagonal-hatch" : "solid",
+        color: contextColor,
+        outlineColor: contextOutlineColor,
+        feature: featureCollection,
+        samples: createLandSamples(extractLandRings(featureCollection), 0.55),
+      };
+    }),
+    ...focusFeatures.map((feature) => {
+      const featureCollection = cloneFeatureCollectionForExport(feature);
+      return {
+        role: "focus",
+        fillMode: "solid",
+        color: focusColor,
+        outlineColor: focusOutlineColor,
+        feature: featureCollection,
+        samples: createLandSamples(extractLandRings(featureCollection), 0.55),
+      };
+    }),
+  ].filter((entry) => entry.feature?.features?.length);
+}
+
+function getEarthMapWaterFeatureCollectionForExport() {
+  const features = [
+    ...(window.EarthMapNaturalEarthLakes10m?.features || []),
+    ...(window.EarthMapNaturalEarthEnclosedSeas10m?.features || []),
+  ];
+  return { type: "FeatureCollection", features };
+}
+
 function buildSubfolderGeoJsonExport(project, folderType, subfolder) {
   const folder = folderType === "project-layers"
     ? { type: "project-layers", title: "Projektkarten" }
@@ -1476,13 +2064,9 @@ async function exportLibrarySubfolder(project, folderType, subfolder) {
 function getEarthMapHtmlExportState() {
   const project = getActiveProject();
   // Exportregel: Das HTML ist ein eigenständiger, interaktiver Minimalviewer.
-  // Auch hier gilt die 10m-Masterregel: Exportiert wird die aktuell geladene
-  // 10m-Ableitung, nicht eine fremde 110m/50m-Ersatzgeometrie.
-  const land = shouldRenderContinentalBaseMap(project)
-    ? getInteractiveNaturalEarthSource()
-      || activeNaturalEarthSource
-      || { type: "FeatureCollection", features: [] }
-    : { type: "FeatureCollection", features: [] };
+  // Auch hier gilt die 10m-Masterregel: Exportiert wird die höchste verfügbare
+  // vollständige Weltgrundlage, nicht nur der im Editor gerade geladene Ausschnitt.
+  const land = getHighestResolutionEarthMapExportLand(project);
   const landRings = extractLandRings(land);
   const layers = getVisibleProjectBoundaryItems(project).map((item) => {
     const features = getRenderableBoundaryFeatures(item);
@@ -1500,10 +2084,12 @@ function getEarthMapHtmlExportState() {
 
   return {
     land: cloneFeatureCollectionForExport(land),
+    water: cloneFeatureCollectionForExport(getEarthMapWaterFeatureCollectionForExport()),
     landSamples: createLandSamples(landRings, 1.15),
     layers,
+    searchHighlights: getEarthMapSearchExportHighlights(),
     rotation: { ...rotation },
-    zoom: globeZoom,
+    zoom: 1,
   };
 }
 
@@ -1515,10 +2101,12 @@ function buildEarthMapHtmlExport() {
     console.error("Earth Map export state could not be serialized", error);
     stateJson = JSON.stringify({
       land: { type: "FeatureCollection", features: [] },
+      water: { type: "FeatureCollection", features: [] },
       landSamples: [],
       layers: [],
+      searchHighlights: [],
       rotation: { ...rotation },
-      zoom: globeZoom,
+      zoom: 1,
     });
   }
   return `<!DOCTYPE html>
@@ -1533,7 +2121,7 @@ function buildEarthMapHtmlExport() {
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #fff; }
     body { cursor: grab; }
     body.is-dragging { cursor: grabbing; }
-    canvas { display: block; width: 100vw; height: 100vh; background: #fff; }
+    canvas { display: block; width: 100vw; height: 100vh; background: #fff; touch-action: none; }
   </style>
 </head>
 <body>
@@ -1553,9 +2141,11 @@ function buildEarthMapHtmlExport() {
       lon: Number(EXPORT_STATE.rotation?.lon) || 0,
       lat: Number(EXPORT_STATE.rotation?.lat) || 0,
     };
-    let zoom = Math.min(9, Math.max(1, Number(EXPORT_STATE.zoom) || 1));
+    const zoom = 1;
     let drag = null;
     let view = { width: 1, height: 1, radius: 1, cx: 0, cy: 0 };
+    let renderFrame = 0;
+    let pendingDraftRender = false;
 
     function colorWithAlpha(hex, alpha) {
       const match = String(hex || "").trim().match(/^#?([0-9a-f]{6})$/i);
@@ -1686,17 +2276,44 @@ function buildEarthMapHtmlExport() {
         .scale(view.radius)
         .rotate([rotation.lon, rotation.lat])
         .clipAngle(90)
-        .precision(0.25);
+        .precision(0.45);
     }
 
-    function drawD3Feature(geojson, fill, stroke, lineWidth) {
+    function drawDiagonalHatchInCurrentClip(color, lineWidth, spacing) {
+      const extent = Math.max(view.width, view.height) * 1.6;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      for (let offset = -extent; offset < extent; offset += spacing) {
+        ctx.moveTo(view.cx + offset - extent, view.cy + extent);
+        ctx.lineTo(view.cx + offset + extent, view.cy - extent);
+      }
+      ctx.stroke();
+    }
+
+    function drawD3Feature(geojson, fill, stroke, lineWidth, options = {}) {
       const projection = createD3Projection();
       if (!projection) return false;
       const path = window.d3.geoPath(projection, ctx);
       ctx.beginPath();
       path(geojson);
-      ctx.fillStyle = fill;
-      ctx.fill("evenodd");
+      if (options.fillMode === "diagonal-hatch") {
+        ctx.fillStyle = options.baseFill || "rgba(255,255,255,.08)";
+        ctx.fill("evenodd");
+        ctx.save();
+        ctx.beginPath();
+        path(geojson);
+        ctx.clip("evenodd");
+        drawDiagonalHatchInCurrentClip(
+          options.hatchColor || fill,
+          options.hatchLineWidth || 1.25,
+          options.hatchSize || 17,
+        );
+        ctx.restore();
+      } else {
+        ctx.fillStyle = fill;
+        ctx.fill("evenodd");
+      }
       if (stroke && lineWidth > 0) {
         ctx.beginPath();
         path(geojson);
@@ -1723,8 +2340,7 @@ function buildEarthMapHtmlExport() {
       view.radius = Math.min(width, height) * 0.47 * zoom;
     }
 
-    function render() {
-      resizeCanvas();
+    function render(draft = false) {
       ctx.clearRect(0, 0, view.width, view.height);
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, view.width, view.height);
@@ -1734,17 +2350,54 @@ function buildEarthMapHtmlExport() {
       ctx.fillStyle = WATER;
       ctx.fill();
       ctx.clip();
-      const d3Rendered = drawD3Feature(EXPORT_STATE.land, "rgba(184,184,180,.82)", "rgba(126,130,128,.44)", Math.max(.55, view.radius * .001));
-      if (!d3Rendered) {
+      // Bewegungsregel: Die volle 10m-Geometrie bleibt die Zielfassung. Während
+      // des Ziehens rendern wir jedoch eine leichte Vorschau, damit die Rotation
+      // unmittelbar der Hand folgt; beim Loslassen wird wieder vollständig gezeichnet.
+      if (draft) {
         drawSurfaceSamples(EXPORT_STATE.landSamples, "rgba(184,184,180,.78)", .0068, 1.4);
-        drawFeatureLines(EXPORT_STATE.land, "rgba(126,130,128,.44)", Math.max(.55, view.radius * .001));
-      }
-      for (const layer of EXPORT_STATE.layers || []) {
-        const layerRendered = drawD3Feature(layer.feature, colorWithAlpha(layer.color, .78), colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
-        if (!layerRendered) {
+        for (const layer of EXPORT_STATE.layers || []) {
           drawSurfaceSamples(layer.samples, colorWithAlpha(layer.color, .82), .0058, 1.15);
-          drawFeatureLines(layer.feature, colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
         }
+        for (const highlight of EXPORT_STATE.searchHighlights || []) {
+          drawSurfaceSamples(highlight.samples, colorWithAlpha(highlight.color, highlight.role === "focus" ? .86 : .72), .0058, 1.15);
+        }
+      } else {
+        const d3Rendered = drawD3Feature(EXPORT_STATE.land, "rgba(184,184,180,.82)", "rgba(126,130,128,.44)", Math.max(.55, view.radius * .001));
+        if (!d3Rendered) {
+          drawSurfaceSamples(EXPORT_STATE.landSamples, "rgba(184,184,180,.78)", .0068, 1.4);
+          drawFeatureLines(EXPORT_STATE.land, "rgba(126,130,128,.44)", Math.max(.55, view.radius * .001));
+        }
+        for (const layer of EXPORT_STATE.layers || []) {
+          const layerRendered = drawD3Feature(layer.feature, colorWithAlpha(layer.color, .78), colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
+          if (!layerRendered) {
+            drawSurfaceSamples(layer.samples, colorWithAlpha(layer.color, .82), .0058, 1.15);
+            drawFeatureLines(layer.feature, colorWithAlpha(layer.outlineColor || layer.color, .98), Math.max(.7, view.radius * .0013));
+          }
+        }
+        for (const highlight of EXPORT_STATE.searchHighlights || []) {
+          const isFocus = highlight.role === "focus";
+          const renderedHighlight = drawD3Feature(
+            highlight.feature,
+            colorWithAlpha(highlight.color, isFocus ? .74 : .66),
+            colorWithAlpha(highlight.outlineColor || highlight.color, isFocus ? .9 : .78),
+            Math.max(isFocus ? .82 : .58, view.radius * .0012),
+            {
+              fillMode: highlight.fillMode,
+              baseFill: colorWithAlpha(highlight.color, .16),
+              hatchColor: colorWithAlpha(highlight.color, .66),
+              hatchLineWidth: 1.25,
+              hatchSize: 17,
+            },
+          );
+          if (!renderedHighlight) {
+            drawSurfaceSamples(highlight.samples, colorWithAlpha(highlight.color, isFocus ? .86 : .72), .0058, 1.15);
+            drawFeatureLines(highlight.feature, colorWithAlpha(highlight.outlineColor || highlight.color, isFocus ? .9 : .78), Math.max(isFocus ? .82 : .58, view.radius * .0012));
+          }
+        }
+        // Layerregel: Wasserflächen sind Teil der physischen Grundkarte. Sie
+        // werden nach thematischen Markierungen erneut gezeichnet, damit Länder-
+        // und Suchflächen Seen oder Binnenmeere nicht überdecken.
+        drawD3Feature(EXPORT_STATE.water, WATER, "rgba(126,130,128,.28)", Math.max(.45, view.radius * .0008));
       }
       const gradient = ctx.createRadialGradient(
         view.cx - view.radius * .38,
@@ -1767,6 +2420,17 @@ function buildEarthMapHtmlExport() {
       ctx.stroke();
     }
 
+    function requestRender(draft = false) {
+      pendingDraftRender = draft;
+      if (renderFrame) return;
+      renderFrame = window.requestAnimationFrame(() => {
+        const shouldDraft = pendingDraftRender;
+        renderFrame = 0;
+        pendingDraftRender = false;
+        render(shouldDraft);
+      });
+    }
+
     canvas.addEventListener("pointerdown", (event) => {
       drag = { x: event.clientX, y: event.clientY, lon: rotation.lon, lat: rotation.lat };
       document.body.classList.add("is-dragging");
@@ -1782,24 +2446,25 @@ function buildEarthMapHtmlExport() {
       const sensitivity = 0.42 / Math.sqrt(Math.max(1, zoom));
       const latitudeLimit = getLatitudeLimit();
       rotation.lon = drag.lon + (event.clientX - drag.x) * sensitivity;
-      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, drag.lat - (event.clientY - drag.y) * sensitivity));
-      render();
+      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, drag.lat + (event.clientY - drag.y) * sensitivity));
+      requestRender(true);
     });
     canvas.addEventListener("pointerup", (event) => {
       drag = null;
       document.body.classList.remove("is-dragging");
       try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
+      requestRender(false);
     });
-    canvas.addEventListener("wheel", (event) => {
-      event.preventDefault();
-      const factor = Math.exp(-event.deltaY * 0.0012);
-      zoom = Math.min(9, Math.max(1, zoom * factor));
-      const latitudeLimit = getLatitudeLimit();
-      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, rotation.lat));
-      render();
-    }, { passive: false });
-    window.addEventListener("resize", render);
+    // Exportregel: Der HTML-Export bleibt drehbar, aber nicht zoombar. So ist
+    // die Ansicht als saubere Publikationsfassung stabil und unabhängig von
+    // Mausrad- oder Touchpad-Gesten.
+    canvas.addEventListener("wheel", (event) => event.preventDefault(), { passive: false });
+    window.addEventListener("resize", () => {
+      resizeCanvas();
+      requestRender(false);
+    });
     function renderWhenReady(attempt = 0) {
+      resizeCanvas();
       render();
       if (window.d3?.geoOrthographic || attempt >= 30) return;
       window.setTimeout(() => renderWhenReady(attempt + 1), 120);
@@ -2142,7 +2807,7 @@ function updateWebglLayerMeshes() {
     const features = getRenderableBoundaryFeatures(item);
     if (!features.length) return;
     const mesh = createWebglMesh(geoJsonToSphereVertices({ type: "FeatureCollection", features }, 1.008));
-    const color = normalizeColorValue(item.display?.color, "");
+    const color = getMapLayerFillColor(item.display?.color);
     if (mesh && color) webglState.layerMeshes.set(item.id, { mesh, color });
   });
   webglState.layerSignature = signature;
@@ -2228,7 +2893,7 @@ function drawWebglMapOutlines(radius, center) {
   getVisibleProjectBoundaryItems().forEach((item) => {
     const features = getRenderableBoundaryFeatures(item);
     if (!features.length) return;
-    const outlineColor = normalizeColorValue(item.display?.outlineColor, "");
+    const outlineColor = getMapBoundaryColor(item.display?.outlineColor);
     if (outlineColor) drawProjectedOutlineRings({ type: "FeatureCollection", features }, radius, center, hexToRgba(outlineColor, 0.95), 1.25, 0.65);
   });
 }
@@ -2294,7 +2959,16 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   // oder dem Rim verrechnet werden, sonst ändert sich die Landfarbe je nach
   // Zoom, Kippwinkel und Position auf der Kugel.
   const usedVectorSurface = drawVectorMapSurface(radius, center);
+  drawMapSearchHighlights(radius, center, { contextOnly: true });
   drawProjectBoundaryLayers(radius, center);
+  drawMapSearchHighlights(radius, center, { focusOnly: true });
+  // Layerregel: Gewässer schneiden thematische Länderflächen optisch aus. Eine
+  // Länderhervorhebung darf Seen oder Binnenmeere nicht überdecken.
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthLakeLayer(radius, center);
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthAdmin0BoundaryLayer(radius, center);
+  drawNaturalEarthAdmin1BoundaryLayer(radius, center);
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthCoastlineOverlay(radius, center);
+  if (state.showGraticule) drawGraticule(radius, center);
   if (!usedVectorSurface) drawWebglMapOutlines(radius, center);
 }
 
@@ -2778,6 +3452,40 @@ function extractLandPolygons(geojson) {
   return polygons;
 }
 
+function extractBoundaryLineStrings(geojson) {
+  const lines = [];
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  features.forEach((feature) => {
+    const geometry = feature?.geometry;
+    if (!geometry) return;
+    if (geometry.type === "LineString") {
+      const line = sanitizeRing(geometry.coordinates || []);
+      if (line.length > 1) lines.push(line);
+    }
+    if (geometry.type === "MultiLineString") {
+      (geometry.coordinates || []).forEach((rawLine) => {
+        const line = sanitizeRing(rawLine || []);
+        if (line.length > 1) lines.push(line);
+      });
+    }
+    if (geometry.type === "Polygon") {
+      (geometry.coordinates || []).forEach((rawRing) => {
+        const line = sanitizeRing(rawRing || []);
+        if (line.length > 1) lines.push(line);
+      });
+    }
+    if (geometry.type === "MultiPolygon") {
+      (geometry.coordinates || []).forEach((polygon) => {
+        (polygon || []).forEach((rawRing) => {
+          const line = sanitizeRing(rawRing || []);
+          if (line.length > 1) lines.push(line);
+        });
+      });
+    }
+  });
+  return lines;
+}
+
 function getRingBounds(ring) {
   const lons = ring.map(([lon]) => lon);
   const lats = ring.map(([, lat]) => lat);
@@ -2943,6 +3651,24 @@ function densifyRing(points, maxStep = 4) {
   return result;
 }
 
+function densifyLine(points, maxStep = 4) {
+  if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? points : [];
+  const result = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const [lon, lat] = points[index];
+    const [nextLon, nextLat] = points[index + 1];
+    const lonDelta = normalizeLonDelta(nextLon - lon);
+    const latDelta = nextLat - lat;
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(lonDelta), Math.abs(latDelta)) / maxStep));
+    for (let step = 0; step < steps; step += 1) {
+      const t = step / steps;
+      result.push([lon + lonDelta * t, lat + latDelta * t]);
+    }
+  }
+  result.push(points[points.length - 1]);
+  return result;
+}
+
 function toRotatedUnit(lon, lat) {
   const lambda = (lon + rotation.lon) * DEG;
   const phi = lat * DEG;
@@ -3024,6 +3750,8 @@ function drawGeographicLayer(radius, center) {
     drawTopographicReliefOverlay(rings, radius, center, style);
   }
 
+  drawNaturalEarthLakeLayer(radius, center);
+
   rings.forEach((ring) => {
     drawProjectedLine(
       densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85),
@@ -3034,6 +3762,162 @@ function drawGeographicLayer(radius, center) {
     );
   });
 
+  return true;
+}
+
+function getNaturalEarthAdmin1BoundaryRings() {
+  if (state.naturalEarthAdmin1BoundaryRings) return state.naturalEarthAdmin1BoundaryRings;
+  const source = window.EarthMapNaturalEarthAdmin1Boundaries10m;
+  if (!source?.features?.length) return [];
+  // Hintergrundregel: Admin-1 ist ein Standard-Grenzlayer, kein Projektobjekt.
+  // Für die Anzeige halten wir nur die Linienringe im Speicher; Flächenfüllung
+  // bleibt transparent. Die vollständige Geometrie/Metadatenlogik bleibt vom
+  // späteren Archiv- und Importpfad getrennt.
+  state.naturalEarthAdmin1BoundaryRings = extractBoundaryLineStrings(source);
+  return state.naturalEarthAdmin1BoundaryRings;
+}
+
+function getNaturalEarthAdmin0BoundaryRings() {
+  if (state.naturalEarthAdmin0BoundaryRings) return state.naturalEarthAdmin0BoundaryRings;
+  const boundarySource = window.EarthMapNaturalEarthAdmin0Boundaries10m;
+  if (boundarySource?.features?.length) {
+    state.naturalEarthAdmin0BoundaryRings = extractBoundaryLineStrings(boundarySource);
+    return state.naturalEarthAdmin0BoundaryRings;
+  }
+  const dataset = getNaturalEarthCountryDataset();
+  if (!dataset?.features?.length) return [];
+  // Hintergrundregel: Staatsgrenzen sind eine Standard-Annotation auf der
+  // Grundkarte. Wir leiten sie aus den Admin-0-Polygonen ab, zeichnen aber nur
+  // die Ringe als Linien. Dadurch bleibt die Länderfüllung fachlich getrennt
+  // von der globalen Landmasse und erzeugt keine neue Flächenlogik.
+  state.naturalEarthAdmin0BoundaryRings = extractLandPolygons(dataset).flat();
+  return state.naturalEarthAdmin0BoundaryRings;
+}
+
+function getNaturalEarthLakePolygons() {
+  if (state.naturalEarthLakePolygons) return state.naturalEarthLakePolygons;
+  const source = window.EarthMapNaturalEarthLakes10m;
+  if (!source?.features?.length) return [];
+  // Hintergrundregel: Seen sind Teil der physischen Grundkarte. Sie bleiben
+  // deshalb strikt von Projektlayern getrennt und übernehmen die Wasserfarbe
+  // der aktuell gewählten Grundkarte.
+  state.naturalEarthLakePolygons = extractLandPolygons(source);
+  return state.naturalEarthLakePolygons;
+}
+
+function getNaturalEarthLakeRings() {
+  if (state.naturalEarthLakeRings) return state.naturalEarthLakeRings;
+  state.naturalEarthLakeRings = getNaturalEarthLakePolygons().flat();
+  return state.naturalEarthLakeRings;
+}
+
+function getNaturalEarthEnclosedSeaPolygons() {
+  if (state.naturalEarthEnclosedSeaPolygons) return state.naturalEarthEnclosedSeaPolygons;
+  const source = window.EarthMapNaturalEarthEnclosedSeas10m;
+  if (!source?.features?.length) return [];
+  // Datenregel: Natural Earth führt das Kaspische Meer nicht in den Lakes,
+  // sondern in geography_marine_polys. Für die Grundkarte behandeln wir solche
+  // landumschlossenen Meeresflächen dennoch wie Wasserflächen.
+  state.naturalEarthEnclosedSeaPolygons = extractLandPolygons(source);
+  return state.naturalEarthEnclosedSeaPolygons;
+}
+
+function getNaturalEarthEnclosedSeaRings() {
+  if (state.naturalEarthEnclosedSeaRings) return state.naturalEarthEnclosedSeaRings;
+  state.naturalEarthEnclosedSeaRings = getNaturalEarthEnclosedSeaPolygons().flat();
+  return state.naturalEarthEnclosedSeaRings;
+}
+
+function getNaturalEarthWaterPolygons() {
+  return [
+    ...getNaturalEarthLakePolygons(),
+    ...getNaturalEarthEnclosedSeaPolygons(),
+  ];
+}
+
+function getNaturalEarthWaterRings() {
+  return [
+    ...getNaturalEarthLakeRings(),
+    ...getNaturalEarthEnclosedSeaRings(),
+  ];
+}
+
+function drawNaturalEarthLakeLayer(radius, center) {
+  const polygons = getNaturalEarthWaterPolygons();
+  if (!polygons.length) return false;
+  const style = getContinentalRenderStyle();
+  const density = globeZoom > 7 ? 0.42 : globeZoom > 3 ? 0.75 : 1.15;
+  const fill = style.sea;
+  polygons.forEach((polygon) => {
+    drawVisibleHemispherePolygonFill(
+      polygon.map((ring) => densifyRing(ring, density)),
+      radius,
+      center,
+      fill,
+    );
+  });
+
+  const rings = getNaturalEarthWaterRings();
+  const stroke = isEarthMapDarkMode()
+    ? DARK_MAP_COASTLINE_COLOR
+    : "rgba(92,96,94,.22)";
+  const lineWidth = getStableGlobeStrokeWidth(radius, 0.001, 0.36);
+  rings.forEach((ring) => {
+    if (!ring?.length) return;
+    drawProjectedLine(densifyLine(ring, density), radius, center, stroke, lineWidth);
+  });
+  return true;
+}
+
+function drawNaturalEarthAdmin0BoundaryLayer(radius, center) {
+  const rings = getNaturalEarthAdmin0BoundaryRings();
+  if (!rings.length) return false;
+  const alpha = globeZoom < 1.35 ? 0.44 : globeZoom < 2.8 ? 0.5 : 0.58;
+  const stroke = isEarthMapDarkMode()
+    ? DARK_MAP_BOUNDARY_COLOR
+    : `rgba(66,72,70,${alpha})`;
+  const lineWidth = getStableGlobeStrokeWidth(radius, 0.00155, 0.68);
+  const density = globeZoom > 7 ? 0.42 : globeZoom > 3 ? 0.7 : 1.05;
+  rings.forEach((ring) => {
+    if (!ring?.length) return;
+    drawProjectedLine(densifyLine(ring, density), radius, center, stroke, lineWidth);
+  });
+  return true;
+}
+
+function drawNaturalEarthAdmin1BoundaryLayer(radius, center) {
+  requestNaturalEarthAdmin1BoundaryLayerForZoom();
+  if (globeZoom < NATURAL_EARTH_ADMIN1_BOUNDARY_LAYER_ZOOM) return false;
+  if (!state.naturalEarthAdmin1BoundaryLoaded) return false;
+  const rings = getNaturalEarthAdmin1BoundaryRings();
+  if (!rings.length) return false;
+  const alpha = clamp((globeZoom - NATURAL_EARTH_ADMIN1_BOUNDARY_LAYER_ZOOM) / 1.8, 0.18, 0.58);
+  const stroke = isEarthMapDarkMode()
+    ? DARK_MAP_BOUNDARY_COLOR
+    : `rgba(82,88,86,${alpha})`;
+  const lineWidth = getStableGlobeStrokeWidth(radius, 0.0012, 0.42);
+  const density = globeZoom > 9 ? 0.35 : globeZoom > 5 ? 0.55 : 0.9;
+  const maxRings = globeZoom < 4.2 ? 1800 : globeZoom < 6.4 ? 3200 : rings.length;
+  const stride = rings.length > maxRings ? Math.ceil(rings.length / maxRings) : 1;
+  for (let index = 0; index < rings.length; index += stride) {
+    const ring = rings[index];
+    if (!ring?.length) continue;
+    drawProjectedLine(densifyLine(ring, density), radius, center, stroke, lineWidth);
+  }
+  return true;
+}
+
+function drawNaturalEarthCoastlineOverlay(radius, center) {
+  const source = getRenderableNaturalEarthSource(getInteractiveNaturalEarthSource());
+  if (!source?.features?.length) return false;
+  const rings = extractLandRings(source);
+  if (!rings.length) return false;
+  const style = getContinentalRenderStyle();
+  const density = globeZoom > 7 ? 0.45 : 0.85;
+  const lineWidth = getStableGlobeStrokeWidth(radius, 0.0018, 0.7);
+  rings.forEach((ring) => {
+    drawProjectedLine(densifyRing(ring, density), radius, center, style.outline, lineWidth);
+  });
   return true;
 }
 
@@ -3083,15 +3967,79 @@ function drawProjectBoundaryLayers(radius, center) {
     const features = getRenderableBoundaryFeatures(item);
     if (!features.length) return;
 
-    const color = normalizeColorValue(item.display?.color, "");
+    const color = getMapLayerFillColor(item.display?.color);
     const outlineStyle = getProjectBoundaryOutlineStyle(project, item);
     const outlineColor = outlineStyle && Object.prototype.hasOwnProperty.call(outlineStyle, "strokeColor")
-      ? normalizeColorValue(outlineStyle.strokeColor, "")
-      : normalizeColorValue(item.display?.outlineColor, "");
+      ? getMapBoundaryColor(outlineStyle.strokeColor)
+      : getMapBoundaryColor(item.display?.outlineColor);
     if (drawBoundaryFeatureVector({ type: "FeatureCollection", features }, radius, center, color, outlineColor, outlineStyle)) {
       drewLayer = true;
     }
   });
+
+  return drewLayer;
+}
+
+function drawMapSearchHighlights(radius, center, options = {}) {
+  const highlight = state.mapSearchHighlight;
+  const selectedFeatures = Array.isArray(highlight?.selectedFeatures)
+    ? highlight.selectedFeatures
+    : [highlight?.countryFeature].filter(Boolean);
+  const focusFeatures = Array.isArray(highlight?.focusFeatures)
+    ? highlight.focusFeatures
+    : [highlight?.provinceFeature].filter(Boolean);
+  if (!selectedFeatures.length && !focusFeatures.length) return false;
+  let drewLayer = false;
+  const focusOnly = options.focusOnly === true;
+  const contextOnly = options.contextOnly === true;
+
+  // Suchregel: Bei "Region, Staat" ist der Staat der ausgewählte Kontext,
+  // die Region ist die besondere Hervorhebung. Beide werden als normale
+  // Vektorflächen gezeichnet. Der Kontext liegt unter Grenzen/Küsten, der
+  // Fokus wird anschließend ein zweites Mal ganz oben gesetzt, damit er nicht
+  // von der Kontextfüllung oder späteren Standardlayern verschluckt wird.
+  if (!focusOnly) {
+    selectedFeatures.forEach((feature, index) => {
+      const color = getMapSearchSelectedAreaColor();
+      const outlineColor = getMapSearchSelectedOutlineColor();
+      const hatched = index > 0;
+      drewLayer = drawBoundaryFeatureVector(
+        feature,
+        radius,
+        center,
+        color,
+        outlineColor,
+        {
+          strokeWidth: isEarthMapDarkMode() ? (hatched ? 0.72 : 0) : 0.58,
+          fillMode: hatched ? "diagonal-hatch" : "solid",
+          fillAlpha: isEarthMapDarkMode() ? 0.84 : 0.66,
+          strokeAlpha: isEarthMapDarkMode() ? 0.98 : 0.78,
+          hatchAlpha: isEarthMapDarkMode() ? 0.86 : 0.62,
+          hatchLineWidth: isEarthMapDarkMode() ? 2 : 1.25,
+          hatchSize: isEarthMapDarkMode() ? 14 : 17,
+        },
+      ) || drewLayer;
+    });
+  }
+  if (!contextOnly) {
+    focusFeatures.forEach((feature) => {
+      const color = getMapSearchSpecialHighlightColor();
+      const outlineColor = getMapSearchSpecialOutlineColor();
+      drewLayer = drawBoundaryFeatureVector(
+        feature,
+        radius,
+        center,
+        color,
+        outlineColor,
+        {
+          strokeWidth: isEarthMapDarkMode() ? 1.15 : 0.82,
+          fillMode: "solid",
+          fillAlpha: isEarthMapDarkMode() ? 0.84 : 0.74,
+          strokeAlpha: isEarthMapDarkMode() ? 0.98 : 0.9,
+        },
+      ) || drewLayer;
+    });
+  }
 
   return drewLayer;
 }
@@ -3110,13 +4058,43 @@ function getLineDashForStrokeStyle(strokeStyle, lineWidth) {
   return [];
 }
 
+function createDiagonalHatchPattern(color, alpha = 0.86, lineWidth = 2, size = 14) {
+  const patternCanvas = document.createElement("canvas");
+  patternCanvas.width = size;
+  patternCanvas.height = size;
+  const patternCtx = patternCanvas.getContext("2d");
+  if (!patternCtx) return hexToRgba(color, 0.38);
+  patternCtx.clearRect(0, 0, size, size);
+  patternCtx.strokeStyle = hexToRgba(color, alpha);
+  patternCtx.lineWidth = lineWidth;
+  patternCtx.lineCap = "round";
+  // Suchmarkierungsregel: Bei Aufzählungen bleibt das erste Objekt flächig.
+  // Weitere Objekte bekommen eine transparente Schraffur, damit sie als
+  // gleichartige, aber sekundäre Treffer lesbar bleiben und die Grundkarte
+  // darunter nicht vollständig zugedeckt wird.
+  [-size, 0, size].forEach((offset) => {
+    patternCtx.beginPath();
+    patternCtx.moveTo(offset, size);
+    patternCtx.lineTo(offset + size, 0);
+    patternCtx.stroke();
+  });
+  return ctx.createPattern(patternCanvas, "repeat") || hexToRgba(color, 0.38);
+}
+
 function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR, outlineStyle = {}) {
   const featureCollection = feature?.type === "FeatureCollection" ? feature : { type: "FeatureCollection", features: [feature] };
   const polygons = extractLandPolygons(featureCollection);
   const rings = polygons.flat();
   if (!polygons.length || !rings.length) return false;
-  const fillStyle = color ? hexToRgba(color, 0.84) : "";
-  const strokeStyle = outlineColor ? hexToRgba(outlineColor, 0.98) : "";
+  const fillAlpha = Number.isFinite(Number(outlineStyle.fillAlpha)) ? clamp(Number(outlineStyle.fillAlpha), 0, 1) : 0.84;
+  const strokeAlpha = Number.isFinite(Number(outlineStyle.strokeAlpha)) ? clamp(Number(outlineStyle.strokeAlpha), 0, 1) : 0.98;
+  const hatchAlpha = Number.isFinite(Number(outlineStyle.hatchAlpha)) ? clamp(Number(outlineStyle.hatchAlpha), 0, 1) : 0.86;
+  const hatchLineWidth = Number.isFinite(Number(outlineStyle.hatchLineWidth)) ? Math.max(0.5, Number(outlineStyle.hatchLineWidth)) : 2;
+  const hatchSize = Number.isFinite(Number(outlineStyle.hatchSize)) ? Math.max(8, Number(outlineStyle.hatchSize)) : 14;
+  const fillStyle = color
+    ? (outlineStyle.fillMode === "diagonal-hatch" ? createDiagonalHatchPattern(color, hatchAlpha, hatchLineWidth, hatchSize) : hexToRgba(color, fillAlpha))
+    : "";
+  const strokeStyle = outlineColor ? hexToRgba(outlineColor, strokeAlpha) : "";
   const configuredLineWidth = Number(outlineStyle.strokeWidth);
   const lineWidth = Number.isFinite(configuredLineWidth) ? Math.max(0, configuredLineWidth) : getStableGlobeStrokeWidth(radius, 0.0042, 1.15);
   const lineDash = getLineDashForStrokeStyle(normalizeProjectStrokeStyle(outlineStyle.strokeStyle), lineWidth);
@@ -3442,8 +4420,18 @@ function renderGlobe() {
     if (!usedGeographicProjection) {
       drawLand(radius, center);
     }
+    drawMapSearchHighlights(radius, center, { contextOnly: true });
   }
   drawProjectBoundaryLayers(radius, center);
+  drawMapSearchHighlights(radius, center, { focusOnly: true });
+  // Layerregel: Gewässer gehören zur Grundkarte und bleiben sichtbar über
+  // thematischen Füllungen; Grenzen/Küsten werden anschließend wieder lesbar
+  // darüber gesetzt.
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthLakeLayer(radius, center);
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthAdmin0BoundaryLayer(radius, center);
+  drawNaturalEarthAdmin1BoundaryLayer(radius, center);
+  if (shouldRenderContinentalBaseMap()) drawNaturalEarthCoastlineOverlay(radius, center);
+  if (state.showGraticule) drawGraticule(radius, center);
   drawAtmosphere(baseSize, radius, center);
   ctx.restore();
 }
@@ -3813,94 +4801,96 @@ function createProjectCardMenu(project) {
 }
 
 function renderProjectBrowser() {
+  const browserNodes = [];
   if (!state.projects.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
     empty.textContent = "Noch kein Projekt angelegt. Die Erde oben ist die neutrale Startansicht.";
-    ui.projectBrowserList.replaceChildren(empty);
-    return;
-  }
+    browserNodes.push(empty);
+  } else {
+    browserNodes.push(...state.projects.map((project) => {
+      const boundarySet = getActiveBoundarySet(project);
+      const boundaryLayers = getLibraryFolderItems(getLibraryFolder(project, "boundary-maps"));
+      const boundaryCollections = getLibraryFolderItems(getLibraryFolder(project, "boundary-collections"));
+      const projectNodeId = `project:${project.id}`;
+      const projectCollapsed = isBrowserNodeCollapsed(projectNodeId);
+      const isActiveProject = project.id === state.activeProjectId;
+      const card = document.createElement("article");
+      card.className = "project-card";
+      if (isActiveProject) card.classList.add("is-active");
+      card.dataset.projectId = project.id;
 
-  ui.projectBrowserList.replaceChildren(...state.projects.map((project) => {
-    const boundarySet = getActiveBoundarySet(project);
-    const boundaryLayers = getLibraryFolderItems(getLibraryFolder(project, "boundary-maps"));
-    const boundaryCollections = getLibraryFolderItems(getLibraryFolder(project, "boundary-collections"));
-    const projectNodeId = `project:${project.id}`;
-    const projectCollapsed = isBrowserNodeCollapsed(projectNodeId);
-    const isActiveProject = project.id === state.activeProjectId;
-    const card = document.createElement("article");
-    card.className = "project-card";
-    if (isActiveProject) card.classList.add("is-active");
-    card.dataset.projectId = project.id;
+      const row = document.createElement("div");
+      row.className = "project-browser-row project-row";
+      row.dataset.projectId = project.id;
+      setupLibraryDropTarget(row, project, "", "");
 
-    const row = document.createElement("div");
-    row.className = "project-browser-row project-row";
-    row.dataset.projectId = project.id;
-    setupLibraryDropTarget(row, project, "", "");
+      const visibility = document.createElement("input");
+      visibility.type = "checkbox";
+      visibility.className = "browser-visibility-checkbox";
+      visibility.checked = isActiveProject;
+      visibility.title = "Dieses Projekt aktivieren";
+      visibility.addEventListener("click", (event) => event.stopPropagation());
+      visibility.addEventListener("change", () => {
+        // Projektregel: Der Haken auf Projektebene ist kein Sichtbarkeitsschalter
+        // für Layer, sondern wählt genau ein aktives Earth-Map-Projekt. Die
+        // Sichtbarkeit der Karten bleibt darunter in Kontinental-/einfachen Karten.
+        if (!visibility.checked && state.activeProjectId === project.id) {
+          visibility.checked = true;
+          return;
+        }
+        state.activeProjectId = project.id;
+        state.openProjectBrowserMenuId = null;
+        state.openFolderBrowserMenuId = null;
+        state.openLayerBrowserMenuId = null;
+        resetProjectDeleteHold();
+        resetLayerDeleteHold();
+        persistProjects();
+        renderWorkspace();
+        renderGlobe();
+      });
 
-    const visibility = document.createElement("input");
-    visibility.type = "checkbox";
-    visibility.className = "browser-visibility-checkbox";
-    visibility.checked = isActiveProject;
-    visibility.title = "Dieses Projekt aktivieren";
-    visibility.addEventListener("click", (event) => event.stopPropagation());
-    visibility.addEventListener("change", () => {
-      // Projektregel: Der Haken auf Projektebene ist kein Sichtbarkeitsschalter
-      // für Layer, sondern wählt genau ein aktives Earth-Map-Projekt. Die
-      // Sichtbarkeit der Karten bleibt darunter in Kontinental-/einfachen Karten.
-      if (!visibility.checked && state.activeProjectId === project.id) {
-        visibility.checked = true;
-        return;
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "browser-tree-toggle";
+      toggle.textContent = projectCollapsed ? "▸" : "▾";
+      toggle.setAttribute("aria-label", `${project.title} ${projectCollapsed ? "aufklappen" : "zuklappen"}`);
+      toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleBrowserNode(projectNodeId);
+      });
+
+      const icon = document.createElement("span");
+      icon.className = "browser-row-icon browser-row-icon-project";
+      icon.style.setProperty("--browser-row-icon-url", `url("${getIconifyPreviewUrl(project.iconName, project.iconColor || "#9a6419", 18)}")`);
+      icon.style.color = normalizeColorValue(project.iconColor, "#9a6419") || "#9a6419";
+      icon.setAttribute("aria-hidden", "true");
+
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "project-card-main";
+      main.dataset.projectId = project.id;
+      const title = document.createElement("strong");
+      title.textContent = project.title;
+      const meta = document.createElement("span");
+      const totalMaps = boundaryLayers.length + boundaryCollections.length;
+      meta.textContent = [
+        boundarySet?.label || "ohne Grenzgrundlage",
+        `${totalMaps} Karten`,
+        project.status,
+      ].join(" · ");
+      main.append(title, meta);
+      row.append(visibility, toggle, icon, main, createProjectCardMenu(project));
+      card.append(row);
+      if (!projectCollapsed) {
+        card.append(createProjectMapTree(project));
       }
-      state.activeProjectId = project.id;
-      state.openProjectBrowserMenuId = null;
-      state.openFolderBrowserMenuId = null;
-      state.openLayerBrowserMenuId = null;
-      resetProjectDeleteHold();
-      resetLayerDeleteHold();
-      persistProjects();
-      renderWorkspace();
-      renderGlobe();
-    });
-
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "browser-tree-toggle";
-    toggle.textContent = projectCollapsed ? "▸" : "▾";
-    toggle.setAttribute("aria-label", `${project.title} ${projectCollapsed ? "aufklappen" : "zuklappen"}`);
-    toggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleBrowserNode(projectNodeId);
-    });
-
-    const icon = document.createElement("span");
-    icon.className = "browser-row-icon browser-row-icon-project";
-    icon.style.setProperty("--browser-row-icon-url", `url("${getIconifyPreviewUrl(project.iconName, project.iconColor || "#9a6419", 18)}")`);
-    icon.style.color = normalizeColorValue(project.iconColor, "#9a6419") || "#9a6419";
-    icon.setAttribute("aria-hidden", "true");
-
-    const main = document.createElement("button");
-    main.type = "button";
-    main.className = "project-card-main";
-    main.dataset.projectId = project.id;
-    const title = document.createElement("strong");
-    title.textContent = project.title;
-    const meta = document.createElement("span");
-    const totalMaps = boundaryLayers.length + boundaryCollections.length;
-    meta.textContent = [
-      boundarySet?.label || "ohne Grenzgrundlage",
-      `${totalMaps} Karten`,
-      project.status,
-    ].join(" · ");
-    main.append(title, meta);
-    row.append(visibility, toggle, icon, main, createProjectCardMenu(project));
-    card.append(row);
-    if (!projectCollapsed) {
-      card.append(createProjectMapTree(project));
-    }
-    return card;
-  }));
+      return card;
+    }));
+  }
+  browserNodes.push(createBrowserFooterSpacer(), createNaturalEarthArchiveCard(), createBrowserTrashRow());
+  ui.projectBrowserList.replaceChildren(...browserNodes);
 }
 
 function getProjectMapFolders(project) {
@@ -3931,6 +4921,544 @@ function getProjectSubfolderItems(project, subfolderId) {
     const subfolder = (folder.subfolders || []).find((candidate) => candidate.id === subfolderId);
     return (subfolder?.items || []).map((item) => ({ item, folderType: folder.type }));
   });
+}
+
+function getNaturalEarthAdmin0ArchiveGroups() {
+  const features = getNaturalEarthCountryDataset().features || [];
+  const overrides = getActiveProject()?.naturalEarthOverrides || {};
+  const groups = new Map();
+  features.forEach((feature) => {
+    const properties = feature.properties || {};
+    const sovereign = repairLegacyText(properties.SOVEREIGNT || properties.ADMIN || "Unbestimmt");
+    if (!groups.has(sovereign)) groups.set(sovereign, []);
+    groups.get(sovereign).push(feature);
+  });
+  return [...groups.entries()]
+    .map(([title, items]) => ({
+      title,
+      items: items
+        .map((feature) => {
+          const properties = feature.properties || {};
+          const archiveKey = getNaturalEarthAdmin0ArchiveKey(feature);
+          const override = overrides[archiveKey] || {};
+          return {
+            archiveKey,
+            name: repairLegacyText(override.name || override.boundarySet?.title || properties.NAME_EN || properties.NAME || properties.ADMIN || "Unbenannt"),
+            type: repairLegacyText(override.boundarySet?.boundary_type || properties.TYPE || "Einheit"),
+            iso3: override.boundarySet?.country_iso3 || override.iso3 || properties.ADM0_A3 || properties.ISO_A3 || "",
+            sovereign: repairLegacyText(properties.SOVEREIGNT || ""),
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, "de")),
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title, "de"));
+}
+
+function getNaturalEarthAdmin1ArchiveGroups() {
+  const features = state.naturalEarthAdmin1Dataset?.features || [];
+  const overrides = getActiveProject()?.naturalEarthOverrides || {};
+  const groups = new Map();
+  features.forEach((feature) => {
+    const properties = feature.properties || {};
+    const stateTitle = repairLegacyText(properties.admin || properties.geonunit || properties.adm0_a3 || "Unbestimmt");
+    if (!groups.has(stateTitle)) groups.set(stateTitle, []);
+    groups.get(stateTitle).push(feature);
+  });
+  return [...groups.entries()]
+    .map(([title, items]) => ({
+      title,
+      items: items
+        .map((feature) => {
+          const properties = feature.properties || {};
+          const archiveKey = getNaturalEarthAdmin1ArchiveKey(feature);
+          const override = overrides[archiveKey] || {};
+          return {
+            archiveKey,
+            name: repairLegacyText(override.name || override.boundarySet?.title || properties.name_de || properties.name || properties.name_en || properties.adm1_code || "Unbenannt"),
+            type: repairLegacyText(override.boundarySet?.boundary_type || properties.type || properties.type_en || "Gliedstaat / Provinz"),
+            iso3: override.boundarySet?.country_iso3 || override.iso3 || properties.adm0_a3 || properties.sov_a3 || "",
+            code: properties.iso_3166_2 || properties.adm1_code || "",
+            wikidataId: override.boundarySet?.wikidata_id || override.wikidataId || properties.wikidataid || "",
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, "de")),
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title, "de"));
+}
+
+function getNaturalEarthAdmin1ArchiveItemsForState(stateTitle) {
+  if (!state.naturalEarthAdmin1Dataset) return [];
+  const matchingGroup = getNaturalEarthAdmin1ArchiveGroups().find((group) => group.title === stateTitle);
+  return matchingGroup?.items || [];
+}
+
+function getNaturalEarthAdmin0ArchiveKey(feature) {
+  const properties = feature?.properties || {};
+  const raw = properties.ADM0_A3 || properties.ISO_A3 || properties.ADM0_A3_US || properties.NAME || properties.ADMIN || "";
+  return `natural-earth:10m:admin0:${slugifyBoundaryId(raw, "admin0")}`;
+}
+
+function getNaturalEarthAdmin1ArchiveKey(feature) {
+  const properties = feature?.properties || {};
+  const raw = properties.iso_3166_2 || properties.adm1_code || properties.name || properties.name_en || "";
+  return `natural-earth:10m:admin1:${slugifyBoundaryId(raw, "admin1")}`;
+}
+
+function findNaturalEarthAdmin0FeatureByArchiveKey(archiveKey) {
+  return (getNaturalEarthCountryDataset().features || []).find((feature) => getNaturalEarthAdmin0ArchiveKey(feature) === archiveKey) || null;
+}
+
+function findNaturalEarthAdmin1FeatureByArchiveKey(archiveKey) {
+  const features = state.naturalEarthAdmin1Dataset?.features || window.EarthMapNaturalEarthAdmin1Metadata10m?.features || [];
+  return features.find((feature) => getNaturalEarthAdmin1ArchiveKey(feature) === archiveKey) || null;
+}
+
+function getNaturalEarthArchiveFeature(datasetId, archiveKey) {
+  if (datasetId === "admin_1_states_provinces") return findNaturalEarthAdmin1FeatureByArchiveKey(archiveKey);
+  return findNaturalEarthAdmin0FeatureByArchiveKey(archiveKey);
+}
+
+function createNaturalEarthArchiveItemDefaults(datasetId, feature) {
+  const properties = feature?.properties || {};
+  const isAdmin1 = datasetId === "admin_1_states_provinces";
+  const archiveKey = isAdmin1 ? getNaturalEarthAdmin1ArchiveKey(feature) : getNaturalEarthAdmin0ArchiveKey(feature);
+  const title = isAdmin1
+    ? repairLegacyText(properties.name_de || properties.name || properties.name_en || properties.adm1_code || "Unbenannt")
+    : repairLegacyText(properties.NAME_EN || properties.NAME || properties.ADMIN || "Unbenannt");
+  const iso3 = isAdmin1
+    ? String(properties.adm0_a3 || properties.sov_a3 || "").toUpperCase()
+    : String(properties.ADM0_A3 || properties.ISO_A3 || "").toUpperCase();
+  const providerId = isAdmin1
+    ? properties.iso_3166_2 || properties.adm1_code || archiveKey
+    : properties.ADM0_A3 || properties.ISO_A3 || archiveKey;
+  const wikidataId = normalizeWikidataId(isAdmin1 ? properties.wikidataid : properties.WIKIDATAID);
+  const typeLabel = isAdmin1
+    ? repairLegacyText(properties.type || properties.type_en || "Gliedstaat / Provinz")
+    : repairLegacyText(properties.TYPE || "Staat / abhängiges Gebiet");
+  const rank = isAdmin1 ? 2 : 1;
+  return normalizeLibraryItem({
+    id: archiveKey,
+    kind: "boundary-map",
+    name: title,
+    source: "Natural Earth",
+    iso3,
+    wikidataId,
+    adminLevel: isAdmin1 ? "ADM1" : "ADM0",
+    detail: "10m",
+    license: "Public Domain",
+    sourceUrl: isAdmin1
+      ? "../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.coast-aligned.geojson"
+      : "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.geojson",
+    importedAt: "system-archive",
+    temporalCoverage: {
+      label: "gegenwärtiger Natural-Earth-Datensatz",
+      from: "",
+      to: "",
+    },
+    display: {
+      visible: true,
+      color: "",
+      outlineColor: DEFAULT_LAYER_OUTLINE_COLOR,
+    },
+    geometryRef: {
+      provider: "natural-earth-archive",
+      dataset: datasetId,
+      archiveKey,
+    },
+    boundarySet: {
+      id: archiveKey,
+      title,
+      schema: "ziselin-boundary-set-v1",
+      provider: "Natural Earth",
+      provider_boundary_id: String(providerId || ""),
+      boundary_type: "administrative",
+      country_iso3: iso3,
+      admin_level: isAdmin1 ? "ADM1" : "ADM0",
+      wikidata_id: wikidataId,
+      review_status: "imported",
+      year_represented: "",
+      valid_from: "",
+      valid_to: "",
+      type: isAdmin1 ? "constituent_state" : "state",
+      rank,
+      sovereignty_status: isAdmin1 ? "non_sovereign" : "",
+      relation_to_parent: isAdmin1 ? "administrative_subdivision" : "none",
+      parent_id: isAdmin1 ? iso3 : "",
+      geometry_scope: "core_territory",
+      source: {
+        label: "Natural Earth",
+        url: "https://www.naturalearthdata.com/",
+        accessed_at: "",
+      },
+      license: {
+        id: "public-domain",
+        label: "Public Domain",
+        url: "https://www.naturalearthdata.com/about/terms-of-use/",
+        detail: "Natural Earth public domain map data.",
+        compatibility: {
+          wikimedia: true,
+          openstreetmap: true,
+          attribution_required: false,
+        },
+      },
+      features: feature?.geometry ? [{
+        id: archiveKey,
+        name: title,
+        wikidata_id: wikidataId,
+        properties: { ...properties, ziselin_archive_type: typeLabel },
+        geometry: feature.geometry,
+      }] : [],
+    },
+    locked: true,
+  });
+}
+
+function getEditableNaturalEarthArchiveItem(datasetId, archiveKey) {
+  const project = getActiveProject();
+  const feature = getNaturalEarthArchiveFeature(datasetId, archiveKey);
+  if (!project || !feature) return null;
+  project.naturalEarthOverrides = project.naturalEarthOverrides || {};
+  const defaults = createNaturalEarthArchiveItemDefaults(datasetId, feature);
+  const existing = project.naturalEarthOverrides[archiveKey] || {};
+  const merged = normalizeLibraryItem({
+    ...defaults,
+    ...existing,
+    display: { ...(defaults.display || {}), ...(existing.display || {}) },
+    temporalCoverage: { ...(defaults.temporalCoverage || {}), ...(existing.temporalCoverage || {}) },
+    geometryRef: { ...(defaults.geometryRef || {}), ...(existing.geometryRef || {}) },
+    boundarySet: {
+      ...(defaults.boundarySet || {}),
+      ...(existing.boundarySet || {}),
+      source: { ...(defaults.boundarySet?.source || {}), ...(existing.boundarySet?.source || {}) },
+      license: {
+        ...(defaults.boundarySet?.license || {}),
+        ...(existing.boundarySet?.license || {}),
+        compatibility: {
+          ...(defaults.boundarySet?.license?.compatibility || {}),
+          ...(existing.boundarySet?.license?.compatibility || {}),
+        },
+      },
+      features: defaults.boundarySet?.features || [],
+    },
+  });
+  project.naturalEarthOverrides[archiveKey] = merged;
+  return merged;
+}
+
+function getNaturalEarthArchiveGroups(datasetId) {
+  if (datasetId === "admin_1_states_provinces") return getNaturalEarthAdmin1ArchiveGroups();
+  if (datasetId === "admin_0_countries") return getNaturalEarthAdmin0ArchiveGroups();
+  return [];
+}
+
+function createNaturalEarthArchiveCard() {
+  const archiveNodeId = `archive:${NATURAL_EARTH_ARCHIVE_ID}`;
+  const archiveCollapsed = isArchiveBrowserNodeCollapsed(archiveNodeId);
+  const groups = getNaturalEarthArchiveGroups("admin_0_countries");
+  const featureCount = groups.reduce((sum, group) => sum + group.items.length, 0);
+
+  const card = document.createElement("article");
+  card.className = "project-card archive-browser-card";
+
+  const row = document.createElement("div");
+  row.className = "project-browser-row archive-browser-row";
+
+  const checkboxSpacer = document.createElement("span");
+  checkboxSpacer.className = "browser-visibility-checkbox browser-visibility-spacer";
+  checkboxSpacer.setAttribute("aria-hidden", "true");
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "browser-tree-toggle";
+  toggle.textContent = archiveCollapsed ? "▸" : "▾";
+  toggle.setAttribute("aria-label", `Natural-Earth-Archiv ${archiveCollapsed ? "aufklappen" : "zuklappen"}`);
+  toggle.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleArchiveBrowserNode(archiveNodeId);
+  });
+
+  const icon = document.createElement("span");
+  icon.className = "browser-row-icon browser-row-icon-archive";
+  icon.setAttribute("aria-hidden", "true");
+
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "project-card-main";
+  main.addEventListener("click", (event) => {
+    event.preventDefault();
+    toggleArchiveBrowserNode(archiveNodeId);
+  });
+  const title = document.createElement("strong");
+  title.textContent = "Archiv";
+  const meta = document.createElement("span");
+  meta.textContent = `Natural Earth · ${NATURAL_EARTH_ARCHIVE_DATASETS.length} Datensätze · ${groups.length} Staatsordner · ${featureCount} Einheiten`;
+  main.append(title, meta);
+  row.append(checkboxSpacer, toggle, icon, main);
+  card.append(row);
+
+  if (!archiveCollapsed) {
+    const tree = document.createElement("div");
+    tree.className = "project-layer-tree archive-browser-tree";
+
+    const datasetList = document.createElement("div");
+    datasetList.className = "archive-dataset-list";
+    NATURAL_EARTH_ARCHIVE_DATASETS
+      .filter((dataset) => dataset.id !== "admin_1_states_provinces")
+      .forEach((dataset) => {
+      const datasetNodeId = `archive:${NATURAL_EARTH_ARCHIVE_ID}:dataset:${dataset.id}`;
+      const isGroupedUnitDataset = dataset.id === "admin_0_countries";
+      const datasetCollapsed = isArchiveBrowserNodeCollapsed(datasetNodeId);
+      const datasetGroups = getNaturalEarthArchiveGroups(dataset.id);
+      const datasetFeatureCount = datasetGroups.reduce((sum, group) => sum + group.items.length, 0);
+      const datasetRow = document.createElement("div");
+      datasetRow.className = "project-browser-row archive-dataset-row";
+      if (isGroupedUnitDataset) datasetRow.classList.add("archive-dataset-row-folder");
+
+      const datasetToggle = document.createElement("button");
+      datasetToggle.type = "button";
+      datasetToggle.className = "browser-tree-toggle";
+      datasetToggle.textContent = isGroupedUnitDataset ? (datasetCollapsed ? "▸" : "▾") : "";
+      datasetToggle.disabled = !isGroupedUnitDataset;
+      datasetToggle.setAttribute("aria-label", `${dataset.label} ${datasetCollapsed ? "aufklappen" : "zuklappen"}`);
+      datasetToggle.addEventListener("click", (event) => {
+        if (!isGroupedUnitDataset) return;
+        event.preventDefault();
+        event.stopPropagation();
+        toggleArchiveBrowserNode(datasetNodeId);
+      });
+
+      const datasetIcon = document.createElement("span");
+      datasetIcon.className = "browser-row-icon browser-row-icon-dataset";
+      datasetIcon.setAttribute("aria-hidden", "true");
+      const copy = isGroupedUnitDataset ? document.createElement("button") : document.createElement("div");
+      copy.className = "project-card-main";
+      if (isGroupedUnitDataset) {
+        copy.type = "button";
+        copy.addEventListener("click", (event) => {
+          event.preventDefault();
+          toggleArchiveBrowserNode(datasetNodeId);
+        });
+      }
+      const datasetTitle = document.createElement("strong");
+      datasetTitle.textContent = dataset.label;
+      const datasetMeta = document.createElement("span");
+      datasetMeta.textContent = isGroupedUnitDataset && (datasetFeatureCount || dataset.id === "admin_0_countries")
+        ? [dataset.detail, `${datasetGroups.length} Staatsordner`, `${datasetFeatureCount} Einheiten`, dataset.status].join(" · ")
+        : [dataset.detail, dataset.status].join(" · ");
+      copy.append(datasetTitle, datasetMeta);
+      datasetRow.append(document.createElement("span"), datasetToggle, datasetIcon, copy);
+      datasetList.append(datasetRow);
+
+      if (isGroupedUnitDataset && !datasetCollapsed) {
+        const groupList = document.createElement("div");
+        groupList.className = "archive-state-folder-list";
+        datasetGroups.forEach((group) => {
+          const groupNodeId = `archive:${NATURAL_EARTH_ARCHIVE_ID}:dataset:${dataset.id}:state:${group.title}`;
+          const admin1NodeId = `${groupNodeId}:admin1:${group.title}`;
+          const groupCollapsed = isArchiveBrowserNodeCollapsed(groupNodeId);
+          const groupRow = document.createElement("div");
+          groupRow.className = "project-browser-row archive-state-folder-row";
+          const groupToggle = document.createElement("button");
+          groupToggle.type = "button";
+          groupToggle.className = "browser-tree-toggle";
+          groupToggle.textContent = groupCollapsed ? "▸" : "▾";
+          groupToggle.setAttribute("aria-label", `${group.title} ${groupCollapsed ? "aufklappen" : "zuklappen"}`);
+          groupToggle.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleArchiveBrowserNode(groupNodeId);
+          });
+          const groupIcon = document.createElement("span");
+          groupIcon.className = "browser-row-icon browser-row-icon-subfolder";
+          groupIcon.setAttribute("aria-hidden", "true");
+          const groupCopy = document.createElement("button");
+          groupCopy.type = "button";
+          groupCopy.className = "project-card-main";
+          groupCopy.addEventListener("click", (event) => {
+            event.preventDefault();
+            toggleArchiveBrowserNode(groupNodeId);
+          });
+          const groupTitle = document.createElement("strong");
+          groupTitle.textContent = group.title;
+          const groupMeta = document.createElement("span");
+          groupMeta.textContent = `${group.items.length} Einheiten`;
+          groupCopy.append(groupTitle, groupMeta);
+          groupRow.append(document.createElement("span"), groupToggle, groupIcon, groupCopy);
+          groupList.append(groupRow);
+
+          if (!groupCollapsed) {
+            const itemList = document.createElement("div");
+            itemList.className = "archive-state-item-list";
+            group.items.forEach((item) => {
+              const itemRow = document.createElement("div");
+              itemRow.className = "project-browser-row archive-state-item-row";
+              itemRow.classList.toggle("is-active", state.editorMode === "archive-object" && state.activeEditorItemId === item.archiveKey);
+              const itemIcon = document.createElement("span");
+              itemIcon.className = "browser-row-icon browser-row-icon-layers";
+              itemIcon.setAttribute("aria-hidden", "true");
+              const itemCopy = document.createElement("button");
+              itemCopy.type = "button";
+              itemCopy.className = "project-card-main";
+              itemCopy.addEventListener("click", (event) => {
+                event.preventDefault();
+                openNaturalEarthArchiveItemEditor("admin_0_countries", item.archiveKey);
+              });
+              const itemTitle = document.createElement("strong");
+              itemTitle.textContent = item.name;
+              const itemMeta = document.createElement("span");
+              itemMeta.textContent = [item.type, item.code, item.iso3, item.wikidataId].filter(Boolean).join(" · ");
+              itemCopy.append(itemTitle, itemMeta);
+              itemRow.append(document.createElement("span"), document.createElement("span"), itemIcon, itemCopy);
+              itemList.append(itemRow);
+            });
+            groupList.append(itemList);
+
+            const admin1Items = getNaturalEarthAdmin1ArchiveItemsForState(group.title);
+            const admin1Collapsed = isArchiveBrowserNodeCollapsed(admin1NodeId);
+            const admin1FolderRow = document.createElement("div");
+            admin1FolderRow.className = "project-browser-row archive-state-folder-row archive-admin1-folder-row";
+            const admin1Toggle = document.createElement("button");
+            admin1Toggle.type = "button";
+            admin1Toggle.className = "browser-tree-toggle";
+            admin1Toggle.textContent = admin1Collapsed ? "▸" : "▾";
+            admin1Toggle.setAttribute("aria-label", `Gliedstaaten / Provinzen ${admin1Collapsed ? "aufklappen" : "zuklappen"}`);
+            admin1Toggle.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              toggleArchiveBrowserNode(admin1NodeId);
+            });
+            const admin1Icon = document.createElement("span");
+            admin1Icon.className = "browser-row-icon browser-row-icon-subfolder";
+            admin1Icon.setAttribute("aria-hidden", "true");
+            const admin1Copy = document.createElement("button");
+            admin1Copy.type = "button";
+            admin1Copy.className = "project-card-main";
+            admin1Copy.addEventListener("click", (event) => {
+              event.preventDefault();
+              toggleArchiveBrowserNode(admin1NodeId);
+            });
+            const admin1Title = document.createElement("strong");
+            admin1Title.textContent = "Gliedstaaten / Provinzen";
+            const admin1Meta = document.createElement("span");
+            if (state.naturalEarthAdmin1Loading && !state.naturalEarthAdmin1Dataset) {
+              admin1Meta.textContent = "Natural Earth 10m · wird geladen …";
+            } else if (state.naturalEarthAdmin1Error) {
+              admin1Meta.textContent = state.naturalEarthAdmin1Error;
+            } else if (state.naturalEarthAdmin1Dataset) {
+              admin1Meta.textContent = `Natural Earth 10m · ${admin1Items.length} Einheiten`;
+            } else {
+              admin1Meta.textContent = "Natural Earth 10m · zum Laden öffnen";
+            }
+            admin1Copy.append(admin1Title, admin1Meta);
+            admin1FolderRow.append(document.createElement("span"), admin1Toggle, admin1Icon, admin1Copy);
+            groupList.append(admin1FolderRow);
+
+            if (!admin1Collapsed) {
+              const admin1ItemList = document.createElement("div");
+              admin1ItemList.className = "archive-state-item-list archive-admin1-item-list";
+              if (state.naturalEarthAdmin1Loading && !state.naturalEarthAdmin1Dataset) {
+                const loadingRow = document.createElement("div");
+                loadingRow.className = "project-browser-row archive-state-item-row archive-loading-row";
+                const loadingCopy = document.createElement("div");
+                loadingCopy.className = "project-card-main";
+                const loadingTitle = document.createElement("strong");
+                loadingTitle.textContent = "Gliedstaaten und Provinzen werden geladen …";
+                const loadingMeta = document.createElement("span");
+                loadingMeta.textContent = "Natural Earth 10m · Admin-1";
+                loadingCopy.append(loadingTitle, loadingMeta);
+                loadingRow.append(document.createElement("span"), document.createElement("span"), document.createElement("span"), loadingCopy);
+                admin1ItemList.append(loadingRow);
+              } else if (state.naturalEarthAdmin1Error) {
+                const errorRow = document.createElement("div");
+                errorRow.className = "project-browser-row archive-state-item-row archive-loading-row";
+                const errorCopy = document.createElement("div");
+                errorCopy.className = "project-card-main";
+                const errorTitle = document.createElement("strong");
+                errorTitle.textContent = state.naturalEarthAdmin1Error;
+                const errorMeta = document.createElement("span");
+                errorMeta.textContent = "Bitte später erneut öffnen.";
+                errorCopy.append(errorTitle, errorMeta);
+                errorRow.append(document.createElement("span"), document.createElement("span"), document.createElement("span"), errorCopy);
+                admin1ItemList.append(errorRow);
+              } else if (!admin1Items.length) {
+                const emptyRow = document.createElement("div");
+                emptyRow.className = "project-browser-row archive-state-item-row archive-loading-row";
+                const emptyCopy = document.createElement("div");
+                emptyCopy.className = "project-card-main";
+                const emptyTitle = document.createElement("strong");
+                emptyTitle.textContent = "Keine Gliedstaaten / Provinzen hinterlegt";
+                const emptyMeta = document.createElement("span");
+                emptyMeta.textContent = "Natural Earth 10m · Admin-1";
+                emptyCopy.append(emptyTitle, emptyMeta);
+                emptyRow.append(document.createElement("span"), document.createElement("span"), document.createElement("span"), emptyCopy);
+                admin1ItemList.append(emptyRow);
+              } else {
+                admin1Items.forEach((item) => {
+                  const itemRow = document.createElement("div");
+                  itemRow.className = "project-browser-row archive-state-item-row";
+                  itemRow.classList.toggle("is-active", state.editorMode === "archive-object" && state.activeEditorItemId === item.archiveKey);
+                  const itemIcon = document.createElement("span");
+                  itemIcon.className = "browser-row-icon browser-row-icon-layers";
+                  itemIcon.setAttribute("aria-hidden", "true");
+                  const itemCopy = document.createElement("button");
+                  itemCopy.type = "button";
+                  itemCopy.className = "project-card-main";
+                  itemCopy.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    openNaturalEarthArchiveItemEditor("admin_1_states_provinces", item.archiveKey);
+                  });
+                  const itemTitle = document.createElement("strong");
+                  itemTitle.textContent = item.name;
+                  const itemMeta = document.createElement("span");
+                  itemMeta.textContent = [item.type, item.code, item.iso3, item.wikidataId].filter(Boolean).join(" · ");
+                  itemCopy.append(itemTitle, itemMeta);
+                  itemRow.append(document.createElement("span"), document.createElement("span"), itemIcon, itemCopy);
+                  admin1ItemList.append(itemRow);
+                });
+              }
+              groupList.append(admin1ItemList);
+            }
+          }
+        });
+        datasetList.append(groupList);
+      }
+    });
+    tree.append(datasetList);
+    card.append(tree);
+  }
+
+  return card;
+}
+
+function createBrowserTrashRow() {
+  const row = document.createElement("div");
+  row.className = "project-browser-row z-browser-trash-row browser-trash-row";
+  const checkboxSpacer = document.createElement("span");
+  checkboxSpacer.className = "browser-visibility-checkbox browser-visibility-spacer";
+  checkboxSpacer.setAttribute("aria-hidden", "true");
+  const toggleSpacer = document.createElement("span");
+  toggleSpacer.className = "browser-tree-toggle browser-tree-toggle-spacer";
+  toggleSpacer.setAttribute("aria-hidden", "true");
+  const icon = document.createElement("span");
+  icon.className = "browser-row-icon browser-row-icon-trash";
+  icon.setAttribute("aria-hidden", "true");
+  const copy = document.createElement("div");
+  copy.className = "project-card-main";
+  const title = document.createElement("strong");
+  title.textContent = "Papierkorb";
+  const meta = document.createElement("span");
+  meta.textContent = "0 Elemente";
+  copy.append(title, meta);
+  row.append(checkboxSpacer, toggleSpacer, icon, copy);
+  return row;
+}
+
+function createBrowserFooterSpacer() {
+  const spacer = document.createElement("div");
+  spacer.className = "browser-footer-spacer";
+  spacer.setAttribute("aria-hidden", "true");
+  return spacer;
 }
 
 function createProjectSubfolder(project) {
@@ -5499,7 +7027,7 @@ function getEditorTabForLibraryItem(item) {
 
 function updateEditorModeView() {
   const activeTab = state.activeEditorTab;
-  const objectMode = state.editorMode === "object";
+  const objectMode = state.editorMode === "object" || state.editorMode === "archive-object";
   const projectMode = state.editorMode === "project";
   const subfolderMode = state.editorMode === "subfolder";
   const propertiesMode = objectMode || projectMode || subfolderMode;
@@ -5527,7 +7055,7 @@ function updateEditorModeView() {
 
 function setEditorTab(tabName, options = {}) {
   state.editorMode = options.mode || "tool";
-  state.activeEditorTab = (state.editorMode === "object" || state.editorMode === "project" || state.editorMode === "subfolder") ? "properties" : tabName;
+  state.activeEditorTab = (state.editorMode === "object" || state.editorMode === "archive-object" || state.editorMode === "project" || state.editorMode === "subfolder") ? "properties" : tabName;
   if (state.editorMode === "tool") state.previousToolEditorTab = state.activeEditorTab;
   renderEditorTabs();
   document.querySelectorAll("[data-editor-tab]").forEach((tab) => {
@@ -5545,8 +7073,23 @@ function setEditorTab(tabName, options = {}) {
 
 function openLibraryItemEditor(item = getActiveLibraryItem()) {
   state.activeSubfolderRef = null;
+  state.activeArchiveItem = null;
   state.previousToolEditorTab = getEditorTabForLibraryItem(item) || state.previousToolEditorTab || "single-maps";
   setEditorTab("properties", { mode: "object" });
+  renderObjectEditor();
+  updateEditorModeView();
+}
+
+function openNaturalEarthArchiveItemEditor(datasetId, archiveKey) {
+  const item = getEditableNaturalEarthArchiveItem(datasetId, archiveKey);
+  if (!item) return;
+  state.activeSubfolderRef = null;
+  state.activeArchiveItem = item;
+  state.activeEditorItemId = archiveKey;
+  state.activeEditorChapterKey = state.activeEditorChapterKey || "";
+  state.previousToolEditorTab = "background";
+  setEditorTab("properties", { mode: "archive-object" });
+  renderProjectBrowser();
   renderObjectEditor();
   updateEditorModeView();
 }
@@ -5554,6 +7097,7 @@ function openLibraryItemEditor(item = getActiveLibraryItem()) {
 function openProjectEditor(project = getActiveProject()) {
   if (!project) return;
   state.activeSubfolderRef = null;
+  state.activeArchiveItem = null;
   state.activeEditorItemId = `project:${project.id}`;
   state.activeEditorChapterKey = state.activeEditorChapterKey || "";
   state.previousToolEditorTab = "background";
@@ -5571,6 +7115,7 @@ function openSubfolderEditor(project, folderType, subfolderId) {
   if (!folder || !subfolder) return;
   state.activeProjectId = project.id;
   state.activeSubfolderRef = { projectId: project.id, folderType, subfolderId };
+  state.activeArchiveItem = null;
   state.activeEditorItemId = `subfolder:${project.id}:${folderType}:${subfolderId}`;
   state.activeEditorChapterKey = state.activeEditorChapterKey || "";
   state.previousToolEditorTab = "single-maps";
@@ -5665,6 +7210,377 @@ function searchNaturalEarthCountries(query) {
       datasetUrl: dataset.sourceUrl,
       importStatus: "bereit",
     }));
+}
+
+function scoreSearchValues(values, needles) {
+  const normalizedValues = values
+    .filter(Boolean)
+    .flatMap(getSearchNeedles);
+  if (!normalizedValues.length || !needles.length) return 0;
+  let score = 0;
+  normalizedValues.forEach((value) => {
+    needles.forEach((needle) => {
+      if (!needle || !value) return;
+      if (value === needle) score = Math.max(score, 100);
+      else if (value.startsWith(needle)) score = Math.max(score, 72);
+      else if (value.includes(needle)) score = Math.max(score, 44);
+    });
+  });
+  return score;
+}
+
+function findBestFeatureMatch(features, getValues, query) {
+  const needles = getSearchNeedles(query);
+  if (!features?.length || !needles.length) return null;
+  return features
+    .map((feature) => ({ feature, score: scoreSearchValues(getValues(feature?.properties || {}, feature), needles) }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.feature || null;
+}
+
+function findNaturalEarthCountryFeature(query) {
+  return findBestFeatureMatch(
+    getNaturalEarthCountryDataset().features,
+    (props) => getNaturalEarthSearchValues(props),
+    query,
+  );
+}
+
+function findMapSearchUnionFeature(query) {
+  const union = MAP_SEARCH_UNION_ALIASES
+    .map((candidate) => ({
+      union: candidate,
+      score: scoreSearchValues(candidate.names, getSearchNeedles(query)),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.union || null;
+  if (!union) return null;
+  const features = union.iso3
+    .map(getNaturalEarthCountryFeatureByIso3)
+    .filter(Boolean);
+  if (!features.length) return null;
+  return {
+    type: "FeatureCollection",
+    properties: { name: union.names[0], id: union.id, iso3: union.iso3 },
+    features,
+  };
+}
+
+function findMapSearchCountryAliasFeature(query) {
+  const alias = MAP_SEARCH_COUNTRY_ALIASES
+    .map((candidate) => ({
+      alias: candidate,
+      score: scoreSearchValues(candidate.names, getSearchNeedles(query)),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score)[0]?.alias || null;
+  return alias ? getNaturalEarthCountryFeatureByIso3(alias.iso3) : null;
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7200) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "force-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function setMapSearchLoaderVisible(visible) {
+  if (!ui.mapSearchLoader) return;
+  ui.mapSearchLoader.hidden = !visible;
+  ui.mapSearchLoader.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
+function beginWikidataMapSearchLoading() {
+  wikidataMapSearchLoadingCount += 1;
+  setMapSearchLoaderVisible(true);
+}
+
+function endWikidataMapSearchLoading() {
+  wikidataMapSearchLoadingCount = Math.max(0, wikidataMapSearchLoadingCount - 1);
+  setMapSearchLoaderVisible(wikidataMapSearchLoadingCount > 0);
+}
+
+async function findWikidataEntityId(query) {
+  const search = encodeURIComponent(String(query || "").trim());
+  if (!search) return "";
+  const url = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${search}&language=de&uselang=de&format=json&origin=*`;
+  const data = await fetchJsonWithTimeout(url);
+  const first = (data?.search || []).find((entry) => /^Q\d+$/.test(entry.id));
+  return first?.id || "";
+}
+
+async function resolveWikidataMapSearchTerm(query) {
+  const cacheKey = normalizeSearchText(query);
+  if (!cacheKey) return null;
+  if (wikidataMapSearchCache.has(cacheKey)) return wikidataMapSearchCache.get(cacheKey);
+
+  const promise = (async () => {
+    beginWikidataMapSearchLoading();
+    try {
+      const qid = await findWikidataEntityId(query);
+      if (!qid) return null;
+      // Wikidata-Regel: Für lebendige Verbände fragen wir nicht manuell
+      // kuratierte Listen ab, sondern lesen Staaten über P463 (Mitglied von)
+      // und mappen deren ISO-3-Code (P298) auf unsere lokalen Natural-Earth-
+      // Geometrien. Wenn der Suchtreffer selbst ein Staat ist, liefert P298
+      // direkt dessen Fläche.
+      const sparql = `
+        SELECT ?kind ?iso3 WHERE {
+          { wd:${qid} wdt:P298 ?iso3. BIND("country" AS ?kind) }
+          UNION
+          { ?country wdt:P463 wd:${qid}; wdt:P298 ?iso3. BIND("member" AS ?kind) }
+        }
+      `;
+      const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
+      const data = await fetchJsonWithTimeout(url, 9000);
+      const bindings = data?.results?.bindings || [];
+      const countryIso = bindings.find((binding) => binding.kind?.value === "country")?.iso3?.value || "";
+      if (countryIso) {
+        const feature = getNaturalEarthCountryFeatureByIso3(countryIso);
+        return feature ? { kind: "country", feature, wikidataId: qid } : null;
+      }
+      const iso3 = [...new Set(bindings
+        .filter((binding) => binding.kind?.value === "member")
+        .map((binding) => String(binding.iso3?.value || "").toUpperCase())
+        .filter(Boolean))];
+      const features = iso3.map(getNaturalEarthCountryFeatureByIso3).filter(Boolean);
+      if (!features.length) return null;
+      return {
+        kind: "union",
+        wikidataId: qid,
+        feature: {
+          type: "FeatureCollection",
+          properties: { name: String(query || qid), id: qid, iso3, source: "Wikidata" },
+          features,
+        },
+      };
+    } catch (error) {
+      console.warn("Wikidata-Suche konnte nicht aufgelöst werden.", error);
+      return null;
+    } finally {
+      endWikidataMapSearchLoading();
+    }
+  })();
+
+  wikidataMapSearchCache.set(cacheKey, promise);
+  return promise;
+}
+
+function getNaturalEarthAdmin1SearchValues(props) {
+  return [
+    props.name_de, props.name, props.name_en, props.name_local, props.name_alt,
+    props.woe_name, props.gn_name, props.gns_name, props.admin, props.geonunit,
+    props.iso_3166_2, props.adm1_code, props.postal, props.code_hasc, props.wikidataid,
+  ].map(repairLegacyText);
+}
+
+function getNaturalEarthAdmin1Name(feature) {
+  const props = feature?.properties || {};
+  return repairLegacyText(props.name_de || props.name || props.name_en || props.name_local || "Unbenannte Region");
+}
+
+function getNaturalEarthAdmin1CountryIso3(feature) {
+  const props = feature?.properties || {};
+  return String(props.adm0_a3 || props.sov_a3 || "").toUpperCase();
+}
+
+function getMapSearchFeatureIso3(entry) {
+  if (!entry) return "";
+  if (entry.kind === "admin1") return getNaturalEarthAdmin1CountryIso3(entry.feature);
+  if (entry.kind === "country") return getNaturalEarthIso3(entry.feature).toUpperCase();
+  return "";
+}
+
+function getMapSearchContextIso3Set(entry) {
+  if (!entry) return new Set();
+  if (entry.kind === "union") return new Set((entry.feature?.properties?.iso3 || []).map((iso) => String(iso).toUpperCase()));
+  const iso = getMapSearchFeatureIso3(entry);
+  return iso ? new Set([iso]) : new Set();
+}
+
+function getMapSearchAdmin1Id(feature) {
+  const props = feature?.properties || {};
+  return String(props.adm1_code || props.iso_3166_2 || props.wikidataid || "").toUpperCase();
+}
+
+function isMapSearchFocusInsideContext(focus, contextEntries) {
+  if (!contextEntries.length) return true;
+  return contextEntries.some((context) => {
+    if (context.kind === "union") {
+      const focusIso = getMapSearchFeatureIso3(focus);
+      return Boolean(focusIso) && getMapSearchContextIso3Set(context).has(focusIso);
+    }
+    if (context.kind === "country") {
+      const focusIso = getMapSearchFeatureIso3(focus);
+      return Boolean(focusIso) && getMapSearchFeatureIso3(context) === focusIso;
+    }
+    if (context.kind === "admin1") {
+      return focus.kind === "admin1" && getMapSearchAdmin1Id(focus.feature) === getMapSearchAdmin1Id(context.feature);
+    }
+    return false;
+  });
+}
+
+async function findNaturalEarthAdmin1Feature(query, countryFeature = null) {
+  const dataset = await loadNaturalEarthAdmin1FullDataset();
+  const features = dataset?.features || [];
+  if (!features.length) return null;
+  const countryIso = getNaturalEarthIso3(countryFeature).toUpperCase();
+  const scopedFeatures = countryIso
+    ? features.filter((feature) => getNaturalEarthAdmin1CountryIso3(feature) === countryIso)
+    : features;
+  return findBestFeatureMatch(
+    scopedFeatures,
+    (props) => getNaturalEarthAdmin1SearchValues(props),
+    query,
+  );
+}
+
+async function resolveMapSearchTerm(query) {
+  const trimmed = String(query || "").trim();
+  if (!trimmed) return null;
+  const unionFeature = findMapSearchUnionFeature(trimmed);
+  if (unionFeature) return { kind: "union", feature: unionFeature };
+  const countryAliasFeature = findMapSearchCountryAliasFeature(trimmed);
+  if (countryAliasFeature) return { kind: "country", feature: countryAliasFeature };
+  const countryFeature = findNaturalEarthCountryFeature(trimmed);
+  if (countryFeature) return { kind: "country", feature: countryFeature };
+  const provinceFeature = await findNaturalEarthAdmin1Feature(trimmed);
+  if (provinceFeature) return { kind: "admin1", feature: provinceFeature };
+  const wikidataFeature = await resolveWikidataMapSearchTerm(trimmed);
+  if (wikidataFeature) return wikidataFeature;
+  return null;
+}
+
+async function resolveMapSearchTermList(rawList) {
+  const terms = String(rawList || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const entries = [];
+  for (const term of terms) {
+    const entry = await resolveMapSearchTerm(term);
+    if (entry) entries.push(entry);
+  }
+  return entries;
+}
+
+function getMapSearchOptionLabelForAdmin1Feature(feature) {
+  const country = getNaturalEarthCountryFeatureByIso3(getNaturalEarthAdmin1CountryIso3(feature));
+  const countryName = country ? getNaturalEarthCountryName(country) : repairLegacyText(feature?.properties?.admin || "");
+  return [getNaturalEarthAdmin1Name(feature), countryName].filter(Boolean).join("; ");
+}
+
+function getMapSearchOptionCache() {
+  if (mapSearchOptionCache) return mapSearchOptionCache;
+  if (!ui.mapSearchOptions) return;
+  const countryOptions = getNaturalEarthCountryDataset().features
+    .map((feature) => getNaturalEarthCountryName(feature))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "de"));
+  const admin1Options = (window.EarthMapNaturalEarthAdmin1Metadata10m?.features || []).flatMap((feature) => {
+    const solo = getNaturalEarthAdmin1Name(feature);
+    const scoped = getMapSearchOptionLabelForAdmin1Feature(feature);
+    return [solo, scoped].filter(Boolean);
+  });
+  const unionOptions = MAP_SEARCH_UNION_ALIASES.flatMap((union) => union.names.slice(0, 3));
+  const countryAliasOptions = MAP_SEARCH_COUNTRY_ALIASES.flatMap((alias) => alias.names.slice(0, 3));
+  mapSearchOptionCache = [...new Set([...unionOptions, ...countryAliasOptions, ...countryOptions, ...admin1Options])]
+    .map((value) => ({ value, needles: getSearchNeedles(value) }))
+    .sort((a, b) => a.value.localeCompare(b.value, "de"));
+  return mapSearchOptionCache;
+}
+
+function populateMapSearchOptions(query = "") {
+  if (!ui.mapSearchOptions) return;
+  const needles = getSearchNeedles(query);
+  if (!needles.length) {
+    ui.mapSearchOptions.replaceChildren();
+    return;
+  }
+  const matches = getMapSearchOptionCache()
+    .filter((option) => needles.some((needle) => option.needles.some((value) => value.startsWith(needle) || value.includes(needle))))
+    .slice(0, 28);
+  ui.mapSearchOptions.replaceChildren(...matches.map(({ value }) => {
+    const option = document.createElement("option");
+    option.value = value;
+    return option;
+  }));
+}
+
+function getMapSearchSelectedAreaColor() {
+  return isEarthMapDarkMode() ? DARK_MAP_SELECTED_COLOR : LIGHT_MAP_SELECTED_COLOR;
+}
+
+function getMapSearchSelectedOutlineColor() {
+  return isEarthMapDarkMode() ? DARK_MAP_SELECTED_COLOR : LIGHT_MAP_SELECTED_OUTLINE_COLOR;
+}
+
+function getMapSearchSpecialHighlightColor() {
+  return isEarthMapDarkMode() ? DARK_MAP_SPECIAL_HIGHLIGHT_COLOR : LIGHT_MAP_SPECIAL_HIGHLIGHT_COLOR;
+}
+
+function getMapSearchSpecialOutlineColor() {
+  return isEarthMapDarkMode() ? DARK_MAP_SPECIAL_HIGHLIGHT_COLOR : LIGHT_MAP_SPECIAL_OUTLINE_COLOR;
+}
+
+function clearMapSearchHighlight() {
+  state.mapSearchHighlight = null;
+  ui.mapSearchInput?.classList.remove("has-search-error");
+  ui.mapSearchInput?.removeAttribute("title");
+  scheduleGlobeRender();
+}
+
+async function applyMapSearchQuery(rawQuery) {
+  const requestSerial = ++mapSearchRequestSerial;
+  const query = String(rawQuery || "").trim();
+  if (!query) {
+    clearMapSearchHighlight();
+    return;
+  }
+  const hasRelationSeparator = query.includes(";");
+  const [focusExpression = "", contextExpression = ""] = hasRelationSeparator
+    ? query.split(";")
+    : ["", query];
+
+  // Suchsyntax:
+  //   links vom Semikolon = Fokus/Hervorhebung (rot)
+  //   rechts vom Semikolon = Kontext/Auswahlfläche (creme)
+  //   Kommata bleiben innerhalb beider Seiten reine Aufzählungstrenner.
+  // Wenn rechts ein Kontext steht, werden linke Fokusobjekte nur dann rot
+  // gesetzt, wenn sie zu mindestens einem Kontextobjekt gehören. Dadurch
+  // bleibt z. B. "Vereinigtes Königreich; EU" fachlich sichtbar falsch:
+  // Die EU wird markiert, das Vereinigte Königreich aber nicht hervorgehoben.
+  const contextEntries = await resolveMapSearchTermList(contextExpression);
+  const rawFocusEntries = await resolveMapSearchTermList(focusExpression);
+  const focusEntries = rawFocusEntries.filter((entry) => isMapSearchFocusInsideContext(entry, contextEntries));
+  const fallbackEntries = !hasRelationSeparator && !contextEntries.length
+    ? await resolveMapSearchTermList(query)
+    : [];
+
+  if (requestSerial !== mapSearchRequestSerial) return;
+
+  if (!contextEntries.length && !focusEntries.length && !fallbackEntries.length) {
+    state.mapSearchHighlight = null;
+    ui.mapSearchInput?.classList.add("has-search-error");
+    ui.mapSearchInput?.setAttribute("title", "Keine passende Karte im lokalen Natural-Earth-Archiv gefunden.");
+    scheduleGlobeRender();
+    return;
+  }
+
+  ui.mapSearchInput?.classList.remove("has-search-error");
+  ui.mapSearchInput?.removeAttribute("title");
+  state.mapSearchHighlight = {
+    query,
+    selectedFeatures: contextEntries.length ? contextEntries.map((entry) => entry.feature) : fallbackEntries.map((entry) => entry.feature),
+    focusFeatures: focusEntries.map((entry) => entry.feature),
+  };
+  scheduleGlobeRender();
 }
 
 function slugifyBoundaryId(value, fallback = "boundary") {
@@ -6564,10 +8480,38 @@ ui.exportMenu?.addEventListener("click", (event) => {
   if (!button) return;
   handleExportFormat(button.dataset.exportFormat);
 });
+let viewDrawerDrag = null;
+ui.viewToolsDrawerTab?.addEventListener("pointerdown", (event) => {
+  viewDrawerDrag = {
+    pointerId: event.pointerId,
+    startY: event.clientY,
+    moved: false,
+  };
+  ui.viewToolsDrawerTab.setPointerCapture?.(event.pointerId);
+});
+ui.viewToolsDrawerTab?.addEventListener("pointermove", (event) => {
+  if (!viewDrawerDrag || viewDrawerDrag.pointerId !== event.pointerId) return;
+  const deltaY = event.clientY - viewDrawerDrag.startY;
+  if (Math.abs(deltaY) < 10) return;
+  viewDrawerDrag.moved = true;
+  if (deltaY < -18) setViewToolsDrawerOpen(true);
+  if (deltaY > 18) setViewToolsDrawerOpen(false);
+});
+ui.viewToolsDrawerTab?.addEventListener("pointerup", (event) => {
+  if (!viewDrawerDrag || viewDrawerDrag.pointerId !== event.pointerId) return;
+  const wasDrag = viewDrawerDrag.moved;
+  viewDrawerDrag = null;
+  if (!wasDrag) setViewToolsDrawerOpen(!state.viewToolsDrawerOpen);
+});
+ui.viewToolsDrawerTab?.addEventListener("pointercancel", () => {
+  viewDrawerDrag = null;
+});
+ui.graticuleToggle?.addEventListener("click", () => setGraticuleVisible(state.showGraticule !== true));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
     setExportMenuOpen(false);
+    setViewToolsDrawerOpen(false);
     setBrowserActionsMenuOpen(false);
     if (state.openLayerBrowserMenuId) {
       state.openLayerBrowserMenuId = null;
@@ -6587,10 +8531,14 @@ document.addEventListener("keydown", (event) => {
 });
 document.addEventListener("click", (event) => {
   if (event.target instanceof Element && event.target.closest(".export-control")) return;
+  if (event.target instanceof Element && event.target.closest(".app-view-drawer")) return;
   if (event.target instanceof Element && event.target.closest(".project-card-menu-shell")) return;
   if (event.target instanceof Element && event.target.closest(".layer-row-menu-shell")) return;
   if (event.target instanceof Element && event.target.closest(".browser-actions-menu-shell")) return;
+  if (event.target instanceof Element && event.target.closest(".earthmap-search-wrap")) return;
   setExportMenuOpen(false);
+  setViewToolsDrawerOpen(false);
+  setMapSearchInfoOpen(false);
   setBrowserActionsMenuOpen(false);
   if (state.openLayerBrowserMenuId) {
     state.openLayerBrowserMenuId = null;
@@ -6616,9 +8564,73 @@ ui.boundarySearchButton?.addEventListener("click", renderBoundarySearchResults);
 ui.boundarySearchInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") renderBoundarySearchResults();
 });
+function setMapSearchInfoOpen(open) {
+  ui.mapSearchInfoPopup?.toggleAttribute("hidden", !open);
+  ui.mapSearchInfoButton?.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+ui.mapSearchInfoButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  setMapSearchInfoOpen(ui.mapSearchInfoPopup?.hasAttribute("hidden") ?? true);
+});
+ui.mapSearchInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    clearTimeout(mapSearchDebounceTimer);
+    void applyMapSearchQuery(ui.mapSearchInput.value);
+  }
+  if (event.key === "Escape") {
+    if (!ui.mapSearchInfoPopup?.hasAttribute("hidden")) {
+      setMapSearchInfoOpen(false);
+      return;
+    }
+    ui.mapSearchInput.value = "";
+    populateMapSearchOptions("");
+    clearMapSearchHighlight();
+  }
+});
+ui.mapSearchInput?.addEventListener("change", () => {
+  clearTimeout(mapSearchDebounceTimer);
+  populateMapSearchOptions(ui.mapSearchInput.value);
+  void applyMapSearchQuery(ui.mapSearchInput.value);
+});
+ui.mapSearchInput?.addEventListener("input", () => {
+  populateMapSearchOptions(ui.mapSearchInput.value);
+  if (!ui.mapSearchInput.value.trim()) {
+    clearTimeout(mapSearchDebounceTimer);
+    clearMapSearchHighlight();
+    return;
+  }
+  // Kleine Bedienhilfe: Bei freien Eingaben suchen wir nicht aggressiv bei
+  // jedem Tastendruck, aber nach einer kurzen Pause. Enter bleibt der präzise
+  // Weg für bewusst gesetzte Suchbegriffe.
+  clearTimeout(mapSearchDebounceTimer);
+  mapSearchDebounceTimer = setTimeout(() => {
+    void applyMapSearchQuery(ui.mapSearchInput.value);
+  }, 520);
+});
+ui.mapSearchInput?.addEventListener("focus", () => {
+  populateMapSearchOptions(ui.mapSearchInput.value);
+});
 
 ui.openWorkspaceButton.addEventListener("click", () => setWorkspaceMode("details"));
+ui.openWorkspaceButton.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    setWorkspaceMode("details");
+  }
+});
 ui.returnPreviewButton.addEventListener("click", () => setWorkspaceMode("preview"));
+ui.fullscreenButton?.addEventListener("pointerup", (event) => {
+  event.stopPropagation();
+});
+ui.fullscreenButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  void toggleFullscreen();
+});
+document.addEventListener("fullscreenchange", updateFullscreenButtonState);
 ui.browserActionsMenuButton?.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
@@ -6797,6 +8809,9 @@ window.addEventListener("resize", () => {
   scheduleGlobeRender();
 });
 setTheme(getStoredTheme(), false);
+syncViewToolsControls();
+setViewToolsDrawerOpen(false);
+populateMapSearchOptions();
 renderWorkspace();
 renderGlobe();
 scheduleNaturalEarthDetailUpdate(40);

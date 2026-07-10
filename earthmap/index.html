@@ -8,9 +8,9 @@
   <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
   <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260702a">
   <link rel="stylesheet" href="../assets/ui/editor-tabs.css?v=20260701c">
-  <link rel="stylesheet" href="earthmap.css?v=20260703g">
-  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260702a">
-  <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260701c">
+  <link rel="stylesheet" href="earthmap.css?v=20260710a">
+  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260709i">
+  <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260709b">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
@@ -26,6 +26,25 @@
             </a>
             <span class="brand-name">earth map</span>
           </div>
+        </div>
+        <div class="topbar-search earthmap-topbar-search">
+          <div id="mapSearchLoader" class="map-search-loader" hidden aria-hidden="true">
+            <l-newtons-cradle size="34" speed="1.4" color="currentColor"></l-newtons-cradle>
+            <span class="map-search-loader-fallback" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          </div>
+          <div class="search-wrap earthmap-search-wrap">
+            <button type="button" id="mapSearchInfoButton" class="map-search-info-button" aria-label="Suchsyntax erklären" aria-expanded="false" aria-controls="mapSearchInfoPopup">
+              <span aria-hidden="true"></span>
+            </button>
+            <input id="mapSearchInput" class="app-search earthmap-map-search" type="search" list="mapSearchOptions" placeholder="Staat oder Region suchen" aria-label="Staat oder Region suchen" autocomplete="off">
+            <div id="mapSearchInfoPopup" class="map-search-info-popup" role="dialog" aria-label="Suchsyntax" hidden>
+              <strong>Suchlogik</strong>
+              <p><code>Deutschland</code> markiert ein Gebiet.</p>
+              <p><code>Bayern; Deutschland</code> hebt Bayern besonders hervor und markiert Deutschland als Kontext.</p>
+              <p>Kommas bilden Aufzählungen: links vom Semikolon werden alle Einträge hervorgehoben, rechts davon wird der erste flächig und weitere schraffiert markiert.</p>
+            </div>
+          </div>
+          <datalist id="mapSearchOptions"></datalist>
         </div>
         <div class="topbar-actions">
           <div class="export-control">
@@ -84,9 +103,23 @@
         </section>
       </section>
 
-      <button type="button" id="openWorkspaceButton" class="workspace-strip" aria-label="Browser und Editor öffnen">
+      <aside id="viewToolsDrawer" class="app-view-drawer" aria-label="Darstellungsoptionen">
+        <button type="button" id="viewToolsDrawerTab" class="app-view-drawer-tab" aria-expanded="false" aria-controls="viewToolsDrawerPanel">
+          <span class="app-view-drawer-tab-grip" aria-hidden="true"></span>
+        </button>
+        <div id="viewToolsDrawerPanel" class="app-view-drawer-panel" hidden>
+          <button type="button" id="graticuleToggle" class="app-view-drawer-option" aria-pressed="false">
+            <span class="app-view-drawer-option-icon app-view-drawer-option-icon-grid" aria-hidden="true"></span>
+            <span class="app-view-drawer-option-label">Koordinatensystem anzeigen</span>
+            <span class="app-view-drawer-option-check" aria-hidden="true"></span>
+          </button>
+        </div>
+      </aside>
+
+      <div id="openWorkspaceButton" class="workspace-strip" role="button" tabindex="0" aria-label="Browser und Editor öffnen">
         <span>Browser/Editor</span>
-      </button>
+        <button type="button" id="fullscreenButton" class="workspace-fullscreen-button" aria-label="Vollbild umschalten" title="Vollbild umschalten">⛶</button>
+      </div>
     </section>
 
     <section class="details-view" aria-label="Earth Map Arbeitsbereich">
@@ -168,8 +201,16 @@
 
   <script src="../assets/vendor/d3.v7.min.js?v=20260627a"></script>
   <script src="../assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_vector_hierarchy_index.js?v=20260630a"></script>
-  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.js?v=20260628a"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.js?v=20260709b"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coastless.boundaries.js?v=20260709c"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_lakes.js?v=20260709a"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a"></script>
+  <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.metadata.js?v=20260709a"></script>
   <script src="../assets/geojson/natural-earth/110m/ne_110m_admin_0_countries.js?v=20260627a"></script>
-  <script src="earthmap.js?v=20260703m"></script>
+  <script type="module">
+    import { newtonsCradle } from "https://esm.sh/ldrs";
+    newtonsCradle.register();
+  </script>
+  <script src="earthmap.js?v=20260710p"></script>
 </body>
 </html>
