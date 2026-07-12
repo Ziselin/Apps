@@ -321,11 +321,18 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
   border-color: rgba(196,105,95,.68);
   box-shadow: 0 0 0 4px rgba(196,105,95,.11);
 }
+.app-search.is-search-blocked {
+  cursor: not-allowed;
+  opacity: .58;
+}
 body.earthmap-theme-dark .app-search {
   color: var(--ink);
   background: rgba(255,255,255,.045);
   border-color: rgba(255,179,71,.18);
   box-shadow: 0 12px 28px rgba(0,0,0,.16);
+}
+body.earthmap-theme-dark .app-search.is-search-blocked {
+  opacity: .66;
 }
 body.earthmap-theme-dark .app-search:focus {
   border-color: rgba(255,179,71,.42);
@@ -678,17 +685,23 @@ body.earthmap-theme-dark .export-menu {
 .editor-tab[data-editor-tab="background"] {
   --editor-tab-icon: url("https://api.iconify.design/mdi/earth.svg");
 }
-.editor-tab[data-editor-tab="single-maps"] {
-  --editor-tab-icon: url("https://api.iconify.design/mdi/magnify.svg");
+.editor-tab[data-editor-tab="gearbox"] {
+  --editor-tab-icon: url("https://api.iconify.design/mdi/chart-bar.svg");
 }
 .editor-tab[data-editor-tab="collections"] {
   --editor-tab-icon: url("https://api.iconify.design/mdi/file-import-outline.svg");
 }
-.editor-tab[data-editor-tab="animations"] {
-  --editor-tab-icon: url("https://api.iconify.design/mdi/movie-open-outline.svg");
-}
 .editor-tab[data-editor-tab="properties"] {
   --editor-tab-icon: url("https://api.iconify.design/mdi/form-select.svg");
+}
+.editor-tab[data-editor-tab="statistic-editor"] {
+  --editor-tab-icon: url("https://api.iconify.design/mdi/tune-variant.svg");
+}
+.editor-tab[data-editor-tab="statistic-values"] {
+  --editor-tab-icon: url("https://api.iconify.design/mdi/table.svg");
+}
+.editor-tab[data-editor-tab="statistic-csv"] {
+  --editor-tab-icon: url("https://api.iconify.design/mdi/code-json.svg");
 }
 .editor-tab-panel { min-width: 0; }
 .secondary-button {
@@ -823,6 +836,11 @@ body.earthmap-theme-dark .project-card.is-active > .project-card-main strong { c
 .browser-row-icon-collections::before {
   -webkit-mask-image: url("https://api.iconify.design/fa-solid/atlas.svg");
   mask-image: url("https://api.iconify.design/fa-solid/atlas.svg");
+}
+.browser-row-icon-statistics { color: #8cae9a; }
+.browser-row-icon-statistics::before {
+  -webkit-mask-image: url("https://api.iconify.design/mdi/chart-box-outline.svg");
+  mask-image: url("https://api.iconify.design/mdi/chart-box-outline.svg");
 }
 .browser-row-icon-archive { color: #8f8d83; }
 .browser-row-icon-archive::before {
@@ -1202,6 +1220,187 @@ body.earthmap-theme-dark .secondary-button {
   gap: 8px;
   align-items: center;
 }
+.gearbox-mode-row,
+.gearbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.gearbox-workspace {
+  display: grid;
+  gap: 12px;
+}
+.gearbox-panel {
+  display: grid;
+  gap: 12px;
+}
+.gearbox-match-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,248,.46);
+  color: var(--ink-soft);
+}
+body.earthmap-theme-dark .gearbox-match-summary {
+  background: rgba(255,255,255,.045);
+}
+.gearbox-panel textarea {
+  min-height: 150px;
+  font-family: "Source Code Pro", Consolas, monospace;
+  font-size: .9rem;
+}
+.gearbox-style-editor {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,248,.44);
+}
+.gearbox-style-editor h4 {
+  margin: 0;
+  color: var(--ink);
+  font-size: .92rem;
+}
+.gearbox-class-list {
+  display: grid;
+  gap: 10px;
+}
+.gearbox-class-row {
+  display: grid;
+  grid-template-columns: minmax(82px, 1fr) minmax(82px, 1fr) minmax(116px, 1.25fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+.gearbox-class-swatch {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: rgba(33,54,51,.76);
+  font-family: "Source Code Pro", Consolas, monospace;
+  font-size: .78rem;
+}
+.gearbox-class-remove {
+  min-height: 36px;
+  align-self: end;
+}
+body.earthmap-theme-dark .gearbox-style-editor {
+  background: rgba(255,255,255,.045);
+}
+body.earthmap-theme-dark .gearbox-class-swatch {
+  color: rgba(255,244,214,.82);
+}
+.gearbox-values-table-panel {
+  display: grid;
+  gap: 12px;
+}
+.gearbox-values-table-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: baseline;
+}
+.gearbox-values-table-title strong {
+  color: var(--ink);
+  font-size: .96rem;
+}
+.gearbox-values-table-title span {
+  color: var(--muted);
+  font-size: .78rem;
+}
+.gearbox-values-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255,255,248,.44);
+}
+.gearbox-values-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.gearbox-values-table th,
+.gearbox-values-table td {
+  padding: 7px;
+  border-bottom: 1px solid rgba(33,54,51,.08);
+  border-right: 1px solid rgba(33,54,51,.06);
+  vertical-align: top;
+}
+.gearbox-values-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--panel) 92%, white);
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.gearbox-values-table input {
+  width: 150px;
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: rgba(255,255,248,.54);
+  font: inherit;
+}
+.gearbox-values-table input:focus {
+  border-color: var(--line-strong);
+  outline: none;
+  background: rgba(255,255,248,.82);
+}
+.gearbox-value-source-open {
+  display: inline-block;
+  margin: 5px 0 0 2px;
+  color: #9a6419;
+  font-size: .72rem;
+  text-decoration: none;
+}
+.gearbox-value-source-open:hover,
+.gearbox-value-source-open:focus-visible {
+  text-decoration: underline;
+}
+.gearbox-values-row-actions {
+  white-space: nowrap;
+}
+.gearbox-values-row-actions .secondary-button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+}
+body.earthmap-theme-dark .gearbox-values-table-wrap {
+  background: rgba(255,255,255,.045);
+}
+body.earthmap-theme-dark .gearbox-values-table th {
+  background: color-mix(in srgb, var(--panel) 92%, black);
+}
+body.earthmap-theme-dark .gearbox-values-table th,
+body.earthmap-theme-dark .gearbox-values-table td {
+  border-color: rgba(255,255,255,.07);
+}
+body.earthmap-theme-dark .gearbox-values-table input {
+  background: rgba(255,255,255,.045);
+}
+body.earthmap-theme-dark .gearbox-values-table input:focus {
+  background: rgba(255,179,71,.08);
+}
+body.earthmap-theme-dark .gearbox-value-source-open {
+  color: var(--amber);
+}
+.secondary-button.is-active {
+  color: var(--z-editor-tab-active-text);
+  border-color: var(--z-editor-tab-active-line);
+}
 .structured-editor-field-help code {
   padding: 1px 5px;
   border: 1px solid var(--line);
@@ -1523,6 +1722,17 @@ body.earthmap-theme-dark .boundary-feature-row {
 }
 
 @media (max-width: 760px) {
+  .gearbox-class-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .gearbox-class-row .structured-editor-field,
+  .gearbox-class-row .gearbox-class-swatch {
+    min-width: 0;
+  }
+  .gearbox-class-remove {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
   :root { --earthmap-topbar-height: 126px; }
   .topbar {
     flex-wrap: wrap;
