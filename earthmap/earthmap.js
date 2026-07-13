@@ -2,8 +2,8 @@
   "globeApp", "menuButton", "menuButtonIcon", "menuCloseButton", "menuOverlay", "sideMenu",
   "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu", "fullscreenButton",
   "mapSearchInput", "mapSearchOptions", "mapSearchLoader", "mapSearchInfoButton", "mapSearchInfoPopup",
-  "openWorkspaceButton", "returnPreviewButton", "globe", "globeCanvas",
-  "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "graticuleToggle",
+  "openWorkspaceButton", "returnPreviewButton", "globe", "mapLibreContainer", "globeCanvas", "mapEngineDiagnostics",
+  "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "graticuleToggle", "admin1Toggle",
   "browserActionsMenuButton", "browserActionsMenu",
   "editorBackButton",
   "newProjectButton", "importBoundarySetButton", "importBoundarySetFromFolderButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
@@ -14,6 +14,8 @@
 let viewToolsDrawerCloseTimer = null;
 let mapSearchDebounceTimer = null;
 let mapSearchRequestSerial = 0;
+let mapLibreAdmin1RequestSerial = 0;
+let mapLibreAdmin1ViewportTimer = null;
 let mapSearchOptionCache = null;
 let wikidataMapSearchLoadingCount = 0;
 const wikidataMapSearchCache = new Map();
@@ -41,6 +43,27 @@ const EARTHMAP_BOUNDARY_SET_SCHEMA = "ziselin-boundary-set-v1";
 const EARTHMAP_GEARBOX_SCHEMA = "ziselin-gearbox-v1";
 const EARTHMAP_ENGINE_ADMIN0_BASE = "../assets/earthmap-engine/boundary-sets/natural-earth/10m/admin0/";
 const EARTHMAP_ENGINE_ADMIN1_BASE = "../assets/earthmap-engine/boundary-sets/natural-earth/10m/admin1/";
+const EARTHMAP_RENDER_ENGINE_V2 = "maplibre-pilot";
+const MAPLIBRE_LAND_SOURCE_ID = "earthmap-natural-earth-land";
+const MAPLIBRE_LAND_FILL_LAYER_ID = "earthmap-natural-earth-land-fill";
+const MAPLIBRE_COASTLINE_LAYER_ID = "earthmap-natural-earth-coastline";
+const MAPLIBRE_WATER_SOURCE_ID = "earthmap-natural-earth-water";
+const MAPLIBRE_WATER_FILL_LAYER_ID = "earthmap-natural-earth-water-fill";
+const MAPLIBRE_WATER_OUTLINE_LAYER_ID = "earthmap-natural-earth-water-outline";
+const MAPLIBRE_ADMIN0_SOURCE_ID = "earthmap-natural-earth-admin0";
+const MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID = "earthmap-natural-earth-admin0-boundaries";
+const MAPLIBRE_ADMIN0_FILL_LAYER_ID = "earthmap-natural-earth-admin0-fill";
+const MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin0-boundary";
+const MAPLIBRE_ADMIN1_SOURCE_ID = "earthmap-natural-earth-admin1";
+const MAPLIBRE_ADMIN1_FILL_LAYER_ID = "earthmap-natural-earth-admin1-fill";
+const MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin1-boundary";
+const MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin1-special-boundary";
+const MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin1-swiss-canton-boundary";
+const MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID = "earthmap-search-highlight";
+const MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID = "earthmap-search-context-fill";
+const MAPLIBRE_SEARCH_FOCUS_FILL_LAYER_ID = "earthmap-search-focus-fill";
+const MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID = "earthmap-search-context-outline";
+const MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID = "earthmap-search-focus-outline";
 // Architekturregel: Boundary-Sets speichern geografische Einheiten, Geometrie,
 // Provenienz, Lizenz und Gültigkeit. GearBoxes speichern dagegen nur die
 // Übersetzung externer Tabellen auf diese Boundaries: Join-Spalten, Wertspalten,
@@ -48,6 +71,12 @@ const EARTHMAP_ENGINE_ADMIN1_BASE = "../assets/earthmap-engine/boundary-sets/nat
 // versehentlich zur zweiten Kartenwahrheit.
 const NATURAL_EARTH_ADMIN1_BOUNDARY_LAYER_ZOOM = 3.15;
 const NATURAL_EARTH_ADMIN1_BOUNDARY_LOAD_ZOOM = 2.75;
+const MAPLIBRE_ADMIN1_VIEWPORT_LOAD_ZOOM = 2.75;
+const MAPLIBRE_ADMIN1_VIEWPORT_CHUNK_LIMIT = 6;
+const MAPLIBRE_ADMIN1_PERMANENT_VIEWPORT_ZOOM = 3.5;
+const MAPLIBRE_SWISS_CANTON_BOUNDARY_ZOOM = 6.5;
+const MAPLIBRE_FULL_LAND_LOAD_ZOOM = 2.15;
+const MAPLIBRE_WATER_LOAD_ZOOM = 2.35;
 const NATURAL_EARTH_ARCHIVE_DATASETS = [
   {
     id: "admin_0_countries",
@@ -282,6 +311,15 @@ const SOVEREIGNTY_STATUS_CHOICES = [
   { value: "occupied", label: "8 · Besetzt", description: "Militärisch oder faktisch besetzt, ohne stabile rechtliche Eingliederung." },
   { value: "disputed", label: "9 · Umstritten", description: "Gebiet mit konkurrierenden Herrschaftsansprüchen oder unklarem Status." },
   { value: "claimed", label: "10 · Beansprucht", description: "Beansprucht, aber nicht oder kaum kontrolliert." },
+];
+
+const CONSTITUTIONAL_STATUS_CHOICES = [
+  { value: "", label: "—", description: "Noch nicht hinsichtlich dauerhaft hervorzuhebender Binnenordnung eingeordnet." },
+  { value: "ordinary", label: "1 · Normale Verwaltungseinheit", description: "Keine besondere konstitutionelle Hervorhebung; Darstellung nur über normale Provinz-/Detailansicht." },
+  { value: "federal_subject", label: "2 · Föderationssubjekt", description: "Gliedstaat eines Bundesstaats, z. B. deutsches Bundesland, US-Bundesstaat, kanadische Provinz." },
+  { value: "autonomous_region", label: "3 · Autonome Region", description: "Region mit verfassungsrechtlich oder gesetzlich hervorgehobener Selbstverwaltung, z. B. Autonome Gemeinschaften Spaniens." },
+  { value: "constituent_country", label: "4 · Konstituierender Landesteil", description: "Konstitutionell hervorgehobener Landesteil eines Staates, z. B. Home Nations, falls als saubere Geometrie vorhanden." },
+  { value: "special_region", label: "5 · Sonderregion", description: "Sonderstatus mit politisch-rechtlicher Eigenstellung, der nicht gut in die anderen Kategorien passt." },
 ];
 
 const RELATION_TO_PARENT_CHOICES = [
@@ -547,6 +585,7 @@ const THEME_STORAGE_KEY = "earthmap-theme";
 const VIEW_SETTINGS_STORAGE_KEY = "earthmap-view-settings-v1";
 const NATURAL_EARTH_ASSET_BASE = "../assets/geojson/natural-earth/";
 const boundaryFeatureRenderCache = new Map();
+const boundaryFeatureVectorPathCache = new Map();
 
 const GEOMETRY_BASE_REGISTRY = {
   naturalEarthModern: {
@@ -986,9 +1025,10 @@ function loadViewSettings() {
     const parsed = JSON.parse(localStorage.getItem(VIEW_SETTINGS_STORAGE_KEY) || "{}");
     return {
       showGraticule: parsed.showGraticule === true,
+      showAdmin1Boundaries: parsed.showAdmin1Boundaries === true,
     };
   } catch {
-    return { showGraticule: false };
+    return { showGraticule: false, showAdmin1Boundaries: false };
   }
 }
 
@@ -996,6 +1036,7 @@ function persistViewSettings() {
   try {
     localStorage.setItem(VIEW_SETTINGS_STORAGE_KEY, JSON.stringify({
       showGraticule: state.showGraticule === true,
+      showAdmin1Boundaries: state.showAdmin1Boundaries === true,
     }));
   } catch (error) {
     console.warn("EarthMap-Ansichtseinstellungen konnten nicht gespeichert werden.", error);
@@ -1050,10 +1091,19 @@ const state = {
   naturalEarthAdmin1BoundaryError: "",
   naturalEarthAdmin0BoundaryRings: null,
   naturalEarthAdmin1BoundaryRings: null,
+  naturalEarthAdmin0BoundaryPreparing: false,
+  naturalEarthAdmin1BoundaryPreparing: false,
+  backgroundTaskQueue: [],
+  backgroundTaskRunning: false,
+  backgroundTaskSerial: 0,
+  heavyMapLayerWorkEnabled: false,
+  heavyMapLayerWorkTimer: 0,
   naturalEarthLakePolygons: null,
   naturalEarthLakeRings: null,
+  naturalEarthLakePreparing: false,
   naturalEarthEnclosedSeaPolygons: null,
   naturalEarthEnclosedSeaRings: null,
+  naturalEarthEnclosedSeaPreparing: false,
 };
 
 state.activeProjectId = loadActiveProjectId(state.projects);
@@ -1389,6 +1439,87 @@ function runWhenIdle(callback, timeout = 1800) {
   }
 }
 
+function waitForNextFrame() {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+function waitForEarthMapIdle(timeout = 1200) {
+  return new Promise((resolve) => {
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(resolve, { timeout });
+    } else {
+      window.setTimeout(resolve, Math.min(timeout, 120));
+    }
+  });
+}
+
+function pauseEarthMapBackgroundTasks() {
+  state.backgroundTaskSerial += 1;
+}
+
+function queueEarthMapBackgroundTask(label, task, options = {}) {
+  if (typeof task !== "function") return;
+  const key = options.key || label;
+  if (key && state.backgroundTaskQueue.some((entry) => entry.key === key)) return;
+  state.backgroundTaskQueue.push({
+    key,
+    label,
+    task,
+    priority: Number(options.priority) || 0,
+  });
+  state.backgroundTaskQueue.sort((a, b) => b.priority - a.priority);
+  runEarthMapBackgroundTaskQueue();
+}
+
+function runEarthMapBackgroundTaskQueue() {
+  if (state.backgroundTaskRunning) return;
+  if (!state.backgroundTaskQueue.length) return;
+  state.backgroundTaskRunning = true;
+  const serial = state.backgroundTaskSerial;
+  const runNext = async () => {
+    if (serial !== state.backgroundTaskSerial || isNavigatingGlobe) {
+      state.backgroundTaskRunning = false;
+      if (state.backgroundTaskQueue.length) {
+        runWhenIdle(runEarthMapBackgroundTaskQueue, 900);
+      }
+      return;
+    }
+    const entry = state.backgroundTaskQueue.shift();
+    if (!entry) {
+      state.backgroundTaskRunning = false;
+      return;
+    }
+    const isGearBoxTask = String(entry.key || "").startsWith("gearbox-");
+    if (isGearBoxTask && isNaturalEarthTileWorkPending()) {
+      state.backgroundTaskQueue.push(entry);
+      state.backgroundTaskQueue.sort((a, b) => b.priority - a.priority);
+      state.backgroundTaskRunning = false;
+      runWhenIdle(runEarthMapBackgroundTaskQueue, 900);
+      return;
+    }
+    try {
+      await waitForEarthMapIdle(900);
+      if (serial !== state.backgroundTaskSerial || isNavigatingGlobe) {
+        state.backgroundTaskQueue.unshift(entry);
+        state.backgroundTaskRunning = false;
+        runWhenIdle(runEarthMapBackgroundTaskQueue, 900);
+        return;
+      }
+      await entry.task({
+        yield: () => waitForEarthMapIdle(700),
+        shouldPause: () => serial !== state.backgroundTaskSerial
+          || isNavigatingGlobe
+          || (isGearBoxTask && isNaturalEarthTileWorkPending()),
+      });
+    } catch (error) {
+      console.warn(`EarthMap-Hintergrundaufgabe fehlgeschlagen: ${entry.label}`, error);
+    }
+    state.backgroundTaskRunning = false;
+    if (state.backgroundTaskQueue.length) runEarthMapBackgroundTaskQueue();
+  };
+  void runNext();
+}
+
 function loadNaturalEarthCountries10m() {
   return loadEarthMapScriptAsset(
     "natural-earth-admin0-countries-10m",
@@ -1516,6 +1647,7 @@ function requestNaturalEarthAdmin0EngineFeatureByIso3(iso3) {
   void loadNaturalEarthAdmin0EngineFeature(entry).then((feature) => {
     if (!feature) return;
     boundaryFeatureRenderCache.clear();
+    boundaryFeatureVectorPathCache.clear();
     scheduleGlobeRender();
   });
 }
@@ -1527,6 +1659,7 @@ function loadNaturalEarthAdmin0BoundaryLayer() {
     () => Boolean(window.EarthMapNaturalEarthAdmin0Boundaries10m?.features?.length),
   ).then(() => {
     state.naturalEarthAdmin0BoundaryRings = null;
+    state.naturalEarthAdmin0BoundaryPreparing = false;
     scheduleGlobeRender();
   });
 }
@@ -1539,6 +1672,7 @@ function loadNaturalEarthLakesLayer() {
   ).then(() => {
     state.naturalEarthLakePolygons = null;
     state.naturalEarthLakeRings = null;
+    state.naturalEarthLakePreparing = false;
     scheduleGlobeRender();
   });
 }
@@ -1791,6 +1925,7 @@ function requestNaturalEarthAdmin1BoundaryLayerForZoom() {
     state.naturalEarthAdmin1BoundaryLoading = false;
     state.naturalEarthAdmin1BoundaryLoaded = Boolean(window.EarthMapNaturalEarthAdmin1Boundaries10m?.features?.length);
     state.naturalEarthAdmin1BoundaryRings = null;
+    state.naturalEarthAdmin1BoundaryPreparing = false;
     scheduleGlobeRender();
   };
   script.onerror = () => {
@@ -2182,12 +2317,23 @@ function setViewToolsDrawerOpen(isOpen) {
 function syncViewToolsControls() {
   ui.graticuleToggle?.setAttribute("aria-pressed", state.showGraticule === true ? "true" : "false");
   ui.graticuleToggle?.classList.toggle("is-active", state.showGraticule === true);
+  ui.admin1Toggle?.setAttribute("aria-pressed", state.showAdmin1Boundaries === true ? "true" : "false");
+  ui.admin1Toggle?.classList.toggle("is-active", state.showAdmin1Boundaries === true);
 }
 
 function setGraticuleVisible(isVisible) {
   state.showGraticule = Boolean(isVisible);
   syncViewToolsControls();
   persistViewSettings();
+  renderGlobe();
+}
+
+function setAdmin1BoundariesVisible(isVisible) {
+  state.showAdmin1Boundaries = Boolean(isVisible);
+  syncViewToolsControls();
+  persistViewSettings();
+  syncMapLibreAdmin1Visibility();
+  void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
   renderGlobe();
 }
 
@@ -2206,6 +2352,7 @@ function setTheme(theme, persist = true) {
       ? "https://api.iconify.design/material-symbols/menu.svg?color=%23ffb347"
       : "https://api.iconify.design/material-symbols/menu.svg?color=%23213633";
   }
+  syncMapLibreTheme();
   if (ui.globeCanvas) renderGlobe();
   if (persist) {
     try {
@@ -2480,6 +2627,7 @@ function buildSubfolderGeoJsonExport(project, folderType, subfolder) {
         ziselin_type: classification.type || "",
         ziselin_rank: classification.rank ?? "",
         ziselin_sovereignty_status: classification.sovereignty_status || "",
+        ziselin_constitutional_status: classification.constitutional_status || "",
         ziselin_relation_to_parent: classification.relation_to_parent || "",
         ziselin_parent_id: classification.parent_id || "",
         ziselin_geometry_scope: classification.geometry_scope || "",
@@ -2906,8 +3054,8 @@ function buildEarthMapHtmlExport() {
       if (!drag) return;
       const sensitivity = 0.42 / Math.sqrt(Math.max(1, zoom));
       const latitudeLimit = getLatitudeLimit();
-      rotation.lon = drag.lon + (event.clientX - drag.x) * sensitivity;
-      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, drag.lat + (event.clientY - drag.y) * sensitivity));
+      rotation.lon = drag.lon - (event.clientX - drag.x) * sensitivity;
+      rotation.lat = Math.max(-latitudeLimit, Math.min(latitudeLimit, drag.lat - (event.clientY - drag.y) * sensitivity));
       requestRender(true);
     });
     canvas.addEventListener("pointerup", (event) => {
@@ -2983,7 +3131,15 @@ const NATURAL_EARTH_LAND_DETAILS = {
 let activeNaturalEarthSource = null;
 let pendingNaturalEarthDetail = "";
 let activeNaturalEarthTileSignature = "";
+let pendingNaturalEarthTileBuildSignature = "";
 const pendingNaturalEarthTiles = new Set();
+const naturalEarthTileLoadQueue = [];
+let naturalEarthTileLoadActiveCount = 0;
+const naturalEarthSurfaceCache = {
+  signature: "",
+  fillRings: [],
+  outlineRings: [],
+};
 
 const geoState = {
   detailLevel: "10m",
@@ -3010,6 +3166,1552 @@ const webglState = {
   maxTextureSize: 4096,
   ready: false,
 };
+
+const mapLibreEngineState = {
+  map: null,
+  status: "initializing",
+  error: "",
+  active: false,
+  styleLoaded: false,
+  lastFrameAt: 0,
+  lastDiagnosticsAt: 0,
+  lastCameraSyncAt: 0,
+  movingFps: 0,
+  movingFrameMs: 0,
+  lastRenderGapMs: 0,
+  frameCount: 0,
+  renderPhase: "idle",
+  sourceCount: 0,
+  layerCount: 0,
+  landLayerVisible: false,
+  landSourceReady: false,
+  coastlineLayerVisible: false,
+  coastlineWidth: 0,
+  coastlineColor: "",
+  landSource: "none",
+  landFeatureCount: 0,
+  landLoadMs: 0,
+  fullLandRequested: false,
+  fullLandPending: false,
+  fullLandGeoJson: null,
+  fullLandPromise: null,
+  fullLandLoadMode: "none",
+  waterGeoJson: null,
+  waterPromise: null,
+  waterLayerVisible: false,
+  waterSourceReady: false,
+  waterFeatureCount: 0,
+  waterLoadMs: 0,
+  waterLoadMode: "none",
+  waterDetail: "none",
+  admin0GeoJson: null,
+  admin0BoundaryGeoJson: null,
+  admin0Promise: null,
+  admin0BoundaryPromise: null,
+  admin0LayerVisible: false,
+  admin0SourceReady: false,
+  admin0BoundarySourceReady: false,
+  admin0FeatureCount: 0,
+  admin0BoundaryFeatureCount: 0,
+  admin0LoadedChunks: 0,
+  admin0TotalChunks: 0,
+  admin0LoadMs: 0,
+  admin1GeoJson: null,
+  admin1Iso3: [],
+  admin1ViewportIso3: [],
+  admin1DemandMode: "none",
+  admin1LayerVisible: false,
+  admin1SourceReady: false,
+  admin1FeatureCount: 0,
+  admin1LoadMs: 0,
+  searchHighlightFeatures: 0,
+  searchHighlightSourceReady: false,
+};
+
+function getMapLibreZoomFromGlobeZoom() {
+  // Übergangsregel: Die alte Globussteuerung arbeitet mit einem linearen
+  // Skalierungsfaktor, MapLibre dagegen mit logarithmischen Zoomstufen. Diese
+  // Übersetzung ist bewusst zentralisiert, damit wir den Motorwechsel später
+  // kalibrieren können, ohne Eingabelogik und Renderlogik zu vermischen.
+  return clamp(Math.log2(Math.max(1, globeZoom)) + 0.65, 0, 17);
+}
+
+function getEarthMapMapLibreStyle() {
+  const style = getContinentalRenderStyle();
+  return {
+    version: 8,
+    name: "EarthMap MapLibre Pilot",
+    sources: {},
+    layers: [
+      {
+        id: "earthmap-water-background",
+        type: "background",
+        paint: {
+          "background-color": style.sea,
+        },
+      },
+    ],
+  };
+}
+
+function stripGeoJsonAltitudeCoordinates(coordinates) {
+  if (!Array.isArray(coordinates)) return coordinates;
+  if (typeof coordinates[0] === "number") return coordinates.slice(0, 2);
+  return coordinates.map(stripGeoJsonAltitudeCoordinates);
+}
+
+function cloneGeoJsonForMapLibre(geojson) {
+  return {
+    ...geojson,
+    features: (geojson?.features || []).map((feature, index) => ({
+      ...feature,
+      id: feature.id || feature.properties?._earthMapFeatureId || `earthmap-land-${index}`,
+      geometry: feature.geometry ? {
+        ...feature.geometry,
+        coordinates: stripGeoJsonAltitudeCoordinates(feature.geometry.coordinates),
+      } : feature.geometry,
+      properties: {
+        ...(feature.properties || {}),
+        stable_id: feature.properties?._earthMapFeatureId || `earthmap-land-${index}`,
+      },
+    })),
+  };
+}
+
+function getMapLibrePilotLandDataset(detail = "start") {
+  // Pilotregel: Die Engine startet mit einer sehr kleinen Natural-Earth-
+  // Startgeometrie und ersetzt sie nachgelagert durch die vollständige
+  // 10m-Landfläche. Die Vollgeometrie wird kontrolliert geladen: zuerst als
+  // GeoJSON-Datei, bei blockiertem fetch() als Script-Fallback. Erst danach
+  // wird sie als MapLibre-Source gesetzt, sodass klar diagnostizierbar bleibt,
+  // welche Geometrie wirklich aktiv ist.
+  if (detail === "full") {
+    if (!mapLibreEngineState.fullLandGeoJson?.features?.length) return null;
+    return {
+      label: "natural-earth-10m-land",
+      geojson: cloneGeoJsonForMapLibre(mapLibreEngineState.fullLandGeoJson),
+      featureCount: mapLibreEngineState.fullLandGeoJson.features.length,
+    };
+  }
+  const start = window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start"] || null;
+  if (start?.features?.length) {
+    return {
+      label: "natural-earth-global-start",
+      geojson: cloneGeoJsonForMapLibre(start),
+    };
+  }
+  return null;
+}
+
+function loadMapLibrePilotFullLandGeoJson() {
+  if (mapLibreEngineState.fullLandGeoJson?.features?.length) {
+    return Promise.resolve(mapLibreEngineState.fullLandGeoJson);
+  }
+  if (mapLibreEngineState.fullLandPromise) return mapLibreEngineState.fullLandPromise;
+  const url = "../assets/geojson/natural-earth/10m/ne_10m_land.geojson?v=20260712a";
+  mapLibreEngineState.fullLandLoadMode = "fetch";
+  mapLibreEngineState.fullLandPromise = fetch(url, { cache: "force-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    })
+    .catch(async (error) => {
+      console.warn("Natural-Earth-10m-Land per GeoJSON-URL nicht geladen, versuche Script-Fallback.", error);
+      mapLibreEngineState.fullLandLoadMode = "script";
+      const loaded = await loadEarthMapScriptAsset(
+        "natural-earth-10m-land-script",
+        "../assets/geojson/natural-earth/10m/ne_10m_land.js?v=20260712a",
+        () => Boolean(window.EarthMapNaturalEarthData?.land10m?.features?.length),
+      );
+      if (!loaded) throw new Error("Natural-Earth-10m-Land-Script nicht geladen");
+      return window.EarthMapNaturalEarthData.land10m;
+    })
+    .then((geojson) => {
+      mapLibreEngineState.fullLandGeoJson = geojson?.features?.length ? geojson : null;
+      return mapLibreEngineState.fullLandGeoJson;
+    })
+    .finally(() => {
+      mapLibreEngineState.fullLandPromise = null;
+    });
+  return mapLibreEngineState.fullLandPromise;
+}
+
+function removeMapLibrePilotLandLayer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  try {
+    if (map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID)) map.removeLayer(MAPLIBRE_COASTLINE_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_LAND_FILL_LAYER_ID)) map.removeLayer(MAPLIBRE_LAND_FILL_LAYER_ID);
+    if (map.getSource(MAPLIBRE_LAND_SOURCE_ID)) map.removeSource(MAPLIBRE_LAND_SOURCE_ID);
+  } catch (error) {
+    mapLibreEngineState.status = "land-remove-error";
+    mapLibreEngineState.error = error?.message || String(error);
+  }
+}
+
+function removeMapLibrePilotWaterLayer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  try {
+    if (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)) map.removeLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_WATER_FILL_LAYER_ID)) map.removeLayer(MAPLIBRE_WATER_FILL_LAYER_ID);
+    if (map.getSource(MAPLIBRE_WATER_SOURCE_ID)) map.removeSource(MAPLIBRE_WATER_SOURCE_ID);
+  } catch (error) {
+    mapLibreEngineState.status = "water-remove-error";
+    mapLibreEngineState.error = error?.message || String(error);
+  }
+}
+
+function removeMapLibrePilotAdmin0Layer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  try {
+    if (map.getLayer(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_ADMIN0_FILL_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_FILL_LAYER_ID);
+    if (map.getSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID);
+    if (map.getSource(MAPLIBRE_ADMIN0_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_SOURCE_ID);
+  } catch (error) {
+    mapLibreEngineState.status = "admin0-remove-error";
+    mapLibreEngineState.error = error?.message || String(error);
+  }
+}
+
+function removeMapLibrePilotAdmin1Layer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  try {
+    if (map.getLayer(MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_ADMIN1_FILL_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN1_FILL_LAYER_ID);
+    if (map.getSource(MAPLIBRE_ADMIN1_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN1_SOURCE_ID);
+  } catch (error) {
+    mapLibreEngineState.status = "admin1-remove-error";
+    mapLibreEngineState.error = error?.message || String(error);
+  }
+  mapLibreEngineState.admin1GeoJson = null;
+  mapLibreEngineState.admin1Iso3 = [];
+  mapLibreEngineState.admin1ViewportIso3 = [];
+  mapLibreEngineState.admin1DemandMode = "none";
+  mapLibreEngineState.admin1FeatureCount = 0;
+  mapLibreEngineState.admin1SourceReady = false;
+  mapLibreEngineState.admin1LayerVisible = false;
+}
+
+function getMapLibrePilotWaterGeoJson() {
+  if (mapLibreEngineState.waterGeoJson?.features?.length) {
+    return cloneGeoJsonForMapLibre(mapLibreEngineState.waterGeoJson);
+  }
+  return null;
+}
+
+function loadMapLibrePilotWaterGeoJson(detail = "full") {
+  if (mapLibreEngineState.waterGeoJson?.features?.length && mapLibreEngineState.waterDetail === detail) {
+    return Promise.resolve(mapLibreEngineState.waterGeoJson);
+  }
+  if (mapLibreEngineState.waterPromise) return mapLibreEngineState.waterPromise;
+  mapLibreEngineState.waterLoadMode = detail === "major" ? "script-major" : "script";
+  const startedAt = performance.now();
+  const loaders = [
+    loadEarthMapScriptAsset(
+      "natural-earth-enclosed-seas-10m",
+      "../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a",
+      () => Boolean(window.EarthMapNaturalEarthEnclosedSeas10m?.features?.length),
+    ),
+  ];
+  if (detail !== "major") {
+    loaders.unshift(loadEarthMapScriptAsset(
+      "natural-earth-lakes-10m",
+      "../assets/geojson/natural-earth/10m/ne_10m_lakes.js?v=20260709a",
+      () => Boolean(window.EarthMapNaturalEarthLakes10m?.features?.length),
+    ));
+  }
+  mapLibreEngineState.waterPromise = Promise.all(loaders)
+    .then(() => {
+      const features = [
+        ...(detail === "major" ? [] : (window.EarthMapNaturalEarthLakes10m?.features || [])),
+        ...(window.EarthMapNaturalEarthEnclosedSeas10m?.features || []),
+      ];
+      mapLibreEngineState.waterGeoJson = {
+        type: "FeatureCollection",
+        name: detail === "major" ? "natural-earth-10m-major-water" : "natural-earth-10m-water",
+        features,
+      };
+      mapLibreEngineState.waterDetail = detail;
+      mapLibreEngineState.waterFeatureCount = features.length;
+      mapLibreEngineState.waterLoadMs = performance.now() - startedAt;
+      return mapLibreEngineState.waterGeoJson;
+    })
+    .finally(() => {
+      mapLibreEngineState.waterPromise = null;
+    });
+  return mapLibreEngineState.waterPromise;
+}
+
+async function loadMapLibrePilotAdmin0GeoJson() {
+  if (mapLibreEngineState.admin0GeoJson?.features?.length) return mapLibreEngineState.admin0GeoJson;
+  if (mapLibreEngineState.admin0Promise) return mapLibreEngineState.admin0Promise;
+  const startedAt = performance.now();
+  mapLibreEngineState.admin0Promise = (async () => {
+    const index = await loadNaturalEarthAdmin0EngineIndex();
+    const chunks = index?.chunks || [];
+    mapLibreEngineState.admin0TotalChunks = chunks.length;
+    mapLibreEngineState.admin0LoadedChunks = 0;
+    const features = [];
+    // Pilotregel: Admin-0 wird hier noch als Gesamt-Source installiert. Das
+    // bestätigt Layer-Reihenfolge, Styling und Boundary-Set-Datenfluss. Die
+    // produktive Stufe ersetzt diese Source durch MVT/PMTiles-Kacheln.
+    for (let indexOffset = 0; indexOffset < chunks.length; indexOffset += 12) {
+      const batch = chunks.slice(indexOffset, indexOffset + 12);
+      const loaded = await Promise.all(batch.map((entry) => loadNaturalEarthAdmin0EngineFeature(entry)));
+      features.push(...loaded.filter(Boolean));
+      mapLibreEngineState.admin0LoadedChunks = Math.min(indexOffset + batch.length, chunks.length);
+      mapLibreEngineState.admin0FeatureCount = features.length;
+      renderMapEngineDiagnostics();
+      await waitForNextFrame();
+    }
+    mapLibreEngineState.admin0GeoJson = {
+      type: "FeatureCollection",
+      name: "natural-earth-10m-admin0-boundary-set",
+      features,
+    };
+    mapLibreEngineState.admin0FeatureCount = features.length;
+    mapLibreEngineState.admin0LoadMs = performance.now() - startedAt;
+    return mapLibreEngineState.admin0GeoJson;
+  })().finally(() => {
+    mapLibreEngineState.admin0Promise = null;
+  });
+  return mapLibreEngineState.admin0Promise;
+}
+
+function loadMapLibrePilotAdmin0BoundaryGeoJson() {
+  if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) {
+    return Promise.resolve(mapLibreEngineState.admin0BoundaryGeoJson);
+  }
+  if (mapLibreEngineState.admin0BoundaryPromise) return mapLibreEngineState.admin0BoundaryPromise;
+  mapLibreEngineState.admin0BoundaryPromise = loadEarthMapScriptAsset(
+    "natural-earth-admin0-boundaries-10m",
+    "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coastless.boundaries.js?v=20260709c",
+    () => Boolean(window.EarthMapNaturalEarthAdmin0Boundaries10m?.features?.length),
+  )
+    .then(() => {
+      const source = window.EarthMapNaturalEarthAdmin0Boundaries10m || null;
+      mapLibreEngineState.admin0BoundaryGeoJson = source?.features?.length ? source : null;
+      mapLibreEngineState.admin0BoundaryFeatureCount = source?.features?.length || 0;
+      return mapLibreEngineState.admin0BoundaryGeoJson;
+    })
+    .finally(() => {
+      mapLibreEngineState.admin0BoundaryPromise = null;
+    });
+  return mapLibreEngineState.admin0BoundaryPromise;
+}
+
+function installMapLibrePilotLandLayer(detail = "start") {
+  const map = mapLibreEngineState.map;
+  if (!map) return false;
+  if (!map.isStyleLoaded?.()) {
+    mapLibreEngineState.status = "land-waiting-for-style";
+    map.once("idle", installMapLibrePilotLandLayer);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  const startedAt = performance.now();
+  const dataset = getMapLibrePilotLandDataset(detail);
+  const land = dataset?.geojson || null;
+  if (!dataset?.geojsonUrl && !land?.features?.length) {
+    mapLibreEngineState.landSource = "missing";
+    mapLibreEngineState.landFeatureCount = 0;
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  try {
+    const renderStyle = getContinentalRenderStyle();
+    const coastlineWidth = isEarthMapDarkMode() ? 1.25 : 1;
+    removeMapLibrePilotLandLayer();
+    map.addSource(MAPLIBRE_LAND_SOURCE_ID, {
+      type: "geojson",
+      data: dataset.geojsonUrl || land,
+    });
+    map.addLayer({
+      id: MAPLIBRE_LAND_FILL_LAYER_ID,
+      type: "fill",
+      source: MAPLIBRE_LAND_SOURCE_ID,
+      paint: {
+        "fill-color": renderStyle.land,
+        "fill-opacity": 1,
+      },
+    });
+    map.addLayer({
+      id: MAPLIBRE_COASTLINE_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_LAND_SOURCE_ID,
+      paint: {
+        "line-color": renderStyle.outline,
+        "line-width": coastlineWidth,
+        "line-opacity": 1,
+      },
+    });
+    mapLibreEngineState.landSource = dataset.label;
+    mapLibreEngineState.landFeatureCount = dataset.featureCount || land.features.length;
+    mapLibreEngineState.landLoadMs = performance.now() - startedAt;
+    mapLibreEngineState.coastlineColor = renderStyle.outline;
+    mapLibreEngineState.coastlineWidth = coastlineWidth;
+    mapLibreEngineState.status = "ready";
+    mapLibreEngineState.error = "";
+    map.resize?.();
+    orderMapLibreReadableBoundaryLayers();
+    updateMapLibreDiagnosticsFrame();
+    return true;
+  } catch (error) {
+    mapLibreEngineState.status = "land-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+}
+
+function installMapLibrePilotWaterLayer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return false;
+  if (!map.isStyleLoaded?.()) {
+    mapLibreEngineState.status = "water-waiting-for-style";
+    map.once("idle", installMapLibrePilotWaterLayer);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  const water = getMapLibrePilotWaterGeoJson();
+  if (!water?.features?.length) {
+    mapLibreEngineState.waterFeatureCount = 0;
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  try {
+    const renderStyle = getContinentalRenderStyle();
+    const outline = isEarthMapDarkMode()
+      ? DARK_MAP_COASTLINE_COLOR
+      : getThemeMapColor("--water-outline", "rgba(92,96,94,.28)");
+    removeMapLibrePilotWaterLayer();
+    map.addSource(MAPLIBRE_WATER_SOURCE_ID, {
+      type: "geojson",
+      data: water,
+    });
+    map.addLayer({
+      id: MAPLIBRE_WATER_FILL_LAYER_ID,
+      type: "fill",
+      source: MAPLIBRE_WATER_SOURCE_ID,
+      paint: {
+        "fill-color": renderStyle.sea,
+        "fill-opacity": 1,
+      },
+    }, map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID) ? MAPLIBRE_COASTLINE_LAYER_ID : undefined);
+    map.addLayer({
+      id: MAPLIBRE_WATER_OUTLINE_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_WATER_SOURCE_ID,
+      paint: {
+        "line-color": outline,
+        "line-width": isEarthMapDarkMode() ? 1.05 : 0.85,
+        "line-opacity": 1,
+      },
+    });
+    mapLibreEngineState.waterFeatureCount = water.features.length;
+    mapLibreEngineState.status = "ready";
+    mapLibreEngineState.error = "";
+    syncMapLibreSearchHighlight();
+    void syncMapLibreAdmin1LayerForSearch();
+    orderMapLibreReadableBoundaryLayers();
+    updateMapLibreDiagnosticsFrame();
+    return true;
+  } catch (error) {
+    mapLibreEngineState.status = "water-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+}
+
+function installMapLibrePilotAdmin0Layer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return false;
+  if (!map.isStyleLoaded?.()) {
+    mapLibreEngineState.status = "admin0-waiting-for-style";
+    map.once("idle", installMapLibrePilotAdmin0Layer);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  const admin0Boundaries = mapLibreEngineState.admin0BoundaryGeoJson;
+  if (!admin0Boundaries?.features?.length) {
+    renderMapEngineDiagnostics();
+    return false;
+  }
+  try {
+    const boundaryColor = isEarthMapDarkMode()
+      ? "rgba(74,82,80,.96)"
+      : "rgba(76,82,79,.74)";
+    removeMapLibrePilotAdmin0Layer();
+    map.addSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID, {
+      type: "geojson",
+      data: cloneGeoJsonForMapLibre(admin0Boundaries),
+    });
+    map.addLayer({
+      id: MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID,
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": boundaryColor,
+        "line-width": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.95,
+          2.5, 1.08,
+          5.5, 1.22,
+          9, 1.36,
+        ],
+        "line-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.86,
+          2.5, 0.94,
+          6, 0.98,
+        ],
+      },
+    }, map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)
+      ? MAPLIBRE_WATER_OUTLINE_LAYER_ID
+      : (map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID) ? MAPLIBRE_COASTLINE_LAYER_ID : undefined));
+    mapLibreEngineState.status = "ready";
+    mapLibreEngineState.error = "";
+    syncMapLibreSearchHighlight();
+    void syncMapLibreAdmin1LayerForSearch();
+    updateMapLibreDiagnosticsFrame();
+    return true;
+  } catch (error) {
+    mapLibreEngineState.status = "admin0-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+}
+
+function requestMapLibrePilotAdmin0Layer() {
+  if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length || mapLibreEngineState.admin0BoundaryPromise) return;
+  mapLibreEngineState.status = "loading-admin0";
+  mapLibreEngineState.error = "Natural-Earth-10m-Admin-0-Grenzen werden geladen";
+  renderMapEngineDiagnostics();
+  runWhenIdle(() => {
+    loadMapLibrePilotAdmin0BoundaryGeoJson()
+      .then((geojson) => {
+        if (!geojson?.features?.length) {
+          mapLibreEngineState.status = "admin0-missing";
+          mapLibreEngineState.error = "Admin-0-Grenzen enthalten keine Features";
+          renderMapEngineDiagnostics();
+          return;
+        }
+        mapLibreEngineState.admin0FeatureCount = geojson.features.length;
+        mapLibreEngineState.admin0LoadedChunks = 1;
+        mapLibreEngineState.admin0TotalChunks = 1;
+        installMapLibrePilotAdmin0Layer();
+        syncMapLibreCamera();
+      })
+      .catch((error) => {
+        mapLibreEngineState.status = "admin0-error";
+        mapLibreEngineState.error = error?.message || String(error);
+        renderMapEngineDiagnostics();
+      });
+  }, 900);
+}
+
+function collectMapLibreSearchFeatures(input, output = []) {
+  if (!input) return output;
+  if (Array.isArray(input)) {
+    input.forEach((entry) => collectMapLibreSearchFeatures(entry, output));
+    return output;
+  }
+  if (input.type === "FeatureCollection") {
+    (input.features || []).forEach((feature) => collectMapLibreSearchFeatures(feature, output));
+    return output;
+  }
+  if (input.type === "Feature") output.push(input);
+  return output;
+}
+
+function isNaturalEarthAdmin1Feature(feature) {
+  const props = feature?.properties || {};
+  return Boolean(props.iso_3166_2 || props.ISO3166_2 || props.adm1_code);
+}
+
+function isPermanentAdmin1BoundaryFeature(feature) {
+  const props = feature?.properties || {};
+  const iso3 = getNaturalEarthAdmin1CountryIso3(feature);
+  const type = String(props.type || "").toLowerCase();
+  const typeEn = String(props.type_en || "").toLowerCase();
+  const constitutionalStatus = String(
+    feature?.constitutional_status
+    || feature?.classification?.constitutional_status
+    || props.constitutional_status
+    || props.ziselin_constitutional_status
+    || "",
+  ).toLowerCase();
+  if (constitutionalStatus === "ordinary") return false;
+  if (["federal_subject", "autonomous_region", "constituent_country", "special_region"].includes(constitutionalStatus)) {
+    return true;
+  }
+  const ownCategory = [
+    feature?.classification?.sovereignty_status,
+    feature?.classification?.relation_to_parent,
+    feature?.classification?.boundary_type,
+    feature?.boundary_type,
+    feature?.sovereignty_status,
+    feature?.relation_to_parent,
+    props.ziselin_sovereignty_status,
+    props.ziselin_relation_to_parent,
+    props.ziselin_boundary_type,
+  ].map((value) => String(value || "").toLowerCase()).join(" ");
+  // Fachregel: Normale ADM1-Details bleiben abschaltbar. Dauerhaft sichtbar
+  // sind Einheiten, die föderale, konstitutionelle oder autonome Subjekte
+  // darstellen. Eigene Boundary-Set-v1-Kategorien haben Vorrang; Natural-
+  // Earth-Typen werden danach länderspezifisch interpretiert, weil dieselben
+  // Wörter ("province", "state", "region") je nach Staat Verschiedenes meinen.
+  if (/\b(federal_subject|federated_subject|constituent_country|home_nation|autonomous_region|autonomous_subject)\b/.test(ownCategory)) {
+    return true;
+  }
+  if (/\b(ordinary_administrative|district|borough|county|municipality|department)\b/.test(ownCategory)) {
+    return false;
+  }
+
+  if (iso3 === "DEU") return type === "land" || typeEn === "state";
+  if (iso3 === "USA") return type === "state" || typeEn === "state";
+  if (iso3 === "CAN") return type === "province" || typeEn === "province" || type === "territoire" || typeEn === "territory";
+  if (iso3 === "AUS") return type === "state" || typeEn === "state" || typeEn === "territory";
+  if (iso3 === "AUT") return type === "land" || typeEn === "state";
+  if (iso3 === "CHE") return type === "canton" || typeEn === "canton";
+  if (iso3 === "BRA") return type === "estado" || typeEn === "state";
+  if (iso3 === "MEX") return type === "estado" || typeEn === "state";
+  if (iso3 === "RUS") {
+    return type === "respublika"
+      || typeEn === "republic"
+      || type.includes("avtonom")
+      || typeEn.includes("autonomous");
+  }
+  // Natural Earth bildet die britischen Home Nations im Admin-1-Datensatz
+  // nicht als saubere vier Gesamtflächen ab. Bis wir ein kuratiertes
+  // Boundary-Set für Wales/Schottland/England/Nordirland haben, vermeiden wir
+  // hier bewusst falsche Treffer wie London Boroughs oder Mid Ulster.
+  if (iso3 === "GBR") return false;
+  return false;
+}
+
+function getMapLibreLongitudeIntervals(west, east) {
+  const normalizedWest = normalizeLongitude(west);
+  const normalizedEast = normalizeLongitude(east);
+  const rawSpan = Math.abs(Number(east) - Number(west));
+  if (rawSpan >= 360) return [[-180, 180]];
+  if (normalizedWest <= normalizedEast) return [[normalizedWest, normalizedEast]];
+  return [[normalizedWest, 180], [-180, normalizedEast]];
+}
+
+function longitudeIntervalsIntersect(a, b) {
+  return a.some(([aWest, aEast]) => b.some(([bWest, bEast]) => aWest <= bEast && aEast >= bWest));
+}
+
+function getMapLibreExpandedBounds() {
+  const map = mapLibreEngineState.map;
+  if (!map?.getBounds) return null;
+  const bounds = map.getBounds();
+  const west = bounds.getWest();
+  const east = bounds.getEast();
+  const south = bounds.getSouth();
+  const north = bounds.getNorth();
+  const zoom = map.getZoom?.() ?? getMapLibreZoomFromGlobeZoom();
+  // Viewport-Regel: Admin-1 wird nicht exakt am Bildschirmrand geschnitten,
+  // sondern mit einer kleinen Umgebung geladen. Die Umgebung schrumpft beim
+  // Hineinzoomen, damit Bewegungen flüssig bleiben und nicht unnötig viele
+  // Länder-Chunks angefordert werden.
+  const lonPad = clamp(20 / Math.max(1.35, zoom), 2.8, 9);
+  const latPad = clamp(14 / Math.max(1.35, zoom), 2.0, 6);
+  return {
+    west: west - lonPad,
+    east: east + lonPad,
+    south: clamp(south - latPad, -90, 90),
+    north: clamp(north + latPad, -90, 90),
+  };
+}
+
+function doesBboxIntersectMapLibreBounds(bbox, bounds) {
+  if (!Array.isArray(bbox) || bbox.length < 4 || !bounds) return false;
+  const [minLon, minLat, maxLon, maxLat] = bbox.map(Number);
+  if (![minLon, minLat, maxLon, maxLat].every(Number.isFinite)) return false;
+  if (maxLat < bounds.south || minLat > bounds.north) return false;
+  return longitudeIntervalsIntersect(
+    getMapLibreLongitudeIntervals(minLon, maxLon),
+    getMapLibreLongitudeIntervals(bounds.west, bounds.east),
+  );
+}
+
+function getMapLibreViewportAdmin0Iso3s(options = {}) {
+  const map = mapLibreEngineState.map;
+  const zoom = map?.getZoom?.() ?? getMapLibreZoomFromGlobeZoom();
+  const minZoom = Number.isFinite(options.minZoom) ? options.minZoom : MAPLIBRE_ADMIN1_VIEWPORT_LOAD_ZOOM;
+  if (zoom < minZoom) return [];
+  const index = getNaturalEarthAdmin0EngineIndex();
+  const bounds = getMapLibreExpandedBounds();
+  if (!index?.chunks?.length || !bounds) return [];
+  const limit = Number.isFinite(options.limit) ? Math.max(0, options.limit) : MAPLIBRE_ADMIN1_VIEWPORT_CHUNK_LIMIT;
+  const center = map.getCenter?.();
+  const centerLon = normalizeLongitude(center?.lng ?? rotation.lon);
+  const centerLat = Number.isFinite(center?.lat) ? center.lat : rotation.lat;
+  const getBboxCenterDistance = (entry) => {
+    const bbox = entry.bbox || [];
+    const midLon = normalizeLongitude((Number(bbox[0]) + Number(bbox[2])) / 2);
+    const midLat = (Number(bbox[1]) + Number(bbox[3])) / 2;
+    const lonDistance = Math.abs(normalizeLongitude(midLon - centerLon));
+    const latDistance = Math.abs(midLat - centerLat);
+    return lonDistance + latDistance * 1.35;
+  };
+  const visibleEntries = index.chunks
+    .filter((entry) => doesBboxIntersectMapLibreBounds(entry.bbox, bounds))
+    .sort((a, b) => getBboxCenterDistance(a) - getBboxCenterDistance(b));
+  return (limit > 0 ? visibleEntries.slice(0, limit) : visibleEntries)
+    .map((entry) => String(entry.country_iso3 || entry.provider_boundary_id || "").toUpperCase())
+    .filter(Boolean);
+}
+
+function scheduleMapLibreAdmin1ViewportSync(delay = 760) {
+  if (!mapLibreEngineState.active) return;
+  window.clearTimeout(mapLibreAdmin1ViewportTimer);
+  mapLibreAdmin1ViewportTimer = window.setTimeout(() => {
+    if (isNavigatingGlobe) {
+      scheduleMapLibreAdmin1ViewportSync(900);
+      return;
+    }
+    void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
+  }, delay);
+}
+
+function getMapLibreAdmin1Iso3DemandSet(includeViewport = false) {
+  const highlight = state.mapSearchHighlight;
+  const iso3s = new Set();
+  const selectedFeatures = collectMapLibreSearchFeatures(Array.isArray(highlight?.selectedFeatures)
+    ? highlight.selectedFeatures
+    : [highlight?.countryFeature].filter(Boolean));
+  const focusFeatures = collectMapLibreSearchFeatures(Array.isArray(highlight?.focusFeatures)
+    ? highlight.focusFeatures
+    : [highlight?.provinceFeature].filter(Boolean));
+
+  focusFeatures.forEach((feature) => {
+    if (!isNaturalEarthAdmin1Feature(feature)) return;
+    const iso3 = getNaturalEarthAdmin1CountryIso3(feature);
+    if (iso3) iso3s.add(iso3);
+  });
+
+  // On-demand-Regel: einzelne oder wenige Kontextstaaten dürfen ihre Admin-1-
+  // Linien sofort zeigen. Große Verbände wie EU/NATO lösen dagegen nicht
+  // automatisch dutzende Provinz-Chunks aus; dafür braucht es später Kacheln.
+  if (selectedFeatures.length > 0 && selectedFeatures.length <= 3) {
+    selectedFeatures.forEach((feature) => {
+      if (isNaturalEarthAdmin1Feature(feature)) {
+        const iso3 = getNaturalEarthAdmin1CountryIso3(feature);
+        if (iso3) iso3s.add(iso3);
+        return;
+      }
+      const iso3 = getNaturalEarthIso3(feature).toUpperCase();
+      if (iso3) iso3s.add(iso3);
+    });
+  }
+
+  if (includeViewport) {
+    getMapLibreViewportAdmin0Iso3s().forEach((iso3) => iso3s.add(iso3));
+    getMapLibreViewportAdmin0Iso3s({
+      minZoom: MAPLIBRE_ADMIN1_PERMANENT_VIEWPORT_ZOOM,
+      limit: 0,
+    }).forEach((iso3) => iso3s.add(iso3));
+  }
+
+  return iso3s;
+}
+
+function installMapLibrePilotAdmin1Layer(geojson, iso3s = []) {
+  const map = mapLibreEngineState.map;
+  if (!map || !map.isStyleLoaded?.()) return false;
+  removeMapLibrePilotAdmin1Layer();
+  if (!geojson?.features?.length) {
+    updateMapLibreDiagnosticsFrame();
+    return false;
+  }
+  try {
+    const boundaryColor = isEarthMapDarkMode()
+      ? "rgba(92,98,96,.9)"
+      : "rgba(78,84,80,.62)";
+    const classifiedGeoJson = {
+      ...geojson,
+      features: (geojson.features || []).map((feature) => ({
+        ...feature,
+        properties: {
+          ...(feature.properties || {}),
+          ziselin_constitutional_status: feature.constitutional_status || feature.classification?.constitutional_status || feature.properties?.ziselin_constitutional_status || feature.properties?.constitutional_status || "",
+          _earthMapAdmin1CountryIso3: getNaturalEarthAdmin1CountryIso3(feature),
+          _earthMapAdmin1BoundaryClass: isPermanentAdmin1BoundaryFeature(feature) ? "permanent" : "detail",
+        },
+      })),
+    };
+    map.addSource(MAPLIBRE_ADMIN1_SOURCE_ID, {
+      type: "geojson",
+      data: cloneGeoJsonForMapLibre(classifiedGeoJson),
+    });
+    map.addLayer({
+      id: MAPLIBRE_ADMIN1_FILL_LAYER_ID,
+      type: "fill",
+      source: MAPLIBRE_ADMIN1_SOURCE_ID,
+      paint: {
+        "fill-color": "rgba(0,0,0,0)",
+        "fill-opacity": 0,
+      },
+    }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID)
+      ? MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID
+      : (map.getLayer(MAPLIBRE_WATER_FILL_LAYER_ID) ? MAPLIBRE_WATER_FILL_LAYER_ID : undefined));
+    map.addLayer({
+      id: MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_ADMIN1_SOURCE_ID,
+      filter: ["!=", ["get", "_earthMapAdmin1BoundaryClass"], "permanent"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+        "visibility": state.showAdmin1Boundaries === true ? "visible" : "none",
+      },
+      paint: {
+        "line-color": boundaryColor,
+        "line-width": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.52,
+          2.8, 0.6,
+          5.5, 0.78,
+          9, 0.94,
+        ],
+        "line-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.24,
+          2.4, 0.34,
+          3.2, 0.56,
+          5, 0.78,
+        ],
+      },
+    }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
+      ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
+      : (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID) ? MAPLIBRE_WATER_OUTLINE_LAYER_ID : undefined));
+    map.addLayer({
+      id: MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_ADMIN1_SOURCE_ID,
+      filter: [
+        "all",
+        ["==", ["get", "_earthMapAdmin1BoundaryClass"], "permanent"],
+        ["!=", ["get", "_earthMapAdmin1CountryIso3"], "CHE"],
+      ],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": isEarthMapDarkMode() ? "rgba(74,82,80,.98)" : "rgba(64,70,67,.78)",
+        "line-width": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.68,
+          3, 0.78,
+          6, 0.94,
+          10, 1.08,
+        ],
+        "line-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          0, 0.72,
+          3, 0.84,
+          6, 0.94,
+        ],
+        "line-dasharray": [2.6, 3.2],
+      },
+    }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
+      ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
+      : (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID) ? MAPLIBRE_WATER_OUTLINE_LAYER_ID : undefined));
+    map.addLayer({
+      id: MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID,
+      type: "line",
+      source: MAPLIBRE_ADMIN1_SOURCE_ID,
+      minzoom: MAPLIBRE_SWISS_CANTON_BOUNDARY_ZOOM,
+      filter: [
+        "all",
+        ["==", ["get", "_earthMapAdmin1BoundaryClass"], "permanent"],
+        ["==", ["get", "_earthMapAdmin1CountryIso3"], "CHE"],
+      ],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": isEarthMapDarkMode() ? "rgba(74,82,80,.98)" : "rgba(64,70,67,.78)",
+        "line-width": [
+          "interpolate", ["linear"], ["zoom"],
+          6.5, 0.86,
+          8, 0.98,
+          10, 1.08,
+        ],
+        "line-opacity": [
+          "interpolate", ["linear"], ["zoom"],
+          6.5, 0.7,
+          8, 0.9,
+        ],
+        "line-dasharray": [2.6, 3.2],
+      },
+    }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
+      ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
+      : (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID) ? MAPLIBRE_WATER_OUTLINE_LAYER_ID : undefined));
+    mapLibreEngineState.admin1GeoJson = geojson;
+    mapLibreEngineState.admin1Iso3 = iso3s;
+    mapLibreEngineState.admin1FeatureCount = geojson.features.length;
+    mapLibreEngineState.admin1SourceReady = true;
+    mapLibreEngineState.admin1LayerVisible = true;
+    orderMapLibreReadableBoundaryLayers();
+    updateMapLibreDiagnosticsFrame();
+    return true;
+  } catch (error) {
+    mapLibreEngineState.status = "admin1-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+    return false;
+  }
+}
+
+function syncMapLibreAdmin1Visibility() {
+  const map = mapLibreEngineState.map;
+  if (!map?.getLayer?.(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID)) return;
+  try {
+    map.setLayoutProperty(
+      MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
+      "visibility",
+      state.showAdmin1Boundaries === true ? "visible" : "none",
+    );
+  } catch (error) {
+    console.warn("EarthMap-Provinzgrenzen konnten nicht umgeschaltet werden.", error);
+  }
+}
+
+function orderMapLibreReadableBoundaryLayers() {
+  const map = mapLibreEngineState.map;
+  if (!map?.getLayer || !map?.moveLayer) return;
+  try {
+    // Lesbarkeitsregel: Suchflächen dürfen administrative Grenzen nicht
+    // verschlucken. Die Grenzen bleiben deshalb oberhalb der Füllungen, die
+    // Such-Outlines aber ganz oben. So ist die Markierung kräftig und die
+    // politische Struktur trotzdem erkennbar.
+    const searchOutlineBefore = map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
+      ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
+      : (map.getLayer(MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID) ? MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID : undefined);
+    [
+      MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
+      MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
+      MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID,
+      MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID,
+    ].forEach((layerId) => {
+      if (!map.getLayer(layerId)) return;
+      if (searchOutlineBefore) map.moveLayer(layerId, searchOutlineBefore);
+      else map.moveLayer(layerId);
+    });
+  } catch (error) {
+    console.warn("EarthMap-Layerreihenfolge konnte nicht nachgeschärft werden.", error);
+  }
+}
+
+async function syncMapLibreAdmin1LayerForSearch(options = {}) {
+  const map = mapLibreEngineState.map;
+  if (!map || !map.isStyleLoaded?.()) return;
+  const includeViewport = options.includeViewport === true;
+  const zoom = map.getZoom?.() ?? getMapLibreZoomFromGlobeZoom();
+  if (includeViewport && zoom >= MAPLIBRE_ADMIN1_VIEWPORT_LOAD_ZOOM && !getNaturalEarthAdmin0EngineIndex()?.chunks?.length) {
+    await loadNaturalEarthAdmin0EngineIndex();
+  }
+  const requestSerial = ++mapLibreAdmin1RequestSerial;
+  const viewportIso3s = includeViewport ? getMapLibreViewportAdmin0Iso3s() : [];
+  const permanentViewportIso3s = includeViewport ? getMapLibreViewportAdmin0Iso3s({
+    minZoom: MAPLIBRE_ADMIN1_PERMANENT_VIEWPORT_ZOOM,
+    limit: 0,
+  }) : [];
+  const iso3s = [...getMapLibreAdmin1Iso3DemandSet(includeViewport)].filter(Boolean).sort();
+  const signature = iso3s.join(",");
+  mapLibreEngineState.admin1ViewportIso3 = permanentViewportIso3s.length ? permanentViewportIso3s : viewportIso3s;
+  mapLibreEngineState.admin1DemandMode = permanentViewportIso3s.length
+    ? "permanent-viewport"
+    : (includeViewport ? "viewport" : (state.mapSearchHighlight ? "search" : "none"));
+  if (!signature) {
+    removeMapLibrePilotAdmin1Layer();
+    mapLibreEngineState.admin1ViewportIso3 = [];
+    mapLibreEngineState.admin1DemandMode = "none";
+    updateMapLibreDiagnosticsFrame();
+    return;
+  }
+  if (signature === mapLibreEngineState.admin1Iso3.join(",") && mapLibreEngineState.admin1SourceReady) {
+    syncMapLibreAdmin1Visibility();
+    orderMapLibreReadableBoundaryLayers();
+    return;
+  }
+  const startedAt = performance.now();
+  mapLibreEngineState.status = "loading-admin1";
+  mapLibreEngineState.error = `Admin-1 wird geladen (${mapLibreEngineState.admin1DemandMode}): ${signature}`;
+  renderMapEngineDiagnostics();
+  const features = [];
+  for (const iso3 of iso3s) {
+    if (requestSerial !== mapLibreAdmin1RequestSerial) return;
+    if (includeViewport && isNavigatingGlobe) {
+      scheduleMapLibreAdmin1ViewportSync(520);
+      return;
+    }
+    const dataset = await loadNaturalEarthAdmin1CountryChunk(iso3);
+    features.push(...(dataset?.features || []));
+    // Die Chunk-Schleife gibt der UI bewusst Luft. Admin-1 bleibt reaktiv,
+    // bis MVT/PMTiles diese Zwischenstufe später ganz ersetzt.
+    await waitForNextFrame();
+  }
+  if (requestSerial !== mapLibreAdmin1RequestSerial) return;
+  mapLibreEngineState.admin1LoadMs = performance.now() - startedAt;
+  installMapLibrePilotAdmin1Layer({
+    type: "FeatureCollection",
+    name: `earthmap-admin1-on-demand-${signature}`,
+    features,
+  }, iso3s);
+  mapLibreEngineState.status = "ready";
+  mapLibreEngineState.error = "";
+  renderMapEngineDiagnostics();
+}
+
+function getMapLibreSearchHighlightFeatureCollection() {
+  if (isStatisticalMapActive()) return { type: "FeatureCollection", features: [] };
+  const highlight = state.mapSearchHighlight;
+  const selectedFeatures = Array.isArray(highlight?.selectedFeatures)
+    ? highlight.selectedFeatures
+    : [highlight?.countryFeature].filter(Boolean);
+  const focusFeatures = Array.isArray(highlight?.focusFeatures)
+    ? highlight.focusFeatures
+    : [highlight?.provinceFeature].filter(Boolean);
+  const contextColor = getMapSearchSelectedAreaColor();
+  const contextOutline = getMapSearchSelectedOutlineColor();
+  const focusColor = getMapSearchSpecialHighlightColor();
+  const focusOutline = getMapSearchSpecialOutlineColor();
+  const features = [];
+
+  const appendSearchFeatures = (input, role, inputIndex, fill, outline, opacity) => {
+    const sourceFeatures = input?.type === "FeatureCollection"
+      ? input.features || []
+      : [input].filter(Boolean);
+    sourceFeatures.forEach((feature, featureIndex) => {
+      if (!feature?.geometry) return;
+      // Suchdatenfluss: Organisationen wie EU/NATO werden als FeatureCollection
+      // aufgelöst. MapLibre-Layer brauchen aber einzelne Features mit eigener
+      // Geometry. Darum wird die Sammlung hier nur für den Renderpfad
+      // aufgefächert; die semantische Suchlogik bleibt unverändert.
+      features.push({
+        ...feature,
+        id: `search-${role}-${inputIndex}-${featureIndex}`,
+        properties: {
+          ...(feature.properties || {}),
+          _earthMapSearchRole: role,
+          _earthMapSearchOrder: inputIndex,
+          _earthMapSearchMemberOrder: featureIndex,
+          _earthMapSearchFill: fill,
+          _earthMapSearchOutline: outline,
+          _earthMapSearchOpacity: opacity,
+        },
+      });
+    });
+  };
+
+  selectedFeatures.forEach((feature, index) => {
+    appendSearchFeatures(
+      feature,
+      "context",
+      index,
+      contextColor,
+      contextOutline,
+      isEarthMapDarkMode() ? 0.78 : 0.52,
+    );
+  });
+  focusFeatures.forEach((feature, index) => {
+    appendSearchFeatures(
+      feature,
+      "focus",
+      index,
+      focusColor,
+      focusOutline,
+      isEarthMapDarkMode() ? 0.82 : 0.68,
+    );
+  });
+
+  return {
+    type: "FeatureCollection",
+    name: "earthmap-search-highlight",
+    features,
+  };
+}
+
+function removeMapLibreSearchHighlightLayer() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  [
+    MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID,
+    MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID,
+    MAPLIBRE_SEARCH_FOCUS_FILL_LAYER_ID,
+    MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID,
+  ].forEach((layerId) => {
+    if (map.getLayer(layerId)) map.removeLayer(layerId);
+  });
+  if (map.getSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID)) {
+    map.removeSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID);
+  }
+  mapLibreEngineState.searchHighlightFeatures = 0;
+  mapLibreEngineState.searchHighlightSourceReady = false;
+}
+
+function syncMapLibreSearchHighlight() {
+  const map = mapLibreEngineState.map;
+  if (!map || !map.isStyleLoaded?.()) return;
+  const collection = getMapLibreSearchHighlightFeatureCollection();
+  const features = collection.features || [];
+  removeMapLibreSearchHighlightLayer();
+  if (!features.length) {
+    updateMapLibreDiagnosticsFrame();
+    return;
+  }
+  const waterFillBeforeId = map.getLayer(MAPLIBRE_WATER_FILL_LAYER_ID)
+    ? MAPLIBRE_WATER_FILL_LAYER_ID
+    : (map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID) ? MAPLIBRE_COASTLINE_LAYER_ID : undefined);
+  const outlineBeforeId = map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)
+    ? MAPLIBRE_WATER_OUTLINE_LAYER_ID
+    : (map.getLayer(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID) ? MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID : undefined);
+
+  map.addSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID, {
+    type: "geojson",
+    data: cloneGeoJsonForMapLibre(collection),
+  });
+  map.addLayer({
+    id: MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID,
+    type: "fill",
+    source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
+    filter: ["==", ["get", "_earthMapSearchRole"], "context"],
+    paint: {
+      "fill-color": ["get", "_earthMapSearchFill"],
+      "fill-opacity": ["get", "_earthMapSearchOpacity"],
+    },
+  }, waterFillBeforeId);
+  map.addLayer({
+    id: MAPLIBRE_SEARCH_FOCUS_FILL_LAYER_ID,
+    type: "fill",
+    source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
+    filter: ["==", ["get", "_earthMapSearchRole"], "focus"],
+    paint: {
+      "fill-color": ["get", "_earthMapSearchFill"],
+      "fill-opacity": ["get", "_earthMapSearchOpacity"],
+    },
+  }, waterFillBeforeId);
+  map.addLayer({
+    id: MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID,
+    type: "line",
+    source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
+    filter: ["==", ["get", "_earthMapSearchRole"], "context"],
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+    },
+    paint: {
+      "line-color": ["get", "_earthMapSearchOutline"],
+      "line-width": [
+        "interpolate", ["linear"], ["zoom"],
+        0, isEarthMapDarkMode() ? 1.05 : 0.96,
+        5, isEarthMapDarkMode() ? 1.22 : 1.08,
+        9, isEarthMapDarkMode() ? 1.38 : 1.2,
+      ],
+      "line-opacity": isEarthMapDarkMode() ? 0.98 : 0.92,
+    },
+  }, outlineBeforeId);
+  map.addLayer({
+    id: MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID,
+    type: "line",
+    source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
+    filter: ["==", ["get", "_earthMapSearchRole"], "focus"],
+    layout: {
+      "line-cap": "round",
+      "line-join": "round",
+    },
+    paint: {
+      "line-color": ["get", "_earthMapSearchOutline"],
+      "line-width": [
+        "interpolate", ["linear"], ["zoom"],
+        0, isEarthMapDarkMode() ? 1.45 : 1.24,
+        5, isEarthMapDarkMode() ? 1.68 : 1.42,
+        9, isEarthMapDarkMode() ? 1.86 : 1.56,
+      ],
+      "line-opacity": 0.98,
+    },
+  }, outlineBeforeId);
+  mapLibreEngineState.searchHighlightFeatures = features.length;
+  mapLibreEngineState.searchHighlightSourceReady = true;
+  void syncMapLibreAdmin1LayerForSearch();
+  orderMapLibreReadableBoundaryLayers();
+  updateMapLibreDiagnosticsFrame();
+}
+
+function requestMapLibrePilotWaterLayer(detail = "full") {
+  if (
+    mapLibreEngineState.waterGeoJson?.features?.length
+    && mapLibreEngineState.waterDetail === detail
+    && mapLibreEngineState.waterSourceReady
+  ) {
+    if (!mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) requestMapLibrePilotAdmin0Layer();
+    return;
+  }
+  if (mapLibreEngineState.waterPromise) return;
+  mapLibreEngineState.status = "loading-water";
+  mapLibreEngineState.error = detail === "major"
+    ? "große Natural-Earth-10m-Gewässer werden geladen"
+    : "Natural-Earth-10m-Gewässer werden nachgeladen";
+  renderMapEngineDiagnostics();
+  runWhenIdle(() => {
+    loadMapLibrePilotWaterGeoJson(detail)
+      .then((geojson) => {
+        if (!geojson?.features?.length) {
+          mapLibreEngineState.status = "water-missing";
+          mapLibreEngineState.error = "Gewässerdaten enthalten keine Features";
+          renderMapEngineDiagnostics();
+          return;
+        }
+        installMapLibrePilotWaterLayer();
+        requestMapLibrePilotAdmin0Layer();
+        syncMapLibreCamera();
+      })
+      .catch((error) => {
+        mapLibreEngineState.status = "water-error";
+        mapLibreEngineState.error = error?.message || String(error);
+        renderMapEngineDiagnostics();
+      });
+  }, 650);
+}
+
+function maybeRequestMapLibrePilotWaterLayer(zoom = getMapLibreZoomFromGlobeZoom()) {
+  if (zoom < MAPLIBRE_WATER_LOAD_ZOOM) return;
+  requestMapLibrePilotWaterLayer("full");
+}
+
+function requestMapLibrePilotFullLandLayer() {
+  if (mapLibreEngineState.fullLandPending) return;
+  if (mapLibreEngineState.fullLandRequested && mapLibreEngineState.landSource === "natural-earth-10m-land") return;
+  mapLibreEngineState.fullLandPending = true;
+  runWhenIdle(() => {
+    mapLibreEngineState.status = "loading-full-land";
+    mapLibreEngineState.error = "vollständige Natural-Earth-10m-Landfläche wird nachgeladen";
+    renderMapEngineDiagnostics();
+    loadMapLibrePilotFullLandGeoJson()
+      .then((geojson) => {
+        if (!geojson?.features?.length) {
+          mapLibreEngineState.status = "full-land-missing";
+          mapLibreEngineState.error = "vollständige 10m-Landfläche enthält keine Features";
+          renderMapEngineDiagnostics();
+          return;
+        }
+        const installed = installMapLibrePilotLandLayer("full");
+        mapLibreEngineState.fullLandRequested = installed;
+        maybeRequestMapLibrePilotWaterLayer();
+        syncMapLibreCamera();
+      })
+      .catch((error) => {
+        mapLibreEngineState.status = "full-land-error";
+        mapLibreEngineState.error = error?.message || String(error);
+        renderMapEngineDiagnostics();
+      })
+      .finally(() => {
+        mapLibreEngineState.fullLandPending = false;
+      });
+  }, 400);
+}
+
+function maybeRequestMapLibrePilotFullLandLayer(zoom = getMapLibreZoomFromGlobeZoom()) {
+  if (zoom < MAPLIBRE_FULL_LAND_LOAD_ZOOM) return;
+  if (mapLibreEngineState.landSource === "natural-earth-10m-land") return;
+  requestMapLibrePilotFullLandLayer();
+}
+
+function renderMapEngineDiagnostics() {
+  if (!ui.mapEngineDiagnostics) return;
+  const engineLabel = mapLibreEngineState.active ? "MapLibre Pilot" : "Legacy";
+  const status = mapLibreEngineState.status || "unknown";
+  const detail = mapLibreEngineState.error || (mapLibreEngineState.styleLoaded ? "style bereit" : "wartet");
+  const movingFps = mapLibreEngineState.renderPhase === "active" ? mapLibreEngineState.movingFps.toFixed(0) : "idle";
+  const movingFrame = mapLibreEngineState.renderPhase === "active" ? `${mapLibreEngineState.movingFrameMs.toFixed(1)} ms` : "—";
+  const diagnosticZoom = mapLibreEngineState.map?.getZoom?.() ?? getMapLibreZoomFromGlobeZoom();
+  // Diagnosekonvention: "Zoom" ist der exakte Schaltwert der Engine.
+  // "Höhe" ist eine relative Kamerahöhe aus demselben Wert: groß = weit weg,
+  // klein = nah. So können wir Schwellen präzise besprechen, ohne so zu tun,
+  // als läge schon ein metrisches Höhenmodell vor.
+  const diagnosticHeight = 1 / (2 ** diagnosticZoom);
+  const statisticLayers = getEarthMapStatisticDebugInfo?.() || [];
+  const activeStatisticLayers = statisticLayers.filter((layer) => layer.visible);
+  const statisticRows = activeStatisticLayers.reduce((sum, layer) => sum + layer.rows, 0);
+  const statisticMatches = activeStatisticLayers.reduce((sum, layer) => sum + layer.matches, 0);
+  const statisticDrawable = activeStatisticLayers.reduce((sum, layer) => sum + layer.drawableMatches, 0);
+  const statisticHydrating = activeStatisticLayers.some((layer) => layer.hydrationPending);
+  const firstStatisticDraw = activeStatisticLayers
+    .map((layer) => layer.lastStatisticDraw || null)
+    .find(Boolean);
+  const yesNo = (value) => value ? "ja" : "nein";
+  const visibleText = (value) => value ? "sichtbar" : "aus";
+  const loadText = (value) => Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} ms` : "—";
+  const sourceText = (value) => value ? "bereit" : "—";
+  const layerRow = ({ label, source, visible, features, load, note = "" }) => `
+    <tr>
+      <th scope="row">${label}</th>
+      <td>${source}</td>
+      <td>${visible}</td>
+      <td>${features}</td>
+      <td>${load}</td>
+      <td>${note}</td>
+    </tr>
+  `;
+  ui.mapEngineDiagnostics.innerHTML = `
+    <strong>Engine</strong>
+    <dl class="engine-diagnostics-summary">
+      <dt>Pfad</dt><dd>${engineLabel}</dd>
+      <dt>Status</dt><dd>${status}</dd>
+      <dt>Render</dt><dd>${mapLibreEngineState.renderPhase}</dd>
+      <dt>Zoom</dt><dd>${diagnosticZoom.toFixed(2)}</dd>
+      <dt>Höhe</dt><dd>${diagnosticHeight.toFixed(4)} rel.</dd>
+      <dt>FPS</dt><dd>${movingFps}</dd>
+      <dt>Frame</dt><dd>${movingFrame}</dd>
+      <dt>Letzter</dt><dd>${mapLibreEngineState.lastRenderGapMs.toFixed(0)} ms</dd>
+      <dt>Quellen</dt><dd>${mapLibreEngineState.sourceCount}</dd>
+      <dt>Layer</dt><dd>${mapLibreEngineState.layerCount}</dd>
+    </dl>
+    <table class="engine-diagnostics-layer-table">
+      <thead>
+        <tr><th>Layer</th><th>Quelle</th><th>Sicht</th><th>Feat.</th><th>Laden</th><th>Notiz</th></tr>
+      </thead>
+      <tbody>
+        ${layerRow({
+          label: "Land",
+          source: sourceText(mapLibreEngineState.landSourceReady),
+          visible: visibleText(mapLibreEngineState.landLayerVisible),
+          features: mapLibreEngineState.landFeatureCount,
+          load: loadText(mapLibreEngineState.landLoadMs),
+          note: mapLibreEngineState.fullLandLoadMode || mapLibreEngineState.landSource,
+        })}
+        ${layerRow({
+          label: "Küste",
+          source: sourceText(mapLibreEngineState.landSourceReady),
+          visible: visibleText(mapLibreEngineState.coastlineLayerVisible),
+          features: mapLibreEngineState.landFeatureCount,
+          load: "—",
+          note: `${mapLibreEngineState.coastlineWidth.toFixed(2)} · ${mapLibreEngineState.coastlineColor || "—"}`,
+        })}
+        ${layerRow({
+          label: "Wasser",
+          source: sourceText(mapLibreEngineState.waterSourceReady),
+          visible: visibleText(mapLibreEngineState.waterLayerVisible),
+          features: mapLibreEngineState.waterFeatureCount,
+          load: loadText(mapLibreEngineState.waterLoadMs),
+          note: mapLibreEngineState.waterLoadMode,
+        })}
+        ${layerRow({
+          label: "Admin0",
+          source: sourceText(mapLibreEngineState.admin0BoundarySourceReady),
+          visible: visibleText(mapLibreEngineState.admin0LayerVisible),
+          features: mapLibreEngineState.admin0FeatureCount,
+          load: loadText(mapLibreEngineState.admin0LoadMs),
+          note: `${mapLibreEngineState.admin0LoadedChunks}/${mapLibreEngineState.admin0TotalChunks} Chunks`,
+        })}
+        ${layerRow({
+          label: "Admin1",
+          source: sourceText(mapLibreEngineState.admin1SourceReady),
+          visible: visibleText(mapLibreEngineState.admin1LayerVisible),
+          features: mapLibreEngineState.admin1FeatureCount,
+          load: loadText(mapLibreEngineState.admin1LoadMs),
+          note: `${mapLibreEngineState.admin1DemandMode} · ${mapLibreEngineState.admin1Iso3.join(",") || "—"}`,
+        })}
+        ${layerRow({
+          label: "Suche",
+          source: sourceText(mapLibreEngineState.searchHighlightSourceReady),
+          visible: mapLibreEngineState.searchHighlightSourceReady ? "aktiv" : "aus",
+          features: mapLibreEngineState.searchHighlightFeatures,
+          load: "—",
+          note: isStatisticalMapActive() ? "durch Statistik blockiert" : "frei",
+        })}
+        ${layerRow({
+          label: "Statistik",
+          source: activeStatisticLayers.length ? "Projekt" : "—",
+          visible: activeStatisticLayers.length ? "aktiv" : "aus",
+          features: `${statisticDrawable}/${statisticMatches}`,
+          load: "—",
+          note: `${statisticRows} Werte · Hydrierung ${yesNo(statisticHydrating)}${firstStatisticDraw ? ` · gezeichnet ${firstStatisticDraw.drawn}/${firstStatisticDraw.attempted}` : ""}`,
+        })}
+      </tbody>
+    </table>
+    <dl class="engine-diagnostics-summary engine-diagnostics-note">
+      <dt>Hinweis</dt><dd>${detail}</dd>
+    </dl>
+  `;
+}
+
+function updateMapLibreDiagnosticsFrame() {
+  const now = performance.now();
+  if (mapLibreEngineState.lastFrameAt) {
+    const delta = now - mapLibreEngineState.lastFrameAt;
+    mapLibreEngineState.lastRenderGapMs = delta;
+    if (now - mapLibreEngineState.lastCameraSyncAt < 450 && delta < 220) {
+      mapLibreEngineState.renderPhase = "active";
+      mapLibreEngineState.movingFrameMs = delta;
+      mapLibreEngineState.movingFps = delta > 0 ? 1000 / delta : 0;
+    } else if (mapLibreEngineState.renderPhase !== "style") {
+      mapLibreEngineState.renderPhase = "idle";
+    }
+  }
+  mapLibreEngineState.lastFrameAt = now;
+  mapLibreEngineState.frameCount += 1;
+  if (now - mapLibreEngineState.lastDiagnosticsAt < 250) return;
+  mapLibreEngineState.lastDiagnosticsAt = now;
+  const style = mapLibreEngineState.map?.getStyle?.();
+  mapLibreEngineState.sourceCount = style?.sources ? Object.keys(style.sources).length : 0;
+  mapLibreEngineState.layerCount = style?.layers?.length || 0;
+  mapLibreEngineState.landSourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_LAND_SOURCE_ID));
+  const landLayer = mapLibreEngineState.map?.getLayer?.(MAPLIBRE_LAND_FILL_LAYER_ID);
+  const landVisibility = landLayer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_LAND_FILL_LAYER_ID, "visibility") : "none";
+  mapLibreEngineState.landLayerVisible = Boolean(landLayer) && landVisibility !== "none";
+  const coastlineLayer = mapLibreEngineState.map?.getLayer?.(MAPLIBRE_COASTLINE_LAYER_ID);
+  const coastlineVisibility = coastlineLayer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_COASTLINE_LAYER_ID, "visibility") : "none";
+  mapLibreEngineState.coastlineLayerVisible = Boolean(coastlineLayer) && coastlineVisibility !== "none";
+  mapLibreEngineState.waterSourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_WATER_SOURCE_ID));
+  const waterLayer = mapLibreEngineState.map?.getLayer?.(MAPLIBRE_WATER_FILL_LAYER_ID);
+  const waterVisibility = waterLayer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_WATER_FILL_LAYER_ID, "visibility") : "none";
+  mapLibreEngineState.waterLayerVisible = Boolean(waterLayer) && waterVisibility !== "none";
+  mapLibreEngineState.admin0SourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_ADMIN0_SOURCE_ID));
+  mapLibreEngineState.admin0BoundarySourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID));
+  const admin0Layer = mapLibreEngineState.map?.getLayer?.(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID);
+  const admin0Visibility = admin0Layer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID, "visibility") : "none";
+  mapLibreEngineState.admin0LayerVisible = Boolean(admin0Layer) && admin0Visibility !== "none";
+  mapLibreEngineState.admin1SourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_ADMIN1_SOURCE_ID));
+  const admin1Layer = mapLibreEngineState.map?.getLayer?.(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID);
+  const admin1Visibility = admin1Layer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID, "visibility") : "none";
+  mapLibreEngineState.admin1LayerVisible = Boolean(admin1Layer) && admin1Visibility !== "none";
+  mapLibreEngineState.searchHighlightSourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID));
+  if (!mapLibreEngineState.searchHighlightSourceReady) mapLibreEngineState.searchHighlightFeatures = 0;
+  renderMapEngineDiagnostics();
+}
+
+function syncMapLibreCamera() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  const center = [normalizeLongitude(rotation.lon), clamp(rotation.lat, -85, 85)];
+  const zoom = getMapLibreZoomFromGlobeZoom();
+  try {
+    mapLibreEngineState.lastCameraSyncAt = performance.now();
+    mapLibreEngineState.renderPhase = "active";
+    map.jumpTo({
+      center,
+      zoom,
+      bearing: 0,
+      pitch: 0,
+    });
+    document.body.classList.toggle("earthmap-globe-outline-visible", false);
+    maybeRequestMapLibrePilotFullLandLayer(zoom);
+    maybeRequestMapLibrePilotWaterLayer(zoom);
+    scheduleMapLibreAdmin1ViewportSync();
+  } catch (error) {
+    mapLibreEngineState.status = "camera-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+  }
+}
+
+function syncMapLibreTheme() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  try {
+    map.setStyle(getEarthMapMapLibreStyle(), { diff: false });
+    mapLibreEngineState.styleLoaded = false;
+    mapLibreEngineState.status = "restyling";
+    mapLibreEngineState.renderPhase = "style";
+    map.once("styledata", () => {
+      mapLibreEngineState.styleLoaded = true;
+      installMapLibrePilotLandLayer(mapLibreEngineState.fullLandGeoJson?.features?.length ? "full" : "start");
+      if (mapLibreEngineState.waterGeoJson?.features?.length) installMapLibrePilotWaterLayer();
+      if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) installMapLibrePilotAdmin0Layer();
+      syncMapLibreSearchHighlight();
+      void syncMapLibreAdmin1LayerForSearch();
+      syncMapLibreCamera();
+      scheduleMapLibreAdmin1ViewportSync(650);
+    });
+    renderMapEngineDiagnostics();
+  } catch (error) {
+    mapLibreEngineState.status = "style-error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+  }
+}
+
+function initializeMapLibreEnginePilot() {
+  if (!ui.mapLibreContainer) return;
+  if (!window.maplibregl?.Map) {
+    mapLibreEngineState.status = "unavailable";
+    mapLibreEngineState.error = "MapLibre nicht geladen";
+    renderMapEngineDiagnostics();
+    return;
+  }
+  if (mapLibreEngineState.map) return;
+  try {
+    mapLibreEngineState.map = new window.maplibregl.Map({
+      container: ui.mapLibreContainer,
+      style: getEarthMapMapLibreStyle(),
+      interactive: false,
+      attributionControl: false,
+      center: [normalizeLongitude(rotation.lon), clamp(rotation.lat, -85, 85)],
+      zoom: getMapLibreZoomFromGlobeZoom(),
+      pitch: 0,
+      bearing: 0,
+    });
+    mapLibreEngineState.active = true;
+    mapLibreEngineState.status = "loading";
+    ui.mapLibreContainer.classList.add("is-active");
+    ui.globe?.classList.add("is-maplibre-pilot");
+    document.documentElement.dataset.geoEngineV2 = EARTHMAP_RENDER_ENGINE_V2;
+    mapLibreEngineState.map.on("load", () => {
+      mapLibreEngineState.status = "ready";
+      mapLibreEngineState.styleLoaded = true;
+      try {
+        if (typeof mapLibreEngineState.map.setProjection === "function") {
+          mapLibreEngineState.map.setProjection({ type: "globe" });
+        }
+      } catch (error) {
+        // Projektion ist nicht kritisch für den Pilotstart. Die Diagnose hält
+        // den Status fest; der produktive Renderer wird später darauf bestehen.
+        mapLibreEngineState.status = "ready-no-globe-projection";
+        mapLibreEngineState.error = error?.message || String(error);
+      }
+      installMapLibrePilotLandLayer();
+      requestMapLibrePilotWaterLayer("major");
+      requestMapLibrePilotAdmin0Layer();
+      syncMapLibreCamera();
+      updateMapLibreDiagnosticsFrame();
+    });
+    mapLibreEngineState.map.on("render", updateMapLibreDiagnosticsFrame);
+    mapLibreEngineState.map.on("idle", () => {
+      mapLibreEngineState.renderPhase = "idle";
+      updateMapLibreDiagnosticsFrame();
+    });
+    mapLibreEngineState.map.on("error", (event) => {
+      mapLibreEngineState.status = "error";
+      mapLibreEngineState.error = event?.error?.message || "MapLibre-Fehler";
+      renderMapEngineDiagnostics();
+    });
+  } catch (error) {
+    mapLibreEngineState.status = "error";
+    mapLibreEngineState.error = error?.message || String(error);
+    renderMapEngineDiagnostics();
+  }
+  renderMapEngineDiagnostics();
+}
 
 function createShader(gl, type, source) {
   const shader = gl.createShader(type);
@@ -3061,11 +4763,13 @@ function createProgram(gl) {
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, `
     precision mediump float;
     uniform sampler2D u_map;
+    uniform vec4 u_color;
+    uniform int u_useTexture;
     varying vec2 v_uv;
     varying float v_light;
     varying float v_rim;
     void main() {
-      vec4 base = texture2D(u_map, v_uv);
+      vec4 base = u_useTexture == 1 ? texture2D(u_map, v_uv) : u_color;
       vec3 shaded = base.rgb * v_light;
       shaded = mix(shaded, vec3(0.90, 0.90, 0.87), v_rim * 0.055);
       gl_FragColor = vec4(shaded, base.a);
@@ -3166,6 +4870,27 @@ function geoJsonToSphereLineVertices(geojson, radius = 1.006) {
   return new Float32Array(vertices);
 }
 
+function preparedSurfaceToSphereVertices(preparedSurface, radius = 1.003) {
+  const vertices = [];
+  (preparedSurface?.fillRings || []).forEach((ring) => {
+    vertices.push(...ringToSphereFanVertices(ring, radius));
+  });
+  return new Float32Array(vertices);
+}
+
+function preparedSurfaceToSphereLineVertices(preparedSurface, radius = 1.006) {
+  const vertices = [];
+  (preparedSurface?.outlineRings || []).forEach((ring) => {
+    for (let index = 0; index < ring.length - 1; index += 1) {
+      vertices.push(
+        ...lonLatToSpherePoint(ring[index][0], ring[index][1], radius),
+        ...lonLatToSpherePoint(ring[index + 1][0], ring[index + 1][1], radius),
+      );
+    }
+  });
+  return new Float32Array(vertices);
+}
+
 function createWebglMesh(vertices) {
   const gl = webglState.gl;
   if (!gl || !vertices?.length) return null;
@@ -3247,12 +4972,14 @@ function getRenderableLandGeoJson() {
 
 function updateWebglLandMesh() {
   const source = getRenderableLandGeoJson();
-  const signature = `${activeNaturalEarthTileSignature}|${source?.features?.length || 0}`;
+  const signature = `${activeNaturalEarthTileSignature}|${source?.features?.length || 0}|${Boolean(source?._earthMapWebglLandVertices)}|${Boolean(source?._earthMapWebglLineVertices)}`;
   if (!source || signature === webglState.landSignature) return;
   deleteWebglMesh(webglState.landMesh);
   deleteWebglMesh(webglState.landLineMesh);
-  webglState.landMesh = createWebglMesh(geoJsonToSphereVertices(source, 1.003));
-  webglState.landLineMesh = createWebglMesh(geoJsonToSphereLineVertices(source, 1.006));
+  const landVertices = source._earthMapWebglLandVertices || geoJsonToSphereVertices(source, 1.003);
+  const lineVertices = source._earthMapWebglLineVertices || geoJsonToSphereLineVertices(source, 1.006);
+  webglState.landMesh = createWebglMesh(landVertices);
+  webglState.landLineMesh = createWebglMesh(lineVertices);
   webglState.landSignature = signature;
 }
 
@@ -3284,6 +5011,10 @@ function hexToVectorColor(hex, alpha = 1) {
   return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255, alpha];
 }
 
+function styleColorToVectorColor(color, fallback = "#b8b8b4", alpha = 1) {
+  return hexToVectorColor(normalizeColorValue(color, fallback) || fallback, alpha);
+}
+
 function drawWebglMesh(mesh, color, depthScale = 0.62, mode = null) {
   const gl = webglState.gl;
   const program = webglState.program;
@@ -3292,7 +5023,10 @@ function drawWebglMesh(mesh, color, depthScale = 0.62, mode = null) {
   const positionLocation = gl.getAttribLocation(program, "a_position");
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+  const uvLocation = gl.getAttribLocation(program, "a_uv");
+  if (uvLocation >= 0) gl.disableVertexAttribArray(uvLocation);
   gl.uniform4fv(gl.getUniformLocation(program, "u_color"), color);
+  gl.uniform1i(gl.getUniformLocation(program, "u_useTexture"), 0);
   gl.uniform1f(gl.getUniformLocation(program, "u_lon"), rotation.lon);
   gl.uniform1f(gl.getUniformLocation(program, "u_lat"), rotation.lat);
   const width = Math.max(1, webglState.canvas.width);
@@ -3303,6 +5037,22 @@ function drawWebglMesh(mesh, color, depthScale = 0.62, mode = null) {
   gl.uniform1f(gl.getUniformLocation(program, "u_scaleY"), zoomScale * (fit / height));
   gl.uniform1f(gl.getUniformLocation(program, "u_depthScale"), depthScale);
   gl.drawArrays(mode || gl.TRIANGLES, 0, mesh.vertexCount);
+}
+
+function drawWebglLandSurface() {
+  if (!shouldRenderContinentalBaseMap()) return false;
+  updateWebglLandMesh();
+  const style = getContinentalRenderStyle();
+  const gl = webglState.gl;
+  const hasLandMesh = Boolean(webglState.landMesh?.vertexCount);
+  const hasLineMesh = Boolean(webglState.landLineMesh?.vertexCount);
+  if (hasLandMesh) {
+    drawWebglMesh(webglState.landMesh, styleColorToVectorColor(style.land, "#c4c4c0", 1), 0.62, gl.TRIANGLES);
+  }
+  if (hasLineMesh && !isNavigatingGlobe) {
+    drawWebglMesh(webglState.landLineMesh, styleColorToVectorColor(style.outline, "#5c605e", 1), 0.62, gl.LINES);
+  }
+  return hasLandMesh;
 }
 
 function drawWebglTexturedSphere() {
@@ -3316,6 +5066,7 @@ function drawWebglTexturedSphere() {
   gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, stride, 0);
   gl.enableVertexAttribArray(uvLocation);
   gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, stride, 3 * Float32Array.BYTES_PER_ELEMENT);
+  gl.uniform1i(gl.getUniformLocation(program, "u_useTexture"), 1);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, webglState.mapTexture);
   gl.uniform1i(gl.getUniformLocation(program, "u_map"), 0);
@@ -3377,7 +5128,7 @@ function drawVectorMapSurface(radius, center) {
   return true;
 }
 
-function drawWebglAtmosphereOverlay(width, height, dpr) {
+function drawWebglAtmosphereOverlay(width, height, dpr, usedWebglLandSurface = false) {
   const cssWidth = Math.max(1, Math.floor(width / dpr));
   const cssHeight = Math.max(1, Math.floor(height / dpr));
   const baseSize = Math.min(cssWidth, cssHeight);
@@ -3419,11 +5170,12 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   ctx.strokeStyle = "rgba(255,255,255,.48)";
   ctx.stroke();
 
-  // Farbregel: Die Kartenflächen werden nach der Kugel-/Atmosphärebasis
-  // deckend gezeichnet. Sie dürfen nicht halbtransparent mit der Wasserbasis
-  // oder dem Rim verrechnet werden, sonst ändert sich die Landfarbe je nach
-  // Zoom, Kippwinkel und Position auf der Kugel.
-  const usedVectorSurface = drawVectorMapSurface(radius, center);
+  // Renderregel: Die Grundlandmasse wird im WebGL-Pfad nicht mehr über Canvas
+  // gefüllt. Canvas bleibt hier für Atmosphäre, Markierungen und Annotationen.
+  // Dadurch hängt die Interaktionsgeschwindigkeit nicht mehr an der Zahl der
+  // Küstenvektoren, die in jedem Frame neu auf die Kugel projiziert würden.
+  const usedVectorSurface = Boolean(usedWebglLandSurface);
+  if (!usedVectorSurface) drawVectorMapSurface(radius, center);
   drawMapSearchHighlights(radius, center, { contextOnly: true });
   drawProjectBoundaryLayers(radius, center);
   drawStatisticalDataLayer(radius, center);
@@ -3433,7 +5185,7 @@ function drawWebglAtmosphereOverlay(width, height, dpr) {
   if (shouldRenderContinentalBaseMap()) drawNaturalEarthLakeLayer(radius, center);
   if (shouldRenderContinentalBaseMap()) drawNaturalEarthAdmin0BoundaryLayer(radius, center);
   drawNaturalEarthAdmin1BoundaryLayer(radius, center);
-  if (shouldRenderContinentalBaseMap()) drawNaturalEarthCoastlineOverlay(radius, center);
+  if (shouldRenderContinentalBaseMap() && !webglState.landLineMesh) drawNaturalEarthCoastlineOverlay(radius, center);
   if (state.showGraticule) drawGraticule(radius, center);
   if (!usedVectorSurface) drawWebglMapOutlines(radius, center);
 }
@@ -3457,7 +5209,8 @@ function renderWebglGlobe() {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.useProgram(webglState.program);
   drawWebglTexturedSphere();
-  drawWebglAtmosphereOverlay(webglState.canvas.width, webglState.canvas.height, dpr);
+  const usedWebglLandSurface = drawWebglLandSurface();
+  drawWebglAtmosphereOverlay(webglState.canvas.width, webglState.canvas.height, dpr, usedWebglLandSurface);
   return true;
 }
 
@@ -3526,11 +5279,55 @@ function getNaturalEarth10mDetailThreshold() {
   return current;
 }
 
+function getNaturalEarthSurfaceDensity() {
+  return globeZoom > 7 ? 0.45 : 0.9;
+}
+
+function resetNaturalEarthSurfaceCache() {
+  naturalEarthSurfaceCache.signature = "";
+  naturalEarthSurfaceCache.fillRings = [];
+  naturalEarthSurfaceCache.outlineRings = [];
+}
+
+function createPreparedNaturalEarthSurface(source, density = getNaturalEarthSurfaceDensity()) {
+  const rings = extractLandRings(source);
+  return {
+    density,
+    fillRings: rings.map((ring) => densifyRing(ring, density)),
+    outlineRings: rings.map((ring) => densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85)),
+  };
+}
+
+async function createPreparedNaturalEarthSurfaceInBatches(source, taskContext = {}, density = getNaturalEarthSurfaceDensity()) {
+  const rings = await extractLandRingsInBatches(source, taskContext);
+  if (!rings) return null;
+  const fillRings = [];
+  const outlineRings = [];
+  for (let index = 0; index < rings.length; index += 1) {
+    if (taskContext.shouldPause?.()) return null;
+    const ring = rings[index];
+    fillRings.push(densifyRing(ring, density));
+    outlineRings.push(densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85));
+    if (index % 24 === 0) await taskContext.yield?.();
+  }
+  return { density, fillRings, outlineRings };
+}
+
 function getSurfaceBudgetSignature() {
   if (globeZoom < 2.4) return "surface-xl";
   if (globeZoom < 4.2) return "surface-l";
   if (globeZoom < 7) return "surface-m";
   return "surface-s";
+}
+
+function getNaturalEarthSurfaceFeatureBudget() {
+  const mobileFactor = window.matchMedia?.("(max-width: 760px)")?.matches ? 0.58 : 1;
+  const base = globeZoom < 2.4 ? 420
+    : globeZoom < 4.2 ? 760
+      : globeZoom < 7 ? 1250
+        : globeZoom < 12 ? 1900
+          : 2800;
+  return Math.max(260, Math.round(base * mobileFactor));
 }
 
 function getVisibleNaturalEarth10mTiles() {
@@ -3542,6 +5339,75 @@ function getVisibleNaturalEarth10mTiles() {
 
 function getNaturalEarth10mTileDataKey(tile) {
   return `10m-land-hierarchy-${tile.key}`;
+}
+
+function getNaturalEarthGlobalTile() {
+  const index = getNaturalEarth10mTileIndex();
+  if (window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start"]) {
+    return { key: "global-start", file: "ne_10m_land_hierarchy_global_start.js", isGlobal: true };
+  }
+  return index?.global ? { ...index.global, isGlobal: true } : null;
+}
+
+function getNaturalEarthTileLoadLimit() {
+  return window.matchMedia?.("(max-width: 760px)")?.matches ? 1 : 2;
+}
+
+function queueNaturalEarthTileLoads(tiles) {
+  let added = false;
+  tiles.forEach((tile) => {
+    const key = tile.isGlobal ? `10m-land-hierarchy-${tile.key}` : getNaturalEarth10mTileDataKey(tile);
+    if (window.EarthMapNaturalEarthTileData?.[key]) return;
+    if (pendingNaturalEarthTiles.has(key)) return;
+    if (naturalEarthTileLoadQueue.some((entry) => entry.key === key)) return;
+    naturalEarthTileLoadQueue.push({ key, tile });
+    pendingNaturalEarthTiles.add(key);
+    added = true;
+  });
+  if (added) runNaturalEarthTileLoadQueue();
+}
+
+function runNaturalEarthTileLoadQueue() {
+  if (isNavigatingGlobe) {
+    scheduleNaturalEarthDetailUpdate(520);
+    return;
+  }
+  const limit = getNaturalEarthTileLoadLimit();
+  while (naturalEarthTileLoadActiveCount < limit && naturalEarthTileLoadQueue.length) {
+    const entry = naturalEarthTileLoadQueue.shift();
+    if (!entry) return;
+    const { key, tile } = entry;
+    if (window.EarthMapNaturalEarthTileData?.[key]) {
+      pendingNaturalEarthTiles.delete(key);
+      continue;
+    }
+    naturalEarthTileLoadActiveCount += 1;
+    const script = document.createElement("script");
+    script.src = `${NATURAL_EARTH_LAND_DETAILS["10m"].tileBasePath}${tile.file}?v=20260628h`;
+    script.async = true;
+    script.onload = () => {
+      naturalEarthTileLoadActiveCount = Math.max(0, naturalEarthTileLoadActiveCount - 1);
+      pendingNaturalEarthTiles.delete(key);
+      scheduleNaturalEarthDetailUpdate(180);
+      if (!isNaturalEarthTileWorkPending()) runEarthMapBackgroundTaskQueue();
+      runWhenIdle(runNaturalEarthTileLoadQueue, 420);
+    };
+    script.onerror = () => {
+      naturalEarthTileLoadActiveCount = Math.max(0, naturalEarthTileLoadActiveCount - 1);
+      pendingNaturalEarthTiles.delete(key);
+      console.warn(`Natural-Earth-10m-Hierarchie-Tile ${key} konnte nicht geladen werden.`);
+      if (!isNaturalEarthTileWorkPending()) runEarthMapBackgroundTaskQueue();
+      runWhenIdle(runNaturalEarthTileLoadQueue, 700);
+    };
+    document.head.appendChild(script);
+  }
+}
+
+function isNaturalEarthTileWorkPending() {
+  return naturalEarthTileLoadActiveCount > 0
+    || naturalEarthTileLoadQueue.length > 0
+    || pendingNaturalEarthTiles.size > 0
+    || Boolean(pendingNaturalEarthTileBuildSignature);
 }
 
 function decodeHierarchicalRing(ring, threshold) {
@@ -3615,12 +5481,13 @@ function decodeHierarchicalFeature(feature, threshold) {
 }
 
 function buildNaturalEarth10mTileCollection(tiles) {
-  const features = [];
+  const candidates = [];
   const seenFeatureIds = new Set();
   const collections = [];
   const index = getNaturalEarth10mTileIndex();
   const threshold = getNaturalEarth10mDetailThreshold();
-  const globalCollection = window.EarthMapNaturalEarthTileData?.[`10m-land-hierarchy-${index?.global?.key}`];
+  const globalKey = getNaturalEarthGlobalTile()?.key || index?.global?.key;
+  const globalCollection = window.EarthMapNaturalEarthTileData?.[`10m-land-hierarchy-${globalKey}`];
   if (globalCollection?.features?.length) collections.push(globalCollection);
   tiles.forEach((tile) => {
     const collection = window.EarthMapNaturalEarthTileData?.[getNaturalEarth10mTileDataKey(tile)];
@@ -3628,20 +5495,101 @@ function buildNaturalEarth10mTileCollection(tiles) {
   });
   collections.forEach((collection) => {
     collection.features.forEach((feature) => {
-      const id = feature.properties?._earthMapFeatureId || `${feature.bbox?.join(",")}-${features.length}`;
+      const id = feature.properties?._earthMapFeatureId || `${feature.bbox?.join(",")}-${candidates.length}`;
       if (seenFeatureIds.has(id)) return;
       const decodedFeature = decodeHierarchicalFeature(feature, threshold);
       if (!decodedFeature) return;
       seenFeatureIds.add(id);
-      features.push(decodedFeature);
+      candidates.push({ feature: decodedFeature, area: getApproxFeaturePixelMetrics(feature).area });
     });
   });
-  return {
+  const features = candidates
+    .sort((a, b) => b.area - a.area)
+    .slice(0, getNaturalEarthSurfaceFeatureBudget())
+    .map((candidate) => candidate.feature);
+  const collection = {
     type: "FeatureCollection",
     name: `ne_10m_land_hierarchy_zoom_${globeZoom.toFixed(2)}`,
     features,
   };
+  collection._earthMapPreparedSurface = createPreparedNaturalEarthSurface(collection);
+  collection._earthMapWebglLandVertices = preparedSurfaceToSphereVertices(collection._earthMapPreparedSurface, 1.003);
+  collection._earthMapWebglLineVertices = preparedSurfaceToSphereLineVertices(collection._earthMapPreparedSurface, 1.006);
+  return collection;
 }
+
+async function buildNaturalEarth10mTileCollectionInBatches(tiles, taskContext = {}) {
+  const candidates = [];
+  const seenFeatureIds = new Set();
+  const collections = [];
+  const index = getNaturalEarth10mTileIndex();
+  const threshold = getNaturalEarth10mDetailThreshold();
+  const globalKey = getNaturalEarthGlobalTile()?.key || index?.global?.key;
+  const globalCollection = window.EarthMapNaturalEarthTileData?.[`10m-land-hierarchy-${globalKey}`];
+  if (globalCollection?.features?.length) collections.push(globalCollection);
+  tiles.forEach((tile) => {
+    const collection = window.EarthMapNaturalEarthTileData?.[getNaturalEarth10mTileDataKey(tile)];
+    if (collection?.features?.length) collections.push(collection);
+  });
+
+  let processed = 0;
+  for (const collection of collections) {
+    for (const feature of collection.features || []) {
+      if (taskContext.shouldPause?.()) return null;
+      const id = feature.properties?._earthMapFeatureId || `${feature.bbox?.join(",")}-${candidates.length}`;
+      if (!seenFeatureIds.has(id)) {
+        const decodedFeature = decodeHierarchicalFeature(feature, threshold);
+        if (decodedFeature) {
+          seenFeatureIds.add(id);
+          candidates.push({ feature: decodedFeature, area: getApproxFeaturePixelMetrics(feature).area });
+        }
+      }
+      processed += 1;
+      if (processed % 28 === 0) await taskContext.yield?.();
+    }
+  }
+  const features = candidates
+    .sort((a, b) => b.area - a.area)
+    .slice(0, getNaturalEarthSurfaceFeatureBudget())
+    .map((candidate) => candidate.feature);
+  const collection = {
+    type: "FeatureCollection",
+    name: `ne_10m_land_hierarchy_zoom_${globeZoom.toFixed(2)}`,
+    features,
+  };
+  await taskContext.yield?.();
+  const preparedSurface = await createPreparedNaturalEarthSurfaceInBatches(collection, taskContext);
+  if (!preparedSurface) return null;
+  collection._earthMapPreparedSurface = preparedSurface;
+  await taskContext.yield?.();
+  collection._earthMapWebglLandVertices = preparedSurfaceToSphereVertices(preparedSurface, 1.003);
+  await taskContext.yield?.();
+  collection._earthMapWebglLineVertices = preparedSurfaceToSphereLineVertices(preparedSurface, 1.006);
+  return collection;
+}
+
+function getPreparedNaturalEarthSurface(source) {
+  if (!source?.features?.length) return null;
+  const density = getNaturalEarthSurfaceDensity();
+  const signature = [
+    source._earthMapRenderSignature || activeNaturalEarthTileSignature || source.name || "natural-earth",
+    source.features.length,
+    density,
+  ].join("|");
+  if (naturalEarthSurfaceCache.signature === signature) return naturalEarthSurfaceCache;
+  const prepared = source._earthMapPreparedSurface;
+  naturalEarthSurfaceCache.signature = signature;
+  if (prepared?.fillRings?.length || prepared?.outlineRings?.length) {
+    naturalEarthSurfaceCache.fillRings = prepared.fillRings || [];
+    naturalEarthSurfaceCache.outlineRings = prepared.outlineRings || [];
+    return naturalEarthSurfaceCache;
+  }
+  const fallback = createPreparedNaturalEarthSurface(source, density);
+  naturalEarthSurfaceCache.fillRings = fallback.fillRings;
+  naturalEarthSurfaceCache.outlineRings = fallback.outlineRings;
+  return naturalEarthSurfaceCache;
+}
+
 function featureBboxIntersectsViewport(feature, bounds) {
   const bbox = feature?.bbox || feature?.geometry?.bbox;
   if (!Array.isArray(bbox) || bbox.length < 4 || !bbox.every(Number.isFinite)) return true;
@@ -3652,21 +5600,19 @@ function featureBboxIntersectsViewport(feature, bounds) {
 
 function getRenderableNaturalEarthSource(source) {
   if (geoState.detailLevel !== "10m" || source?.type !== "FeatureCollection") return source;
-  const bounds = getBufferedViewportBounds();
-  // Performance-Regel: 10m bleibt topologisch ungeschnitten, wird aber vor dem
-  // Rendern auf den gepufferten Sichtbereich reduziert. So vermeiden wir die
-  // früheren Kachel-Schnittartefakte, ohne bei jedem Frame die gesamte 10m-Welt
-  // durch D3 laufen zu lassen.
-  return {
-    type: "FeatureCollection",
-    name: `${source.name || "ne_10m_land"}_visible`,
-    features: (source.features || []).filter((feature) => featureBboxIntersectsViewport(feature, bounds)),
-  };
+  // Performance-Regel: Die 10m-FeatureCollection ist bereits aus Startfläche
+  // plus sichtbaren/bepufferten Tiles gebaut. Eine zweite BBox-Filterung im
+  // Renderframe erzeugt neue Objekte, invalidiert vorbereitete Ringe und zwingt
+  // den Hauptthread zur erneuten Küstenarbeit. Darum rendert die Anzeige genau
+  // die zuletzt installierte, bereits vorbereitete Kollektion.
+  return source;
 }
 
 function installNaturalEarthDetail(level, geojson) {
   if (!geojson) return;
   activeNaturalEarthSource = geojson;
+  pendingNaturalEarthTileBuildSignature = "";
+  resetNaturalEarthSurfaceCache();
   geoState.detailLevel = level;
   installLandGeoJson(geojson);
   buildLandSamplesDeferred();
@@ -3682,14 +5628,30 @@ function requestNaturalEarthDetailForZoom() {
   if (desiredLevel === "10m") {
     const index = getNaturalEarth10mTileIndex();
     if (!index) return;
-    const tiles = getVisibleNaturalEarth10mTiles();
+    const threshold = getNaturalEarth10mDetailThreshold();
+    const startupGlobal = threshold >= 0.52 && globeZoom < 1.35
+      ? { key: "global-start", file: "ne_10m_land_hierarchy_global_start.js", isGlobal: true }
+      : null;
+    const tiles = startupGlobal ? [] : getVisibleNaturalEarth10mTiles();
+    const globalTile = getNaturalEarthGlobalTile();
     const required = [
-      index.global ? { ...index.global, isGlobal: true } : null,
+      startupGlobal || globalTile,
       ...tiles,
     ].filter(Boolean);
-    const threshold = getNaturalEarth10mDetailThreshold();
-    const signature = `hierarchy|${threshold}|${getSurfaceBudgetSignature()}|${required.map((tile) => tile.key).sort().join("|")}`;
+    const loadedTiles = tiles.filter((tile) => {
+      const key = getNaturalEarth10mTileDataKey(tile);
+      return Boolean(window.EarthMapNaturalEarthTileData?.[key]);
+    });
+    const loadedRequired = [
+      startupGlobal || globalTile,
+      ...loadedTiles,
+    ].filter((tile) => {
+      const key = tile.isGlobal ? `10m-land-hierarchy-${tile.key}` : getNaturalEarth10mTileDataKey(tile);
+      return Boolean(window.EarthMapNaturalEarthTileData?.[key]);
+    });
+    const signature = `hierarchy|${threshold}|${getSurfaceBudgetSignature()}|${loadedRequired.map((tile) => tile.key).sort().join("|")}`;
     if (signature === activeNaturalEarthTileSignature && geoState.detailLevel === "10m" && activeNaturalEarthSource) return;
+    if (signature === pendingNaturalEarthTileBuildSignature) return;
 
     const missing = required.filter((tile) => {
       const key = tile.isGlobal ? `10m-land-hierarchy-${tile.key}` : getNaturalEarth10mTileDataKey(tile);
@@ -3697,32 +5659,43 @@ function requestNaturalEarthDetailForZoom() {
     });
 
     if (missing.length) {
-      missing.forEach((tile) => {
-        const key = tile.isGlobal ? `10m-land-hierarchy-${tile.key}` : getNaturalEarth10mTileDataKey(tile);
-        if (pendingNaturalEarthTiles.has(key)) return;
-        pendingNaturalEarthTiles.add(key);
-        const script = document.createElement("script");
-        script.src = `${NATURAL_EARTH_LAND_DETAILS["10m"].tileBasePath}${tile.file}?v=20260628h`;
-        script.async = true;
-        script.onload = () => {
-          pendingNaturalEarthTiles.delete(key);
-          scheduleNaturalEarthDetailUpdate(120);
-        };
-        script.onerror = () => {
-          pendingNaturalEarthTiles.delete(key);
-          console.warn(`Natural-Earth-10m-Hierarchie-Tile ${key} konnte nicht geladen werden.`);
-        };
-        document.head.appendChild(script);
-      });
-      return;
+      queueNaturalEarthTileLoads(missing);
+      if (!startupGlobal && !loadedTiles.length) return;
     }
 
-    activeNaturalEarthTileSignature = signature;
-    installNaturalEarthDetail("10m", buildNaturalEarth10mTileCollection(tiles));
+    if (startupGlobal) {
+      activeNaturalEarthTileSignature = signature;
+      installNaturalEarthDetail("10m", buildNaturalEarth10mTileCollection(tiles));
+      scheduleGlobeRender();
+      return;
+    }
+    pendingNaturalEarthTileBuildSignature = signature;
+    queueEarthMapBackgroundTask("Natural-Earth-10m-Detailflächen vorbereiten", async (taskContext) => {
+      if (taskContext.shouldPause?.()) return;
+      const collection = await buildNaturalEarth10mTileCollectionInBatches(loadedTiles, taskContext);
+      if (!collection) {
+        pendingNaturalEarthTileBuildSignature = "";
+        scheduleNaturalEarthDetailUpdate(900);
+        return;
+      }
+      if (taskContext.shouldPause?.()) {
+        pendingNaturalEarthTileBuildSignature = "";
+        scheduleNaturalEarthDetailUpdate(900);
+        return;
+      }
+      activeNaturalEarthTileSignature = signature;
+      pendingNaturalEarthTileBuildSignature = "";
+      installNaturalEarthDetail("10m", collection);
+      scheduleGlobeRender();
+    }, {
+      key: `natural-earth-detail-${signature}`,
+      priority: 20,
+    });
     scheduleGlobeRender();
     return;
   }
   activeNaturalEarthTileSignature = "";
+  pendingNaturalEarthTileBuildSignature = "";
   if (desiredLevel === geoState.detailLevel && activeNaturalEarthSource) return;
 
   const loaded = getLoadedNaturalEarthLand(desiredLevel);
@@ -3777,7 +5750,8 @@ function scheduleGlobeRender() {
   if (renderFrameId) return;
   renderFrameId = window.requestAnimationFrame(() => {
     renderFrameId = 0;
-    renderGlobe();
+    syncMapLibreCamera();
+    if (!mapLibreEngineState.active) renderGlobe();
   });
 }
 
@@ -3791,10 +5765,13 @@ function scheduleNaturalEarthDetailUpdate(delay = 220) {
 
 function markGlobeNavigationActive() {
   isNavigatingGlobe = true;
+  pauseEarthMapBackgroundTasks();
   window.clearTimeout(detailLoadTimer);
   window.clearTimeout(navigationSettledTimer);
   navigationSettledTimer = window.setTimeout(() => {
     isNavigatingGlobe = false;
+    runNaturalEarthTileLoadQueue();
+    runEarthMapBackgroundTaskQueue();
     scheduleNaturalEarthDetailUpdate(680);
     scheduleGlobeRender();
   }, 360);
@@ -3894,6 +5871,29 @@ function extractLandRings(geojson) {
   return rings;
 }
 
+async function extractLandRingsInBatches(geojson, taskContext = {}) {
+  const rings = [];
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  let processed = 0;
+  for (const feature of features) {
+    if (taskContext.shouldPause?.()) return null;
+    const geometry = feature?.geometry;
+    if (geometry?.type === "Polygon") {
+      const outerRing = sanitizeRing(geometry.coordinates?.[0] || []);
+      if (outerRing.length > 2) rings.push(outerRing);
+    }
+    if (geometry?.type === "MultiPolygon") {
+      geometry.coordinates?.forEach((polygon) => {
+        const outerRing = sanitizeRing(polygon?.[0] || []);
+        if (outerRing.length > 2) rings.push(outerRing);
+      });
+    }
+    processed += 1;
+    if (processed % 48 === 0) await taskContext.yield?.();
+  }
+  return rings;
+}
+
 function extractLandPolygons(geojson) {
   const polygons = [];
   const features = Array.isArray(geojson?.features) ? geojson.features : [];
@@ -3915,6 +5915,36 @@ function extractLandPolygons(geojson) {
       });
     }
   });
+  return polygons;
+}
+
+async function extractLandPolygonsInBatches(geojson, taskContext = {}) {
+  const polygons = [];
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  let processed = 0;
+  const addGeometryPolygons = (geometry) => {
+    if (!geometry) return;
+    if (geometry.type === "Polygon") {
+      const rings = (geometry.coordinates || [])
+        .map(sanitizeRing)
+        .filter((ring) => ring.length > 2);
+      if (rings.length) polygons.push(rings);
+    }
+    if (geometry.type === "MultiPolygon") {
+      geometry.coordinates?.forEach((polygon) => {
+        const rings = (polygon || [])
+          .map(sanitizeRing)
+          .filter((ring) => ring.length > 2);
+        if (rings.length) polygons.push(rings);
+      });
+    }
+  };
+  for (const feature of features) {
+    if (taskContext.shouldPause?.()) return null;
+    addGeometryPolygons(feature?.geometry);
+    processed += 1;
+    if (processed % 80 === 0) await taskContext.yield?.();
+  }
   return polygons;
 }
 
@@ -3949,6 +5979,46 @@ function extractBoundaryLineStrings(geojson) {
       });
     }
   });
+  return lines;
+}
+
+async function extractBoundaryLineStringsInBatches(geojson, taskContext = {}) {
+  const lines = [];
+  const features = Array.isArray(geojson?.features) ? geojson.features : [];
+  let processed = 0;
+  const addGeometryLines = (geometry) => {
+    if (!geometry) return;
+    if (geometry.type === "LineString") {
+      const line = sanitizeRing(geometry.coordinates || []);
+      if (line.length > 1) lines.push(line);
+    }
+    if (geometry.type === "MultiLineString") {
+      (geometry.coordinates || []).forEach((rawLine) => {
+        const line = sanitizeRing(rawLine || []);
+        if (line.length > 1) lines.push(line);
+      });
+    }
+    if (geometry.type === "Polygon") {
+      (geometry.coordinates || []).forEach((rawRing) => {
+        const line = sanitizeRing(rawRing || []);
+        if (line.length > 1) lines.push(line);
+      });
+    }
+    if (geometry.type === "MultiPolygon") {
+      (geometry.coordinates || []).forEach((polygon) => {
+        (polygon || []).forEach((rawRing) => {
+          const line = sanitizeRing(rawRing || []);
+          if (line.length > 1) lines.push(line);
+        });
+      });
+    }
+  };
+  for (const feature of features) {
+    if (taskContext.shouldPause?.()) return null;
+    addGeometryLines(feature?.geometry);
+    processed += 1;
+    if (processed % 120 === 0) await taskContext.yield?.();
+  }
   return lines;
 }
 
@@ -3996,6 +6066,14 @@ function createLandSamples(rings, step = 1.35) {
 }
 
 function installLandGeoJson(geojson) {
+  if (hasD3Geo) {
+    geoState.sampleGeneration += 1;
+    geoState.landRings = [];
+    geoState.landSamples = [];
+    geoState.samplesReady = true;
+    geoState.status = geojson?.features?.length ? "ready" : "empty";
+    return;
+  }
   const landRings = extractLandRings(geojson);
   geoState.sampleGeneration += 1;
   geoState.landRings = landRings;
@@ -4198,8 +6276,8 @@ function createOrthographicProjection(radius, center) {
 function drawGeographicLayer(radius, center) {
   const renderSource = getRenderableNaturalEarthSource(getInteractiveNaturalEarthSource());
   if (!hasD3Geo || !renderSource) return false;
-  const rings = extractLandRings(renderSource);
-  if (!rings.length) return false;
+  const preparedSurface = getPreparedNaturalEarthSurface(renderSource);
+  if (!preparedSurface?.fillRings?.length) return false;
   const style = getContinentalRenderStyle();
 
   // Renderregel: Die Basislandmasse wird nicht mehr mit D3s sphärischer
@@ -4207,20 +6285,19 @@ function drawGeographicLayer(radius, center) {
   // mit unserer eigenen Projektion gefüllt. Horizontgeschnittene Polygone
   // schließen wir über den Globusrand, statt sie ganz weiß zu lassen oder D3
   // wieder das sphärische Komplement füllen zu lassen.
-  rings.forEach((ring) => {
-    const denseRing = densifyRing(ring, globeZoom > 7 ? 0.45 : 0.9);
-    drawVisibleHemisphereFill(denseRing, radius, center, style.land);
+  preparedSurface.fillRings.forEach((ring) => {
+    drawVisibleHemisphereFill(ring, radius, center, style.land);
   });
 
   if (isOsmTopographicBaseMap()) {
-    drawTopographicReliefOverlay(rings, radius, center, style);
+    drawTopographicReliefOverlay(preparedSurface.fillRings, radius, center, style);
   }
 
   drawNaturalEarthLakeLayer(radius, center);
 
-  rings.forEach((ring) => {
+  preparedSurface.outlineRings.forEach((ring) => {
     drawProjectedLine(
-      densifyRing(ring, globeZoom > 7 ? 0.45 : 0.85),
+      ring,
       radius,
       center,
       style.outline,
@@ -4231,6 +6308,29 @@ function drawGeographicLayer(radius, center) {
   return true;
 }
 
+function scheduleNaturalEarthBoundaryRingPreparation(kind, source) {
+  const isAdmin1 = kind === "admin1";
+  const ringsKey = isAdmin1 ? "naturalEarthAdmin1BoundaryRings" : "naturalEarthAdmin0BoundaryRings";
+  const preparingKey = isAdmin1 ? "naturalEarthAdmin1BoundaryPreparing" : "naturalEarthAdmin0BoundaryPreparing";
+  if (state[ringsKey] || state[preparingKey] || !source?.features?.length) return;
+
+  state[preparingKey] = true;
+  queueEarthMapBackgroundTask(`Natural-Earth-${isAdmin1 ? "Admin-1" : "Admin-0"}-Grenzlinien vorbereiten`, async (taskContext) => {
+    const rings = await extractBoundaryLineStringsInBatches(source, taskContext);
+    if (!rings) {
+      state[preparingKey] = false;
+      if (!taskContext.shouldPause?.()) scheduleNaturalEarthBoundaryRingPreparation(kind, source);
+      return;
+    }
+    state[ringsKey] = rings;
+    state[preparingKey] = false;
+    scheduleGlobeRender();
+  }, {
+    key: `natural-earth-boundaries-${kind}`,
+    priority: isAdmin1 ? 16 : 18,
+  });
+}
+
 function getNaturalEarthAdmin1BoundaryRings() {
   if (state.naturalEarthAdmin1BoundaryRings) return state.naturalEarthAdmin1BoundaryRings;
   const source = window.EarthMapNaturalEarthAdmin1Boundaries10m;
@@ -4239,25 +6339,47 @@ function getNaturalEarthAdmin1BoundaryRings() {
   // Für die Anzeige halten wir nur die Linienringe im Speicher; Flächenfüllung
   // bleibt transparent. Die vollständige Geometrie/Metadatenlogik bleibt vom
   // späteren Archiv- und Importpfad getrennt.
-  state.naturalEarthAdmin1BoundaryRings = extractBoundaryLineStrings(source);
-  return state.naturalEarthAdmin1BoundaryRings;
+  scheduleNaturalEarthBoundaryRingPreparation("admin1", source);
+  return [];
 }
 
 function getNaturalEarthAdmin0BoundaryRings() {
   if (state.naturalEarthAdmin0BoundaryRings) return state.naturalEarthAdmin0BoundaryRings;
   const boundarySource = window.EarthMapNaturalEarthAdmin0Boundaries10m;
   if (boundarySource?.features?.length) {
-    state.naturalEarthAdmin0BoundaryRings = extractBoundaryLineStrings(boundarySource);
-    return state.naturalEarthAdmin0BoundaryRings;
+    scheduleNaturalEarthBoundaryRingPreparation("admin0", boundarySource);
+    return [];
   }
-  const dataset = getNaturalEarthCountryDataset();
-  if (!dataset?.features?.length) return [];
   // Hintergrundregel: Staatsgrenzen sind eine Standard-Annotation auf der
-  // Grundkarte. Wir leiten sie aus den Admin-0-Polygonen ab, zeichnen aber nur
-  // die Ringe als Linien. Dadurch bleibt die Länderfüllung fachlich getrennt
-  // von der globalen Landmasse und erzeugt keine neue Flächenlogik.
-  state.naturalEarthAdmin0BoundaryRings = extractLandPolygons(dataset).flat();
-  return state.naturalEarthAdmin0BoundaryRings;
+  // Grundkarte. Wenn das vorbereitete Grenzskript noch nicht da ist, zeichnen
+  // wir lieber einen Frame ohne diese Annotation, statt synchron aus den
+  // Länderpolygonen Ringe zu extrahieren und dadurch die Interaktion zu sperren.
+  return [];
+}
+
+function scheduleNaturalEarthWaterPreparation(kind, source) {
+  const isLake = kind === "lake";
+  const polygonsKey = isLake ? "naturalEarthLakePolygons" : "naturalEarthEnclosedSeaPolygons";
+  const ringsKey = isLake ? "naturalEarthLakeRings" : "naturalEarthEnclosedSeaRings";
+  const preparingKey = isLake ? "naturalEarthLakePreparing" : "naturalEarthEnclosedSeaPreparing";
+  if (state[polygonsKey] || state[preparingKey] || !source?.features?.length) return;
+
+  state[preparingKey] = true;
+  queueEarthMapBackgroundTask(`Natural-Earth-${isLake ? "Gewässerflächen" : "Binnenmeere"} vorbereiten`, async (taskContext) => {
+    const polygons = await extractLandPolygonsInBatches(source, taskContext);
+    if (!polygons) {
+      state[preparingKey] = false;
+      if (!taskContext.shouldPause?.()) scheduleNaturalEarthWaterPreparation(kind, source);
+      return;
+    }
+    state[polygonsKey] = polygons;
+    state[ringsKey] = polygons.flat();
+    state[preparingKey] = false;
+    scheduleGlobeRender();
+  }, {
+    key: `natural-earth-water-${kind}`,
+    priority: isLake ? 17 : 14,
+  });
 }
 
 function getNaturalEarthLakePolygons() {
@@ -4267,14 +6389,14 @@ function getNaturalEarthLakePolygons() {
   // Hintergrundregel: Seen sind Teil der physischen Grundkarte. Sie bleiben
   // deshalb strikt von Projektlayern getrennt und übernehmen die Wasserfarbe
   // der aktuell gewählten Grundkarte.
-  state.naturalEarthLakePolygons = extractLandPolygons(source);
-  return state.naturalEarthLakePolygons;
+  scheduleNaturalEarthWaterPreparation("lake", source);
+  return [];
 }
 
 function getNaturalEarthLakeRings() {
   if (state.naturalEarthLakeRings) return state.naturalEarthLakeRings;
-  state.naturalEarthLakeRings = getNaturalEarthLakePolygons().flat();
-  return state.naturalEarthLakeRings;
+  getNaturalEarthLakePolygons();
+  return [];
 }
 
 function getNaturalEarthEnclosedSeaPolygons() {
@@ -4284,14 +6406,14 @@ function getNaturalEarthEnclosedSeaPolygons() {
   // Datenregel: Natural Earth führt das Kaspische Meer nicht in den Lakes,
   // sondern in geography_marine_polys. Für die Grundkarte behandeln wir solche
   // landumschlossenen Meeresflächen dennoch wie Wasserflächen.
-  state.naturalEarthEnclosedSeaPolygons = extractLandPolygons(source);
-  return state.naturalEarthEnclosedSeaPolygons;
+  scheduleNaturalEarthWaterPreparation("enclosed-sea", source);
+  return [];
 }
 
 function getNaturalEarthEnclosedSeaRings() {
   if (state.naturalEarthEnclosedSeaRings) return state.naturalEarthEnclosedSeaRings;
-  state.naturalEarthEnclosedSeaRings = getNaturalEarthEnclosedSeaPolygons().flat();
-  return state.naturalEarthEnclosedSeaRings;
+  getNaturalEarthEnclosedSeaPolygons();
+  return [];
 }
 
 function getNaturalEarthWaterPolygons() {
@@ -4376,13 +6498,13 @@ function drawNaturalEarthAdmin1BoundaryLayer(radius, center) {
 function drawNaturalEarthCoastlineOverlay(radius, center) {
   const source = getRenderableNaturalEarthSource(getInteractiveNaturalEarthSource());
   if (!source?.features?.length) return false;
-  const rings = extractLandRings(source);
+  const preparedSurface = getPreparedNaturalEarthSurface(source);
+  const rings = preparedSurface?.outlineRings || [];
   if (!rings.length) return false;
   const style = getContinentalRenderStyle();
-  const density = globeZoom > 7 ? 0.45 : 0.85;
   const lineWidth = getStableGlobeStrokeWidth(radius, 0.0018, 0.7);
   rings.forEach((ring) => {
-    drawProjectedLine(densifyRing(ring, density), radius, center, style.outline, lineWidth);
+    drawProjectedLine(ring, radius, center, style.outline, lineWidth);
   });
   return true;
 }
@@ -4455,30 +6577,79 @@ function hasDrawableBoundaryFeature(feature) {
   return feature.type === "Polygon" || feature.type === "MultiPolygon";
 }
 
+function canRunHeavyMapLayerWork() {
+  return state.heavyMapLayerWorkEnabled === true
+    && !isNavigatingGlobe
+    && !isNaturalEarthTileWorkPending();
+}
+
+function scheduleHeavyMapLayerWorkActivation(delay = 2600) {
+  window.clearTimeout(state.heavyMapLayerWorkTimer);
+  state.heavyMapLayerWorkTimer = window.setTimeout(() => {
+    const activate = () => {
+      if (isNavigatingGlobe) {
+        scheduleHeavyMapLayerWorkActivation(900);
+        return;
+      }
+      state.heavyMapLayerWorkEnabled = true;
+      scheduleGlobeRender();
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(activate, { timeout: 1800 });
+    } else {
+      activate();
+    }
+  }, delay);
+}
+
 function scheduleGearBoxLayerGeometryHydration(layer) {
   const rows = Array.isArray(layer?.table?.rows) ? layer.table.rows : [];
-  if (!rows.length || layer._gearBoxGeometryHydrationPending) return;
+  if (!rows.length || layer._gearBoxGeometryHydrationPending || !canRunHeavyMapLayerWork()) return;
   const now = Date.now();
   if (layer._gearBoxGeometryHydrationLastAttemptAt && now - layer._gearBoxGeometryHydrationLastAttemptAt < 10000) return;
   layer._gearBoxGeometryHydrationPending = true;
   layer._gearBoxGeometryHydrationLastAttemptAt = now;
-  ensureGearBoxBoundaryChunksForRows(rows)
-    .then(() => {
+  const hydrate = async (taskContext = {}) => {
+    if (!canRunHeavyMapLayerWork()) {
+      layer._gearBoxGeometryHydrationPending = false;
+      scheduleHeavyMapLayerWorkActivation(900);
+      return;
+    }
+    try {
+      const completed = await ensureGearBoxBoundaryChunksForRowsInBatches(rows, taskContext);
+      if (!completed || taskContext.shouldPause?.()) {
+        layer._gearBoxGeometryHydrationPending = false;
+        layer._gearBoxGeometryHydrationLastAttemptAt = 0;
+        scheduleGearBoxLayerGeometryHydration(layer);
+        return;
+      }
+      await taskContext.yield?.();
       rebuildGearBoxDataLayerMatches(layer);
       persistProjects();
-      renderProjectBrowser();
-      renderObjectEditor();
-      renderGlobe();
-    })
-    .catch((error) => {
+      if (!taskContext.shouldPause?.()) {
+        scheduleGlobeRender();
+      }
+    } catch (error) {
       console.warn("Statistik-Geometrien konnten nicht nachgeladen werden.", error);
-    })
-    .finally(() => {
+    } finally {
       layer._gearBoxGeometryHydrationPending = false;
-    });
+    }
+  };
+  queueEarthMapBackgroundTask(`Statistik-Geometrien: ${layer.title || layer.id}`, hydrate, {
+    key: `gearbox-hydrate-${layer.id}`,
+    priority: 8,
+  });
 }
 
-function getActiveStatisticalDataLayer(project = getActiveProject()) {
+function getActiveStatisticalDataLayer(project = getActiveProject(), options = {}) {
+  if (options.allowHeavyWork !== true && !canRunHeavyMapLayerWork()) {
+    const layers = Array.isArray(project?.dataLayers) ? project.dataLayers : [];
+    return [...layers].reverse()
+      .find((candidate) => candidate?.kind === "gearbox-data-layer"
+        && candidate.visible !== false
+        && Array.isArray(candidate.valueMatches)
+        && candidate.valueMatches.some((match) => hasDrawableBoundaryFeature(match?.feature) && match.fill)) || null;
+  }
   const layers = Array.isArray(project?.dataLayers) ? project.dataLayers : [];
   const visibleLayers = [...layers].reverse()
     .filter((candidate) => candidate?.kind === "gearbox-data-layer" && candidate.visible !== false);
@@ -4498,11 +6669,13 @@ function getActiveStatisticalDataLayer(project = getActiveProject()) {
 }
 
 function isStatisticalMapActive() {
-  return Boolean(getActiveStatisticalDataLayer());
+  return Boolean(getActiveStatisticalDataLayer(getActiveProject(), { allowHeavyWork: false }));
 }
 
 function drawStatisticalDataLayer(radius, center) {
-  const layer = getActiveStatisticalDataLayer();
+  if (isNavigatingGlobe) return false;
+  if (isNaturalEarthTileWorkPending()) return false;
+  const layer = getActiveStatisticalDataLayer(getActiveProject(), { allowHeavyWork: true });
   if (!layer) return false;
   let drewLayer = false;
   let attempted = 0;
@@ -4515,8 +6688,26 @@ function drawStatisticalDataLayer(radius, center) {
     groupedByFill.get(match.fill).push(match.feature);
   });
   groupedByFill.forEach((features, fill) => {
-    const didDraw = drawBoundaryFeatureVector(
-      { type: "FeatureCollection", features },
+    const featureCollection = { type: "FeatureCollection", features };
+    const cacheKey = getBoundaryFeatureVectorCacheKey(featureCollection);
+    const statisticCacheKey = cacheKey || `stat:${layer.id}:${fill}:${features.length}`;
+    const preparedPaths = boundaryFeatureVectorPathCache.get(statisticCacheKey);
+    if (!preparedPaths) {
+      queueEarthMapBackgroundTask(`Statistik-Renderpfade: ${layer.title || layer.id}`, async (taskContext) => {
+        const prepared = await prepareBoundaryFeatureVectorPathsInBatches(featureCollection, taskContext);
+        if (prepared && !taskContext.shouldPause?.()) {
+          if (boundaryFeatureVectorPathCache.size > 320) boundaryFeatureVectorPathCache.clear();
+          boundaryFeatureVectorPathCache.set(statisticCacheKey, prepared);
+        }
+        if (!taskContext.shouldPause?.()) scheduleGlobeRender();
+      }, {
+        key: `gearbox-render-paths-${statisticCacheKey}`,
+        priority: 9,
+      });
+      return;
+    }
+    const didDraw = drawPreparedBoundaryFeatureVectorPaths(
+      preparedPaths,
       radius,
       center,
       fill,
@@ -4566,6 +6757,7 @@ function getEarthMapStatisticDebugInfo(project = getActiveProject()) {
         } : null,
         missing: layer.matchPreview?.missing || [],
         hydrationPending: Boolean(layer._gearBoxGeometryHydrationPending),
+        lastStatisticDraw: layer._lastStatisticDraw || null,
       };
     });
 }
@@ -4674,10 +6866,56 @@ function createDiagonalHatchPattern(color, alpha = 0.86, lineWidth = 2, size = 1
   return ctx.createPattern(patternCanvas, "repeat") || hexToRgba(color, 0.38);
 }
 
-function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR, outlineStyle = {}) {
-  const featureCollection = feature?.type === "FeatureCollection" ? feature : { type: "FeatureCollection", features: [feature] };
+function getBoundaryFeatureVectorCacheKey(featureCollection) {
+  const features = Array.isArray(featureCollection?.features) ? featureCollection.features : [];
+  if (!features.length) return "";
+  const keys = features.map((feature, index) => {
+    const props = feature?.properties || {};
+    return feature?.stable_id
+      || feature?.id
+      || props.stable_id
+      || props.iso_3166_2
+      || props.adm1_code
+      || props.ISO_A3
+      || props.ADM0_A3
+      || props.wikidata_id
+      || `anonymous:${index}`;
+  });
+  if (keys.some((key) => String(key).startsWith("anonymous:"))) return "";
+  return `${features.length}:${keys.join("|")}`;
+}
+
+function getPreparedBoundaryFeatureVectorPaths(featureCollection) {
+  const cacheKey = getBoundaryFeatureVectorCacheKey(featureCollection);
+  if (cacheKey && boundaryFeatureVectorPathCache.has(cacheKey)) {
+    return boundaryFeatureVectorPathCache.get(cacheKey);
+  }
   const polygons = extractLandPolygons(featureCollection);
-  const rings = polygons.flat();
+  const prepared = { polygons, rings: polygons.flat() };
+  if (cacheKey) {
+    if (boundaryFeatureVectorPathCache.size > 320) boundaryFeatureVectorPathCache.clear();
+    boundaryFeatureVectorPathCache.set(cacheKey, prepared);
+  }
+  return prepared;
+}
+
+async function prepareBoundaryFeatureVectorPathsInBatches(featureCollection, taskContext = {}) {
+  const cacheKey = getBoundaryFeatureVectorCacheKey(featureCollection);
+  if (cacheKey && boundaryFeatureVectorPathCache.has(cacheKey)) {
+    return boundaryFeatureVectorPathCache.get(cacheKey);
+  }
+  const polygons = await extractLandPolygonsInBatches(featureCollection, taskContext);
+  if (!polygons) return null;
+  const prepared = { polygons, rings: polygons.flat() };
+  if (cacheKey) {
+    if (boundaryFeatureVectorPathCache.size > 320) boundaryFeatureVectorPathCache.clear();
+    boundaryFeatureVectorPathCache.set(cacheKey, prepared);
+  }
+  return prepared;
+}
+
+function drawPreparedBoundaryFeatureVectorPaths(preparedPaths, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR, outlineStyle = {}) {
+  const { polygons = [], rings = [] } = preparedPaths || {};
   if (!polygons.length || !rings.length) return false;
   const fillAlpha = Number.isFinite(Number(outlineStyle.fillAlpha)) ? clamp(Number(outlineStyle.fillAlpha), 0, 1) : 0.84;
   const strokeAlpha = Number.isFinite(Number(outlineStyle.strokeAlpha)) ? clamp(Number(outlineStyle.strokeAlpha), 0, 1) : 0.98;
@@ -4719,6 +6957,18 @@ function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor 
   }
 
   return Boolean(fillStyle || (strokeStyle && lineWidth > 0));
+}
+
+function drawBoundaryFeatureVector(feature, radius, center, color, outlineColor = DEFAULT_LAYER_OUTLINE_COLOR, outlineStyle = {}) {
+  const featureCollection = feature?.type === "FeatureCollection" ? feature : { type: "FeatureCollection", features: [feature] };
+  return drawPreparedBoundaryFeatureVectorPaths(
+    getPreparedBoundaryFeatureVectorPaths(featureCollection),
+    radius,
+    center,
+    color,
+    outlineColor,
+    outlineStyle,
+  );
 }
 
 function drawProjectedLine(points, radius, center, strokeStyle, lineWidth, lineDash = []) {
@@ -4988,6 +7238,12 @@ function drawAtmosphere(size, radius, center) {
 }
 
 function renderGlobe() {
+  // Engine-Regel: Sobald MapLibre aktiv ist, darf der alte Canvas-/WebGL-
+  // Renderer nicht mehr parallel rechnen. Er ist dann visuell ausgeblendet,
+  // würde aber sonst bei jeder Mausbewegung weiterhin Vektorpfade, Gewässer,
+  // Statistikflächen und Atmosphäreneffekte vorbereiten — genau der doppelte
+  // Renderweg, der die neue Engine trotz schneller Layer ruckelig machte.
+  if (mapLibreEngineState.active) return;
   if (renderWebglGlobe()) return;
   const rect = ui.globe.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -6835,6 +9091,7 @@ function ensureBoundarySetShape(item) {
   item.boundarySet.type = item.boundarySet.type || item.boundarySet.boundary_type || "";
   item.boundarySet.rank = item.boundarySet.rank == null ? "" : String(item.boundarySet.rank);
   item.boundarySet.sovereignty_status = item.boundarySet.sovereignty_status || "";
+  item.boundarySet.constitutional_status = item.boundarySet.constitutional_status || "";
   item.boundarySet.relation_to_parent = item.boundarySet.relation_to_parent || "";
   item.boundarySet.parent_id = item.boundarySet.parent_id || "";
   item.boundarySet.geometry_scope = item.boundarySet.geometry_scope || "";
@@ -6845,6 +9102,9 @@ function ensureBoundarySetShape(item) {
     feature.version_id = feature.version_id || boundarySet.version_id;
     feature.parent_id = feature.parent_id || boundarySet.parent_id || "";
     feature.rank = feature.rank == null || feature.rank === "" ? boundarySet.rank : String(feature.rank);
+    feature.sovereignty_status = feature.sovereignty_status || boundarySet.sovereignty_status || "";
+    feature.constitutional_status = feature.constitutional_status || boundarySet.constitutional_status || "";
+    feature.relation_to_parent = feature.relation_to_parent || boundarySet.relation_to_parent || "";
     feature.valid_from = feature.valid_from || boundarySet.valid_from || "";
     feature.valid_to = feature.valid_to || boundarySet.valid_to || null;
     feature.valid_precision = feature.valid_precision || boundarySet.valid_precision || "unknown";
@@ -7560,6 +9820,10 @@ function createLayerEditorSections(item) {
       classificationTarget.sovereignty_status = value;
       persistEditorMutation(item, { renderBrowser: true });
     }),
+    createSelectField("Konstitutioneller Status", classificationTarget.constitutional_status || "", CONSTITUTIONAL_STATUS_CHOICES, (value) => {
+      classificationTarget.constitutional_status = value;
+      persistEditorMutation(item, { renderBrowser: true, renderGlobe: true });
+    }),
     createSelectField("Beziehung zum Parent", classificationTarget.relation_to_parent || "", RELATION_TO_PARENT_CHOICES, (value) => {
       classificationTarget.relation_to_parent = value;
       if (!value || value === "none") classificationTarget.parent_id = "";
@@ -7918,9 +10182,6 @@ function createStatisticLayerEditorSections(layer) {
 }
 
 function createStatisticLayerDiagnosticsSection(layer) {
-  if (state.naturalEarthAdmin1CountryChunkCache?.size && Array.isArray(layer?.table?.rows) && layer.table.rows.length) {
-    rebuildGearBoxDataLayerMatches(layer);
-  }
   const section = createEditorSection("Diagnose", "Diese Übersicht zeigt, ob CSV-Werte, Boundary-Matches, Geometrien und Farben wirklich zusammenfinden.", {
     key: "statistic-diagnostics",
     icon: "https://api.iconify.design/mdi/stethoscope.svg",
@@ -8359,44 +10620,11 @@ function getGearBoxRowValue(row, key) {
 }
 
 function addGearBoxMatchKey(keys, value) {
-  const normalized = normalizeSearchText(value);
-  if (normalized) keys.add(normalized);
+  addEarthMapBoundaryMatchKey(keys, value);
 }
 
 function getGearBoxFeatureMatchKeys(feature) {
-  const props = feature?.properties || {};
-  const keys = new Set();
-  const isAdmin1Feature = Boolean(props.iso_3166_2 || props.ISO3166_2 || props.adm1_code);
-  [
-    feature?.stable_id,
-    feature?.version_id,
-    feature?.id,
-    feature?.name,
-    feature?.wikidata_id,
-    props.AGS,
-    props.ags,
-    props.ISO_A3,
-    props.ADM0_A3,
-    props.iso_3166_2,
-    props.ISO3166_2,
-    props.adm1_code,
-    props.wikidataid,
-    props.name,
-    props.name_de,
-    props.name_en,
-    props.NAME,
-    props.NAME_EN,
-  ].forEach((value) => addGearBoxMatchKey(keys, value));
-  // Matching-Regel: Bei ADM1-Features sind adm0_a3/admin/geonunit Parent-
-  // Informationen. Sie dürfen nicht als Identität der einzelnen Fläche in den
-  // Join-Index, sonst matchen alle Bundesländer mit "DEU" auf dieselbe Fläche.
-  if (!isAdmin1Feature) {
-    [props.adm0_a3, props.ADMIN, props.admin, props.geonunit].forEach((value) => addGearBoxMatchKey(keys, value));
-  }
-  if (Array.isArray(feature?.match_tokens)) {
-    feature.match_tokens.forEach((value) => addGearBoxMatchKey(keys, value));
-  }
-  return keys;
+  return getEarthMapBoundaryMatchKeys(feature);
 }
 
 function getGearBoxRowMatchKeys(row, preferredTableKey = "") {
@@ -8627,7 +10855,28 @@ async function ensureGearBoxBoundaryChunksForRows(rows = []) {
   await Promise.all([...iso3s].map((iso3) => loadNaturalEarthAdmin1CountryChunk(iso3)));
 }
 
-function createGearBoxBoundaryIndex(boundaryFeatures = [], preferredBoundaryKey = "") {
+async function ensureGearBoxBoundaryChunksForRowsInBatches(rows = [], taskContext = {}) {
+  await ensureNaturalEarthSearchBaseLoaded();
+  if (taskContext.shouldPause?.()) return false;
+  const iso3s = new Set();
+  rows.forEach((row) => {
+    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+  });
+  await loadNaturalEarthAdmin1Dataset();
+  if (taskContext.shouldPause?.()) return false;
+  rows.forEach((row) => {
+    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+    inferGearBoxIso3CandidatesFromNames(row).forEach((iso3) => iso3s.add(iso3));
+  });
+  for (const iso3 of iso3s) {
+    if (taskContext.shouldPause?.()) return false;
+    await loadNaturalEarthAdmin1CountryChunk(iso3);
+    await taskContext.yield?.();
+  }
+  return true;
+}
+
+function createEarthMapBoundaryIndex(boundaryFeatures = [], preferredBoundaryKey = "") {
   const index = new Map();
   boundaryFeatures.forEach((entry) => {
     const keys = getGearBoxFeatureMatchKeys(entry.feature);
@@ -8640,9 +10889,13 @@ function createGearBoxBoundaryIndex(boundaryFeatures = [], preferredBoundaryKey 
   return index;
 }
 
-function findGearBoxBoundaryEntryForRow(row, boundaryIndex, preferredTableKey = "", options = {}) {
+function createGearBoxBoundaryIndex(boundaryFeatures = [], preferredBoundaryKey = "") {
+  return createEarthMapBoundaryIndex(boundaryFeatures, preferredBoundaryKey);
+}
+
+function findEarthMapBoundaryEntryByKeys(keys, boundaryIndex, options = {}) {
   const requireDrawable = options.requireDrawable === true;
-  for (const key of getGearBoxRowMatchKeys(row, preferredTableKey)) {
+  for (const key of keys) {
     const matches = boundaryIndex.get(key);
     if (matches?.length) {
       const drawable = matches.find((match) => hasDrawableBoundaryFeature(match.feature));
@@ -8650,6 +10903,12 @@ function findGearBoxBoundaryEntryForRow(row, boundaryIndex, preferredTableKey = 
       if (!requireDrawable) return matches[0];
     }
   }
+  return null;
+}
+
+function findGearBoxBoundaryEntryForRow(row, boundaryIndex, preferredTableKey = "", options = {}) {
+  const indexedEntry = findEarthMapBoundaryEntryByKeys(getGearBoxRowMatchKeys(row, preferredTableKey), boundaryIndex, options);
+  if (indexedEntry) return indexedEntry;
   const loadedAdmin1Entry = findLoadedAdmin1ChunkEntryForRow(row, preferredTableKey);
   if (loadedAdmin1Entry) return loadedAdmin1Entry;
   return null;
@@ -10037,6 +12296,97 @@ function getNaturalEarthAdmin1CountryIso3(feature) {
   return String(props.adm0_a3 || props.sov_a3 || "").toUpperCase();
 }
 
+function createEarthMapBoundaryEntry(kind, feature, meta = {}) {
+  if (!feature) return null;
+  const props = feature.properties || {};
+  const isAdmin1 = kind === "admin1" || Boolean(props.iso_3166_2 || props.ISO3166_2 || props.adm1_code);
+  const iso3 = isAdmin1 ? getNaturalEarthAdmin1CountryIso3(feature) : getNaturalEarthIso3(feature).toUpperCase();
+  const stableId = String(
+    feature.stable_id
+    || props._ziselinBoundarySetStableId
+    || props.iso_3166_2
+    || props.adm1_code
+    || props.ISO_A3
+    || props.ADM0_A3
+    || props.wikidataid
+    || feature.id
+    || "",
+  );
+  return {
+    kind,
+    feature,
+    level: isAdmin1 ? "ADM1" : kind === "union" ? "union" : "ADM0",
+    stableId,
+    iso3,
+    wikidataId: normalizeWikidataId(
+      feature.wikidata_id
+      || props.wikidataid
+      || props.WIKIDATAID
+      || props.WIKIDATA
+      || "",
+    ),
+    label: repairLegacyText(
+      meta.label
+      || feature.name
+      || props.name_de
+      || props.name
+      || props.NAME_DE
+      || props.NAME
+      || props.ADMIN
+      || stableId
+      || "",
+    ),
+    source: meta.source || props._ziselinEngineSource || "natural-earth",
+  };
+}
+
+function addEarthMapBoundaryMatchKey(keys, value) {
+  const normalized = normalizeSearchText(value);
+  if (normalized) keys.add(normalized);
+}
+
+function getEarthMapBoundaryMatchKeys(feature, preferredPath = "") {
+  const props = feature?.properties || {};
+  const keys = new Set();
+  const isAdmin1Feature = Boolean(props.iso_3166_2 || props.ISO3166_2 || props.adm1_code);
+  [
+    getValueByPath(feature, preferredPath),
+    feature?.stable_id,
+    feature?.version_id,
+    feature?.id,
+    feature?.name,
+    feature?.wikidata_id,
+    props._ziselinBoundarySetStableId,
+    props.AGS,
+    props.ags,
+    props.ISO_A2,
+    props.ISO_A3,
+    props.ADM0_A3,
+    props.iso_3166_2,
+    props.ISO3166_2,
+    props.adm1_code,
+    props.wikidataid,
+    props.WIKIDATAID,
+    props.name,
+    props.name_de,
+    props.name_en,
+    props.NAME,
+    props.NAME_DE,
+    props.NAME_EN,
+    props.ADMIN,
+  ].forEach((value) => addEarthMapBoundaryMatchKey(keys, value));
+  // Architekturregel: Parent-Schlüssel sind Kontext, keine Identität der
+  // Einzelfläche. Sonst matcht z.B. jedes deutsche Bundesland über "DEU" auf
+  // dieselbe Fläche und Statistik/Suche/Browser laufen auseinander.
+  if (!isAdmin1Feature) {
+    [props.adm0_a3, props.admin, props.geonunit, props.SOVEREIGNT].forEach((value) => addEarthMapBoundaryMatchKey(keys, value));
+  }
+  if (Array.isArray(feature?.match_tokens)) {
+    feature.match_tokens.forEach((value) => addEarthMapBoundaryMatchKey(keys, value));
+  }
+  return keys;
+}
+
 function getMapSearchFeatureIso3(entry) {
   if (!entry) return "";
   if (entry.kind === "admin1") return getNaturalEarthAdmin1CountryIso3(entry.feature);
@@ -10106,49 +12456,54 @@ async function findNaturalEarthAdmin1Feature(query, countryFeature = null) {
   );
 }
 
-async function resolveMapSearchTerm(query) {
+async function resolveEarthMapBoundaryTerm(query, options = {}) {
   const trimmed = String(query || "").trim();
   if (!trimmed) return null;
   await ensureNaturalEarthSearchBaseLoaded();
-  const unionFeature = await findMapSearchUnionFeature(trimmed);
-  if (unionFeature) return { kind: "union", feature: unionFeature };
+  const contextEntries = Array.isArray(options.contextEntries) ? options.contextEntries : [];
+  if (options.focus && contextEntries.length) {
+    // Gemeinsame Resolver-Regel: Die rechte Seite einer Suchrelation ist
+    // Kontext. "Montana; NAFTA" sucht daher zuerst Admin-1 in allen Staaten
+    // des Bündnisses; "Bayern; Deutschland" sucht im Deutschland-Chunk.
+    for (const context of contextEntries) {
+      if (context.kind === "country") {
+        const admin1Feature = await findNaturalEarthAdmin1Feature(trimmed, context.feature);
+        if (admin1Feature) return createEarthMapBoundaryEntry("admin1", admin1Feature);
+      }
+      if (context.kind === "union") {
+        const iso3s = Array.isArray(context.feature?.properties?.iso3) ? context.feature.properties.iso3 : [];
+        for (const iso3 of iso3s) {
+          const countryFeature = await getNaturalEarthCountryFeatureByIso3Async(iso3);
+          if (!countryFeature) continue;
+          const admin1Feature = await findNaturalEarthAdmin1Feature(trimmed, countryFeature);
+          if (admin1Feature) return createEarthMapBoundaryEntry("admin1", admin1Feature);
+        }
+      }
+    }
+  }
+  if (options.includeUnions !== false) {
+    const unionFeature = await findMapSearchUnionFeature(trimmed);
+    if (unionFeature) return createEarthMapBoundaryEntry("union", unionFeature, { label: unionFeature.properties?.name || trimmed });
+  }
   const countryAliasFeature = await findMapSearchCountryAliasFeature(trimmed);
-  if (countryAliasFeature) return { kind: "country", feature: countryAliasFeature };
+  if (countryAliasFeature) return createEarthMapBoundaryEntry("country", countryAliasFeature);
   const countryFeature = await findNaturalEarthCountryFeatureAsync(trimmed);
-  if (countryFeature) return { kind: "country", feature: countryFeature };
+  if (countryFeature) return createEarthMapBoundaryEntry("country", countryFeature);
   const provinceFeature = await findNaturalEarthAdmin1Feature(trimmed);
-  if (provinceFeature) return { kind: "admin1", feature: provinceFeature };
+  if (provinceFeature) return createEarthMapBoundaryEntry("admin1", provinceFeature);
   const wikidataFeature = await resolveWikidataMapSearchTerm(trimmed);
-  if (wikidataFeature) return wikidataFeature;
+  if (wikidataFeature) return createEarthMapBoundaryEntry(wikidataFeature.kind, wikidataFeature.feature, { label: trimmed, source: "wikidata" });
   return null;
+}
+
+async function resolveMapSearchTerm(query) {
+  return resolveEarthMapBoundaryTerm(query);
 }
 
 async function resolveMapSearchFocusTerm(query, contextEntries = []) {
   const trimmed = String(query || "").trim();
   if (!trimmed) return null;
-
-  // Bei der Relationensuche ist die rechte Seite fachlicher Kontext:
-  // "Bayern; Deutschland" oder "Montana; NAFTA" bedeutet, dass die linke
-  // Einheit zuerst innerhalb des rechten Kontextes gesucht wird. Bei Staaten
-  // ist das genau ein Admin-1-Länderchunk, bei Bündnissen mehrere. Erst danach
-  // prüfen wir, ob die gefundene Einheit tatsächlich Teil des Kontextes ist.
-  for (const context of contextEntries) {
-    if (context.kind === "country") {
-      const admin1Feature = await findNaturalEarthAdmin1Feature(trimmed, context.feature);
-      if (admin1Feature) return { kind: "admin1", feature: admin1Feature };
-    }
-    if (context.kind === "union") {
-      const iso3s = Array.isArray(context.feature?.properties?.iso3) ? context.feature.properties.iso3 : [];
-      for (const iso3 of iso3s) {
-        const countryFeature = await getNaturalEarthCountryFeatureByIso3Async(iso3);
-        if (!countryFeature) continue;
-        const admin1Feature = await findNaturalEarthAdmin1Feature(trimmed, countryFeature);
-        if (admin1Feature) return { kind: "admin1", feature: admin1Feature };
-      }
-    }
-  }
-
-  return resolveMapSearchTerm(trimmed);
+  return resolveEarthMapBoundaryTerm(trimmed, { focus: true, contextEntries });
 }
 
 async function resolveMapSearchTermList(rawList, options = {}) {
@@ -10247,6 +12602,8 @@ function clearMapSearchHighlight() {
   state.mapSearchHighlight = null;
   ui.mapSearchInput?.classList.remove("has-search-error");
   ui.mapSearchInput?.removeAttribute("title");
+  syncMapLibreSearchHighlight();
+  void syncMapLibreAdmin1LayerForSearch();
   scheduleGlobeRender();
 }
 
@@ -10264,6 +12621,8 @@ function updateMapSearchAvailability() {
   if (blocked) {
     state.mapSearchHighlight = null;
     ui.mapSearchOptions?.replaceChildren();
+    syncMapLibreSearchHighlight();
+    void syncMapLibreAdmin1LayerForSearch();
   }
 }
 
@@ -10329,8 +12688,17 @@ function orientGlobeToSearchResult(focusEntries, contextEntries, fallbackEntries
   // Suchinteraktion: Eine gefundene Fläche muss nach der Suche sichtbar sein.
   // Bei "Texas; Vereinigte Staaten" liegt Texas sonst auf der Rückseite der
   // aktuellen Kugelrotation und wirkt fälschlich wie ein nicht erkannter Fokus.
-  rotation.lon = -center.lon;
   const latitudeLimit = getLatitudeNavigationLimit();
+  if (mapLibreEngineState.active) {
+    // MapLibre arbeitet mit einem echten Kartenmittelpunkt. Die Suche darf
+    // deshalb nur den Mittelpunkt verschieben, aber den aktuellen Zoom nicht
+    // verändern; genau dieser Zoom bleibt in syncMapLibreCamera() erhalten.
+    rotation.lon = center.lon;
+    rotation.lat = clamp(center.lat, -latitudeLimit, latitudeLimit);
+    syncMapLibreCamera();
+    return;
+  }
+  rotation.lon = -center.lon;
   rotation.lat = clamp(-center.lat, -latitudeLimit, latitudeLimit);
 }
 
@@ -10339,6 +12707,8 @@ async function applyMapSearchQuery(rawQuery) {
     state.mapSearchHighlight = null;
     ui.mapSearchOptions?.replaceChildren();
     updateMapSearchAvailability();
+    syncMapLibreSearchHighlight();
+    void syncMapLibreAdmin1LayerForSearch();
     scheduleGlobeRender();
     return;
   }
@@ -10374,6 +12744,7 @@ async function applyMapSearchQuery(rawQuery) {
     state.mapSearchHighlight = null;
     ui.mapSearchInput?.classList.add("has-search-error");
     ui.mapSearchInput?.setAttribute("title", "Keine passende Karte im lokalen Natural-Earth-Archiv gefunden.");
+    void syncMapLibreAdmin1LayerForSearch();
     scheduleGlobeRender();
     return;
   }
@@ -10386,6 +12757,7 @@ async function applyMapSearchQuery(rawQuery) {
     focusFeatures: focusEntries.map((entry) => entry.feature),
   };
   orientGlobeToSearchResult(focusEntries, contextEntries, fallbackEntries);
+  syncMapLibreSearchHighlight();
   scheduleGlobeRender();
 }
 
@@ -10497,6 +12869,9 @@ function createImportedBoundaryFeature(feature, index, boundarySet) {
     match_tokens: Array.from(new Set([...(Array.isArray(feature.match_tokens) ? feature.match_tokens.map(repairLegacyText) : []), ...matchTokens])),
     parent_id: feature.parent_id || boundarySet.parent_id || "",
     rank: feature.rank == null || feature.rank === "" ? boundarySet.rank : String(feature.rank),
+    sovereignty_status: feature.sovereignty_status || feature.classification?.sovereignty_status || boundarySet.sovereignty_status || "",
+    constitutional_status: feature.constitutional_status || feature.classification?.constitutional_status || feature.properties?.constitutional_status || feature.properties?.ziselin_constitutional_status || boundarySet.constitutional_status || "",
+    relation_to_parent: feature.relation_to_parent || feature.classification?.relation_to_parent || boundarySet.relation_to_parent || "",
     valid_from: feature.valid_from || boundarySet.valid_from || "",
     valid_to: feature.valid_to || boundarySet.valid_to || null,
     valid_precision: feature.valid_precision || boundarySet.valid_precision || "unknown",
@@ -11072,6 +13447,7 @@ function normalizeImportedBoundarySet(raw, fileName = "kartensammlung.geojson") 
       provider: repairLegacyText(raw.provider || "manual-import"),
       review_status: raw.review_status || "imported",
       boundary_type: raw.boundary_type || "unknown",
+      constitutional_status: raw.constitutional_status || raw.classification?.constitutional_status || "",
       valid_from: validFrom,
       valid_to: validTo,
       valid_precision: raw.valid_precision || "unknown",
@@ -11119,6 +13495,7 @@ function normalizeImportedBoundarySet(raw, fileName = "kartensammlung.geojson") 
     provider_boundary_id: "",
     wikidata_id: normalizeWikidataId(raw.wikidata_id || raw.wikidataId || raw.properties?.wikidata_id || raw.properties?.WIKIDATA || ""),
     boundary_type: "unknown",
+    constitutional_status: importMetadata.constitutional_status || "",
     country_iso3: "",
     admin_level: "",
     year_represented: "",
@@ -11414,6 +13791,7 @@ ui.viewToolsDrawerTab?.addEventListener("pointercancel", () => {
   viewDrawerDrag = null;
 });
 ui.graticuleToggle?.addEventListener("click", () => setGraticuleVisible(state.showGraticule !== true));
+ui.admin1Toggle?.addEventListener("click", () => setAdmin1BoundariesVisible(state.showAdmin1Boundaries !== true));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
@@ -11741,11 +14119,11 @@ ui.globe.addEventListener("pointermove", (event) => {
   const rect = ui.globe.getBoundingClientRect();
   const baseSize = Math.max(1, Math.min(rect.width || 1, rect.height || 1));
   const radius = Math.max(1, baseSize * 0.47 * globeZoom);
-  const degreesPerPixel = 1 / (radius * DEG);
+  const degreesPerPixel = 1.22 / (radius * DEG);
   const lonLatitudeFactor = 1 / Math.max(0.38, Math.cos(rotation.lat * DEG));
   const latitudeLimit = getLatitudeNavigationLimit();
-  rotation.lon = dragState.startRotation.lon + (event.clientX - dragState.startX) * degreesPerPixel * lonLatitudeFactor;
-  rotation.lat = clamp(dragState.startRotation.lat - (event.clientY - dragState.startY) * degreesPerPixel, -latitudeLimit, latitudeLimit);
+  rotation.lon = dragState.startRotation.lon - (event.clientX - dragState.startX) * degreesPerPixel * lonLatitudeFactor;
+  rotation.lat = clamp(dragState.startRotation.lat + (event.clientY - dragState.startY) * degreesPerPixel, -latitudeLimit, latitudeLimit);
   scheduleGlobeRender();
 });
 
@@ -11779,6 +14157,8 @@ ui.globe.addEventListener("wheel", (event) => {
 
 window.addEventListener("resize", () => {
   setDetailsLayoutMode(state.detailsLayoutMode);
+  mapLibreEngineState.map?.resize?.();
+  syncMapLibreCamera();
   scheduleGlobeRender();
 });
 setTheme(getStoredTheme(), false);
@@ -11786,8 +14166,10 @@ syncViewToolsControls();
 setViewToolsDrawerOpen(false);
 populateMapSearchOptions();
 renderWorkspace();
+initializeMapLibreEnginePilot();
 renderGlobe();
 scheduleNaturalEarthDetailUpdate(window.matchMedia?.("(max-width: 760px)")?.matches ? 900 : 40);
 scheduleNaturalEarthBackgroundAssets();
+scheduleHeavyMapLayerWorkActivation(window.matchMedia?.("(max-width: 760px)")?.matches ? 4200 : 2600);
 if (!hasD3Geo) buildLandSamplesDeferred();
 
