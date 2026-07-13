@@ -542,6 +542,11 @@
   -webkit-mask-image: url("https://api.iconify.design/mdi/grid.svg");
 }
 
+.app-view-drawer-option-icon-boundary {
+  mask-image: url("https://api.iconify.design/ri/treasure-map-line.svg");
+  -webkit-mask-image: url("https://api.iconify.design/ri/treasure-map-line.svg");
+}
+
 .app-view-drawer-option-label {
   min-width: 0;
 }
