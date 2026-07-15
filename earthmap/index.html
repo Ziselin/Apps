@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260713a">
   <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260709b">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="earthmap.css?v=20260713k">
+  <link rel="stylesheet" href="earthmap.css?v=20260715b">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
@@ -32,10 +32,6 @@
           </div>
         </div>
         <div class="topbar-search earthmap-topbar-search">
-          <div id="mapSearchLoader" class="map-search-loader" hidden aria-hidden="true">
-            <l-newtons-cradle size="34" speed="1.4" color="currentColor"></l-newtons-cradle>
-            <span class="map-search-loader-fallback" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-          </div>
           <div class="search-wrap earthmap-search-wrap">
             <button type="button" id="mapSearchInfoButton" class="map-search-info-button" aria-label="Suchsyntax erklären" aria-expanded="false" aria-controls="mapSearchInfoPopup">
               <span aria-hidden="true"></span>
@@ -51,6 +47,9 @@
           <datalist id="mapSearchOptions"></datalist>
         </div>
         <div class="topbar-actions">
+          <button type="button" id="saveSearchLayerButton" class="header-icon-button topbar-icon-button save-search-layer-button is-hidden" aria-label="Suchergebnis im Projekt speichern" title="Suchergebnis speichern" hidden>
+            <span class="topbar-action-icon topbar-save-search-icon" aria-hidden="true"></span>
+          </button>
           <div class="export-control">
             <button type="button" id="exportProjectButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
               <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
@@ -221,6 +220,6 @@
     import { newtonsCradle } from "https://esm.sh/ldrs";
     newtonsCradle.register();
   </script>
-  <script src="earthmap.js?v=20260713q"></script>
+  <script src="earthmap.js?v=20260715b"></script>
 </body>
 </html>
