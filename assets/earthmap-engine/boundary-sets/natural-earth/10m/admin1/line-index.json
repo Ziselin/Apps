@@ -1,0 +1,1763 @@
+{
+  "schema": "ziselin-boundary-line-index-v1",
+  "generated_from": "admin1 chunks-js",
+  "chunks": [
+    {
+      "iso3": "ABW",
+      "file": "lines-js/natural-earth-10m-admin1-lines-abw.js",
+      "feature_count": 1,
+      "point_count": 26,
+      "bytes": 1215
+    },
+    {
+      "iso3": "AFG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-afg.js",
+      "feature_count": 33,
+      "point_count": 6371,
+      "bytes": 146133
+    },
+    {
+      "iso3": "AGO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ago.js",
+      "feature_count": 19,
+      "point_count": 4302,
+      "bytes": 100892
+    },
+    {
+      "iso3": "AIA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-aia.js",
+      "feature_count": 16,
+      "point_count": 131,
+      "bytes": 6794
+    },
+    {
+      "iso3": "ALB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-alb.js",
+      "feature_count": 11,
+      "point_count": 1520,
+      "bytes": 35819
+    },
+    {
+      "iso3": "ALD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ald.js",
+      "feature_count": 16,
+      "point_count": 329,
+      "bytes": 10977
+    },
+    {
+      "iso3": "AND",
+      "file": "lines-js/natural-earth-10m-admin1-lines-and.js",
+      "feature_count": 4,
+      "point_count": 123,
+      "bytes": 3810
+    },
+    {
+      "iso3": "ARE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-are.js",
+      "feature_count": 30,
+      "point_count": 1258,
+      "bytes": 34170
+    },
+    {
+      "iso3": "ARG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-arg.js",
+      "feature_count": 28,
+      "point_count": 7715,
+      "bytes": 189730
+    },
+    {
+      "iso3": "ARM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-arm.js",
+      "feature_count": 13,
+      "point_count": 1042,
+      "bytes": 25877
+    },
+    {
+      "iso3": "ASM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-asm.js",
+      "feature_count": 5,
+      "point_count": 66,
+      "bytes": 3103
+    },
+    {
+      "iso3": "ATA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ata.js",
+      "feature_count": 179,
+      "point_count": 23812,
+      "bytes": 598770
+    },
+    {
+      "iso3": "ATC",
+      "file": "lines-js/natural-earth-10m-admin1-lines-atc.js",
+      "feature_count": 1,
+      "point_count": 5,
+      "bytes": 740
+    },
+    {
+      "iso3": "ATF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-atf.js",
+      "feature_count": 20,
+      "point_count": 541,
+      "bytes": 16973
+    },
+    {
+      "iso3": "ATG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-atg.js",
+      "feature_count": 7,
+      "point_count": 155,
+      "bytes": 5407
+    },
+    {
+      "iso3": "AUS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-aus.js",
+      "feature_count": 100,
+      "point_count": 14754,
+      "bytes": 372879
+    },
+    {
+      "iso3": "AUT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-aut.js",
+      "feature_count": 9,
+      "point_count": 1812,
+      "bytes": 41734
+    },
+    {
+      "iso3": "AZE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-aze.js",
+      "feature_count": 81,
+      "point_count": 2772,
+      "bytes": 77977
+    },
+    {
+      "iso3": "BDI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bdi.js",
+      "feature_count": 16,
+      "point_count": 752,
+      "bytes": 20167
+    },
+    {
+      "iso3": "BEL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bel.js",
+      "feature_count": 12,
+      "point_count": 1200,
+      "bytes": 27923
+    },
+    {
+      "iso3": "BEN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ben.js",
+      "feature_count": 11,
+      "point_count": 999,
+      "bytes": 22921
+    },
+    {
+      "iso3": "BFA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bfa.js",
+      "feature_count": 44,
+      "point_count": 3398,
+      "bytes": 82931
+    },
+    {
+      "iso3": "BGD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bgd.js",
+      "feature_count": 27,
+      "point_count": 2797,
+      "bytes": 67038
+    },
+    {
+      "iso3": "BGR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bgr.js",
+      "feature_count": 27,
+      "point_count": 2174,
+      "bytes": 53504
+    },
+    {
+      "iso3": "BHR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bhr.js",
+      "feature_count": 8,
+      "point_count": 162,
+      "bytes": 5616
+    },
+    {
+      "iso3": "BHS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bhs.js",
+      "feature_count": 47,
+      "point_count": 1656,
+      "bytes": 48074
+    },
+    {
+      "iso3": "BIH",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bih.js",
+      "feature_count": 18,
+      "point_count": 1367,
+      "bytes": 34000
+    },
+    {
+      "iso3": "BLM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-blm.js",
+      "feature_count": 1,
+      "point_count": 11,
+      "bytes": 871
+    },
+    {
+      "iso3": "BLR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-blr.js",
+      "feature_count": 6,
+      "point_count": 3469,
+      "bytes": 77217
+    },
+    {
+      "iso3": "BLZ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-blz.js",
+      "feature_count": 14,
+      "point_count": 737,
+      "bytes": 20163
+    },
+    {
+      "iso3": "BMU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bmu.js",
+      "feature_count": 13,
+      "point_count": 129,
+      "bytes": 6107
+    },
+    {
+      "iso3": "BOL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bol.js",
+      "feature_count": 8,
+      "point_count": 2876,
+      "bytes": 70334
+    },
+    {
+      "iso3": "BRA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bra.js",
+      "feature_count": 68,
+      "point_count": 22787,
+      "bytes": 542543
+    },
+    {
+      "iso3": "BRB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-brb.js",
+      "feature_count": 10,
+      "point_count": 213,
+      "bytes": 7384
+    },
+    {
+      "iso3": "BRN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-brn.js",
+      "feature_count": 3,
+      "point_count": 185,
+      "bytes": 5076
+    },
+    {
+      "iso3": "BTN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-btn.js",
+      "feature_count": 18,
+      "point_count": 1505,
+      "bytes": 37011
+    },
+    {
+      "iso3": "BWA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-bwa.js",
+      "feature_count": 14,
+      "point_count": 1265,
+      "bytes": 32212
+    },
+    {
+      "iso3": "CAF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-caf.js",
+      "feature_count": 16,
+      "point_count": 4432,
+      "bytes": 96011
+    },
+    {
+      "iso3": "CAN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-can.js",
+      "feature_count": 428,
+      "point_count": 72460,
+      "bytes": 1764827
+    },
+    {
+      "iso3": "CHE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-che.js",
+      "feature_count": 37,
+      "point_count": 2867,
+      "bytes": 68087
+    },
+    {
+      "iso3": "CHL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-chl.js",
+      "feature_count": 177,
+      "point_count": 18054,
+      "bytes": 467463
+    },
+    {
+      "iso3": "CHN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-chn.js",
+      "feature_count": 98,
+      "point_count": 33705,
+      "bytes": 784039
+    },
+    {
+      "iso3": "CIV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-civ.js",
+      "feature_count": 20,
+      "point_count": 4006,
+      "bytes": 88248
+    },
+    {
+      "iso3": "CLP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-clp.js",
+      "feature_count": 1,
+      "point_count": 7,
+      "bytes": 786
+    },
+    {
+      "iso3": "CMR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cmr.js",
+      "feature_count": 10,
+      "point_count": 2598,
+      "bytes": 56325
+    },
+    {
+      "iso3": "COD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cod.js",
+      "feature_count": 12,
+      "point_count": 5845,
+      "bytes": 129192
+    },
+    {
+      "iso3": "COG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cog.js",
+      "feature_count": 11,
+      "point_count": 2901,
+      "bytes": 64953
+    },
+    {
+      "iso3": "COK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cok.js",
+      "feature_count": 13,
+      "point_count": 131,
+      "bytes": 6396
+    },
+    {
+      "iso3": "COL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-col.js",
+      "feature_count": 42,
+      "point_count": 8112,
+      "bytes": 187751
+    },
+    {
+      "iso3": "COM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-com.js",
+      "feature_count": 3,
+      "point_count": 127,
+      "bytes": 3933
+    },
+    {
+      "iso3": "CPV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cpv.js",
+      "feature_count": 20,
+      "point_count": 537,
+      "bytes": 16876
+    },
+    {
+      "iso3": "CRI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cri.js",
+      "feature_count": 10,
+      "point_count": 1722,
+      "bytes": 40696
+    },
+    {
+      "iso3": "CSI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-csi.js",
+      "feature_count": 21,
+      "point_count": 115,
+      "bytes": 7598
+    },
+    {
+      "iso3": "CUB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cub.js",
+      "feature_count": 54,
+      "point_count": 4046,
+      "bytes": 104065
+    },
+    {
+      "iso3": "CUW",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cuw.js",
+      "feature_count": 1,
+      "point_count": 44,
+      "bytes": 1624
+    },
+    {
+      "iso3": "CYM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cym.js",
+      "feature_count": 3,
+      "point_count": 81,
+      "bytes": 2890
+    },
+    {
+      "iso3": "CYN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cyn.js",
+      "feature_count": 2,
+      "point_count": 203,
+      "bytes": 5238
+    },
+    {
+      "iso3": "CYP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cyp.js",
+      "feature_count": 6,
+      "point_count": 569,
+      "bytes": 14065
+    },
+    {
+      "iso3": "CZE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-cze.js",
+      "feature_count": 13,
+      "point_count": 2595,
+      "bytes": 59662
+    },
+    {
+      "iso3": "DEU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-deu.js",
+      "feature_count": 37,
+      "point_count": 8744,
+      "bytes": 194868
+    },
+    {
+      "iso3": "DJI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-dji.js",
+      "feature_count": 5,
+      "point_count": 262,
+      "bytes": 7199
+    },
+    {
+      "iso3": "DMA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-dma.js",
+      "feature_count": 9,
+      "point_count": 233,
+      "bytes": 7629
+    },
+    {
+      "iso3": "DNK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-dnk.js",
+      "feature_count": 18,
+      "point_count": 2333,
+      "bytes": 54019
+    },
+    {
+      "iso3": "DOM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-dom.js",
+      "feature_count": 33,
+      "point_count": 1262,
+      "bytes": 36180
+    },
+    {
+      "iso3": "DZA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-dza.js",
+      "feature_count": 47,
+      "point_count": 4639,
+      "bytes": 107796
+    },
+    {
+      "iso3": "ECU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ecu.js",
+      "feature_count": 37,
+      "point_count": 3935,
+      "bytes": 97185
+    },
+    {
+      "iso3": "EGY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-egy.js",
+      "feature_count": 36,
+      "point_count": 3322,
+      "bytes": 80426
+    },
+    {
+      "iso3": "ERI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-eri.js",
+      "feature_count": 7,
+      "point_count": 1184,
+      "bytes": 27666
+    },
+    {
+      "iso3": "ESB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-esb.js",
+      "feature_count": 3,
+      "point_count": 108,
+      "bytes": 3393
+    },
+    {
+      "iso3": "ESP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-esp.js",
+      "feature_count": 72,
+      "point_count": 8740,
+      "bytes": 205238
+    },
+    {
+      "iso3": "EST",
+      "file": "lines-js/natural-earth-10m-admin1-lines-est.js",
+      "feature_count": 19,
+      "point_count": 1909,
+      "bytes": 46023
+    },
+    {
+      "iso3": "ETH",
+      "file": "lines-js/natural-earth-10m-admin1-lines-eth.js",
+      "feature_count": 13,
+      "point_count": 2942,
+      "bytes": 65313
+    },
+    {
+      "iso3": "FIN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-fin.js",
+      "feature_count": 58,
+      "point_count": 5261,
+      "bytes": 127267
+    },
+    {
+      "iso3": "FJI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-fji.js",
+      "feature_count": 44,
+      "point_count": 1596,
+      "bytes": 47857
+    },
+    {
+      "iso3": "FLK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-flk.js",
+      "feature_count": 15,
+      "point_count": 1340,
+      "bytes": 35421
+    },
+    {
+      "iso3": "FRA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-fra.js",
+      "feature_count": 116,
+      "point_count": 13826,
+      "bytes": 316954
+    },
+    {
+      "iso3": "FRO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-fro.js",
+      "feature_count": 11,
+      "point_count": 485,
+      "bytes": 13309
+    },
+    {
+      "iso3": "FSM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-fsm.js",
+      "feature_count": 21,
+      "point_count": 269,
+      "bytes": 10745
+    },
+    {
+      "iso3": "GAB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gab.js",
+      "feature_count": 9,
+      "point_count": 2179,
+      "bytes": 48296
+    },
+    {
+      "iso3": "GBR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gbr.js",
+      "feature_count": 277,
+      "point_count": 13799,
+      "bytes": 359243
+    },
+    {
+      "iso3": "GEO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-geo.js",
+      "feature_count": 11,
+      "point_count": 965,
+      "bytes": 23755
+    },
+    {
+      "iso3": "GGY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ggy.js",
+      "feature_count": 3,
+      "point_count": 52,
+      "bytes": 2178
+    },
+    {
+      "iso3": "GHA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gha.js",
+      "feature_count": 9,
+      "point_count": 2826,
+      "bytes": 60926
+    },
+    {
+      "iso3": "GIB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gib.js",
+      "feature_count": 1,
+      "point_count": 7,
+      "bytes": 768
+    },
+    {
+      "iso3": "GIN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gin.js",
+      "feature_count": 33,
+      "point_count": 2942,
+      "bytes": 72524
+    },
+    {
+      "iso3": "GMB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gmb.js",
+      "feature_count": 5,
+      "point_count": 472,
+      "bytes": 12219
+    },
+    {
+      "iso3": "GNB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gnb.js",
+      "feature_count": 20,
+      "point_count": 1783,
+      "bytes": 45297
+    },
+    {
+      "iso3": "GNQ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gnq.js",
+      "feature_count": 5,
+      "point_count": 473,
+      "bytes": 11069
+    },
+    {
+      "iso3": "GRC",
+      "file": "lines-js/natural-earth-10m-admin1-lines-grc.js",
+      "feature_count": 84,
+      "point_count": 6550,
+      "bytes": 161000
+    },
+    {
+      "iso3": "GRD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-grd.js",
+      "feature_count": 6,
+      "point_count": 95,
+      "bytes": 3843
+    },
+    {
+      "iso3": "GRL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-grl.js",
+      "feature_count": 134,
+      "point_count": 21875,
+      "bytes": 527134
+    },
+    {
+      "iso3": "GTM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gtm.js",
+      "feature_count": 21,
+      "point_count": 2008,
+      "bytes": 50620
+    },
+    {
+      "iso3": "GUM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-gum.js",
+      "feature_count": 1,
+      "point_count": 49,
+      "bytes": 1736
+    },
+    {
+      "iso3": "GUY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-guy.js",
+      "feature_count": 12,
+      "point_count": 1813,
+      "bytes": 42439
+    },
+    {
+      "iso3": "HKG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hkg.js",
+      "feature_count": 19,
+      "point_count": 503,
+      "bytes": 15918
+    },
+    {
+      "iso3": "HMD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hmd.js",
+      "feature_count": 1,
+      "point_count": 54,
+      "bytes": 1846
+    },
+    {
+      "iso3": "HND",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hnd.js",
+      "feature_count": 22,
+      "point_count": 2460,
+      "bytes": 61107
+    },
+    {
+      "iso3": "HRV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hrv.js",
+      "feature_count": 44,
+      "point_count": 4091,
+      "bytes": 98801
+    },
+    {
+      "iso3": "HTI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hti.js",
+      "feature_count": 13,
+      "point_count": 903,
+      "bytes": 23731
+    },
+    {
+      "iso3": "HUN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-hun.js",
+      "feature_count": 43,
+      "point_count": 2139,
+      "bytes": 56180
+    },
+    {
+      "iso3": "IDN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-idn.js",
+      "feature_count": 281,
+      "point_count": 21743,
+      "bytes": 549030
+    },
+    {
+      "iso3": "IMN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-imn.js",
+      "feature_count": 2,
+      "point_count": 82,
+      "bytes": 2615
+    },
+    {
+      "iso3": "IND",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ind.js",
+      "feature_count": 73,
+      "point_count": 20326,
+      "bytes": 457784
+    },
+    {
+      "iso3": "IOA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ioa.js",
+      "feature_count": 3,
+      "point_count": 54,
+      "bytes": 2306
+    },
+    {
+      "iso3": "IOT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-iot.js",
+      "feature_count": 10,
+      "point_count": 102,
+      "bytes": 4750
+    },
+    {
+      "iso3": "IRL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-irl.js",
+      "feature_count": 39,
+      "point_count": 5210,
+      "bytes": 122502
+    },
+    {
+      "iso3": "IRN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-irn.js",
+      "feature_count": 41,
+      "point_count": 4428,
+      "bytes": 105569
+    },
+    {
+      "iso3": "IRQ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-irq.js",
+      "feature_count": 18,
+      "point_count": 2856,
+      "bytes": 66397
+    },
+    {
+      "iso3": "ISL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-isl.js",
+      "feature_count": 12,
+      "point_count": 3598,
+      "bytes": 84887
+    },
+    {
+      "iso3": "ISR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-isr.js",
+      "feature_count": 5,
+      "point_count": 884,
+      "bytes": 20685
+    },
+    {
+      "iso3": "ITA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ita.js",
+      "feature_count": 141,
+      "point_count": 11436,
+      "bytes": 276326
+    },
+    {
+      "iso3": "JAM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-jam.js",
+      "feature_count": 12,
+      "point_count": 589,
+      "bytes": 16387
+    },
+    {
+      "iso3": "JEY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-jey.js",
+      "feature_count": 1,
+      "point_count": 47,
+      "bytes": 1637
+    },
+    {
+      "iso3": "JOR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-jor.js",
+      "feature_count": 11,
+      "point_count": 711,
+      "bytes": 18230
+    },
+    {
+      "iso3": "JPN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-jpn.js",
+      "feature_count": 154,
+      "point_count": 9851,
+      "bytes": 257752
+    },
+    {
+      "iso3": "KAB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kab.js",
+      "feature_count": 1,
+      "point_count": 65,
+      "bytes": 2033
+    },
+    {
+      "iso3": "KAS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kas.js",
+      "feature_count": 1,
+      "point_count": 38,
+      "bytes": 1451
+    },
+    {
+      "iso3": "KAZ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kaz.js",
+      "feature_count": 21,
+      "point_count": 5278,
+      "bytes": 119882
+    },
+    {
+      "iso3": "KEN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ken.js",
+      "feature_count": 8,
+      "point_count": 2621,
+      "bytes": 57958
+    },
+    {
+      "iso3": "KGZ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kgz.js",
+      "feature_count": 10,
+      "point_count": 2377,
+      "bytes": 54290
+    },
+    {
+      "iso3": "KHM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-khm.js",
+      "feature_count": 28,
+      "point_count": 2937,
+      "bytes": 73262
+    },
+    {
+      "iso3": "KIR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kir.js",
+      "feature_count": 35,
+      "point_count": 709,
+      "bytes": 23925
+    },
+    {
+      "iso3": "KNA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kna.js",
+      "feature_count": 10,
+      "point_count": 117,
+      "bytes": 5195
+    },
+    {
+      "iso3": "KOR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kor.js",
+      "feature_count": 66,
+      "point_count": 3808,
+      "bytes": 101147
+    },
+    {
+      "iso3": "KOS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kos.js",
+      "feature_count": 28,
+      "point_count": 744,
+      "bytes": 22530
+    },
+    {
+      "iso3": "KWT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-kwt.js",
+      "feature_count": 8,
+      "point_count": 279,
+      "bytes": 8184
+    },
+    {
+      "iso3": "LAO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lao.js",
+      "feature_count": 16,
+      "point_count": 2733,
+      "bytes": 66043
+    },
+    {
+      "iso3": "LBN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lbn.js",
+      "feature_count": 5,
+      "point_count": 678,
+      "bytes": 16210
+    },
+    {
+      "iso3": "LBR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lbr.js",
+      "feature_count": 14,
+      "point_count": 2028,
+      "bytes": 46128
+    },
+    {
+      "iso3": "LBY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lby.js",
+      "feature_count": 20,
+      "point_count": 1306,
+      "bytes": 33071
+    },
+    {
+      "iso3": "LCA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lca.js",
+      "feature_count": 10,
+      "point_count": 127,
+      "bytes": 5419
+    },
+    {
+      "iso3": "LIE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lie.js",
+      "feature_count": 12,
+      "point_count": 135,
+      "bytes": 5762
+    },
+    {
+      "iso3": "LKA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lka.js",
+      "feature_count": 29,
+      "point_count": 2000,
+      "bytes": 48118
+    },
+    {
+      "iso3": "LSO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lso.js",
+      "feature_count": 10,
+      "point_count": 1051,
+      "bytes": 26486
+    },
+    {
+      "iso3": "LTU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ltu.js",
+      "feature_count": 10,
+      "point_count": 1890,
+      "bytes": 43696
+    },
+    {
+      "iso3": "LUX",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lux.js",
+      "feature_count": 2,
+      "point_count": 269,
+      "bytes": 6414
+    },
+    {
+      "iso3": "LVA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-lva.js",
+      "feature_count": 118,
+      "point_count": 3630,
+      "bytes": 104626
+    },
+    {
+      "iso3": "MAC",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mac.js",
+      "feature_count": 2,
+      "point_count": 92,
+      "bytes": 2928
+    },
+    {
+      "iso3": "MAF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-maf.js",
+      "feature_count": 1,
+      "point_count": 22,
+      "bytes": 1123
+    },
+    {
+      "iso3": "MAR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mar.js",
+      "feature_count": 14,
+      "point_count": 1860,
+      "bytes": 44372
+    },
+    {
+      "iso3": "MCO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mco.js",
+      "feature_count": 1,
+      "point_count": 12,
+      "bytes": 870
+    },
+    {
+      "iso3": "MDA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mda.js",
+      "feature_count": 41,
+      "point_count": 1732,
+      "bytes": 46839
+    },
+    {
+      "iso3": "MDG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mdg.js",
+      "feature_count": 23,
+      "point_count": 4168,
+      "bytes": 100210
+    },
+    {
+      "iso3": "MDV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mdv.js",
+      "feature_count": 176,
+      "point_count": 1437,
+      "bytes": 67892
+    },
+    {
+      "iso3": "MEX",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mex.js",
+      "feature_count": 85,
+      "point_count": 14442,
+      "bytes": 356338
+    },
+    {
+      "iso3": "MHL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mhl.js",
+      "feature_count": 22,
+      "point_count": 211,
+      "bytes": 9721
+    },
+    {
+      "iso3": "MKD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mkd.js",
+      "feature_count": 83,
+      "point_count": 3655,
+      "bytes": 97686
+    },
+    {
+      "iso3": "MLI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mli.js",
+      "feature_count": 8,
+      "point_count": 2259,
+      "bytes": 51525
+    },
+    {
+      "iso3": "MLT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mlt.js",
+      "feature_count": 60,
+      "point_count": 691,
+      "bytes": 28204
+    },
+    {
+      "iso3": "MMR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mmr.js",
+      "feature_count": 52,
+      "point_count": 7438,
+      "bytes": 173605
+    },
+    {
+      "iso3": "MNE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mne.js",
+      "feature_count": 22,
+      "point_count": 705,
+      "bytes": 20436
+    },
+    {
+      "iso3": "MNG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mng.js",
+      "feature_count": 21,
+      "point_count": 3624,
+      "bytes": 85942
+    },
+    {
+      "iso3": "MNP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mnp.js",
+      "feature_count": 12,
+      "point_count": 183,
+      "bytes": 7121
+    },
+    {
+      "iso3": "MOZ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-moz.js",
+      "feature_count": 15,
+      "point_count": 4103,
+      "bytes": 97040
+    },
+    {
+      "iso3": "MRT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mrt.js",
+      "feature_count": 15,
+      "point_count": 1528,
+      "bytes": 38118
+    },
+    {
+      "iso3": "MSR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-msr.js",
+      "feature_count": 2,
+      "point_count": 33,
+      "bytes": 1582
+    },
+    {
+      "iso3": "MUS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mus.js",
+      "feature_count": 14,
+      "point_count": 241,
+      "bytes": 8882
+    },
+    {
+      "iso3": "MWI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mwi.js",
+      "feature_count": 28,
+      "point_count": 2095,
+      "bytes": 53873
+    },
+    {
+      "iso3": "MYS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-mys.js",
+      "feature_count": 28,
+      "point_count": 4353,
+      "bytes": 101167
+    },
+    {
+      "iso3": "NAM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nam.js",
+      "feature_count": 12,
+      "point_count": 2462,
+      "bytes": 59056
+    },
+    {
+      "iso3": "NCL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ncl.js",
+      "feature_count": 10,
+      "point_count": 1042,
+      "bytes": 27325
+    },
+    {
+      "iso3": "NER",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ner.js",
+      "feature_count": 7,
+      "point_count": 1493,
+      "bytes": 33394
+    },
+    {
+      "iso3": "NFK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nfk.js",
+      "feature_count": 1,
+      "point_count": 26,
+      "bytes": 1240
+    },
+    {
+      "iso3": "NGA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nga.js",
+      "feature_count": 38,
+      "point_count": 4136,
+      "bytes": 92261
+    },
+    {
+      "iso3": "NIC",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nic.js",
+      "feature_count": 19,
+      "point_count": 1956,
+      "bytes": 48994
+    },
+    {
+      "iso3": "NIU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-niu.js",
+      "feature_count": 1,
+      "point_count": 36,
+      "bytes": 1516
+    },
+    {
+      "iso3": "NLD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nld.js",
+      "feature_count": 24,
+      "point_count": 1609,
+      "bytes": 39091
+    },
+    {
+      "iso3": "NOR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nor.js",
+      "feature_count": 141,
+      "point_count": 17350,
+      "bytes": 403183
+    },
+    {
+      "iso3": "NPL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-npl.js",
+      "feature_count": 13,
+      "point_count": 2164,
+      "bytes": 50261
+    },
+    {
+      "iso3": "NRU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nru.js",
+      "feature_count": 11,
+      "point_count": 62,
+      "bytes": 4149
+    },
+    {
+      "iso3": "NZL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-nzl.js",
+      "feature_count": 38,
+      "point_count": 5481,
+      "bytes": 139009
+    },
+    {
+      "iso3": "OMN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-omn.js",
+      "feature_count": 15,
+      "point_count": 1119,
+      "bytes": 27967
+    },
+    {
+      "iso3": "PAK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pak.js",
+      "feature_count": 8,
+      "point_count": 4455,
+      "bytes": 99089
+    },
+    {
+      "iso3": "PAN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pan.js",
+      "feature_count": 27,
+      "point_count": 2827,
+      "bytes": 67709
+    },
+    {
+      "iso3": "PCN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pcn.js",
+      "feature_count": 4,
+      "point_count": 38,
+      "bytes": 2193
+    },
+    {
+      "iso3": "PER",
+      "file": "lines-js/natural-earth-10m-admin1-lines-per.js",
+      "feature_count": 29,
+      "point_count": 5792,
+      "bytes": 141454
+    },
+    {
+      "iso3": "PGA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pga.js",
+      "feature_count": 11,
+      "point_count": 98,
+      "bytes": 4966
+    },
+    {
+      "iso3": "PHL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-phl.js",
+      "feature_count": 189,
+      "point_count": 9763,
+      "bytes": 259823
+    },
+    {
+      "iso3": "PLW",
+      "file": "lines-js/natural-earth-10m-admin1-lines-plw.js",
+      "feature_count": 17,
+      "point_count": 204,
+      "bytes": 8467
+    },
+    {
+      "iso3": "PNG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-png.js",
+      "feature_count": 71,
+      "point_count": 5530,
+      "bytes": 142221
+    },
+    {
+      "iso3": "POL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pol.js",
+      "feature_count": 15,
+      "point_count": 2402,
+      "bytes": 55876
+    },
+    {
+      "iso3": "PRI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pri.js",
+      "feature_count": 4,
+      "point_count": 303,
+      "bytes": 8153
+    },
+    {
+      "iso3": "PRK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-prk.js",
+      "feature_count": 19,
+      "point_count": 3087,
+      "bytes": 74806
+    },
+    {
+      "iso3": "PRT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-prt.js",
+      "feature_count": 34,
+      "point_count": 2808,
+      "bytes": 69174
+    },
+    {
+      "iso3": "PRY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pry.js",
+      "feature_count": 17,
+      "point_count": 2774,
+      "bytes": 69966
+    },
+    {
+      "iso3": "PSX",
+      "file": "lines-js/natural-earth-10m-admin1-lines-psx.js",
+      "feature_count": 2,
+      "point_count": 234,
+      "bytes": 5916
+    },
+    {
+      "iso3": "PYF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-pyf.js",
+      "feature_count": 88,
+      "point_count": 1043,
+      "bytes": 44847
+    },
+    {
+      "iso3": "QAT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-qat.js",
+      "feature_count": 6,
+      "point_count": 299,
+      "bytes": 8204
+    },
+    {
+      "iso3": "ROU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-rou.js",
+      "feature_count": 41,
+      "point_count": 4571,
+      "bytes": 108692
+    },
+    {
+      "iso3": "RUS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-rus.js",
+      "feature_count": 310,
+      "point_count": 85409,
+      "bytes": 1961474
+    },
+    {
+      "iso3": "RWA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-rwa.js",
+      "feature_count": 4,
+      "point_count": 619,
+      "bytes": 14746
+    },
+    {
+      "iso3": "SAH",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sah.js",
+      "feature_count": 1,
+      "point_count": 289,
+      "bytes": 7145
+    },
+    {
+      "iso3": "SAU",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sau.js",
+      "feature_count": 22,
+      "point_count": 3720,
+      "bytes": 86090
+    },
+    {
+      "iso3": "SDN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sdn.js",
+      "feature_count": 16,
+      "point_count": 2015,
+      "bytes": 47534
+    },
+    {
+      "iso3": "SDS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sds.js",
+      "feature_count": 8,
+      "point_count": 1756,
+      "bytes": 38759
+    },
+    {
+      "iso3": "SEN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sen.js",
+      "feature_count": 15,
+      "point_count": 2348,
+      "bytes": 57037
+    },
+    {
+      "iso3": "SGP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sgp.js",
+      "feature_count": 4,
+      "point_count": 109,
+      "bytes": 3635
+    },
+    {
+      "iso3": "SGS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sgs.js",
+      "feature_count": 17,
+      "point_count": 627,
+      "bytes": 18935
+    },
+    {
+      "iso3": "SHN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-shn.js",
+      "feature_count": 4,
+      "point_count": 83,
+      "bytes": 3167
+    },
+    {
+      "iso3": "SLB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-slb.js",
+      "feature_count": 48,
+      "point_count": 2185,
+      "bytes": 60847
+    },
+    {
+      "iso3": "SLE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sle.js",
+      "feature_count": 4,
+      "point_count": 1080,
+      "bytes": 24760
+    },
+    {
+      "iso3": "SLV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-slv.js",
+      "feature_count": 15,
+      "point_count": 1342,
+      "bytes": 34138
+    },
+    {
+      "iso3": "SMR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-smr.js",
+      "feature_count": 8,
+      "point_count": 97,
+      "bytes": 4215
+    },
+    {
+      "iso3": "SOL",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sol.js",
+      "feature_count": 1,
+      "point_count": 319,
+      "bytes": 7460
+    },
+    {
+      "iso3": "SOM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-som.js",
+      "feature_count": 12,
+      "point_count": 796,
+      "bytes": 19813
+    },
+    {
+      "iso3": "SPM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-spm.js",
+      "feature_count": 2,
+      "point_count": 82,
+      "bytes": 2703
+    },
+    {
+      "iso3": "SRB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-srb.js",
+      "feature_count": 24,
+      "point_count": 7340,
+      "bytes": 165392
+    },
+    {
+      "iso3": "STP",
+      "file": "lines-js/natural-earth-10m-admin1-lines-stp.js",
+      "feature_count": 2,
+      "point_count": 96,
+      "bytes": 2731
+    },
+    {
+      "iso3": "SUR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sur.js",
+      "feature_count": 9,
+      "point_count": 1164,
+      "bytes": 27651
+    },
+    {
+      "iso3": "SVK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-svk.js",
+      "feature_count": 7,
+      "point_count": 2056,
+      "bytes": 46689
+    },
+    {
+      "iso3": "SVN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-svn.js",
+      "feature_count": 183,
+      "point_count": 3803,
+      "bytes": 122348
+    },
+    {
+      "iso3": "SWE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-swe.js",
+      "feature_count": 59,
+      "point_count": 6369,
+      "bytes": 151657
+    },
+    {
+      "iso3": "SWZ",
+      "file": "lines-js/natural-earth-10m-admin1-lines-swz.js",
+      "feature_count": 3,
+      "point_count": 346,
+      "bytes": 8930
+    },
+    {
+      "iso3": "SXM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-sxm.js",
+      "feature_count": 1,
+      "point_count": 9,
+      "bytes": 822
+    },
+    {
+      "iso3": "SYC",
+      "file": "lines-js/natural-earth-10m-admin1-lines-syc.js",
+      "feature_count": 41,
+      "point_count": 431,
+      "bytes": 18511
+    },
+    {
+      "iso3": "SYR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-syr.js",
+      "feature_count": 14,
+      "point_count": 2121,
+      "bytes": 49574
+    },
+    {
+      "iso3": "TCA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tca.js",
+      "feature_count": 12,
+      "point_count": 213,
+      "bytes": 7810
+    },
+    {
+      "iso3": "TCD",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tcd.js",
+      "feature_count": 21,
+      "point_count": 3080,
+      "bytes": 71081
+    },
+    {
+      "iso3": "TGO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tgo.js",
+      "feature_count": 4,
+      "point_count": 801,
+      "bytes": 17288
+    },
+    {
+      "iso3": "THA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tha.js",
+      "feature_count": 94,
+      "point_count": 14947,
+      "bytes": 352683
+    },
+    {
+      "iso3": "TJK",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tjk.js",
+      "feature_count": 6,
+      "point_count": 1823,
+      "bytes": 41404
+    },
+    {
+      "iso3": "TKM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tkm.js",
+      "feature_count": 6,
+      "point_count": 2068,
+      "bytes": 46750
+    },
+    {
+      "iso3": "TLS",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tls.js",
+      "feature_count": 13,
+      "point_count": 509,
+      "bytes": 14755
+    },
+    {
+      "iso3": "TON",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ton.js",
+      "feature_count": 11,
+      "point_count": 223,
+      "bytes": 8263
+    },
+    {
+      "iso3": "TTO",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tto.js",
+      "feature_count": 14,
+      "point_count": 397,
+      "bytes": 12413
+    },
+    {
+      "iso3": "TUN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tun.js",
+      "feature_count": 25,
+      "point_count": 2163,
+      "bytes": 51658
+    },
+    {
+      "iso3": "TUR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tur.js",
+      "feature_count": 82,
+      "point_count": 6791,
+      "bytes": 165709
+    },
+    {
+      "iso3": "TUV",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tuv.js",
+      "feature_count": 9,
+      "point_count": 69,
+      "bytes": 3896
+    },
+    {
+      "iso3": "TWN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-twn.js",
+      "feature_count": 25,
+      "point_count": 1189,
+      "bytes": 32814
+    },
+    {
+      "iso3": "TZA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-tza.js",
+      "feature_count": 31,
+      "point_count": 3622,
+      "bytes": 86343
+    },
+    {
+      "iso3": "UGA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-uga.js",
+      "feature_count": 107,
+      "point_count": 2927,
+      "bytes": 84632
+    },
+    {
+      "iso3": "UKR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ukr.js",
+      "feature_count": 29,
+      "point_count": 11169,
+      "bytes": 249777
+    },
+    {
+      "iso3": "UMI",
+      "file": "lines-js/natural-earth-10m-admin1-lines-umi.js",
+      "feature_count": 12,
+      "point_count": 117,
+      "bytes": 5652
+    },
+    {
+      "iso3": "URY",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ury.js",
+      "feature_count": 16,
+      "point_count": 2334,
+      "bytes": 59352
+    },
+    {
+      "iso3": "USA",
+      "file": "lines-js/natural-earth-10m-admin1-lines-usa.js",
+      "feature_count": 397,
+      "point_count": 44696,
+      "bytes": 1130376
+    },
+    {
+      "iso3": "USG",
+      "file": "lines-js/natural-earth-10m-admin1-lines-usg.js",
+      "feature_count": 2,
+      "point_count": 44,
+      "bytes": 1834
+    },
+    {
+      "iso3": "UZB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-uzb.js",
+      "feature_count": 17,
+      "point_count": 2692,
+      "bytes": 62643
+    },
+    {
+      "iso3": "VAT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vat.js",
+      "feature_count": 1,
+      "point_count": 7,
+      "bytes": 774
+    },
+    {
+      "iso3": "VCT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vct.js",
+      "feature_count": 8,
+      "point_count": 122,
+      "bytes": 4885
+    },
+    {
+      "iso3": "VEN",
+      "file": "lines-js/natural-earth-10m-admin1-lines-ven.js",
+      "feature_count": 51,
+      "point_count": 6941,
+      "bytes": 164567
+    },
+    {
+      "iso3": "VGB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vgb.js",
+      "feature_count": 6,
+      "point_count": 93,
+      "bytes": 3801
+    },
+    {
+      "iso3": "VIR",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vir.js",
+      "feature_count": 3,
+      "point_count": 71,
+      "bytes": 2660
+    },
+    {
+      "iso3": "VNM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vnm.js",
+      "feature_count": 87,
+      "point_count": 6811,
+      "bytes": 173688
+    },
+    {
+      "iso3": "VUT",
+      "file": "lines-js/natural-earth-10m-admin1-lines-vut.js",
+      "feature_count": 27,
+      "point_count": 1015,
+      "bytes": 30251
+    },
+    {
+      "iso3": "WLF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-wlf.js",
+      "feature_count": 3,
+      "point_count": 61,
+      "bytes": 2550
+    },
+    {
+      "iso3": "WSB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-wsb.js",
+      "feature_count": 1,
+      "point_count": 47,
+      "bytes": 1644
+    },
+    {
+      "iso3": "WSM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-wsm.js",
+      "feature_count": 15,
+      "point_count": 193,
+      "bytes": 8370
+    },
+    {
+      "iso3": "YEM",
+      "file": "lines-js/natural-earth-10m-admin1-lines-yem.js",
+      "feature_count": 28,
+      "point_count": 2100,
+      "bytes": 52123
+    },
+    {
+      "iso3": "ZAF",
+      "file": "lines-js/natural-earth-10m-admin1-lines-zaf.js",
+      "feature_count": 11,
+      "point_count": 4222,
+      "bytes": 98932
+    },
+    {
+      "iso3": "ZMB",
+      "file": "lines-js/natural-earth-10m-admin1-lines-zmb.js",
+      "feature_count": 9,
+      "point_count": 3845,
+      "bytes": 89519
+    },
+    {
+      "iso3": "ZWE",
+      "file": "lines-js/natural-earth-10m-admin1-lines-zwe.js",
+      "feature_count": 9,
+      "point_count": 3164,
+      "bytes": 74377
+    }
+  ]
+}

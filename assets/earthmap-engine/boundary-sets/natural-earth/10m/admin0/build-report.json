@@ -1,0 +1,94 @@
+{
+  "input": "assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.geojson",
+  "output": "assets/earthmap-engine/boundary-sets/natural-earth/10m/admin0",
+  "features": 258,
+  "chunks": 258,
+  "totalBytes": 13784225,
+  "largestChunks": [
+    {
+      "stable_id": "natural-earth:10m:admin0:can",
+      "title": "Canada",
+      "bytes": 1578839,
+      "megabytes": 1.506,
+      "point_count": 68193
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:usa",
+      "title": "United States of America",
+      "bytes": 850558,
+      "megabytes": 0.811,
+      "point_count": 35981
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:rus",
+      "title": "Russia",
+      "bytes": 825404,
+      "megabytes": 0.787,
+      "point_count": 36756
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:ata",
+      "title": "Antarctica",
+      "bytes": 566331,
+      "megabytes": 0.54,
+      "point_count": 23815
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:grl",
+      "title": "Greenland",
+      "bytes": 464408,
+      "megabytes": 0.443,
+      "point_count": 20133
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:idn",
+      "title": "Indonesia",
+      "bytes": 446214,
+      "megabytes": 0.426,
+      "point_count": 19564
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:chl",
+      "title": "Chile",
+      "bytes": 414670,
+      "megabytes": 0.395,
+      "point_count": 17197
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:nor",
+      "title": "Norway",
+      "bytes": 345990,
+      "megabytes": 0.33,
+      "point_count": 15817
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:aus",
+      "title": "Australia",
+      "bytes": 330410,
+      "megabytes": 0.315,
+      "point_count": 13650
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:chn",
+      "title": "People's Republic of China",
+      "bytes": 324480,
+      "megabytes": 0.309,
+      "point_count": 14116
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:bra",
+      "title": "Brazil",
+      "bytes": 261379,
+      "megabytes": 0.249,
+      "point_count": 11121
+    },
+    {
+      "stable_id": "natural-earth:10m:admin0:mex",
+      "title": "Mexico",
+      "bytes": 179623,
+      "megabytes": 0.171,
+      "point_count": 7419
+    }
+  ],
+  "missingProviderIds": []
+}

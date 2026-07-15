@@ -1,0 +1,121 @@
+{
+  "input": "assets\\geojson\\natural-earth\\10m\\admin1-by-country",
+  "output": "assets\\earthmap-engine\\boundary-sets\\natural-earth\\10m\\admin1",
+  "countryChunks": 251,
+  "features": 4596,
+  "totalBytes": 43171489,
+  "largestChunks": [
+    {
+      "iso3": "RUS",
+      "bytes": 3253319,
+      "megabytes": 3.103,
+      "feature_count": 86,
+      "point_count": 133897
+    },
+    {
+      "iso3": "CAN",
+      "bytes": 1815069,
+      "megabytes": 1.731,
+      "feature_count": 13,
+      "point_count": 76717
+    },
+    {
+      "iso3": "USA",
+      "bytes": 1397392,
+      "megabytes": 1.333,
+      "feature_count": 51,
+      "point_count": 53344
+    },
+    {
+      "iso3": "CHN",
+      "bytes": 1302185,
+      "megabytes": 1.242,
+      "feature_count": 32,
+      "point_count": 53262
+    },
+    {
+      "iso3": "GBR",
+      "bytes": 1163823,
+      "megabytes": 1.11,
+      "feature_count": 232,
+      "point_count": 20235
+    },
+    {
+      "iso3": "BRA",
+      "bytes": 880420,
+      "megabytes": 0.84,
+      "feature_count": 27,
+      "point_count": 34426
+    },
+    {
+      "iso3": "THA",
+      "bytes": 834463,
+      "megabytes": 0.796,
+      "feature_count": 77,
+      "point_count": 26496
+    },
+    {
+      "iso3": "IND",
+      "bytes": 825902,
+      "megabytes": 0.788,
+      "feature_count": 36,
+      "point_count": 32884
+    },
+    {
+      "iso3": "FRA",
+      "bytes": 791536,
+      "megabytes": 0.755,
+      "feature_count": 101,
+      "point_count": 22901
+    },
+    {
+      "iso3": "ITA",
+      "bytes": 754101,
+      "megabytes": 0.719,
+      "feature_count": 110,
+      "point_count": 19344
+    },
+    {
+      "iso3": "SVN",
+      "bytes": 749976,
+      "megabytes": 0.715,
+      "feature_count": 193,
+      "point_count": 6911
+    },
+    {
+      "iso3": "IDN",
+      "bytes": 643073,
+      "megabytes": 0.613,
+      "feature_count": 33,
+      "point_count": 23897
+    },
+    {
+      "iso3": "PHL",
+      "bytes": 630377,
+      "megabytes": 0.601,
+      "feature_count": 118,
+      "point_count": 11950
+    },
+    {
+      "iso3": "MEX",
+      "bytes": 599067,
+      "megabytes": 0.571,
+      "feature_count": 33,
+      "point_count": 21414
+    },
+    {
+      "iso3": "ATA",
+      "bytes": 566995,
+      "megabytes": 0.541,
+      "feature_count": 2,
+      "point_count": 23813
+    },
+    {
+      "iso3": "GRL",
+      "bytes": 557540,
+      "megabytes": 0.532,
+      "feature_count": 6,
+      "point_count": 23625
+    }
+  ]
+}
