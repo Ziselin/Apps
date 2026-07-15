@@ -2012,6 +2012,9 @@ body.earthmap-theme-dark .boundary-feature-row {
     --earthmap-topbar-height: 128px;
     --earthmap-footer-height: calc(52px + env(safe-area-inset-bottom, 0px));
   }
+  .earthmap-engine-diagnostics {
+    display: none;
+  }
   .topbar { padding: 18px 10px 10px 12px; }
   .brand-plate { gap: 8px; padding: 0 4px; }
   .brand-name { font-size: 1.4rem; }
