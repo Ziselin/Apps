@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ziselin.local/schemas/ziselin-gearbox-v1.schema.json",
+  "title": "Ziselin GearBox v1",
+  "description": "Übersetzungsschicht zwischen externen CSV/JSON-Tabellen, Boundary-Sets und EarthMap-Darstellung. Die GearBox speichert keine Geometrie und keine zweite Boundary-Wahrheit.",
+  "type": "object",
+  "required": ["schema", "id", "title", "target_boundary_set", "input", "join", "values"],
+  "properties": {
+    "schema": {
+      "const": "ziselin-gearbox-v1"
+    },
+    "id": {
+      "type": "string",
+      "description": "Technische ID dieser GearBox-Definition."
+    },
+    "title": {
+      "type": "string",
+      "description": "Menschlich lesbarer Titel der Übersetzung, z. B. 'Arbeitslosenquote nach Kreisen'."
+    },
+    "description": {
+      "type": "string"
+    },
+    "target_boundary_set": {
+      "type": "object",
+      "description": "Boundary-Set-Fassung, an die externe Daten angedockt werden.",
+      "required": ["version_id"],
+      "properties": {
+        "stable_id": {
+          "type": "string",
+          "description": "Stabile Boundary-Set-ID, falls bekannt."
+        },
+        "version_id": {
+          "type": "string",
+          "description": "Konkrete zeitgebundene Boundary-Set-Fassung."
+        },
+        "admin_level": {
+          "type": "string",
+          "description": "Zielebene der Darstellung, z. B. ADM0, ADM1, ADM2, electoral_district oder custom."
+        },
+        "valid_at": {
+          "type": "string",
+          "description": "Zeitpunkt, gegen den die Tabelle fachlich gemappt werden soll."
+        },
+        "scope": {
+          "type": "array",
+          "description": "Gebiete, Staaten, Organisationen oder Bündnisse, für die Werte erfasst und dargestellt werden sollen. Die Einträge sind reine Aufzählungen.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "aggregation": {
+      "type": "object",
+      "description": "Regel, wie feinere Quelldaten auf vorhandene Boundary-Ebenen verdichtet werden, wenn das passende Kartenmaterial noch nicht vorhanden ist.",
+      "properties": {
+        "required_if_source_is_more_detailed_than_available_boundaries": {
+          "type": "boolean",
+          "default": true
+        },
+        "method": {
+          "type": "string",
+          "enum": ["arithmetic_mean", "sum", "weighted_mean", "none"],
+          "default": "arithmetic_mean"
+        },
+        "source_admin_level": {
+          "type": "string",
+          "description": "Ebene, auf der die Quelle ihre Werte ursprünglich liefert."
+        },
+        "display_admin_level": {
+          "type": "string",
+          "description": "Ebene, auf der EarthMap die Werte tatsächlich darstellen kann."
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "description": "Beschreibung der externen Tabelle. Die Tabelle selbst bleibt extern oder projektbezogen.",
+      "required": ["format"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["csv", "tsv", "json"]
+        },
+        "has_header": {
+          "type": "boolean",
+          "default": true
+        },
+        "delimiter": {
+          "type": "string",
+          "description": "Trennzeichen bei CSV/TSV, z. B. ',' oder ';'."
+        },
+        "encoding": {
+          "type": "string",
+          "default": "utf-8"
+        },
+        "source_ref": {
+          "type": "string",
+          "description": "Optionaler lokaler Dateiname, URL oder Projektverweis auf die externe Tabelle."
+        }
+      }
+    },
+    "join": {
+      "type": "object",
+      "description": "Regel, wie Tabellenzeilen auf Boundary-Features gematcht werden.",
+      "required": ["table_key", "boundary_key"],
+      "properties": {
+        "table_key": {
+          "type": "string",
+          "description": "Spalte oder JSON-Pfad in der externen Tabelle."
+        },
+        "boundary_key": {
+          "type": "string",
+          "description": "Feld oder Pfad im Boundary-Feature, z. B. 'stable_id' oder 'properties.AGS'."
+        },
+        "fallback_keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["table_key", "boundary_key"],
+            "properties": {
+              "table_key": { "type": "string" },
+              "boundary_key": { "type": "string" }
+            }
+          }
+        },
+        "normalization": {
+          "type": "object",
+          "properties": {
+            "trim": { "type": "boolean", "default": true },
+            "casefold": { "type": "boolean", "default": true },
+            "remove_diacritics": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+    "values": {
+      "type": "array",
+      "description": "Wertspalten, die aus der Tabelle visualisiert werden können.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["table_key", "id", "type"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Interner Name des Wertes in EarthMap."
+          },
+          "table_key": {
+            "type": "string",
+            "description": "Spalte oder JSON-Pfad in der externen Tabelle."
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["number", "percentage", "integer", "category", "boolean", "text"]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string",
+            "description": "Optionaler Quellenhinweis für genau diese Wertspalte."
+          }
+        }
+      }
+    },
+    "style": {
+      "type": "object",
+      "description": "Projekt- oder GearBox-Darstellungsregeln. Sie verändern keine Boundary-Daten.",
+      "properties": {
+        "value_id": {
+          "type": "string",
+          "description": "Welcher Wert standardmäßig dargestellt wird."
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": { "type": ["number", "null"] },
+              "to": { "type": ["number", "null"] },
+              "value": { "type": ["string", "number", "boolean", "null"] },
+              "label": { "type": "string" },
+              "fill": { "type": "string" },
+              "outline": { "type": "string" },
+              "pattern": { "type": "string" }
+            }
+          }
+        },
+        "missing": {
+          "type": "object",
+          "properties": {
+            "fill": { "type": "string" },
+            "label": { "type": "string" }
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "Quelle der externen Tabelle bzw. der fachlichen Werte.",
+      "properties": {
+        "label": { "type": "string" },
+        "url": { "type": "string" },
+        "accessed_at": { "type": "string" },
+        "license": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

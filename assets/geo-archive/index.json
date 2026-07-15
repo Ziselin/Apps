@@ -2,6 +2,25 @@
   "schema": "ziselin-geo-archive-index-v1",
   "title": "Ziselin Geo-Archive",
   "updated_at": "",
+  "schemas": [
+    {
+      "id": "ziselin-boundary-set-v1",
+      "path": "schemas/ziselin-boundary-set-v1.schema.json",
+      "role": "map-boundaries"
+    },
+    {
+      "id": "ziselin-gearbox-v1",
+      "path": "schemas/ziselin-gearbox-v1.schema.json",
+      "role": "external-data-coupling"
+    }
+  ],
   "collections": [],
-  "datasets": []
+  "datasets": [
+    {
+      "id": "gearbox-example-v1",
+      "path": "datasets/gearbox-example-v1.json",
+      "schema": "ziselin-gearbox-v1",
+      "role": "example"
+    }
+  ]
 }

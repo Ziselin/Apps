@@ -1,0 +1,84 @@
+{
+  "schema": "ziselin-gearbox-v1",
+  "id": "example-unemployment-rate-counties",
+  "title": "Beispiel: Arbeitslosenquote nach Kreisen",
+  "description": "Beispieldefinition für die Kopplung einer externen CSV-Tabelle an ein Boundary-Set. Die CSV-Daten selbst werden nicht in dieser GearBox gespeichert.",
+  "target_boundary_set": {
+    "stable_id": "de-kreise",
+    "version_id": "de-kreise@2024..open",
+    "valid_at": "2024",
+    "scope": ["Deutschland"]
+  },
+  "aggregation": {
+    "required_if_source_is_more_detailed_than_available_boundaries": true,
+    "method": "arithmetic_mean",
+    "source_admin_level": "ADM2",
+    "display_admin_level": "ADM2",
+    "note": "Wenn nur gröbere Boundary-Geometrien vorhanden sind, werden feinere Werte auf die verfügbare Ebene gemittelt."
+  },
+  "input": {
+    "format": "csv",
+    "has_header": true,
+    "delimiter": ";",
+    "encoding": "utf-8",
+    "source_ref": "arbeitslosenquote-kreise-2024.csv"
+  },
+  "join": {
+    "table_key": "ags",
+    "boundary_key": "properties.AGS",
+    "fallback_keys": [
+      {
+        "table_key": "kreis_name",
+        "boundary_key": "name"
+      }
+    ],
+    "normalization": {
+      "trim": true,
+      "casefold": true,
+      "remove_diacritics": true
+    }
+  },
+  "values": [
+    {
+      "id": "unemployment_rate",
+      "table_key": "arbeitslosenquote",
+      "label": "Arbeitslosenquote",
+      "type": "percentage",
+      "unit": "%"
+    }
+  ],
+  "style": {
+    "value_id": "unemployment_rate",
+    "classes": [
+      {
+        "from": 0,
+        "to": 3,
+        "label": "0 bis 3 %",
+        "fill": "#d6ecff"
+      },
+      {
+        "from": 3,
+        "to": 6,
+        "label": "3 bis 6 %",
+        "fill": "#7db7e8"
+      },
+      {
+        "from": 6,
+        "to": null,
+        "label": "über 6 %",
+        "fill": "#2166ac"
+      }
+    ],
+    "missing": {
+      "fill": "#eeeeee",
+      "label": "kein Wert"
+    }
+  },
+  "source": {
+    "label": "Beispielquelle",
+    "url": "",
+    "accessed_at": "",
+    "license": "",
+    "note": "Nur Beispiel. Vor produktiver Nutzung Quelle und Lizenz prüfen."
+  }
+}

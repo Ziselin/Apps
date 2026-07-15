@@ -2,15 +2,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ziselin.local/schemas/ziselin-boundary-set-v1.schema.json",
   "title": "Ziselin Boundary Set v1",
+  "description": "Zeitgebundene, zitierbare und über GearBoxes mit externen Tabellen verknüpfbare Boundary-Sets für EarthMap.",
   "type": "object",
-  "required": ["schema", "id", "title", "boundary_type", "source", "license", "features"],
+  "required": ["schema", "id", "stable_id", "version_id", "title", "boundary_type", "source", "license", "features"],
   "properties": {
     "schema": {
       "const": "ziselin-boundary-set-v1"
     },
     "id": {
       "type": "string",
-      "description": "Stabile ID der Kartensammlung."
+      "description": "Technische ID der Kartensammlung innerhalb von EarthMap."
+    },
+    "stable_id": {
+      "type": "string",
+      "description": "Sachlich stabile ID der Boundary-Sammlung, unabhängig von einer konkreten Geometrie- oder Zeitfassung."
+    },
+    "version_id": {
+      "type": "string",
+      "description": "Konkrete zeitgebundene Fassung, üblicherweise stable_id plus Gültigkeitsangabe."
     },
     "title": {
       "type": "string"
@@ -35,14 +44,52 @@
     "admin_level": {
       "type": "string"
     },
+    "rank": {
+      "type": ["string", "number"]
+    },
+    "parent_id": {
+      "type": "string"
+    },
     "year_represented": {
       "type": "string"
     },
     "valid_from": {
-      "type": "string"
+      "type": "string",
+      "description": "Beginn der Gültigkeit. Darf leer sein, wenn nur eine undatierte Referenzfassung vorliegt."
     },
     "valid_to": {
-      "type": ["string", "null"]
+      "type": ["string", "null"],
+      "description": "Ende der Gültigkeit oder null für offen/gegenwärtig."
+    },
+    "valid_precision": {
+      "type": "string",
+      "enum": ["day", "month", "year", "range", "unknown"],
+      "default": "unknown"
+    },
+    "temporal_status": {
+      "type": "string",
+      "enum": ["current", "historical", "undated_reference", "working", "unknown"],
+      "default": "unknown"
+    },
+    "temporal_note": {
+      "type": "string"
+    },
+    "data_binding": {
+      "type": "object",
+      "description": "Anschlussstellen für GearBoxes und externe Tabellen. Statistikdaten werden nicht im Boundary-Set gespeichert.",
+      "properties": {
+        "preferred_keys": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "supports_external_datasets": {
+          "type": "boolean",
+          "default": true
+        },
+        "join_notes": {
+          "type": "string"
+        }
+      }
     },
     "source": {
       "type": "object",
@@ -84,10 +131,20 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "geometry"],
+        "required": ["id", "stable_id", "version_id", "name", "geometry"],
         "properties": {
           "id": { "type": "string" },
+          "stable_id": {
+            "type": "string",
+            "description": "Sachlich stabile ID der Einzelfläche."
+          },
+          "version_id": {
+            "type": "string",
+            "description": "Konkrete zeitgebundene Boundary-Fassung der Einzelfläche."
+          },
           "name": { "type": "string" },
+          "parent_id": { "type": "string" },
+          "rank": { "type": ["string", "number"] },
           "wikidata_id": { "type": "string" },
           "identifiers": { "type": "object" },
           "names": { "type": "object" },
@@ -101,10 +158,20 @@
           },
           "valid_from": { "type": "string" },
           "valid_to": { "type": ["string", "null"] },
+          "valid_precision": {
+            "type": "string",
+            "enum": ["day", "month", "year", "range", "unknown"],
+            "default": "unknown"
+          },
+          "temporal_status": {
+            "type": "string",
+            "enum": ["current", "historical", "undated_reference", "working", "unknown"],
+            "default": "unknown"
+          },
           "source_ref": { "type": "string" },
           "geometry": {
             "type": "object",
-            "description": "GeoJSON Geometry."
+            "description": "GeoJSON Geometry. GeoJSON beschreibt hier die Geometrie, nicht die vollständige fachliche Wahrheit der Boundary."
           },
           "properties": { "type": "object" }
         }
