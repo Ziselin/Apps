@@ -547,6 +547,11 @@
   -webkit-mask-image: url("https://api.iconify.design/ri/treasure-map-line.svg");
 }
 
+.app-view-drawer-option-icon-projection {
+  mask-image: url("https://api.iconify.design/mdi/earth.svg");
+  -webkit-mask-image: url("https://api.iconify.design/mdi/earth.svg");
+}
+
 .app-view-drawer-option-label {
   min-width: 0;
 }
