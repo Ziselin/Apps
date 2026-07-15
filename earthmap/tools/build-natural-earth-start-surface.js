@@ -3,7 +3,10 @@ const path = require("path");
 
 const inputPath = path.join(__dirname, "..", "..", "assets", "geojson", "natural-earth", "10m", "tiles-vector-hierarchy", "ne_10m_land_hierarchy_global.js");
 const outputPath = path.join(__dirname, "..", "..", "assets", "geojson", "natural-earth", "10m", "tiles-vector-hierarchy", "ne_10m_land_hierarchy_global_start.js");
-const threshold = 0.52;
+// Startfläche: klein genug für den sofortigen Online-Start, aber nicht so
+// aggressiv reduziert, dass MapLibre-Globe die Ringe nur noch als Küstenfetzen
+// statt als stabile Kontinentalflächen füllen kann.
+const threshold = 0.19;
 
 function decodeRingForThreshold(ring) {
   const decoded = (ring || [])
