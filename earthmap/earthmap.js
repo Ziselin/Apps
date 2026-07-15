@@ -4359,6 +4359,24 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     const boundaryColor = isEarthMapDarkMode()
       ? "rgba(92,98,96,.9)"
       : "rgba(78,84,80,.62)";
+    // Alle Admin-1-Grenzen teilen dieselbe kartografische Strichdefinition.
+    // Autonome Regionen, Föderationssubjekte und Kantone dürfen fachlich
+    // gefiltert oder später eingeblendet werden, sollen aber nicht durch
+    // eigene Farbe oder Dicke als Sonderstil aus dem Provinzbild fallen.
+    const admin1BoundaryLineWidth = [
+      "interpolate", ["linear"], ["zoom"],
+      0, 0.52,
+      2.8, 0.6,
+      5.5, 0.78,
+      9, 0.94,
+    ];
+    const admin1BoundaryLineOpacity = [
+      "interpolate", ["linear"], ["zoom"],
+      0, 0.24,
+      2.4, 0.34,
+      3.2, 0.56,
+      5, 0.78,
+    ];
     const classifiedGeoJson = {
       ...geojson,
       features: (geojson.features || []).map((feature) => ({
@@ -4405,20 +4423,8 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
       },
       paint: {
         "line-color": boundaryColor,
-        "line-width": [
-          "interpolate", ["linear"], ["zoom"],
-          0, 0.52,
-          2.8, 0.6,
-          5.5, 0.78,
-          9, 0.94,
-        ],
-        "line-opacity": [
-          "interpolate", ["linear"], ["zoom"],
-          0, 0.24,
-          2.4, 0.34,
-          3.2, 0.56,
-          5, 0.78,
-        ],
+        "line-width": admin1BoundaryLineWidth,
+        "line-opacity": admin1BoundaryLineOpacity,
       },
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
@@ -4435,22 +4441,12 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
       layout: {
         "line-cap": "round",
         "line-join": "round",
+        "visibility": state.showAdmin1Boundaries === true ? "visible" : "none",
       },
       paint: {
-        "line-color": isEarthMapDarkMode() ? "rgba(74,82,80,.98)" : "rgba(64,70,67,.86)",
-        "line-width": [
-          "interpolate", ["linear"], ["zoom"],
-          0, 0.94,
-          3, 1.02,
-          6, 1.12,
-          10, 1.24,
-        ],
-        "line-opacity": [
-          "interpolate", ["linear"], ["zoom"],
-          0, 0.9,
-          3, 0.94,
-          6, 0.98,
-        ],
+        "line-color": boundaryColor,
+        "line-width": admin1BoundaryLineWidth,
+        "line-opacity": admin1BoundaryLineOpacity,
       },
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
@@ -4468,20 +4464,12 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
       layout: {
         "line-cap": "round",
         "line-join": "round",
+        "visibility": state.showAdmin1Boundaries === true ? "visible" : "none",
       },
       paint: {
-        "line-color": isEarthMapDarkMode() ? "rgba(74,82,80,.98)" : "rgba(64,70,67,.86)",
-        "line-width": [
-          "interpolate", ["linear"], ["zoom"],
-          6.5, 1.02,
-          8, 1.12,
-          10, 1.24,
-        ],
-        "line-opacity": [
-          "interpolate", ["linear"], ["zoom"],
-          6.5, 0.92,
-          8, 0.98,
-        ],
+        "line-color": boundaryColor,
+        "line-width": admin1BoundaryLineWidth,
+        "line-opacity": admin1BoundaryLineOpacity,
       },
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
@@ -4507,11 +4495,18 @@ function syncMapLibreAdmin1Visibility() {
   const map = mapLibreEngineState.map;
   if (!map?.getLayer?.(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID)) return;
   try {
-    map.setLayoutProperty(
+    [
       MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
-      "visibility",
-      state.showAdmin1Boundaries === true ? "visible" : "none",
-    );
+      MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID,
+      MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID,
+    ].forEach((layerId) => {
+      if (!map.getLayer(layerId)) return;
+      map.setLayoutProperty(
+        layerId,
+        "visibility",
+        state.showAdmin1Boundaries === true ? "visible" : "none",
+      );
+    });
   } catch (error) {
     console.warn("EarthMap-Provinzgrenzen konnten nicht umgeschaltet werden.", error);
   }
