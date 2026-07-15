@@ -11,7 +11,7 @@
   <link rel="icon" type="image/svg+xml" href="../assets/earthmap-favicon.svg?v=20260628a">
   <link rel="stylesheet" href="../assets/ui/color-choice.css?v=20260702a">
   <link rel="stylesheet" href="../assets/ui/editor-tabs.css?v=20260701c">
-  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260713a">
+  <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260715a">
   <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260709b">
   <link rel="stylesheet" href="../assets/vendor/maplibre-gl.v5.css?v=20260715a">
   <link rel="stylesheet" href="earthmap.css?v=20260715e">
@@ -113,6 +113,11 @@
           <span class="app-view-drawer-tab-grip" aria-hidden="true"></span>
         </button>
         <div id="viewToolsDrawerPanel" class="app-view-drawer-panel" hidden>
+          <button type="button" id="projectionToggle" class="app-view-drawer-option" aria-pressed="false">
+            <span class="app-view-drawer-option-icon app-view-drawer-option-icon-projection" aria-hidden="true"></span>
+            <span class="app-view-drawer-option-label">Kartenansicht</span>
+            <span class="app-view-drawer-option-check" aria-hidden="true"></span>
+          </button>
           <button type="button" id="graticuleToggle" class="app-view-drawer-option" aria-pressed="false">
             <span class="app-view-drawer-option-icon app-view-drawer-option-icon-grid" aria-hidden="true"></span>
             <span class="app-view-drawer-option-label">Koordinatensystem anzeigen</span>
@@ -215,6 +220,6 @@
   <script src="../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.by-country-index.js?v=20260710b"></script>
   <script src="../assets/vendor/maplibre-gl.v5.js?v=20260715a"></script>
-  <script src="earthmap.js?v=20260715e"></script>
+  <script src="earthmap.js?v=20260715f"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   "saveSearchLayerButton",
   "mapSearchInput", "mapSearchOptions", "mapSearchInfoButton", "mapSearchInfoPopup",
   "openWorkspaceButton", "returnPreviewButton", "globe", "mapLibreContainer", "globeCanvas", "mapEngineDiagnostics",
-  "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "graticuleToggle", "admin1Toggle",
+  "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "projectionToggle", "graticuleToggle", "admin1Toggle",
   "browserActionsMenuButton", "browserActionsMenu",
   "editorBackButton",
   "newProjectButton", "importBoundarySetButton", "importBoundarySetFromFolderButton", "boundarySetImportInput", "projectBrowserList", "libraryBrowserList",
@@ -648,6 +648,8 @@ const LEGACY_STORAGE_KEY = "globemap-projects-v1";
 const ACTIVE_PROJECT_STORAGE_KEY = "earthmap-active-project-v1";
 const THEME_STORAGE_KEY = "earthmap-theme";
 const VIEW_SETTINGS_STORAGE_KEY = "earthmap-view-settings-v1";
+const MAP_PROJECTION_GLOBE = "globe";
+const MAP_PROJECTION_FLAT = "map";
 const NATURAL_EARTH_ASSET_BASE = "../assets/geojson/natural-earth/";
 const boundaryFeatureRenderCache = new Map();
 const boundaryFeatureVectorPathCache = new Map();
@@ -1086,9 +1088,10 @@ function loadViewSettings() {
     return {
       showGraticule: parsed.showGraticule === true,
       showAdmin1Boundaries: parsed.showAdmin1Boundaries === true,
+      mapProjectionMode: parsed.mapProjectionMode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_FLAT : MAP_PROJECTION_GLOBE,
     };
   } catch {
-    return { showGraticule: false, showAdmin1Boundaries: false };
+    return { showGraticule: false, showAdmin1Boundaries: false, mapProjectionMode: MAP_PROJECTION_GLOBE };
   }
 }
 
@@ -1097,6 +1100,7 @@ function persistViewSettings() {
     localStorage.setItem(VIEW_SETTINGS_STORAGE_KEY, JSON.stringify({
       showGraticule: state.showGraticule === true,
       showAdmin1Boundaries: state.showAdmin1Boundaries === true,
+      mapProjectionMode: state.mapProjectionMode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_FLAT : MAP_PROJECTION_GLOBE,
     }));
   } catch (error) {
     console.warn("EarthMap-Ansichtseinstellungen konnten nicht gespeichert werden.", error);
@@ -2444,10 +2448,46 @@ function setViewToolsDrawerOpen(isOpen) {
 }
 
 function syncViewToolsControls() {
+  if (ui.projectionToggle) {
+    const isFlatMap = state.mapProjectionMode === MAP_PROJECTION_FLAT;
+    ui.projectionToggle.setAttribute("aria-pressed", "false");
+    ui.projectionToggle.classList.remove("is-active");
+    ui.projectionToggle.setAttribute("aria-label", isFlatMap ? "Zur Globusansicht wechseln" : "Zur Kartenansicht wechseln");
+    const label = ui.projectionToggle.querySelector(".app-view-drawer-option-label");
+    if (label) label.textContent = isFlatMap ? "Globusansicht" : "Kartenansicht";
+  }
   ui.graticuleToggle?.setAttribute("aria-pressed", state.showGraticule === true ? "true" : "false");
   ui.graticuleToggle?.classList.toggle("is-active", state.showGraticule === true);
   ui.admin1Toggle?.setAttribute("aria-pressed", state.showAdmin1Boundaries === true ? "true" : "false");
   ui.admin1Toggle?.classList.toggle("is-active", state.showAdmin1Boundaries === true);
+}
+
+function applyMapLibreProjection() {
+  const map = mapLibreEngineState.map;
+  if (!map || typeof map.setProjection !== "function") return;
+  // Architekturregel: Theme und Kartenart sind getrennte Zustände. MapLibre
+  // setzt beim Stylewechsel die Projektion zurück; deshalb wird die gewünschte
+  // Ansicht zentral nach jedem Initial- und Restyle-Vorgang erneut angewendet.
+  const projectionType = state.mapProjectionMode === MAP_PROJECTION_FLAT ? "mercator" : "globe";
+  try {
+    map.setProjection({ type: projectionType });
+  } catch (error) {
+    mapLibreEngineState.status = projectionType === "globe" ? "ready-no-globe-projection" : "ready-no-map-projection";
+    mapLibreEngineState.error = error?.message || String(error);
+  }
+}
+
+function setMapProjectionMode(mode) {
+  state.mapProjectionMode = mode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_FLAT : MAP_PROJECTION_GLOBE;
+  syncViewToolsControls();
+  persistViewSettings();
+  applyMapLibreProjection();
+  syncMapLibreCamera();
+  renderGlobe();
+}
+
+function toggleMapProjectionMode() {
+  setMapProjectionMode(state.mapProjectionMode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_GLOBE : MAP_PROJECTION_FLAT);
 }
 
 function setGraticuleVisible(isVisible) {
@@ -5231,6 +5271,7 @@ function syncMapLibreTheme() {
     mapLibreEngineState.renderPhase = "style";
     map.once("styledata", () => {
       mapLibreEngineState.styleLoaded = true;
+      applyMapLibreProjection();
       installMapLibrePilotLandLayer(mapLibreEngineState.fullLandGeoJson?.features?.length ? "full" : "start");
       if (mapLibreEngineState.waterGeoJson?.features?.length) installMapLibrePilotWaterLayer();
       if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) installMapLibrePilotAdmin0Layer();
@@ -5275,16 +5316,7 @@ function initializeMapLibreEnginePilot() {
     mapLibreEngineState.map.on("load", () => {
       mapLibreEngineState.status = "ready";
       mapLibreEngineState.styleLoaded = true;
-      try {
-        if (typeof mapLibreEngineState.map.setProjection === "function") {
-          mapLibreEngineState.map.setProjection({ type: "globe" });
-        }
-      } catch (error) {
-        // Projektion ist nicht kritisch für den Pilotstart. Die Diagnose hält
-        // den Status fest; der produktive Renderer wird später darauf bestehen.
-        mapLibreEngineState.status = "ready-no-globe-projection";
-        mapLibreEngineState.error = error?.message || String(error);
-      }
+      applyMapLibreProjection();
       installMapLibrePilotLandLayer();
       requestMapLibrePilotWaterLayer("major");
       requestMapLibrePilotAdmin0Layer();
@@ -15386,6 +15418,7 @@ ui.viewToolsDrawerTab?.addEventListener("pointercancel", () => {
 });
 ui.graticuleToggle?.addEventListener("click", () => setGraticuleVisible(state.showGraticule !== true));
 ui.admin1Toggle?.addEventListener("click", () => setAdmin1BoundariesVisible(state.showAdmin1Boundaries !== true));
+ui.projectionToggle?.addEventListener("click", toggleMapProjectionMode);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
