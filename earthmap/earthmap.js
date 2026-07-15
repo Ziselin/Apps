@@ -17,6 +17,7 @@ let mapSearchDebounceTimer = null;
 let mapSearchRequestSerial = 0;
 let mapLibreAdmin1RequestSerial = 0;
 let mapLibreAdmin1ViewportTimer = null;
+let mapLibreInitialFullLandTimer = null;
 let mapSearchOptionCache = null;
 let wikidataMapSearchLoadingCount = 0;
 const wikidataMapSearchCache = new Map();
@@ -5038,6 +5039,23 @@ function requestMapLibrePilotFullLandLayer() {
   }, 400);
 }
 
+function scheduleMapLibreInitialFullLandPreload(delay = 1400) {
+  if (mapLibreInitialFullLandTimer) return;
+  if (mapLibreEngineState.fullLandRequested || mapLibreEngineState.fullLandPending) return;
+  // Startdramaturgie: Die kleine globale Startfläche muss sofort erscheinen,
+  // die vollständige 10m-Küstengeometrie darf aber nicht erst durch Zoom oder
+  // Mausbewegung ausgelöst werden. Deshalb wird sie einmalig nach dem ersten
+  // stabilen Start im Idle-Pfad geladen.
+  mapLibreInitialFullLandTimer = window.setTimeout(() => {
+    mapLibreInitialFullLandTimer = null;
+    if (!mapLibreEngineState.map || !mapLibreEngineState.styleLoaded) {
+      scheduleMapLibreInitialFullLandPreload(800);
+      return;
+    }
+    requestMapLibrePilotFullLandLayer();
+  }, delay);
+}
+
 function maybeRequestMapLibrePilotFullLandLayer(zoom = getMapLibreZoomFromGlobeZoom()) {
   if (zoom < MAPLIBRE_FULL_LAND_LOAD_ZOOM) return;
   if (mapLibreEngineState.landSource === "natural-earth-10m-land") return;
@@ -5279,6 +5297,7 @@ function syncMapLibreTheme() {
       void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
       syncMapLibreCamera();
       scheduleMapLibreAdmin1ViewportSync(650);
+      scheduleMapLibreInitialFullLandPreload(1200);
     });
     renderMapEngineDiagnostics();
   } catch (error) {
@@ -5321,6 +5340,7 @@ function initializeMapLibreEnginePilot() {
       requestMapLibrePilotWaterLayer("major");
       requestMapLibrePilotAdmin0Layer();
       syncMapLibreCamera();
+      scheduleMapLibreInitialFullLandPreload(window.matchMedia?.("(max-width: 760px)")?.matches ? 2200 : 900);
       updateMapLibreDiagnosticsFrame();
     });
     mapLibreEngineState.map.on("render", updateMapLibreDiagnosticsFrame);
