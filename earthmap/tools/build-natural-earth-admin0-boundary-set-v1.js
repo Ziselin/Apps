@@ -23,6 +23,8 @@ const chunksDir = path.join(outputRoot, "chunks");
 const chunkScriptsDir = path.join(outputRoot, "chunks-js");
 const indexPath = path.join(outputRoot, "index.json");
 const indexScriptPath = path.join(outputRoot, "index.js");
+const linesPath = path.join(outputRoot, "lines.geojson");
+const linesScriptPath = path.join(outputRoot, "lines.js");
 const reportPath = path.join(outputRoot, "build-report.json");
 
 const BOUNDARY_SET_SCHEMA = "ziselin-boundary-set-v1";
@@ -106,6 +108,51 @@ function getGeometryPointCount(coordinates) {
   if (!Array.isArray(coordinates)) return 0;
   if (typeof coordinates[0] === "number" && typeof coordinates[1] === "number") return 1;
   return coordinates.reduce((sum, entry) => sum + getGeometryPointCount(entry), 0);
+}
+
+function getFeaturePolygonCoordinates(feature) {
+  const geometry = feature?.geometry || {};
+  if (geometry.type === "Polygon") return [geometry.coordinates || []];
+  if (geometry.type === "MultiPolygon") return geometry.coordinates || [];
+  return [];
+}
+
+function createAdmin0PolygonRingBoundaryLineCollection(geojson) {
+  const features = [];
+  (geojson?.features || []).forEach((feature, featureIndex) => {
+    const polygons = getFeaturePolygonCoordinates(feature);
+    const properties = feature.properties || {};
+    const countryIso3 = getAdmin0Iso3(properties).toUpperCase();
+    polygons.forEach((polygon, polygonIndex) => {
+      (polygon || []).forEach((ring, ringIndex) => {
+        if (!Array.isArray(ring) || ring.length < 2) return;
+        const coordinates = ring
+          .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+          .map((point) => [Number(point[0]), Number(point[1])]);
+        if (coordinates.length < 2) return;
+        features.push({
+          type: "Feature",
+          id: `admin0-ring-${featureIndex}-${polygonIndex}-${ringIndex}`,
+          properties: {
+            _earthMapBoundaryDetail: "ring",
+            _earthMapAdmin0CountryIso3: countryIso3,
+            _earthMapAdmin0StableId: `natural-earth:10m:admin0:${slugify(countryIso3 || `feature-${featureIndex + 1}`)}`,
+            _earthMapAdmin0RingIndex: ringIndex,
+          },
+          geometry: { type: "LineString", coordinates },
+        });
+      });
+    });
+  });
+  // Architekturregel: Admin-0-Rendering lädt vorberechnete Ring-Linien aus der
+  // Engine-Pipeline. Dadurch muss die App keine Topologie live erraten und kann
+  // Grenzgeometrie stabil anzeigen. Deduplikation/Shared-Boundary-Optimierung
+  // gehört später in einen eigenen Build-Schritt, nicht in den Browser.
+  return {
+    type: "FeatureCollection",
+    name: "earthmap-admin0-polygon-ring-boundaries",
+    features,
+  };
 }
 
 function createDataBinding(properties, stableId, title, germanTitle, wikidataId) {
@@ -261,6 +308,7 @@ function buildAdmin0BoundarySetArchive() {
     generated_at: new Date().toISOString(),
     source: path.relative(workspaceRoot, sourcePath).replace(/\\/g, "/"),
     chunk_strategy: "one-boundary-set-per-admin0-feature",
+    boundary_lines: null,
     chunks: [],
   };
 
@@ -269,9 +317,26 @@ function buildAdmin0BoundarySetArchive() {
     output: path.relative(workspaceRoot, outputRoot).replace(/\\/g, "/"),
     features: 0,
     chunks: 0,
+    lineFeatures: 0,
+    lineBytes: 0,
     totalBytes: 0,
     largestChunks: [],
     missingProviderIds: [],
+  };
+
+  const boundaryLines = createAdmin0PolygonRingBoundaryLineCollection(source);
+  const boundaryLinesJson = `${JSON.stringify(boundaryLines)}\n`;
+  fs.writeFileSync(linesPath, boundaryLinesJson, "utf8");
+  writeScript(linesScriptPath, "EarthMapBoundarySetLinesNaturalEarth10mAdmin0", boundaryLines);
+  report.lineFeatures = boundaryLines.features.length;
+  report.lineBytes = Buffer.byteLength(boundaryLinesJson);
+  index.boundary_lines = {
+    file: "lines.geojson",
+    scriptFile: "lines.js",
+    global: "EarthMapBoundarySetLinesNaturalEarth10mAdmin0",
+    generation: "polygon-rings",
+    feature_count: boundaryLines.features.length,
+    bytes: report.lineBytes,
   };
 
   (source.features || []).forEach((feature, featureIndex) => {

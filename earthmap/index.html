@@ -14,7 +14,8 @@
   <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260715a">
   <link rel="stylesheet" href="../assets/ui/browser-tree.css?v=20260709b">
   <link rel="stylesheet" href="../assets/vendor/maplibre-gl.v5.css?v=20260715a">
-  <link rel="stylesheet" href="earthmap.css?v=20260715e">
+  <link rel="stylesheet" href="earthmap.css?v=20260717a">
+  <link rel="stylesheet" href="../assets/ui/buttons.css?v=20260717a">
 </head>
 <body>
   <main id="globeApp" class="app-frame workspace-mode-preview">
@@ -103,7 +104,10 @@
           <div id="globe" class="globe" role="img" aria-label="Interaktiver dreidimensional projizierter Globus">
             <div id="mapLibreContainer" class="earthmap-maplibre-container" aria-hidden="true"></div>
             <canvas id="globeCanvas" class="globe-canvas"></canvas>
-            <div id="mapEngineDiagnostics" class="earthmap-engine-diagnostics" aria-live="polite"></div>
+            <div id="mapDiagnosticsStack" class="earthmap-diagnostics-stack" aria-live="polite">
+              <div id="mapEngineDiagnostics" class="earthmap-engine-diagnostics earthmap-diagnostics-console"></div>
+              <div id="mapHarmonyDiagnostics" class="earthmap-engine-diagnostics earthmap-diagnostics-console earthmap-harmony-diagnostics"></div>
+            </div>
           </div>
         </section>
       </section>
@@ -220,6 +224,6 @@
   <script src="../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.by-country-index.js?v=20260710b"></script>
   <script src="../assets/vendor/maplibre-gl.v5.js?v=20260715a"></script>
-  <script src="earthmap.js?v=20260715g"></script>
+  <script src="earthmap.js?v=20260717y"></script>
 </body>
 </html>

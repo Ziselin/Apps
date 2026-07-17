@@ -3,7 +3,7 @@
   "themeToggleButton", "themeToggleIcon", "exportProjectButton", "exportMenu", "fullscreenButton",
   "saveSearchLayerButton",
   "mapSearchInput", "mapSearchOptions", "mapSearchInfoButton", "mapSearchInfoPopup",
-  "openWorkspaceButton", "returnPreviewButton", "globe", "mapLibreContainer", "globeCanvas", "mapEngineDiagnostics",
+  "openWorkspaceButton", "returnPreviewButton", "globe", "mapLibreContainer", "globeCanvas", "mapDiagnosticsStack", "mapEngineDiagnostics", "mapHarmonyDiagnostics",
   "viewToolsDrawer", "viewToolsDrawerTab", "viewToolsDrawerPanel", "projectionToggle", "graticuleToggle", "admin1Toggle",
   "browserActionsMenuButton", "browserActionsMenu",
   "editorBackButton",
@@ -61,9 +61,11 @@ const MAPLIBRE_WATER_FILL_LAYER_ID = "earthmap-natural-earth-water-fill";
 const MAPLIBRE_WATER_OUTLINE_LAYER_ID = "earthmap-natural-earth-water-outline";
 const MAPLIBRE_ADMIN0_SOURCE_ID = "earthmap-natural-earth-admin0";
 const MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID = "earthmap-natural-earth-admin0-boundaries";
+const MAPLIBRE_ADMIN0_BOUNDARY_LOW_SOURCE_ID = "earthmap-natural-earth-admin0-boundaries-low";
 const MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_SOURCE_ID = "earthmap-natural-earth-admin0-special-boundaries";
 const MAPLIBRE_ADMIN0_FILL_LAYER_ID = "earthmap-natural-earth-admin0-fill";
 const MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin0-boundary";
+const MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID = "earthmap-natural-earth-admin0-boundary-low";
 const MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_LAYER_ID = "earthmap-natural-earth-admin0-special-boundary";
 const MAPLIBRE_ADMIN1_SOURCE_ID = "earthmap-natural-earth-admin1";
 const MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID = "earthmap-natural-earth-admin1-boundaries";
@@ -302,6 +304,7 @@ const MAP_SEARCH_COUNTRY_ALIASES = [
   { names: ["Russische Föderation", "Russian Federation", "Rossijskaja Federazija"], iso3: "RUS" },
   { names: ["Vereinigte Staaten", "USA", "United States", "United States of America", "US"], iso3: "USA" },
   { names: ["Vereinigtes Königreich", "UK", "United Kingdom", "Great Britain", "Großbritannien"], iso3: "GBR" },
+  { names: ["Belarus", "Weißrussland", "Weissrussland", "Belorussia", "Republic of Belarus"], iso3: "BLR" },
   { names: ["Südkorea", "South Korea", "Republik Korea", "Republic of Korea"], iso3: "KOR" },
   { names: ["Nordkorea", "North Korea", "Demokratische Volksrepublik Korea"], iso3: "PRK" },
   { names: ["Iran", "Islamische Republik Iran", "Islamic Republic of Iran"], iso3: "IRN" },
@@ -452,7 +455,6 @@ function createEditorTabButton(id, panel, label, active = false) {
   button.setAttribute("role", "tab");
   button.setAttribute("aria-selected", active ? "true" : "false");
   const panelIds = {
-    background: "panelBackground",
     gearbox: "panelGearBox",
     collections: "panelCollections",
     properties: "panelProperties",
@@ -463,6 +465,10 @@ function createEditorTabButton(id, panel, label, active = false) {
     button.addEventListener("click", () => setEditorTab(panel));
   }
   return button;
+}
+
+function normalizeToolEditorTab(tabName = "") {
+  return tabName === "collections" ? "collections" : "gearbox";
 }
 
 function createStatisticWorkTabButton(key, label, active = false) {
@@ -510,6 +516,7 @@ function isGearBoxWorkMode() {
 function renderEditorTabs() {
   const tabs = document.querySelector(".editor-tabs");
   if (!tabs) return;
+  if (state.editorMode === "tool") state.activeEditorTab = normalizeToolEditorTab(state.activeEditorTab);
   const propertiesMode = state.editorMode === "object" || state.editorMode === "archive-object" || state.editorMode === "project" || state.editorMode === "subfolder";
   if (propertiesMode) {
     const item = getActiveLibraryItem();
@@ -535,7 +542,6 @@ function renderEditorTabs() {
     return;
   }
   tabs.replaceChildren(
-    createEditorTabButton("tabBackground", "background", "Hintergrund", state.activeEditorTab === "background"),
     createEditorTabButton("tabGearBox", "gearbox", "Statistik", state.activeEditorTab === "gearbox"),
     createEditorTabButton("tabCollections", "collections", "Importieren", state.activeEditorTab === "collections"),
   );
@@ -549,24 +555,9 @@ function initializeEarthMapEditorShell() {
   if (!editorPanel || !tabs || !searchPanel) return;
 
   tabs.replaceChildren(
-    createEditorTabButton("tabBackground", "background", "Hintergrund", true),
-    createEditorTabButton("tabGearBox", "gearbox", "Statistik"),
+    createEditorTabButton("tabGearBox", "gearbox", "Statistik", true),
     createEditorTabButton("tabCollections", "collections", "Importieren"),
   );
-
-  const backgroundPanel = document.createElement("section");
-  backgroundPanel.id = "panelBackground";
-  backgroundPanel.className = "editor-tab-panel is-active";
-  backgroundPanel.dataset.editorPanel = "background";
-  backgroundPanel.setAttribute("role", "tabpanel");
-  backgroundPanel.setAttribute("aria-labelledby", "tabBackground");
-  backgroundPanel.innerHTML = `
-    <div class="editor-section background-map-section">
-      <h3>Hintergrundkarten</h3>
-      <p>Hintergrundkarten bestimmen die Grunddarstellung des Globus. Sie erscheinen nicht im Projektbrowser, bleiben hier aber auswählbar und über ihre Eigenschaften prüfbar.</p>
-      <div id="backgroundMapList" class="background-map-list"></div>
-    </div>
-  `;
 
   const propertiesPanel = document.createElement("section");
   propertiesPanel.id = "panelProperties";
@@ -579,8 +570,8 @@ function initializeEarthMapEditorShell() {
   searchPanel.id = "panelGearBox";
   searchPanel.dataset.editorPanel = "gearbox";
   searchPanel.setAttribute("aria-labelledby", "tabGearBox");
-  searchPanel.classList.remove("is-active");
-  searchPanel.hidden = true;
+  searchPanel.classList.add("is-active");
+  searchPanel.hidden = false;
   searchPanel.innerHTML = `
     <div class="editor-section gearbox-tool-section">
       <h3>Statistik</h3>
@@ -631,13 +622,12 @@ function initializeEarthMapEditorShell() {
     </div>
   `;
 
-  tabs.insertAdjacentElement("afterend", backgroundPanel);
-  backgroundPanel.insertAdjacentElement("afterend", propertiesPanel);
+  tabs.insertAdjacentElement("afterend", propertiesPanel);
   searchPanel.insertAdjacentElement("afterend", collectionsPanel);
 
   Object.assign(ui, Object.fromEntries([
     "mapObjectEditor", "importBoundarySetButton", "importBoundarySetFromFolderButton", "collectionImportTitle", "collectionImportSummary",
-    "collectionImportContent", "collectionImportMetaList", "addCollectionToProjectButton", "backgroundMapList",
+    "collectionImportContent", "collectionImportMetaList", "addCollectionToProjectButton",
     "gearBoxCreateButton", "gearBoxGenerateButton", "gearBoxCsvCodeButton", "gearBoxWorkspace", "gearBoxCsvFileInput",
   ].map((id) => [id, document.getElementById(id)])));
 }
@@ -937,7 +927,7 @@ function normalizeLibraryFolders(folders) {
 
 function normalizeDataLayer(layer) {
   const title = repairLegacyText(layer?.title || layer?.name || "Statistischer Datenlayer");
-  return {
+  const normalized = {
     id: layer?.id || `data-layer-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     kind: layer?.kind || "gearbox-data-layer",
     origin: layer?.origin || "csv",
@@ -958,6 +948,42 @@ function normalizeDataLayer(layer) {
     visible: layer?.visible !== false,
     matchPreview: layer?.matchPreview || null,
   };
+  return normalizeSearchDataLayerProvenance(normalized);
+}
+
+function normalizeSearchDataLayerProvenance(layer) {
+  if (layer?.origin !== "search") return layer;
+  const table = layer.table || {};
+  const rows = Array.isArray(table.rows) ? table.rows : [];
+  const rowNotes = rows.map((row) => repairLegacyText(row?.source_note || "").trim()).filter(Boolean);
+  const commonSearchNote = layer.gearBox?.source?.note || [...new Set(rowNotes)][0] || layer.title || "";
+  layer.gearBox = layer.gearBox || {};
+  layer.gearBox.source = {
+    label: "EarthMap-Suche",
+    url: "",
+    accessed_at: layer.gearBox.source?.accessed_at || layer.importedAt?.slice?.(0, 10) || new Date().toISOString().slice(0, 10),
+    ...(layer.gearBox.source || {}),
+    note: commonSearchNote,
+    origin_type: "search",
+  };
+  if (table.headers?.includes("source_note")) {
+    table.headers = table.headers.filter((header) => header !== "source_note");
+  }
+  table.rows = rows.map((row) => {
+    const { source_note: _sourceNote, ...compactRow } = row || {};
+    return compactRow;
+  });
+  table.raw = serializeDelimitedRows(table.headers || [], table.rows || [], table.delimiter || ";");
+  layer.valueMatches = (Array.isArray(layer.valueMatches) ? layer.valueMatches : []).map((match, index) => ({
+    ...match,
+    source: {
+      ...(match?.source || {}),
+      label: match?.source?.label || table.rows[index]?.source_label || "EarthMap-Suche",
+      accessed_at: match?.source?.accessed_at || table.rows[index]?.source_accessed_at || layer.gearBox.source.accessed_at,
+      note: commonSearchNote,
+    },
+  }));
+  return layer;
 }
 
 function sanitizeDataLayerForStorage(layer) {
@@ -1086,13 +1112,20 @@ function createInitialCollapsedBrowserNodeIds(projects) {
 function loadViewSettings() {
   try {
     const parsed = JSON.parse(localStorage.getItem(VIEW_SETTINGS_STORAGE_KEY) || "{}");
+    const admin1VisibilityVersion = parsed.admin1VisibilityVersion === 1 ? 1 : 0;
     return {
       showGraticule: parsed.showGraticule === true,
-      showAdmin1Boundaries: parsed.showAdmin1Boundaries === true,
+      // Migrationsregel: Admin-1-Boundaries sind inzwischen regulärer Teil der
+      // Kartenlesbarkeit. Ältere lokale Einstellungen hatten sie noch implizit
+      // deaktiviert; diese Altlast heben wir einmalig an. Danach respektiert
+      // der Fußleisten-Schalter wieder den expliziten Nutzerzustand.
+      showAdmin1Boundaries: admin1VisibilityVersion === 1
+        ? parsed.showAdmin1Boundaries !== false
+        : true,
       mapProjectionMode: parsed.mapProjectionMode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_FLAT : MAP_PROJECTION_GLOBE,
     };
   } catch {
-    return { showGraticule: false, showAdmin1Boundaries: false, mapProjectionMode: MAP_PROJECTION_GLOBE };
+    return { showGraticule: false, showAdmin1Boundaries: true, mapProjectionMode: MAP_PROJECTION_GLOBE };
   }
 }
 
@@ -1101,6 +1134,7 @@ function persistViewSettings() {
     localStorage.setItem(VIEW_SETTINGS_STORAGE_KEY, JSON.stringify({
       showGraticule: state.showGraticule === true,
       showAdmin1Boundaries: state.showAdmin1Boundaries === true,
+      admin1VisibilityVersion: 1,
       mapProjectionMode: state.mapProjectionMode === MAP_PROJECTION_FLAT ? MAP_PROJECTION_FLAT : MAP_PROJECTION_GLOBE,
     }));
   } catch (error) {
@@ -1131,14 +1165,19 @@ const state = {
   gearBoxGeneratedPrompt: "",
   gearBoxPromptCopied: false,
   editorMode: "tool",
-  activeEditorTab: "background",
+  activeEditorTab: "gearbox",
   statisticLayerActiveTab: "properties",
-  previousToolEditorTab: "background",
+  previousToolEditorTab: "gearbox",
   activeEditorItemId: "",
   activeEditorChapterKey: "",
+  pendingDisplayLayerIds: new Set(),
+  previewDataLayerSyncRequested: false,
+  previewDataLayerSyncHydrateNow: false,
   activeSubfolderRef: null,
   activeArchiveItem: null,
   viewToolsDrawerOpen: false,
+  engineDiagnosticsCollapsed: false,
+  harmonyDiagnosticsCollapsed: true,
   boundarySetFeatureCache: new Map(),
   loadingBoundarySetIds: new Set(),
   mapSearchHighlight: null,
@@ -1602,12 +1641,26 @@ async function loadNaturalEarthAdmin0EngineIndex() {
   if (state.naturalEarthAdmin0EngineIndex?.chunks?.length) return state.naturalEarthAdmin0EngineIndex;
   await loadEarthMapScriptAsset(
     "earthmap-engine-natural-earth-admin0-index",
-    `${EARTHMAP_ENGINE_ADMIN0_BASE}index.js?v=20260712a`,
+    `${EARTHMAP_ENGINE_ADMIN0_BASE}index.js?v=20260717a`,
     () => Boolean(window.EarthMapBoundarySetIndexNaturalEarth10mAdmin0?.chunks?.length),
   );
   state.naturalEarthAdmin0EngineIndex = window.EarthMapBoundarySetIndexNaturalEarth10mAdmin0 || null;
   mapSearchOptionCache = null;
   return state.naturalEarthAdmin0EngineIndex;
+}
+
+async function loadNaturalEarthAdmin0EngineBoundaryLines() {
+  if (window.EarthMapBoundarySetLinesNaturalEarth10mAdmin0?.features?.length) {
+    return window.EarthMapBoundarySetLinesNaturalEarth10mAdmin0;
+  }
+  const index = await loadNaturalEarthAdmin0EngineIndex();
+  const scriptFile = index?.boundary_lines?.scriptFile || "lines.js";
+  await loadEarthMapScriptAsset(
+    "earthmap-engine-natural-earth-admin0-lines",
+    `${EARTHMAP_ENGINE_ADMIN0_BASE}${scriptFile}?v=20260717a`,
+    () => Boolean(window.EarthMapBoundarySetLinesNaturalEarth10mAdmin0?.features?.length),
+  );
+  return window.EarthMapBoundarySetLinesNaturalEarth10mAdmin0 || null;
 }
 
 function getNaturalEarthAdmin0EngineIndex() {
@@ -1756,7 +1809,7 @@ function scheduleNaturalEarthBackgroundAssets() {
 }
 
 async function ensureNaturalEarthSearchBaseLoaded() {
-  if (getNaturalEarthAdmin0EngineIndex()?.chunks?.length || window.EarthMapNaturalEarthCountries10m?.features?.length) return;
+  if (getNaturalEarthAdmin0EngineIndex()?.chunks?.length) return;
   beginWikidataMapSearchLoading();
   try {
     await loadNaturalEarthAdmin0EngineIndex();
@@ -2352,10 +2405,182 @@ function downloadBlob(blob, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function markDisplayLayerPending(layer) {
+  if (!layer?.id) return;
+  state.pendingDisplayLayerIds.add(layer.id);
+}
+
+function applyPendingDisplayLayerChanges() {
+  const project = getActiveProject();
+  const pendingIds = state.pendingDisplayLayerIds;
+  if (!project || !pendingIds?.size) return false;
+  const layers = Array.isArray(project.dataLayers) ? project.dataLayers : [];
+  const affectedLayers = layers.filter((layer) => pendingIds.has(layer.id));
+  if (!affectedLayers.length) {
+    pendingIds.clear();
+    return false;
+  }
+  pendingIds.clear();
+  requestPreviewDataLayerSync();
+  return true;
+}
+
+function refreshDataLayerDisplayStyles(layer) {
+  if (!layer || !Array.isArray(layer.valueMatches)) return false;
+  let changed = false;
+  layer.valueMatches.forEach((match) => {
+    const displayStyle = getDataLayerMatchDisplayStyle(layer, match);
+    const nextFill = displayStyle.fill || "";
+    const nextOutline = displayStyle.outline || "";
+    if (match.fill !== nextFill) {
+      match.fill = nextFill;
+      changed = true;
+    }
+    if (match.outline !== nextOutline) {
+      match.outline = nextOutline;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function refreshActiveProjectDataLayerDisplayStyles() {
+  const project = getActiveProject();
+  const layers = Array.isArray(project?.dataLayers) ? project.dataLayers : [];
+  let changed = false;
+  layers.forEach((layer) => {
+    if (layer?.kind !== "gearbox-data-layer") return;
+    changed = refreshDataLayerDisplayStyles(layer) || changed;
+  });
+  if (changed) persistProjects();
+  return changed;
+}
+
+function reloadActiveProjectFromStorageForRender() {
+  const activeProjectId = state.activeProjectId;
+  const activeEditorItemId = state.activeEditorItemId;
+  const activeChapterKey = state.activeEditorChapterKey;
+  const hydrateNow = state.previewDataLayerSyncHydrateNow === true;
+  state.previewDataLayerSyncHydrateNow = false;
+  state.projects = loadProjects();
+  state.activeProjectId = state.projects.some((project) => project.id === activeProjectId)
+    ? activeProjectId
+    : loadActiveProjectId(state.projects);
+  state.activeEditorItemId = activeEditorItemId;
+  state.activeEditorChapterKey = activeChapterKey;
+  const project = getActiveProject();
+  if (project) {
+    rehydrateSavedSearchLayers(project, {
+      persist: false,
+      refreshExisting: true,
+      forceHydration: hydrateNow,
+      hydrateDelay: hydrateNow ? 0 : undefined,
+    });
+  }
+  return project;
+}
+
+function rebuildProjectDataLayerForRender(layer) {
+  if (!layer || layer.kind !== "gearbox-data-layer") return false;
+  if (layer.origin === "search") {
+    rebuildSearchResultDataLayerMatches(layer);
+    if ((layer.valueMatches || []).some((match) => !hasDrawableBoundaryFeature(match?.feature))) {
+      scheduleSearchResultLayerHydration(layer, { delay: 40, force: true });
+    }
+  } else {
+    rebuildGearBoxDataLayerMatches(layer);
+    if ((layer.valueMatches || []).some((match) => !hasDrawableBoundaryFeature(match?.feature))) {
+      scheduleGearBoxLayerGeometryHydration(layer, { force: true });
+    }
+  }
+  refreshDataLayerDisplayStyles(layer);
+  return true;
+}
+
+function rebuildActiveProjectDataLayersForRender() {
+  const project = getActiveProject();
+  const layers = Array.isArray(project?.dataLayers) ? project.dataLayers : [];
+  let changed = false;
+  layers.forEach((layer) => {
+    if (layer?.visible === false) return;
+    changed = rebuildProjectDataLayerForRender(layer) || changed;
+  });
+  if (changed) persistProjects();
+  return changed;
+}
+
+function isEarthMapPreviewMode() {
+  return !ui.globeApp?.classList.contains("workspace-mode-details");
+}
+
+function flushPreviewDataLayerSync({ forceReinstall = false } = {}) {
+  if (!state.previewDataLayerSyncRequested && !forceReinstall) return false;
+  if (!isEarthMapPreviewMode()) return false;
+  const map = mapLibreEngineState.map;
+  if (!map || !map.isStyleLoaded?.()) {
+    window.setTimeout(() => flushPreviewDataLayerSync({ forceReinstall: true }), 160);
+    return false;
+  }
+  state.previewDataLayerSyncRequested = false;
+  // Editor-Änderungen werden bewusst erst beim Rückwechsel in die Karte
+  // vollständig aus dem Projektordner rekonstruiert: Tabellenzeilen werden
+  // erneut gematcht, Styles erneut auf Matches projiziert und die MapLibre-
+  // Source neu installiert. Der Button "Änderungen übernehmen" ist damit ein
+  // echter Commit und kein bloßes Formular-Update.
+  const resync = () => {
+    map.resize?.();
+    reloadActiveProjectFromStorageForRender();
+    rebuildActiveProjectDataLayersForRender();
+    syncMapLibreSearchHighlight({ syncAdmin1: false, forceReinstall: true });
+    orderMapLibreReadableBoundaryLayers();
+    renderMapHarmonyDiagnostics();
+  };
+  window.requestAnimationFrame?.(resync);
+  window.setTimeout(resync, 120);
+  window.setTimeout(resync, 420);
+  return true;
+}
+
+function requestPreviewDataLayerSync({ forceNow = false } = {}) {
+  state.previewDataLayerSyncRequested = true;
+  if (forceNow || isEarthMapPreviewMode()) {
+    flushPreviewDataLayerSync({ forceReinstall: true });
+  }
+}
+
+function requestProjectDataLayerSync({ forceNow = false } = {}) {
+  // Projektwechsel-Regel: Die Suchzeile ist eine temporäre Live-Anzeige.
+  // Gespeicherte Such-/Statistikkarten gehören dagegen zum aktiven
+  // Projektordner. Beim Wechsel des aktiven Projekts darf ein altes
+  // Live-Suchergebnis deshalb nicht im Renderkanal stehen bleiben.
+  state.mapSearchHighlight = null;
+  state.previewDataLayerSyncHydrateNow = true;
+  ui.mapSearchInput?.classList.remove("has-search-error");
+  ui.mapSearchInput?.removeAttribute("title");
+  syncSaveSearchLayerButton();
+  removeMapLibreSearchHighlightLayer();
+  requestPreviewDataLayerSync({ forceNow });
+}
+
+function requestThemeDataLayerSync({ forceNow = false } = {}) {
+  // Theme-Regel: Hell/Dunkel verändert nur die Darstellung, nicht den
+  // fachlichen Zustand. Deshalb bleiben aktives Projekt und Live-Suche
+  // erhalten; die thematischen Layer werden aber wie nach einem Commit neu
+  // aus Projekt- und Suchdaten installiert.
+  state.previewDataLayerSyncHydrateNow = true;
+  requestPreviewDataLayerSync({ forceNow });
+}
+
 function setWorkspaceMode(mode) {
   ui.globeApp.classList.toggle("workspace-mode-details", mode === "details");
   ui.globeApp.classList.toggle("workspace-mode-preview", mode !== "details");
   if (mode === "details") setDetailsLayoutMode(state.detailsLayoutMode);
+  if (mode !== "details") {
+    window.requestAnimationFrame?.(() => {
+      applyPendingDisplayLayerChanges();
+      flushPreviewDataLayerSync({ forceReinstall: true });
+    });
+  }
 }
 
 function isNarrowDetailsViewport() {
@@ -2523,6 +2748,9 @@ function setTheme(theme, persist = true) {
       : "https://api.iconify.design/material-symbols/menu.svg?color=%23213633";
   }
   syncMapLibreTheme();
+  if (mapLibreEngineState.map) {
+    requestThemeDataLayerSync({ forceNow: true });
+  }
   if (ui.globeCanvas) renderGlobe();
   if (persist) {
     try {
@@ -3398,6 +3626,8 @@ const mapLibreEngineState = {
   admin1LoadMs: 0,
   searchResolveMs: 0,
   searchHighlightFeatures: 0,
+  searchHighlightContextFeatures: 0,
+  searchHighlightFocusFeatures: 0,
   searchHighlightSourceReady: false,
 };
 
@@ -3541,9 +3771,11 @@ function removeMapLibrePilotAdmin0Layer() {
   try {
     if (map.getLayer(MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_LAYER_ID);
     if (map.getLayer(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID);
+    if (map.getLayer(MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID);
     if (map.getLayer(MAPLIBRE_ADMIN0_FILL_LAYER_ID)) map.removeLayer(MAPLIBRE_ADMIN0_FILL_LAYER_ID);
     if (map.getSource(MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_SOURCE_ID);
     if (map.getSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID);
+    if (map.getSource(MAPLIBRE_ADMIN0_BOUNDARY_LOW_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_BOUNDARY_LOW_SOURCE_ID);
     if (map.getSource(MAPLIBRE_ADMIN0_SOURCE_ID)) map.removeSource(MAPLIBRE_ADMIN0_SOURCE_ID);
   } catch (error) {
     mapLibreEngineState.status = "admin0-remove-error";
@@ -3666,23 +3898,28 @@ function loadMapLibrePilotAdmin0BoundaryGeoJson() {
     return Promise.resolve(mapLibreEngineState.admin0BoundaryGeoJson);
   }
   if (mapLibreEngineState.admin0BoundaryPromise) return mapLibreEngineState.admin0BoundaryPromise;
-  mapLibreEngineState.admin0BoundaryPromise = loadEarthMapScriptAsset(
-    "natural-earth-admin0-boundaries-10m",
-    "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coastless.boundaries.js?v=20260709c",
-    () => Boolean(window.EarthMapNaturalEarthAdmin0Boundaries10m?.features?.length),
-  )
-    .then(async () => {
-      const source = window.EarthMapNaturalEarthAdmin0Boundaries10m || null;
+  mapLibreEngineState.admin0BoundaryPromise = (async () => {
+      const pipelineLines = await loadNaturalEarthAdmin0EngineBoundaryLines().catch((error) => {
+        console.warn("EarthMap-Admin0-Pipeline-Linien konnten nicht geladen werden; Fallback auf Live-Ableitung.", error);
+        return null;
+      });
       const baikonurFeature = await loadMapLibreBaikonurAdmin0Feature();
       mapLibreEngineState.admin0SpecialBoundaryGeoJson = baikonurFeature
         ? { type: "FeatureCollection", features: [baikonurFeature] }
         : null;
+      let source = pipelineLines?.features?.length ? pipelineLines : null;
+      if (!source?.features?.length) {
+        const admin0GeoJson = await loadMapLibrePilotAdmin0GeoJson();
+        source = admin0GeoJson?.features?.length
+          ? createAdmin0PolygonRingBoundaryLineCollection(admin0GeoJson)
+          : null;
+      }
       mapLibreEngineState.admin0BoundaryGeoJson = source?.features?.length
         ? removeBaikonurSegmentsFromAdmin0Boundaries(source)
         : null;
       mapLibreEngineState.admin0BoundaryFeatureCount = mapLibreEngineState.admin0BoundaryGeoJson?.features?.length || 0;
       return mapLibreEngineState.admin0BoundaryGeoJson;
-    })
+    })()
     .finally(() => {
       mapLibreEngineState.admin0BoundaryPromise = null;
     });
@@ -3724,11 +3961,10 @@ function shouldRemoveBaikonurAdmin0Line(line) {
 }
 
 function removeBaikonurSegmentsFromAdmin0Boundaries(source) {
-  // Natural Earth speichert Admin-0-Grenzen hier als eine Sammel-MultiLineString
-  // ohne Länder-Properties. Baikonur (KAB) ist aber ein lease/Sondergebiet und
-  // soll nicht wie eine normale Staatsgrenze erscheinen. Deshalb schneiden wir
-  // nur dessen kompakten Linienring aus der Sammelgrenze heraus und zeichnen ihn
-  // anschließend aus dem referenzierbaren Boundary-Set gestrichelt neu.
+  // Baikonur (KAB) ist ein lease/Sondergebiet und soll nicht wie eine normale
+  // Staatsgrenze erscheinen. Die ADM-0-Grenzen werden aus referenzierbaren
+  // Länderpolygonen abgeleitet; hier schneiden wir nur dessen kompakten Ring
+  // heraus und zeichnen ihn anschließend als Sondergrenze separat.
   return {
     ...source,
     features: (source.features || []).map((feature) => {
@@ -3901,7 +4137,48 @@ function installMapLibrePilotAdmin0Layer() {
     const boundaryColor = isEarthMapDarkMode()
       ? "rgba(74,82,80,.96)"
       : "rgba(66,72,68,.86)";
+    const admin0LowBoundaries = createLowZoomBoundaryLineCollection(admin0Boundaries, {
+      // Low-Zoom darf beruhigen, aber keine politischen Linien verschlucken:
+      // Die erste Version war zu grob und ließ z.B. in Afrika ganze
+      // Grenzabschnitte verschwinden. Diese Werte halten Kleinstfragmente
+      // zurück, bleiben aber nah genug an der 10m-Geometrie, damit Markierung
+      // und Boundary-Linie kartografisch zusammenfallen.
+      tolerance: 0.045,
+    });
     removeMapLibrePilotAdmin0Layer();
+    if (admin0LowBoundaries.features.length) {
+      map.addSource(MAPLIBRE_ADMIN0_BOUNDARY_LOW_SOURCE_ID, {
+        type: "geojson",
+        data: cloneGeoJsonForMapLibre(admin0LowBoundaries),
+      });
+      map.addLayer({
+        id: MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID,
+        type: "line",
+        source: MAPLIBRE_ADMIN0_BOUNDARY_LOW_SOURCE_ID,
+        maxzoom: 3.45,
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": boundaryColor,
+          "line-width": [
+            "interpolate", ["linear"], ["zoom"],
+            0, 1.05,
+            2.5, 1.12,
+            3.45, 1.18,
+          ],
+          "line-opacity": [
+            "interpolate", ["linear"], ["zoom"],
+            0, 0.88,
+            2.8, 0.94,
+            3.45, 0.78,
+          ],
+        },
+      }, map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)
+        ? MAPLIBRE_WATER_OUTLINE_LAYER_ID
+        : (map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID) ? MAPLIBRE_COASTLINE_LAYER_ID : undefined));
+    }
     map.addSource(MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID, {
       type: "geojson",
       data: cloneGeoJsonForMapLibre(admin0Boundaries),
@@ -3910,6 +4187,7 @@ function installMapLibrePilotAdmin0Layer() {
       id: MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
       type: "line",
       source: MAPLIBRE_ADMIN0_BOUNDARY_SOURCE_ID,
+      minzoom: 2.25,
       layout: {
         "line-cap": "round",
         "line-join": "round",
@@ -3918,16 +4196,17 @@ function installMapLibrePilotAdmin0Layer() {
         "line-color": boundaryColor,
         "line-width": [
           "interpolate", ["linear"], ["zoom"],
-          0, 0.95,
-          2.5, 1.16,
-          5.5, 1.32,
+          2.25, 0.86,
+          2.5, 1.22,
+          5.5, 1.34,
           9, 1.46,
         ],
         "line-opacity": [
           "interpolate", ["linear"], ["zoom"],
-          0, 0.86,
-          2.5, 0.94,
-          6, 0.98,
+          2.25, 0.22,
+          3.15, 0.58,
+          4.2, 0.88,
+          6, 1,
         ],
       },
     }, map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)
@@ -3950,18 +4229,17 @@ function installMapLibrePilotAdmin0Layer() {
           "line-color": isEarthMapDarkMode() ? "rgba(74,82,80,.98)" : "rgba(64,70,67,.78)",
           "line-width": [
             "interpolate", ["linear"], ["zoom"],
-            0, 0.68,
-            3, 0.78,
+            0, 0.96,
+            3, 1.02,
             6, 0.94,
             10, 1.08,
           ],
           "line-opacity": [
             "interpolate", ["linear"], ["zoom"],
-            0, 0.72,
-            3, 0.84,
+            0, 0.9,
+            3, 0.92,
             6, 0.94,
           ],
-          "line-dasharray": [2.6, 3.2],
         },
       }, map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID)
         ? MAPLIBRE_WATER_OUTLINE_LAYER_ID
@@ -4047,6 +4325,48 @@ function getBoundarySegmentKey(a, b) {
   const bKey = getBoundarySegmentCoordKey(b);
   if (!aKey || !bKey || aKey === bKey) return "";
   return aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
+}
+
+function simplifyLineStringCoordinates(coordinates = [], tolerance = 0.18) {
+  const points = coordinates
+    .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+    .map((point) => [Number(point[0]), Number(point[1])]);
+  if (points.length <= 2 || tolerance <= 0) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const isClosed = first && last
+    && Math.abs(first[0] - last[0]) < 1e-9
+    && Math.abs(first[1] - last[1]) < 1e-9;
+  if (isClosed) {
+    const simplifiedRing = simplifyClosedRing(points, tolerance);
+    return simplifiedRing.length >= 4 ? simplifiedRing : points;
+  }
+  const keep = simplifyOpenLine(points, tolerance * tolerance);
+  return [...keep].sort((a, b) => a - b).map((index) => points[index]);
+}
+
+function createLowZoomBoundaryLineCollection(geojson, options = {}) {
+  const tolerance = Number.isFinite(options.tolerance) ? options.tolerance : 0.22;
+  const features = [];
+  (geojson?.features || []).forEach((feature, index) => {
+    const geometry = feature?.geometry || {};
+    const lines = geometry.type === "LineString"
+      ? [geometry.coordinates || []]
+      : geometry.type === "MultiLineString"
+        ? (geometry.coordinates || [])
+        : [];
+    lines.forEach((line) => {
+      const simplified = simplifyLineStringCoordinates(line, tolerance);
+      if (simplified.length < 2) return;
+      features.push({
+        type: "Feature",
+        id: `admin0-low-${features.length}-${index}`,
+        properties: { ...(feature.properties || {}), _earthMapBoundaryDetail: "low" },
+        geometry: { type: "LineString", coordinates: simplified },
+      });
+    });
+  });
+  return { type: "FeatureCollection", name: "earthmap-admin0-low-boundaries", features };
 }
 
 function getBoundarySegmentGroupKey(segment) {
@@ -4185,6 +4505,46 @@ function createUniqueAdmin1BoundaryLineCollection(geojson) {
     type: "FeatureCollection",
     name: "earthmap-admin1-unique-boundaries",
     features: stitchBoundarySegmentsToLineFeatures([...segments.values()]),
+  };
+}
+
+function createAdmin0PolygonRingBoundaryLineCollection(geojson) {
+  const features = [];
+  (geojson?.features || []).forEach((feature, featureIndex) => {
+    const polygons = getFeaturePolygonCoordinates(feature);
+    const countryIso3 = getNaturalEarthIso3(feature).toUpperCase();
+    const props = feature.properties || {};
+    polygons.forEach((polygon, polygonIndex) => {
+      (polygon || []).forEach((ring, ringIndex) => {
+        if (!Array.isArray(ring) || ring.length < 2) return;
+        const coordinates = ring
+          .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]))
+          .map((point) => [Number(point[0]), Number(point[1])]);
+        if (coordinates.length < 2) return;
+        features.push({
+          type: "Feature",
+          id: `admin0-ring-${featureIndex}-${polygonIndex}-${ringIndex}`,
+          properties: {
+            ...props,
+            _earthMapBoundaryDetail: "ring",
+            _earthMapAdmin0CountryIso3: countryIso3,
+            _earthMapAdmin0RingIndex: ringIndex,
+          },
+          geometry: { type: "LineString", coordinates },
+        });
+      });
+    });
+  });
+  // Architekturregel: Die interaktive Engine darf an dieser Stelle keine
+  // Topologie "erraten". Natural-Earth-ADM0-Ringe sind unsere referenzierbare
+  // Wahrheit; fehlertolerante Deduplikation oder echte Shared-Boundary-
+  // Generalisierung gehört später in die Build-Pipeline (MVT/PMTiles), nicht
+  // in die Live-Darstellung. So gehen keine Staatsgrenzen wie in Afrika/Egypten
+  // durch Segment-Stitching verloren.
+  return {
+    type: "FeatureCollection",
+    name: "earthmap-admin0-polygon-ring-boundaries",
+    features,
   };
 }
 
@@ -4406,16 +4766,16 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     // eigene Farbe oder Dicke als Sonderstil aus dem Provinzbild fallen.
     const admin1BoundaryLineWidth = [
       "interpolate", ["linear"], ["zoom"],
-      0, 0.52,
-      2.8, 0.6,
-      5.5, 0.78,
+      0, 0.82,
+      2.8, 0.88,
+      5.5, 0.82,
       9, 0.94,
     ];
     const admin1BoundaryLineOpacity = [
       "interpolate", ["linear"], ["zoom"],
-      0, 0.24,
-      2.4, 0.34,
-      3.2, 0.56,
+      0, 0.54,
+      2.4, 0.62,
+      3.2, 0.68,
       5, 0.78,
     ];
     const classifiedGeoJson = {
@@ -4582,6 +4942,7 @@ function orderMapLibreBaseLayers() {
         MAPLIBRE_WATER_FILL_LAYER_ID,
         MAPLIBRE_COASTLINE_LAYER_ID,
         MAPLIBRE_WATER_OUTLINE_LAYER_ID,
+        MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID,
         MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
         MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
       ]);
@@ -4592,6 +4953,7 @@ function orderMapLibreBaseLayers() {
     if (map.getLayer(MAPLIBRE_COASTLINE_LAYER_ID)) {
       const beforeCoastline = getFirstExistingMapLibreLayerId([
         MAPLIBRE_WATER_OUTLINE_LAYER_ID,
+        MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID,
         MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
         MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_LAYER_ID,
         MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
@@ -4629,6 +4991,7 @@ function orderMapLibreReadableBoundaryLayers() {
       MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID,
       MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID,
       MAPLIBRE_ADMIN0_SPECIAL_BOUNDARY_LAYER_ID,
+      MAPLIBRE_ADMIN0_BOUNDARY_LOW_LAYER_ID,
       MAPLIBRE_ADMIN0_BOUNDARY_LAYER_ID,
       MAPLIBRE_COASTLINE_LAYER_ID,
       MAPLIBRE_WATER_OUTLINE_LAYER_ID,
@@ -4737,19 +5100,20 @@ function getMapLibreSearchHighlightFeatureCollection() {
   const focusOutline = getMapSearchSpecialOutlineColor();
   const features = [];
 
-  const appendSearchFeatures = (input, role, inputIndex, fill, outline, opacity) => {
+  const appendThematicDisplayFeatures = (input, role, inputIndex, fill, outline, opacity, options = {}) => {
     const sourceFeatures = input?.type === "FeatureCollection"
       ? input.features || []
       : [input].filter(Boolean);
     sourceFeatures.forEach((feature, featureIndex) => {
       if (!feature?.geometry) return;
-      // Suchdatenfluss: Organisationen wie EU/NATO werden als FeatureCollection
-      // aufgelöst. MapLibre-Layer brauchen aber einzelne Features mit eigener
-      // Geometry. Darum wird die Sammlung hier nur für den Renderpfad
-      // aufgefächert; die semantische Suchlogik bleibt unverändert.
+      // Thematischer Datenfluss: Suche, gespeicherte Suchkarten und Statistik
+      // liefern bereits aufgelöste Boundary-Geometrien. Diese Funktion erzeugt
+      // daraus ausschließlich Render-Features. Sie berechnet keine neuen
+      // Flächen, sondern färbt vorhandene Boundary-Geometrien nach den Regeln
+      // der jeweiligen Anzeigequelle ein.
       features.push({
         ...feature,
-        id: `search-${role}-${inputIndex}-${featureIndex}`,
+        id: `${options.source || "theme"}-${role}-${inputIndex}-${featureIndex}`,
         properties: {
           ...(feature.properties || {}),
           _earthMapSearchRole: role,
@@ -4758,55 +5122,73 @@ function getMapLibreSearchHighlightFeatureCollection() {
           _earthMapSearchFill: fill,
           _earthMapSearchOutline: outline,
           _earthMapSearchOpacity: opacity,
+          _earthMapDisplaySource: options.source || "theme",
+          _earthMapDisplayLayerId: options.layerId || "",
+          _earthMapDisplayBoundaryKey: options.boundaryKey || "",
         },
       });
     });
   };
 
   selectedFeatures.forEach((feature, index) => {
-    appendSearchFeatures(
+    appendThematicDisplayFeatures(
       feature,
       "context",
       index,
       contextColor,
       contextOutline,
       isEarthMapDarkMode() ? 0.78 : 0.52,
+      { source: "live-search" },
     );
   });
   focusFeatures.forEach((feature, index) => {
-    appendSearchFeatures(
+    appendThematicDisplayFeatures(
       feature,
       "focus",
       index,
       focusColor,
       focusOutline,
       isEarthMapDarkMode() ? 0.82 : 0.68,
+      { source: "live-search" },
     );
   });
-  const savedSearchLayers = (getActiveProject()?.dataLayers || [])
-    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false);
-  savedSearchLayers.forEach((layer, layerIndex) => {
+  const displayLayers = (getActiveProject()?.dataLayers || [])
+    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false);
+  displayLayers.forEach((layer, layerIndex) => {
     layer._searchRenderSkipped = 0;
     layer._searchRenderSkippedExamples = [];
     const hasDrawableMatches = (layer.valueMatches || []).some((match) => hasDrawableBoundaryFeature(match?.feature));
     if (!hasDrawableMatches) {
-      scheduleSearchResultLayerHydration(layer);
+      if (layer.origin === "search") scheduleSearchResultLayerHydration(layer);
+      else scheduleGearBoxLayerGeometryHydration(layer);
       return;
     }
     (layer.valueMatches || []).forEach((match, matchIndex) => {
       if (!hasDrawableBoundaryFeature(match?.feature)) return;
-      const savedRole = match.role || "context";
+      const savedRole = layer.origin === "search" ? (match.role || "context") : "focus";
       const renderRole = savedRole === "focus" ? "focus" : "context";
+      const contextStyle = getGearBoxContextStyle(layer);
+      const displayStyle = renderRole === "context"
+        ? contextStyle
+        : getDataLayerMatchDisplayStyle(layer, match);
+      if (!displayStyle.fill) return;
       const before = features.length;
-      appendSearchFeatures(
+      appendThematicDisplayFeatures(
         match.feature,
         renderRole,
         1000 + layerIndex * 100 + matchIndex,
-        match.fill || (renderRole === "focus" ? focusColor : contextColor),
-        match.outline || (renderRole === "focus" ? focusOutline : contextOutline),
-        renderRole === "focus"
-          ? (isEarthMapDarkMode() ? 0.82 : 0.68)
-          : (isEarthMapDarkMode() ? 0.78 : 0.52),
+        displayStyle.fill || (renderRole === "focus" ? focusColor : contextColor),
+        displayStyle.outline || (renderRole === "focus" ? focusOutline : contextOutline),
+        layer.origin === "search"
+          ? (renderRole === "focus"
+            ? (isEarthMapDarkMode() ? 0.82 : 0.68)
+            : (isEarthMapDarkMode() ? 0.78 : 0.52))
+          : (isEarthMapDarkMode() ? 0.9 : 0.76),
+        {
+          source: layer.origin === "search" ? "saved-search" : "statistics",
+          layerId: layer.id,
+          boundaryKey: match.boundaryKey || match.stable_id || match.featureId || "",
+        },
       );
       if (features.length === before) {
         layer._searchRenderSkipped = Number(layer._searchRenderSkipped || 0) + 1;
@@ -4842,6 +5224,8 @@ function removeMapLibreSearchHighlightLayer() {
     map.removeSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID);
   }
   mapLibreEngineState.searchHighlightFeatures = 0;
+  mapLibreEngineState.searchHighlightContextFeatures = 0;
+  mapLibreEngineState.searchHighlightFocusFeatures = 0;
   mapLibreEngineState.searchHighlightSourceReady = false;
 }
 
@@ -4854,9 +5238,18 @@ function hasCompleteMapLibreSearchHighlightLayers() {
     && map.getLayer(MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID));
 }
 
+function setMapLibreSearchHighlightFeatureCounts(features = []) {
+  mapLibreEngineState.searchHighlightFeatures = features.length;
+  mapLibreEngineState.searchHighlightContextFeatures = features.filter((feature) => feature?.properties?._earthMapSearchRole !== "focus").length;
+  mapLibreEngineState.searchHighlightFocusFeatures = features.filter((feature) => feature?.properties?._earthMapSearchRole === "focus").length;
+}
+
 function syncMapLibreSearchHighlight(options = {}) {
   const map = mapLibreEngineState.map;
   if (!map || !map.isStyleLoaded?.()) return;
+  if (options.forceReinstall === true) {
+    removeMapLibreSearchHighlightLayer();
+  }
   const collection = getMapLibreSearchHighlightFeatureCollection();
   const features = collection.features || [];
   if (!features.length) {
@@ -4869,7 +5262,7 @@ function syncMapLibreSearchHighlight(options = {}) {
     if (features.length && hasCompleteMapLibreSearchHighlightLayers()) {
       const source = map.getSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID);
       source?.setData?.(cloneGeoJsonForMapLibre(collection));
-      mapLibreEngineState.searchHighlightFeatures = features.length;
+      setMapLibreSearchHighlightFeatureCounts(features);
       mapLibreEngineState.searchHighlightSourceReady = true;
       orderMapLibreReadableBoundaryLayers();
       if (options.syncAdmin1 !== false) {
@@ -4894,10 +5287,11 @@ function syncMapLibreSearchHighlight(options = {}) {
       id: MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID,
       type: "fill",
       source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
-      filter: ["==", ["get", "_earthMapSearchRole"], "context"],
+      filter: ["!=", ["get", "_earthMapSearchRole"], "focus"],
       paint: {
-        "fill-color": ["get", "_earthMapSearchFill"],
-        "fill-opacity": ["get", "_earthMapSearchOpacity"],
+        "fill-color": ["coalesce", ["get", "_earthMapSearchFill"], getGearBoxContextStyle({}).fill],
+        "fill-opacity": ["coalesce", ["get", "_earthMapSearchOpacity"], isEarthMapDarkMode() ? 0.78 : 0.52],
+        "fill-antialias": false,
       },
     }, waterFillBeforeId);
     map.addLayer({
@@ -4906,28 +5300,29 @@ function syncMapLibreSearchHighlight(options = {}) {
       source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
       filter: ["==", ["get", "_earthMapSearchRole"], "focus"],
       paint: {
-        "fill-color": ["get", "_earthMapSearchFill"],
-        "fill-opacity": ["get", "_earthMapSearchOpacity"],
+        "fill-color": ["coalesce", ["get", "_earthMapSearchFill"], getMapSearchSpecialHighlightColor()],
+        "fill-opacity": ["coalesce", ["get", "_earthMapSearchOpacity"], isEarthMapDarkMode() ? 0.82 : 0.68],
+        "fill-antialias": false,
       },
     }, waterFillBeforeId);
     map.addLayer({
       id: MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID,
       type: "line",
       source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
-      filter: ["==", ["get", "_earthMapSearchRole"], "context"],
+      filter: ["!=", ["get", "_earthMapSearchRole"], "focus"],
       layout: {
         "line-cap": "round",
         "line-join": "round",
       },
       paint: {
-        "line-color": ["get", "_earthMapSearchOutline"],
+        "line-color": ["coalesce", ["get", "_earthMapSearchOutline"], getGearBoxContextStyle({}).outline],
         "line-width": [
           "interpolate", ["linear"], ["zoom"],
           0, isEarthMapDarkMode() ? 1.05 : 0.96,
           5, isEarthMapDarkMode() ? 1.22 : 1.08,
           9, isEarthMapDarkMode() ? 1.38 : 1.2,
         ],
-        "line-opacity": isEarthMapDarkMode() ? 0.98 : 0.92,
+        "line-opacity": isEarthMapDarkMode() ? 0.18 : 0.12,
       },
     }, outlineBeforeId);
     map.addLayer({
@@ -4940,17 +5335,17 @@ function syncMapLibreSearchHighlight(options = {}) {
         "line-join": "round",
       },
       paint: {
-        "line-color": ["get", "_earthMapSearchOutline"],
+        "line-color": ["coalesce", ["get", "_earthMapSearchOutline"], getMapSearchSpecialOutlineColor()],
         "line-width": [
           "interpolate", ["linear"], ["zoom"],
           0, isEarthMapDarkMode() ? 1.45 : 1.24,
           5, isEarthMapDarkMode() ? 1.68 : 1.42,
           9, isEarthMapDarkMode() ? 1.86 : 1.56,
         ],
-        "line-opacity": 0.98,
+        "line-opacity": isEarthMapDarkMode() ? 0.22 : 0.16,
       },
     }, outlineBeforeId);
-    mapLibreEngineState.searchHighlightFeatures = features.length;
+    setMapLibreSearchHighlightFeatureCounts(features);
     mapLibreEngineState.searchHighlightSourceReady = true;
     orderMapLibreReadableBoundaryLayers();
     if (options.syncAdmin1 !== false) {
@@ -5062,8 +5457,151 @@ function maybeRequestMapLibrePilotFullLandLayer(zoom = getMapLibreZoomFromGlobeZ
   requestMapLibrePilotFullLandLayer();
 }
 
+function escapeDiagnosticText(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderDiagnosticsConsole(container, { title, kind, collapsed, bodyHtml }) {
+  if (!container) return;
+  container.classList.toggle("is-collapsed", collapsed);
+  container.innerHTML = `
+    <button type="button" class="diagnostics-console-header" data-diagnostics-toggle="${escapeDiagnosticText(kind)}" aria-expanded="${collapsed ? "false" : "true"}">
+      <strong>${escapeDiagnosticText(title)}</strong>
+      <span class="diagnostics-console-chevron" aria-hidden="true">${collapsed ? "▸" : "▾"}</span>
+    </button>
+    <div class="diagnostics-console-body" ${collapsed ? "hidden" : ""}>
+      ${bodyHtml}
+    </div>
+  `;
+}
+
+function getSavedSearchDiagnosticLayers(project = getActiveProject()) {
+  return (Array.isArray(project?.dataLayers) ? project.dataLayers : [])
+    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false);
+}
+
+function getStatisticDiagnosticLayers(project = getActiveProject()) {
+  return getEarthMapStatisticDebugInfo(project)
+    .filter((layer) => layer.origin !== "search" && layer.visible);
+}
+
+function getSavedSearchDiagnosticSummary(project = getActiveProject()) {
+  const layers = getSavedSearchDiagnosticLayers(project);
+  const rows = layers.reduce((sum, layer) => sum + (Array.isArray(layer.table?.rows) ? layer.table.rows.length : 0), 0);
+  const matches = layers.reduce((sum, layer) => sum + (Array.isArray(layer.valueMatches) ? layer.valueMatches.length : 0), 0);
+  const drawable = layers.reduce((sum, layer) => sum + (Array.isArray(layer.valueMatches)
+    ? layer.valueMatches.filter((match) => hasDrawableBoundaryFeature(match?.feature)).length
+    : 0), 0);
+  const hydrating = layers.some((layer) => layer._searchGeometryHydrationPending || layer._searchGeometryHydrationQueued);
+  const skipped = layers.reduce((sum, layer) => sum + (Number(layer._searchRenderSkipped) || 0), 0);
+  const skippedExamples = [...new Set(layers.flatMap((layer) => (
+    Array.isArray(layer._searchRenderSkippedExamples) ? layer._searchRenderSkippedExamples : []
+  )))].slice(0, 6);
+  const last = layers
+    .map((layer) => ({
+      matched: Number(layer._searchHydrationLastMatched),
+      missing: Number(layer._searchHydrationLastMissing),
+      examples: Array.isArray(layer._searchHydrationLastMissingExamples) ? layer._searchHydrationLastMissingExamples : [],
+      at: Number(layer._searchHydrationLastRunAt),
+    }))
+    .filter((entry) => Number.isFinite(entry.at))
+    .sort((a, b) => b.at - a.at)[0] || null;
+  return { layers, rows, matches, drawable, hydrating, skipped, skippedExamples, last };
+}
+
+function getStatisticDiagnosticSummary(project = getActiveProject()) {
+  const layers = getStatisticDiagnosticLayers(project);
+  const rows = layers.reduce((sum, layer) => sum + layer.rows, 0);
+  const matches = layers.reduce((sum, layer) => sum + layer.matches, 0);
+  const drawable = layers.reduce((sum, layer) => sum + layer.drawableMatches, 0);
+  const hydrating = layers.some((layer) => layer.hydrationPending);
+  const lastDraw = layers
+    .map((layer) => layer.lastStatisticDraw || null)
+    .find(Boolean);
+  return { layers, rows, matches, drawable, hydrating, lastDraw };
+}
+
+function renderMapHarmonyDiagnostics() {
+  if (!ui.mapHarmonyDiagnostics) return;
+  const project = getActiveProject();
+  const yesNo = (value) => value ? "ja" : "nein";
+  const search = getSavedSearchDiagnosticSummary(project);
+  const statistics = getStatisticDiagnosticSummary(project);
+  const row = ({ label, type, layers, rows, matches, drawable, hydrating, note }) => `
+    <tr>
+      <th scope="row">${escapeDiagnosticText(label)}</th>
+      <td>${escapeDiagnosticText(type)}</td>
+      <td>${escapeDiagnosticText(layers)}</td>
+      <td>${escapeDiagnosticText(rows)}</td>
+      <td>${escapeDiagnosticText(`${drawable}/${matches}`)}</td>
+      <td>${escapeDiagnosticText(yesNo(hydrating))}</td>
+      <td>${escapeDiagnosticText(note || "—")}</td>
+    </tr>
+  `;
+  const searchLastNote = search.last
+    ? `letzter Lauf ${search.last.matched}/${search.last.matched + search.last.missing}${search.last.examples.length ? ` · fehlt ${search.last.examples.join(", ")}` : ""}`
+    : "noch kein Hydrierungslauf";
+  const searchSkipNote = search.skipped
+    ? ` · Render-Skip ${search.skipped}${search.skippedExamples.length ? ` (${search.skippedExamples.join(", ")})` : ""}`
+    : "";
+  const statisticDrawNote = statistics.lastDraw
+    ? `gezeichnet ${statistics.lastDraw.drawn}/${statistics.lastDraw.attempted}`
+    : "noch kein Draw-Protokoll";
+  const harmonyState = [
+    search.layers.length ? "Suchkarten aktiv" : "",
+    statistics.layers.length ? "Statistiken aktiv" : "",
+    search.hydrating || statistics.hydrating ? "Hydrierung läuft" : "",
+  ].filter(Boolean).join(" · ") || "keine gespeicherte Such-/Statistikkarte aktiv";
+  renderDiagnosticsConsole(ui.mapHarmonyDiagnostics, {
+    title: "Harmonisierung",
+    kind: "harmony",
+    collapsed: state.harmonyDiagnosticsCollapsed,
+    bodyHtml: `
+      <dl class="engine-diagnostics-summary">
+        <dt>Projekt</dt><dd>${escapeDiagnosticText(project?.title || "—")}</dd>
+        <dt>Status</dt><dd>${escapeDiagnosticText(harmonyState)}</dd>
+      </dl>
+      <table class="engine-diagnostics-layer-table harmony-diagnostics-table">
+        <thead>
+          <tr><th>Ebene</th><th>Typ</th><th>Layer</th><th>Zeilen</th><th>Drawable</th><th>Hydr.</th><th>Notiz</th></tr>
+        </thead>
+        <tbody>
+          ${row({
+            label: "Suche",
+            type: "gespeichert",
+            layers: search.layers.length,
+            rows: search.rows,
+            matches: search.matches,
+            drawable: search.drawable,
+            hydrating: search.hydrating,
+            note: `${searchLastNote}${searchSkipNote}`,
+          })}
+          ${row({
+            label: "Statistik",
+            type: "Wertekarte",
+            layers: statistics.layers.length,
+            rows: statistics.rows,
+            matches: statistics.matches,
+            drawable: statistics.drawable,
+            hydrating: statistics.hydrating,
+            note: statisticDrawNote,
+          })}
+        </tbody>
+      </table>
+    `,
+  });
+}
+
 function renderMapEngineDiagnostics() {
-  if (!ui.mapEngineDiagnostics) return;
+  if (!ui.mapEngineDiagnostics) {
+    renderMapHarmonyDiagnostics();
+    return;
+  }
   const engineLabel = mapLibreEngineState.active ? "MapLibre Pilot" : "Legacy";
   const status = mapLibreEngineState.status || "unknown";
   const detail = mapLibreEngineState.error || (mapLibreEngineState.styleLoaded ? "style bereit" : "wartet");
@@ -5075,42 +5613,14 @@ function renderMapEngineDiagnostics() {
   // klein = nah. So können wir Schwellen präzise besprechen, ohne so zu tun,
   // als läge schon ein metrisches Höhenmodell vor.
   const diagnosticHeight = 1 / (2 ** diagnosticZoom);
-  const statisticLayers = getEarthMapStatisticDebugInfo?.() || [];
-  const activeStatisticLayers = statisticLayers.filter((layer) => layer.visible);
-  const statisticRows = activeStatisticLayers.reduce((sum, layer) => sum + layer.rows, 0);
-  const statisticMatches = activeStatisticLayers.reduce((sum, layer) => sum + layer.matches, 0);
-  const statisticDrawable = activeStatisticLayers.reduce((sum, layer) => sum + layer.drawableMatches, 0);
-  const statisticHydrating = activeStatisticLayers.some((layer) => layer.hydrationPending);
-  const firstStatisticDraw = activeStatisticLayers
-    .map((layer) => layer.lastStatisticDraw || null)
-    .find(Boolean);
-  const savedSearchLayers = (getActiveProject()?.dataLayers || [])
-    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false);
-  const savedSearchRows = savedSearchLayers.reduce((sum, layer) => sum + (Array.isArray(layer.table?.rows) ? layer.table.rows.length : 0), 0);
-  const savedSearchMatches = savedSearchLayers.reduce((sum, layer) => sum + (Array.isArray(layer.valueMatches) ? layer.valueMatches.length : 0), 0);
-  const savedSearchDrawable = savedSearchLayers.reduce((sum, layer) => sum + (Array.isArray(layer.valueMatches)
-    ? layer.valueMatches.filter((match) => hasDrawableBoundaryFeature(match?.feature)).length
-    : 0), 0);
-  const savedSearchHydrating = savedSearchLayers.some((layer) => layer._searchGeometryHydrationPending || layer._searchGeometryHydrationQueued);
-  const savedSearchSkipped = savedSearchLayers.reduce((sum, layer) => sum + (Number(layer._searchRenderSkipped) || 0), 0);
-  const savedSearchSkippedExamples = [...new Set(savedSearchLayers.flatMap((layer) => (
-    Array.isArray(layer._searchRenderSkippedExamples) ? layer._searchRenderSkippedExamples : []
-  )))].slice(0, 6);
+  const statisticSummary = getStatisticDiagnosticSummary();
+  const savedSearchSummary = getSavedSearchDiagnosticSummary();
   const yesNo = (value) => value ? "ja" : "nein";
-  const savedSearchLast = savedSearchLayers
-    .map((layer) => ({
-      matched: Number(layer._searchHydrationLastMatched),
-      missing: Number(layer._searchHydrationLastMissing),
-      examples: Array.isArray(layer._searchHydrationLastMissingExamples) ? layer._searchHydrationLastMissingExamples : [],
-      at: Number(layer._searchHydrationLastRunAt),
-    }))
-    .filter((entry) => Number.isFinite(entry.at))
-    .sort((a, b) => b.at - a.at)[0] || null;
-  const savedSearchNote = `${savedSearchRows} gespeicherte Zeilen · ${savedSearchDrawable}/${savedSearchMatches} drawable · Hydrierung ${yesNo(savedSearchHydrating)}${
-    savedSearchLast
-      ? ` · letzter Lauf ${savedSearchLast.matched}/${savedSearchLast.matched + savedSearchLast.missing}${savedSearchLast.examples.length ? ` · fehlt ${savedSearchLast.examples.join(", ")}` : ""}`
+  const savedSearchNote = `${savedSearchSummary.rows} gespeicherte Zeilen · ${savedSearchSummary.drawable}/${savedSearchSummary.matches} drawable · Hydrierung ${yesNo(savedSearchSummary.hydrating)}${
+    savedSearchSummary.last
+      ? ` · letzter Lauf ${savedSearchSummary.last.matched}/${savedSearchSummary.last.matched + savedSearchSummary.last.missing}${savedSearchSummary.last.examples.length ? ` · fehlt ${savedSearchSummary.last.examples.join(", ")}` : ""}`
       : ""
-  }${savedSearchSkipped ? ` · Render-Skip ${savedSearchSkipped}${savedSearchSkippedExamples.length ? ` (${savedSearchSkippedExamples.join(", ")})` : ""}` : ""}`;
+  }${savedSearchSummary.skipped ? ` · Render-Skip ${savedSearchSummary.skipped}${savedSearchSummary.skippedExamples.length ? ` (${savedSearchSummary.skippedExamples.join(", ")})` : ""}` : ""}`;
   const visibleText = (value) => value ? "sichtbar" : "aus";
   const loadText = (value) => Number.isFinite(value) && value > 0 ? `${value.toFixed(1)} ms` : "—";
   const sourceText = (value) => value ? "bereit" : "—";
@@ -5125,24 +5635,28 @@ function renderMapEngineDiagnostics() {
     </tr>
   `;
   ui.mapEngineDiagnostics.innerHTML = `
-    <strong>Engine</strong>
-    <dl class="engine-diagnostics-summary">
-      <dt>Pfad</dt><dd>${engineLabel}</dd>
-      <dt>Status</dt><dd>${status}</dd>
-      <dt>Render</dt><dd>${mapLibreEngineState.renderPhase}</dd>
-      <dt>Zoom</dt><dd>${diagnosticZoom.toFixed(2)}</dd>
-      <dt>Höhe</dt><dd>${diagnosticHeight.toFixed(4)} rel.</dd>
-      <dt>FPS</dt><dd>${movingFps}</dd>
-      <dt>Frame</dt><dd>${movingFrame}</dd>
-      <dt>Letzter</dt><dd>${mapLibreEngineState.lastRenderGapMs.toFixed(0)} ms</dd>
-      <dt>Quellen</dt><dd>${mapLibreEngineState.sourceCount}</dd>
-      <dt>Layer</dt><dd>${mapLibreEngineState.layerCount}</dd>
-    </dl>
-    <table class="engine-diagnostics-layer-table">
-      <thead>
-        <tr><th>Layer</th><th>Quelle</th><th>Sicht</th><th>Feat.</th><th>Laden</th><th>Notiz</th></tr>
-      </thead>
-      <tbody>
+    <button type="button" class="diagnostics-console-header" data-diagnostics-toggle="engine" aria-expanded="${state.engineDiagnosticsCollapsed ? "false" : "true"}">
+      <strong>Engine</strong>
+      <span class="diagnostics-console-chevron" aria-hidden="true">${state.engineDiagnosticsCollapsed ? "▸" : "▾"}</span>
+    </button>
+    <div class="diagnostics-console-body" ${state.engineDiagnosticsCollapsed ? "hidden" : ""}>
+      <dl class="engine-diagnostics-summary">
+        <dt>Pfad</dt><dd>${engineLabel}</dd>
+        <dt>Status</dt><dd>${status}</dd>
+        <dt>Render</dt><dd>${mapLibreEngineState.renderPhase}</dd>
+        <dt>Zoom</dt><dd>${diagnosticZoom.toFixed(2)}</dd>
+        <dt>Höhe</dt><dd>${diagnosticHeight.toFixed(4)} rel.</dd>
+        <dt>FPS</dt><dd>${movingFps}</dd>
+        <dt>Frame</dt><dd>${movingFrame}</dd>
+        <dt>Letzter</dt><dd>${mapLibreEngineState.lastRenderGapMs.toFixed(0)} ms</dd>
+        <dt>Quellen</dt><dd>${mapLibreEngineState.sourceCount}</dd>
+        <dt>Layer</dt><dd>${mapLibreEngineState.layerCount}</dd>
+      </dl>
+      <table class="engine-diagnostics-layer-table">
+        <thead>
+          <tr><th>Layer</th><th>Quelle</th><th>Sicht</th><th>Feat.</th><th>Laden</th><th>Notiz</th></tr>
+        </thead>
+        <tbody>
         ${layerRow({
           label: "Land",
           source: sourceText(mapLibreEngineState.landSourceReady),
@@ -5189,24 +5703,27 @@ function renderMapEngineDiagnostics() {
           visible: mapLibreEngineState.searchHighlightSourceReady ? "aktiv" : "aus",
           features: mapLibreEngineState.searchHighlightFeatures,
           load: "—",
-          note: isStatisticalMapActive() && !savedSearchRows
+          note: isStatisticalMapActive() && !savedSearchSummary.rows
             ? "durch Statistik blockiert"
-            : `${savedSearchNote} · Suche ${mapLibreEngineState.searchResolveMs ? `${mapLibreEngineState.searchResolveMs.toFixed(0)} ms` : "—"}`,
+            : `${savedSearchNote} · Context ${mapLibreEngineState.searchHighlightContextFeatures} · Focus ${mapLibreEngineState.searchHighlightFocusFeatures} · Suche ${mapLibreEngineState.searchResolveMs ? `${mapLibreEngineState.searchResolveMs.toFixed(0)} ms` : "—"}`,
         })}
         ${layerRow({
           label: "Statistik",
-          source: activeStatisticLayers.length ? "Projekt" : "—",
-          visible: activeStatisticLayers.length ? "aktiv" : "aus",
-          features: `${statisticDrawable}/${statisticMatches}`,
+          source: statisticSummary.layers.length ? "Projekt" : "—",
+          visible: statisticSummary.layers.length ? "aktiv" : "aus",
+          features: `${statisticSummary.drawable}/${statisticSummary.matches}`,
           load: "—",
-          note: `${statisticRows} Werte · Hydrierung ${yesNo(statisticHydrating)}${firstStatisticDraw ? ` · gezeichnet ${firstStatisticDraw.drawn}/${firstStatisticDraw.attempted}` : ""}`,
+          note: `${statisticSummary.rows} Werte · Hydrierung ${yesNo(statisticSummary.hydrating)}${statisticSummary.lastDraw ? ` · gezeichnet ${statisticSummary.lastDraw.drawn}/${statisticSummary.lastDraw.attempted}` : ""}`,
         })}
-      </tbody>
-    </table>
-    <dl class="engine-diagnostics-summary engine-diagnostics-note">
-      <dt>Hinweis</dt><dd>${detail}</dd>
-    </dl>
+        </tbody>
+      </table>
+      <dl class="engine-diagnostics-summary engine-diagnostics-note">
+        <dt>Hinweis</dt><dd>${detail}</dd>
+      </dl>
+    </div>
   `;
+  ui.mapEngineDiagnostics.classList.toggle("is-collapsed", state.engineDiagnosticsCollapsed);
+  renderMapHarmonyDiagnostics();
 }
 
 function updateMapLibreDiagnosticsFrame() {
@@ -5250,7 +5767,11 @@ function updateMapLibreDiagnosticsFrame() {
   const admin1Visibility = admin1Layer ? mapLibreEngineState.map?.getLayoutProperty?.(MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID, "visibility") : "none";
   mapLibreEngineState.admin1LayerVisible = Boolean(admin1Layer) && admin1Visibility !== "none";
   mapLibreEngineState.searchHighlightSourceReady = Boolean(mapLibreEngineState.map?.getSource?.(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID));
-  if (!mapLibreEngineState.searchHighlightSourceReady) mapLibreEngineState.searchHighlightFeatures = 0;
+  if (!mapLibreEngineState.searchHighlightSourceReady) {
+    mapLibreEngineState.searchHighlightFeatures = 0;
+    mapLibreEngineState.searchHighlightContextFeatures = 0;
+    mapLibreEngineState.searchHighlightFocusFeatures = 0;
+  }
   renderMapEngineDiagnostics();
 }
 
@@ -5282,6 +5803,16 @@ function syncMapLibreCamera() {
 function syncMapLibreTheme() {
   const map = mapLibreEngineState.map;
   if (!map) return;
+  const resyncThemeDependentLayers = () => {
+    // Themewechsel setzen den MapLibre-Style neu. Alle projektbezogenen
+    // Darstellungen müssen danach aus den aktuellen Theme-Farben rekonstruiert
+    // werden; sonst bleiben gespeicherte Such- und Statistikflächen bis zum
+    // Refresh in alten Paint-Werten hängen.
+    syncMapLibreSearchHighlight({ forceReinstall: true });
+    void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
+    syncMapLibreCamera();
+    scheduleMapLibreAdmin1ViewportSync(650);
+  };
   try {
     map.setStyle(getEarthMapMapLibreStyle(), { diff: false });
     mapLibreEngineState.styleLoaded = false;
@@ -5293,10 +5824,9 @@ function syncMapLibreTheme() {
       installMapLibrePilotLandLayer(mapLibreEngineState.fullLandGeoJson?.features?.length ? "full" : "start");
       if (mapLibreEngineState.waterGeoJson?.features?.length) installMapLibrePilotWaterLayer();
       if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) installMapLibrePilotAdmin0Layer();
-      syncMapLibreSearchHighlight();
-      void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
-      syncMapLibreCamera();
-      scheduleMapLibreAdmin1ViewportSync(650);
+      resyncThemeDependentLayers();
+      window.requestAnimationFrame?.(resyncThemeDependentLayers);
+      window.setTimeout(resyncThemeDependentLayers, 180);
       scheduleMapLibreInitialFullLandPreload(1200);
     });
     renderMapEngineDiagnostics();
@@ -7250,17 +7780,20 @@ function scheduleHeavyMapLayerWorkActivation(delay = 2600) {
   }, delay);
 }
 
-function scheduleGearBoxLayerGeometryHydration(layer) {
+function scheduleGearBoxLayerGeometryHydration(layer, options = {}) {
   const rows = Array.isArray(layer?.table?.rows) ? layer.table.rows : [];
-  if (!rows.length || layer._gearBoxGeometryHydrationPending || !canRunHeavyMapLayerWork()) return;
+  const force = options.force === true;
+  if (!rows.length || layer._gearBoxGeometryHydrationPending) return;
+  if (!force && !canRunHeavyMapLayerWork()) return;
   const now = Date.now();
-  if (layer._gearBoxGeometryHydrationLastAttemptAt && now - layer._gearBoxGeometryHydrationLastAttemptAt < 10000) return;
+  if (!force && layer._gearBoxGeometryHydrationLastAttemptAt && now - layer._gearBoxGeometryHydrationLastAttemptAt < 10000) return;
   layer._gearBoxGeometryHydrationPending = true;
   layer._gearBoxGeometryHydrationLastAttemptAt = now;
   const hydrate = async (taskContext = {}) => {
     if (!canRunHeavyMapLayerWork()) {
       layer._gearBoxGeometryHydrationPending = false;
       scheduleHeavyMapLayerWorkActivation(900);
+      window.setTimeout(() => scheduleGearBoxLayerGeometryHydration(layer, { force: true }), 1100);
       return;
     }
     try {
@@ -7274,7 +7807,10 @@ function scheduleGearBoxLayerGeometryHydration(layer) {
       await taskContext.yield?.();
       rebuildGearBoxDataLayerMatches(layer);
       persistProjects();
+      syncMapLibreSearchHighlight({ syncAdmin1: false });
       if (!taskContext.shouldPause?.()) {
+        renderProjectBrowser();
+        renderGearBoxPanel();
         scheduleGlobeRender();
       }
     } catch (error) {
@@ -7322,6 +7858,11 @@ function isStatisticalMapActive() {
 }
 
 function drawStatisticalDataLayer(radius, center) {
+  // MapLibre ist ab jetzt die eine Renderwahrheit für Such- und Statistikflächen.
+  // Der alte Canvas-Pfad bleibt nur als Fallback erhalten, falls die Engine nicht
+  // läuft. So entstehen keine konkurrierenden Füllungen und keine doppelte
+  // Geometriearbeit im Browser.
+  if (mapLibreEngineState.map) return false;
   if (isNavigatingGlobe) return false;
   if (isNaturalEarthTileWorkPending()) return false;
   const layer = getActiveStatisticalDataLayer(getActiveProject(), { allowHeavyWork: true });
@@ -7393,6 +7934,7 @@ function getEarthMapStatisticDebugInfo(project = getActiveProject()) {
       return {
         id: layer.id,
         title: layer.title || layer.name || "Statistik",
+        origin: layer.origin || "statistic",
         visible: layer.visible !== false,
         rows: rows.length,
         matches: matches.length,
@@ -7980,9 +8522,7 @@ function deleteProjectById(projectId) {
   state.openProjectBrowserMenuId = null;
   persistProjects();
   renderWorkspace();
-  syncMapLibreSearchHighlight();
-  void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
-  renderGlobe();
+  requestProjectDataLayerSync({ forceNow: true });
 }
 
 function beginProjectDeleteHold(event) {
@@ -8071,7 +8611,9 @@ function deleteLayerById(projectId, layerId) {
   state.openLayerBrowserMenuId = null;
   persistProjects();
   renderWorkspace();
-  renderGlobe();
+  requestPreviewDataLayerSync();
+  const layerKind = isStatisticLayerItem(layer) ? "Wertekarte" : layer.origin === "search" ? "Suchkarte" : "Karte";
+  showEarthMapFeedback(`${layerKind} „${layer.title || layer.name || "Daten"}“ wurde aus dem Projekt „${project.title || "EarthMap"}“ entfernt.`);
 }
 
 function moveLibraryItem(projectId, layerId, targetSubfolderId = "") {
@@ -8095,8 +8637,8 @@ function moveLibraryItem(projectId, layerId, targetSubfolderId = "") {
   state.openLayerBrowserMenuId = null;
   state.activeSubfolderRef = null;
   persistProjects();
+  requestPreviewDataLayerSync();
   renderWorkspace();
-  renderGlobe();
   openLibraryItemEditor(item);
 }
 
@@ -8272,9 +8814,9 @@ function createProjectCardMenu(project) {
     event.preventDefault();
     event.stopPropagation();
     state.openProjectBrowserMenuId = null;
-    state.activeProjectId = project.id;
+    setActiveProjectExclusive(project.id);
     persistProjects();
-    rehydrateSavedSearchLayers(project, { persist: true });
+    requestProjectDataLayerSync({ forceNow: true });
     renderProjectBrowser();
     openProjectEditor(project);
   });
@@ -8338,12 +8880,15 @@ function renderProjectBrowser() {
       visibility.addEventListener("click", (event) => event.stopPropagation());
       visibility.addEventListener("change", () => {
         // Projektregel: Der Haken auf Projektebene ist kein Sichtbarkeitsschalter
-        // für Layer. Er wählt maximal ein aktives Earth-Map-Projekt, darf aber
-        // auch alle Projekte deaktivieren; dann zeigt EarthMap die neutrale Erde.
-        if (!visibility.checked && state.activeProjectId === project.id) {
-          state.activeProjectId = "";
+        // für einen einzelnen Layer. Er wählt maximal ein aktives Earth-Map-
+        // Projekt. Wird er entfernt, wird die gesamte darunterliegende
+        // Browserstruktur deaktiviert, damit keine alten Haken unsichtbar im
+        // Projekt weiterleben.
+        if (!visibility.checked) {
+          if (state.activeProjectId === project.id) state.activeProjectId = "";
+          setProjectChildVisibility(project, false);
         } else if (visibility.checked) {
-          state.activeProjectId = project.id;
+          setActiveProjectExclusive(project.id);
         }
         state.openProjectBrowserMenuId = null;
         state.openFolderBrowserMenuId = null;
@@ -8351,9 +8896,8 @@ function renderProjectBrowser() {
         resetProjectDeleteHold();
         resetLayerDeleteHold();
         persistProjects();
-        rehydrateSavedSearchLayers(getActiveProject(), { persist: true });
+        requestProjectDataLayerSync({ forceNow: true });
         renderWorkspace();
-        renderGlobe();
       });
 
       const toggle = document.createElement("button");
@@ -8432,6 +8976,32 @@ function getProjectSubfolderItems(project, subfolderId) {
   return getProjectMapFolders(project).flatMap((folder) => {
     const subfolder = (folder.subfolders || []).find((candidate) => candidate.id === subfolderId);
     return (subfolder?.items || []).map((item) => ({ item, folderType: folder.type }));
+  });
+}
+
+function setProjectChildVisibility(project, visible) {
+  if (!project) return;
+  // Browserregel: Wird ein Projekt deaktiviert, werden die Haken seiner
+  // gesamten Baumstruktur ebenfalls entfernt. Das ist eine gespeicherte
+  // Sichtbarkeitsentscheidung, kein bloßer UI-Zustand.
+  getProjectMapFolders(project).forEach((folder) => {
+    (folder.items || []).forEach((item) => setBrowserItemVisible(item, visible));
+    (folder.subfolders || []).forEach((subfolder) => {
+      (subfolder.items || []).forEach((item) => setBrowserItemVisible(item, visible));
+    });
+  });
+  (project.dataLayers || []).forEach((layer) => setBrowserItemVisible(layer, visible));
+}
+
+function setActiveProjectExclusive(projectId = "") {
+  // Browserregel: EarthMap stellt immer nur den Inhalt eines aktiven
+  // Projektordners dar. Wird ein Projekt aktiviert, müssen alle Karten,
+  // Unterordner und Datenlayer anderer Projekte deaktiviert werden; sonst
+  // entstehen unsichtbare Konflikte zwischen Browser-Haken und Renderquelle.
+  state.activeProjectId = projectId || "";
+  if (!state.activeProjectId) return;
+  state.projects.forEach((project) => {
+    if (project.id !== state.activeProjectId) setProjectChildVisibility(project, false);
   });
 }
 
@@ -9040,6 +9610,7 @@ function createProjectSubfolder(project) {
     ]),
   ];
   persistProjects();
+  requestPreviewDataLayerSync();
   renderWorkspace();
 }
 
@@ -9105,7 +9676,7 @@ function createProjectLayerTree(project, folderType, options = {}) {
   const isCollapsed = isBrowserNodeCollapsed(nodeId);
   const layerTree = document.createElement("div");
   layerTree.className = "project-layer-tree";
-  const visibleLayerCount = allItems.filter((item) => item.display?.visible !== false).length;
+  const visibleLayerCount = allItems.filter((item) => isBrowserItemVisible(item)).length;
   const row = document.createElement("div");
   row.className = "project-browser-row layer-folder-row";
   row.classList.toggle("has-folder-action", canCreateSubfolders);
@@ -9120,12 +9691,11 @@ function createProjectLayerTree(project, folderType, options = {}) {
   visibility.addEventListener("click", (event) => event.stopPropagation());
   visibility.addEventListener("change", () => {
     allItems.forEach((item) => {
-      item.display = item.display || {};
-      item.display.visible = visibility.checked;
+      setBrowserItemVisible(item, visibility.checked);
     });
     persistProjects();
+    requestPreviewDataLayerSync();
     renderWorkspace();
-    renderGlobe();
   });
 
   const toggle = document.createElement("button");
@@ -9285,7 +9855,7 @@ function createLibrarySubfolderRow(subfolder, project, folderType) {
   const subfolderItems = folderType === "project-layers"
     ? getProjectSubfolderItems(project, subfolder.id).map((entry) => entry.item)
     : (Array.isArray(subfolder.items) ? subfolder.items : []);
-  const visibleItemCount = subfolderItems.filter((item) => item.display?.visible !== false).length;
+  const visibleItemCount = subfolderItems.filter((item) => isBrowserItemVisible(item)).length;
 
   const visibility = document.createElement("input");
   visibility.type = "checkbox";
@@ -9296,12 +9866,11 @@ function createLibrarySubfolderRow(subfolder, project, folderType) {
   visibility.addEventListener("click", (event) => event.stopPropagation());
   visibility.addEventListener("change", () => {
     subfolderItems.forEach((item) => {
-      item.display = item.display || {};
-      item.display.visible = visibility.checked;
+      setBrowserItemVisible(item, visibility.checked);
     });
     persistProjects();
+    requestPreviewDataLayerSync();
     renderWorkspace();
-    renderGlobe();
   });
 
   const toggle = document.createElement("button");
@@ -9448,9 +10017,8 @@ function createLibraryItemButton(item, project, folderType = "", currentSubfolde
   visibility.addEventListener("change", () => {
     setBrowserItemVisible(item, visibility.checked);
     persistProjects();
+    requestPreviewDataLayerSync();
     renderWorkspace();
-    if (item.origin === "search") syncMapLibreSearchHighlight();
-    renderGlobe();
   });
 
   const typeIcon = document.createElement("span");
@@ -9559,6 +10127,7 @@ function renderBoundaryEditor() {
 }
 
 function renderBackgroundMapList() {
+  ui.backgroundMapList = document.getElementById("backgroundMapList");
   if (!ui.backgroundMapList) return;
   const project = getActiveProject();
   if (!project) {
@@ -9645,6 +10214,7 @@ function renderProjectEditor() {
   ui.layerEditorContent.hidden = false;
   ui.layerMetaList.className = "structured-editor";
   ui.layerMetaList.replaceChildren(...createProjectEditorSections(project));
+  renderBackgroundMapList();
 }
 
 function renderSubfolderEditor() {
@@ -9979,14 +10549,32 @@ function createProjectEditorSections(project) {
     createProjectIconField(project),
   );
 
-  const display = createEditorSection("Darstellung", "Diese Werte steuern die Grundkarte des aktiven Projekts. Die Grundkarte ist eine Projekt-Eigenschaft und kein verschiebbares Browserobjekt.", {
-    key: "display",
-    icon: "https://api.iconify.design/mdi/map-legend.svg",
+  const background = createEditorSection("Hintergrund", "Hintergrundkarten bestimmen die geografische Grunddarstellung des Projekts. Sie sind Projekt-Eigenschaften und keine verschiebbaren Browserobjekte.", {
+    key: "background",
+    icon: "https://api.iconify.design/mdi/earth.svg",
   });
   const selectedOption = getSelectedContinentalMapOption(project);
   const optionNote = document.createElement("p");
   optionNote.className = "structured-editor-section-description";
   optionNote.textContent = selectedOption?.detail || "";
+  const backgroundMapList = document.createElement("div");
+  backgroundMapList.id = "backgroundMapList";
+  backgroundMapList.className = "background-map-list";
+  background.append(
+    createSelectField("Kontinentalkarte", normalizeContinentalMapId(project.displaySettings?.continentalMapId || DEFAULT_CONTINENTAL_MAP_ID), getContinentalMapChoices(project), (value) => {
+      project.displaySettings = project.displaySettings || {};
+      project.displaySettings.continentalMapId = normalizeContinentalMapId(value);
+      persistProjectMutation(project, { renderBrowser: true, renderGlobe: true });
+      renderObjectEditor();
+    }),
+    optionNote,
+    backgroundMapList,
+  );
+
+  const display = createEditorSection("Darstellung", "Diese Werte steuern die Liniengestaltung der Kartenebenen im aktiven Projekt. Bibliografie, Quelle und Boundary-Metadaten bleiben davon getrennt.", {
+    key: "display",
+    icon: "https://api.iconify.design/mdi/map-legend.svg",
+  });
   const rankStyleList = document.createElement("div");
   rankStyleList.className = "project-rank-style-list";
   const rankStyleHint = document.createElement("p");
@@ -10034,17 +10622,9 @@ function createProjectEditorSections(project) {
     rankStyleList.append(row);
   });
   display.append(
-    createSelectField("Kontinentalkarte", normalizeContinentalMapId(project.displaySettings?.continentalMapId || DEFAULT_CONTINENTAL_MAP_ID), getContinentalMapChoices(project), (value) => {
-      project.displaySettings = project.displaySettings || {};
-      project.displaySettings.continentalMapId = normalizeContinentalMapId(value);
-      persistProjectMutation(project, { renderBrowser: true, renderGlobe: true });
-      renderBackgroundMapList();
-      renderObjectEditor();
-    }),
-    optionNote,
     rankStyleList,
   );
-  return [general, display];
+  return [general, background, display];
 }
 
 function createSubfolderEditorSections(project, folder, subfolder) {
@@ -10657,22 +11237,34 @@ function createLayerEditorSections(item) {
 function persistStatisticLayerMutation(layer, options = {}) {
   layer.title = repairLegacyText(layer.title || layer.name || "Statistik");
   layer.name = layer.title;
-  rebuildGearBoxDataLayerMatches(layer);
+  if (options.deferMapRender !== true) {
+    if (layer.origin === "search") rebuildSearchResultDataLayerMatches(layer);
+    else rebuildGearBoxDataLayerMatches(layer);
+  }
   persistProjects();
   if (options.renderBrowser !== false) renderProjectBrowser();
-  if (options.renderGlobe !== false) renderGlobe();
+  if (options.deferMapRender === true) {
+    markDisplayLayerPending(layer);
+  } else if (layer.origin === "search") {
+    syncMapLibreSearchHighlight({ syncAdmin1: false, forceReinstall: true });
+    window.requestAnimationFrame?.(() => syncMapLibreSearchHighlight({ syncAdmin1: false, forceReinstall: true }));
+  }
+  if (options.renderGlobe !== false && options.deferMapRender !== true) renderGlobe();
   if (ui.layerEditorTitle) ui.layerEditorTitle.textContent = layer.title;
   if (ui.layerEditorSummary) ui.layerEditorSummary.textContent = getLayerEditorSummary(layer);
 }
 
 function createStatisticStyleDraftFromLayer(layer) {
   const style = layer?.gearBox?.style || {};
+  const contextStyle = style.context || {};
   return {
     styleMode: style.mode || "manual",
     autoColorMode: style.auto_color_mode || "palette",
     baseColor: style.base_color || "#2166ac",
     lightnessMin: style.lightness_min ?? 32,
     lightnessMax: style.lightness_max ?? 84,
+    contextFill: contextStyle.fill || style.context_fill || getMapSearchSelectedAreaColor(),
+    contextOutline: contextStyle.outline || style.context_outline || getMapSearchSelectedOutlineColor(),
     classes: Array.isArray(style.classes) && style.classes.length
       ? style.classes.map((entry) => ({
         from: entry.from == null ? "" : String(entry.from),
@@ -10696,6 +11288,10 @@ function syncStatisticStyleDraftToLayer(layer, styleDraft) {
     base_color: styleDraft.baseColor || "#2166ac",
     lightness_min: Number(styleDraft.lightnessMin) || 32,
     lightness_max: Number(styleDraft.lightnessMax) || 84,
+    context: {
+      fill: normalizeColorValue(styleDraft.contextFill, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor(),
+      outline: normalizeColorValue(styleDraft.contextOutline, getMapSearchSelectedOutlineColor()) || getMapSearchSelectedOutlineColor(),
+    },
     classes: getGearBoxClassesForDraft(styleDraft).map((entry) => ({
       from: toStoredBoundary(entry.from),
       to: toStoredBoundary(entry.to),
@@ -10720,7 +11316,7 @@ function createStatisticPropertySections(target, mode = "draft") {
     persistStatisticLayerMutation(target);
     renderObjectEditor();
   };
-  const availableChapterKeys = new Set(["statistic-general", "statistic-matching", "statistic-display", "statistic-diagnostics"]);
+  const availableChapterKeys = new Set(["statistic-general", "statistic-matching", "statistic-display"]);
   if (state.activeEditorChapterKey && !availableChapterKeys.has(state.activeEditorChapterKey)) {
     state.activeEditorChapterKey = "";
   }
@@ -10739,6 +11335,9 @@ function createStatisticPropertySections(target, mode = "draft") {
         target.title = repairLegacyText(value || "Statistik");
       }
     }),
+    ...(isLayer ? [
+      createTextInputField("Herkunftstyp", target.origin === "search" ? "Suche" : "Statistik", () => {}, { readonly: true }),
+    ] : []),
     createTextInputField("Boundary-Set-Version", isLayer ? (gearBox.target_boundary_set?.version_id || "") : target.targetBoundarySetVersionId, (value) => {
       if (isLayer) {
         gearBox.target_boundary_set = gearBox.target_boundary_set || {};
@@ -10821,7 +11420,7 @@ function createStatisticPropertySections(target, mode = "draft") {
     }),
   );
 
-  const display = createEditorSection("Darstellung", "Diese Werte steuern, wie Wertebereiche auf der Karte eingefärbt werden.", {
+  const display = createEditorSection("Darstellung", "Diese Werte steuern, wie Focus- und Context-Elemente auf der Karte eingefärbt werden.", {
     key: "statistic-display",
     icon: "https://api.iconify.design/mdi/palette-outline.svg",
   });
@@ -10831,71 +11430,187 @@ function createStatisticPropertySections(target, mode = "draft") {
       target.gearBox = target.gearBox || {};
       target.gearBox.style = target.gearBox.style || {};
       target.gearBox.style.search_result_mode = checked;
-      persistStatisticLayerMutation(target);
+      markDisplayLayerPending(target);
+      persistStatisticLayerMutation(target, { renderBrowser: false, renderGlobe: false, deferMapRender: true });
       renderObjectEditor();
-      renderGlobe();
     }));
   }
   display.append(createGearBoxStyleEditor(draft, isLayer ? {
     onChange: (styleDraft) => {
       syncStatisticStyleDraftToLayer(target, styleDraft);
-      persistStatisticLayerMutation(target);
+      markDisplayLayerPending(target);
+      persistStatisticLayerMutation(target, { renderBrowser: false, renderGlobe: false, deferMapRender: true });
       renderObjectEditor();
     },
   } : undefined));
-  return isLayer ? [general, matching, display, createStatisticLayerDiagnosticsSection(target)] : [general, matching, display];
+  display.append(createGearBoxContextStyleEditor(draft, isLayer ? {
+    onChange: (styleDraft) => {
+      syncStatisticStyleDraftToLayer(target, styleDraft);
+      markDisplayLayerPending(target);
+      persistStatisticLayerMutation(target, { renderBrowser: false, renderGlobe: false, deferMapRender: true });
+      renderObjectEditor();
+    },
+  } : undefined));
+  if (!isLayer) return [general, matching, display];
+  return [
+    createStatisticApplyActions((button) => applyStatisticLayerProperties(target, button)),
+    general,
+    matching,
+    display,
+  ];
 }
 
 function createStatisticLayerEditorSections(layer) {
   return createStatisticPropertySections(layer, "layer");
 }
 
-function createStatisticLayerDiagnosticsSection(layer) {
-  const section = createEditorSection("Diagnose", "Diese Übersicht zeigt, ob CSV-Werte, Boundary-Matches, Geometrien und Farben wirklich zusammenfinden.", {
-    key: "statistic-diagnostics",
-    icon: "https://api.iconify.design/mdi/stethoscope.svg",
+function createButtonIconElement(iconUrl) {
+  const icon = document.createElement("span");
+  icon.className = "z-button-icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.style.setProperty("--z-button-icon-mask", `url("${iconUrl}")`);
+  return icon;
+}
+
+function createButtonLabelElement(label) {
+  const text = document.createElement("span");
+  text.className = "z-button-label";
+  text.textContent = label;
+  return text;
+}
+
+function createTemplateButton(label, { className = "secondary-button", icon = "" } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = className;
+  if (icon) button.append(createButtonIconElement(icon));
+  button.append(createButtonLabelElement(label));
+  return button;
+}
+
+function setTemplateButtonLabel(button, label) {
+  const labelNode = button?.querySelector?.(".z-button-label");
+  if (labelNode) {
+    labelNode.textContent = label;
+  } else if (button) {
+    button.textContent = label;
+  }
+}
+
+function getTemplateButtonLabel(button) {
+  return button?.querySelector?.(".z-button-label")?.textContent || button?.textContent || "";
+}
+
+function createStatisticApplyButton(label = "Änderungen übernehmen") {
+  return createTemplateButton(label, {
+    className: "secondary-button csv-apply-button statistic-apply-button",
+    icon: "https://api.iconify.design/material-symbols/save-outline.svg",
   });
-  const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
-  const matches = Array.isArray(layer.valueMatches) ? layer.valueMatches : [];
-  const drawable = matches.filter((match) => hasDrawableBoundaryFeature(match?.feature) && match.fill);
-  const first = matches[0] || null;
-  const uniqueBoundaryKeys = new Set(matches.map((match) => String(match.boundaryKey || "").trim()).filter(Boolean));
-  const uniqueFeatureKeys = new Set(matches.map((match) => {
-    const props = match?.feature?.properties || {};
-    return String(match?.stable_id || match?.featureId || props.iso_3166_2 || props.adm1_code || props.wikidataid || "").trim();
-  }).filter(Boolean));
-  const uniqueFills = new Set(matches.map((match) => String(match.fill || "").trim()).filter(Boolean));
-  const lastDraw = layer._lastStatisticDraw || {};
-  const table = document.createElement("div");
-  table.className = "layer-meta-table";
-  [
-    ["Tabellenzeilen", rows.length],
-    ["Matches", matches.length],
-    ["Zeichnungsfähige Matches", drawable.length],
-    ["Eindeutige Boundary-Keys", uniqueBoundaryKeys.size || "—"],
-    ["Eindeutige Feature-Keys", uniqueFeatureKeys.size || "—"],
-    ["Eindeutige Farben", uniqueFills.size || "—"],
-    ["Erster Boundary-Key", first?.boundaryKey || "—"],
-    ["Erster Wert", first?.value ?? "—"],
-    ["Erste numerische Lesung", first?.numericValue ?? "—"],
-    ["Erste Farbe", first?.fill || "—"],
-    ["Erste Geometrie vorhanden", first ? (hasDrawableBoundaryFeature(first.feature) ? "ja" : "nein") : "—"],
-    ["Zuletzt gezeichnet", Number.isFinite(lastDraw.drawn) ? `${lastDraw.drawn} von ${lastDraw.attempted}` : "—"],
-    ["Hydrierung läuft", layer._gearBoxGeometryHydrationPending ? "ja" : "nein"],
-    ["Geladene ADM1-Länderchunks", state.naturalEarthAdmin1CountryChunkCache.size || "—"],
-    ["Fehlende Beispiele", layer.matchPreview?.missing?.length ? layer.matchPreview.missing.join(", ") : "—"],
-  ].forEach(([label, value]) => {
-    const row = document.createElement("div");
-    row.className = "layer-meta-row";
-    const key = document.createElement("span");
-    key.textContent = label;
-    const val = document.createElement("strong");
-    val.textContent = String(value);
-    row.append(key, val);
-    table.append(row);
-  });
-  section.append(table);
-  return section;
+}
+
+function setStatisticApplyButtonState(button, stateName, label = "") {
+  if (!button) return;
+  if (stateName === "busy") {
+    button.disabled = true;
+    button.classList.add("is-applying");
+    button.setAttribute("aria-busy", "true");
+    button.dataset.previousLabel = getTemplateButtonLabel(button) || button.dataset.previousLabel || "Änderungen übernehmen";
+    setTemplateButtonLabel(button, label || "Übernehme …");
+    return;
+  }
+  if (stateName === "confirmed") {
+    button.classList.remove("is-applying");
+    button.classList.add("is-confirmed");
+    setTemplateButtonLabel(button, label || "Übernommen");
+    return;
+  }
+  button.disabled = false;
+  button.removeAttribute("aria-busy");
+  button.classList.remove("is-applying", "is-confirmed");
+  setTemplateButtonLabel(button, label || button.dataset.previousLabel || "Änderungen übernehmen");
+}
+
+async function applyCsvCodeToStatisticLayer(layer, csvText, triggerButton = null) {
+  if (!layer) return false;
+  if (triggerButton) {
+    setStatisticApplyButtonState(triggerButton, "busy");
+  }
+  try {
+    layer.table = layer.table || {};
+    const delimiter = layer.table.delimiter || ";";
+    const parsed = parseDelimitedRows(csvText, delimiter, layer.table.hasHeader !== false);
+    layer.table.headers = parsed.headers;
+    layer.table.rows = parsed.rows;
+    layer.table.raw = serializeDelimitedRows(parsed.headers, parsed.rows, delimiter);
+
+    if (layer.origin === "search") {
+      normalizeSearchDataLayerProvenance(layer);
+      layer.valueMatches = [];
+      layer.matchPreview = {
+        ...(layer.matchPreview || {}),
+        headers: layer.table.headers || [],
+        rowCount: layer.table.rows.length,
+        boundaryCount: layer.table.rows.length,
+        matched: 0,
+        missing: [],
+        pending: true,
+      };
+      scheduleSearchResultLayerHydration(layer, { delay: 80, force: true });
+      syncMapLibreSearchHighlight({ syncAdmin1: false });
+    } else {
+      await ensureGearBoxBoundaryChunksForRows(layer.table.rows || []);
+      rebuildGearBoxDataLayerMatches(layer);
+    }
+
+    persistProjects();
+    renderProjectBrowser();
+    renderObjectEditor();
+    removeMapLibreSearchHighlightLayer();
+    requestPreviewDataLayerSync();
+    showEarthMapFeedback(`Änderungen aus dem CSV-Code wurden übernommen (${layer.table.rows.length} Zeilen).`);
+    if (triggerButton) {
+      setStatisticApplyButtonState(triggerButton, "confirmed");
+      window.setTimeout(() => {
+        setStatisticApplyButtonState(triggerButton, "idle");
+      }, 1200);
+    }
+    return true;
+  } finally {
+    if (triggerButton) {
+      if (!triggerButton.classList.contains("is-confirmed")) setStatisticApplyButtonState(triggerButton, "idle");
+    }
+  }
+}
+
+async function applyStatisticLayerProperties(layer, triggerButton = null) {
+  if (!layer) return false;
+  if (triggerButton) setStatisticApplyButtonState(triggerButton, "busy");
+  try {
+    persistStatisticLayerMutation(layer, { renderBrowser: true, renderGlobe: false, deferMapRender: false });
+    refreshDataLayerDisplayStyles(layer);
+    persistProjects();
+    state.pendingDisplayLayerIds.delete(layer.id);
+    removeMapLibreSearchHighlightLayer();
+    requestPreviewDataLayerSync();
+    renderMapHarmonyDiagnostics();
+    showEarthMapFeedback("Eigenschaften und Darstellung wurden übernommen.");
+    if (triggerButton) {
+      setStatisticApplyButtonState(triggerButton, "confirmed");
+      window.setTimeout(() => setStatisticApplyButtonState(triggerButton, "idle"), 1200);
+    }
+    return true;
+  } finally {
+    if (triggerButton && !triggerButton.classList.contains("is-confirmed")) setStatisticApplyButtonState(triggerButton, "idle");
+  }
+}
+
+function createStatisticApplyActions(onApply) {
+  const actions = document.createElement("div");
+  actions.className = "gearbox-actions statistic-apply-actions";
+  const apply = createStatisticApplyButton();
+  apply.addEventListener("click", () => onApply(apply));
+  actions.append(apply);
+  return actions;
 }
 
 function createStatisticLayerCsvEditor(layer) {
@@ -10905,39 +11620,31 @@ function createStatisticLayerCsvEditor(layer) {
   });
   const actions = document.createElement("div");
   actions.className = "gearbox-actions";
-  const check = document.createElement("button");
-  check.type = "button";
-  check.className = "secondary-button";
-  check.textContent = "Matching prüfen";
-  check.addEventListener("click", async () => {
-    check.disabled = true;
-    check.setAttribute("aria-busy", "true");
-    try {
-      await ensureGearBoxBoundaryChunksForRows(layer.table?.rows || []);
-      rebuildGearBoxDataLayerMatches(layer);
-      persistProjects();
-      renderProjectBrowser();
-      renderObjectEditor();
-      renderGlobe();
-    } finally {
-      check.disabled = false;
-      check.removeAttribute("aria-busy");
-    }
-  });
-  actions.append(check);
-  section.append(
-    actions,
-    createTextInputField("CSV-Code", layer.table?.raw || serializeDelimitedRows(layer.table?.headers || [], layer.table?.rows || [], layer.table?.delimiter || ";"), (value) => {
+  const apply = createStatisticApplyButton();
+  actions.append(apply);
+  const csvValue = layer.table?.raw || serializeDelimitedRows(layer.table?.headers || [], layer.table?.rows || [], layer.table?.delimiter || ";");
+  const csvEditor = createEarthMapCsvCodeEditor({
+    value: csvValue,
+    delimiter: layer.table?.delimiter || ";",
+    placeholder: "boundary_key;boundary_label;value;unit;source_label",
+    onInput: (value) => {
       layer.table = layer.table || {};
       layer.table.raw = value;
-      const parsed = parseDelimitedRows(value, layer.table.delimiter || ";", layer.table.hasHeader !== false);
-      layer.table.headers = parsed.headers;
-      layer.table.rows = parsed.rows;
-      rebuildGearBoxDataLayerMatches(layer);
-      persistProjects();
-      renderProjectBrowser();
-      renderGlobe();
-    }, { multiline: true }),
+    },
+    onCommit: (value) => {
+      layer.table = layer.table || {};
+      layer.table.raw = value;
+    },
+  });
+  apply.addEventListener("click", () => applyCsvCodeToStatisticLayer(layer, csvEditor.textarea.value, apply));
+  const csvField = document.createElement("div");
+  csvField.className = "structured-editor-field earthmap-csv-code-field";
+  const csvLabel = document.createElement("span");
+  csvLabel.textContent = "CSV-Code";
+  csvField.append(csvLabel, csvEditor.wrapper);
+  section.append(
+    actions,
+    csvField,
   );
   return section;
 }
@@ -11076,6 +11783,107 @@ function serializeDelimitedRows(headers = [], rows = [], delimiter = ";") {
     headers.map(escapeCell).join(delimiter),
     ...rows.map((row) => headers.map((header) => escapeCell(row?.[header] ?? "")).join(delimiter)),
   ].join("\n");
+}
+
+function parseDelimitedDisplayLine(line, delimiter = ";") {
+  const cells = [];
+  let cell = "";
+  let quoted = false;
+  const source = String(line ?? "");
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (char === "\"" && quoted && next === "\"") {
+      cell += "\"";
+      index += 1;
+    } else if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      cells.push(cell);
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell);
+  return cells;
+}
+
+function getEarthMapCsvTokenClass(header = "", index = 0) {
+  const key = String(header || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  if (key.includes("boundary") || key === "stable_id" || key === "id") return "csv-token-boundary";
+  if (key === "value" || key.includes("wert")) return "csv-token-value";
+  if (key === "unit" || key.includes("einheit")) return "csv-token-unit";
+  if (key.includes("source") || key.includes("quelle")) return "csv-token-source";
+  if (key.includes("wiki") || key.includes("iso") || key.includes("parent") || key.includes("valid") || key.includes("aggregation")) return "csv-token-meta-key";
+  return ["csv-token-boundary", "csv-token-source", "csv-token-value", "csv-token-unit"][Math.min(index, 3)] || "csv-token-source";
+}
+
+function renderHighlightedEarthMapCsvHtml(csvText, delimiter = ";") {
+  const text = String(csvText ?? "");
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  let headers = [];
+  const joinColoredCells = (cells, tokenClasses) => cells
+    .map((cell, index) => {
+      const tokenClass = tokenClasses[Math.min(index, tokenClasses.length - 1)] || "csv-token-source";
+      const prefix = index ? `<span class="csv-token-comma">${escapeDiagnosticText(delimiter)}</span>` : "";
+      return `${prefix}<span class="${tokenClass}">${escapeDiagnosticText(cell)}</span>`;
+    })
+    .join("");
+  return lines.map((line, lineIndex) => {
+    if (!line.length) return '<span class="csv-code-line"><br></span>';
+    const cells = parseDelimitedDisplayLine(line, delimiter);
+    if (lineIndex === 0) {
+      headers = cells.map((cell) => String(cell || "").trim());
+      return `<span class="csv-code-line">${joinColoredCells(cells, cells.map(() => "csv-token-header"))}</span>`;
+    }
+    if (!headers.length || cells.length < 2) {
+      return `<span class="csv-code-line"><span class="csv-token-error">${escapeDiagnosticText(line)}</span></span>`;
+    }
+    return `<span class="csv-code-line">${joinColoredCells(cells, cells.map((_, index) => getEarthMapCsvTokenClass(headers[index], index)))}</span>`;
+  }).join("");
+}
+
+function createEarthMapCsvCodeEditor(options = {}) {
+  const {
+    value = "",
+    placeholder = "",
+    delimiter = ";",
+    onInput = null,
+    onCommit = null,
+  } = options;
+  const wrapper = document.createElement("div");
+  wrapper.className = "csv-code-editor earthmap-csv-code-editor";
+
+  const highlight = document.createElement("pre");
+  highlight.className = "csv-code-highlight";
+  highlight.setAttribute("aria-hidden", "true");
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "csv-code-input";
+  textarea.spellcheck = false;
+  textarea.wrap = "off";
+  textarea.placeholder = placeholder;
+  textarea.value = String(value ?? "");
+
+  const syncHighlight = () => {
+    highlight.innerHTML = renderHighlightedEarthMapCsvHtml(textarea.value || placeholder || "", delimiter);
+    highlight.scrollTop = textarea.scrollTop;
+    highlight.scrollLeft = textarea.scrollLeft;
+  };
+
+  textarea.addEventListener("input", () => {
+    syncHighlight();
+    if (typeof onInput === "function") onInput(textarea.value);
+  });
+  textarea.addEventListener("change", () => {
+    if (typeof onCommit === "function") onCommit(textarea.value, textarea, syncHighlight);
+  });
+  textarea.addEventListener("scroll", syncHighlight);
+
+  wrapper.append(highlight, textarea);
+  syncHighlight();
+  return { wrapper, textarea, refresh: syncHighlight };
 }
 
 function getValueByPath(source, path) {
@@ -11313,7 +12121,9 @@ function getGearBoxRowMatchKeys(row, preferredTableKey = "") {
   // Statistik-Join-Regel: ISO3/Parent-Key beschreiben häufig nur den
   // übergeordneten Staat. Wenn bereits ein konkreter Boundary-Key vorhanden ist,
   // darf der Parent-Key nicht als gleichwertiger Treffer genutzt werden.
-  if (!specificValues.some((value) => normalizeSearchText(value))) {
+  const specificTextValues = specificValues.map((value) => String(value || "").trim()).filter(Boolean);
+  const specificLooksLikeAdmin0Iso3 = specificTextValues.some((value) => /^[A-Z]{3}$/i.test(value));
+  if (specificLooksLikeAdmin0Iso3 || !specificValues.some((value) => normalizeSearchText(value))) {
     [
       getGearBoxRowValue(row, "iso3"),
       getGearBoxRowValue(row, "parent_key"),
@@ -11324,8 +12134,30 @@ function getGearBoxRowMatchKeys(row, preferredTableKey = "") {
   return keys;
 }
 
+function getGearBoxRowStrongMatchKeys(row, preferredTableKey = "") {
+  const keys = new Set();
+  // Datenfluss-Regel: Starke Schlüssel sind technische Identitäten. Anzeigenamen
+  // wie boundary_label/name bleiben bewusst draußen, weil sie global nicht
+  // eindeutig sind und sonst fremde Admin1-Flächen als scheinbare Treffer laden.
+  [
+    getGearBoxRowValue(row, preferredTableKey),
+    getGearBoxRowValue(row, "boundary_key"),
+    getGearBoxRowValue(row, "stable_id"),
+    getGearBoxRowValue(row, "feature_id"),
+    getGearBoxRowValue(row, "version_id"),
+    getGearBoxRowValue(row, "provider_boundary_id"),
+    getGearBoxRowValue(row, "id"),
+    getGearBoxRowValue(row, "wikidata_id"),
+    getGearBoxRowValue(row, "iso_3166_2"),
+    getGearBoxRowValue(row, "adm1_code"),
+  ].forEach((value) => addGearBoxMatchKey(keys, value));
+  return keys;
+}
+
 function getGearBoxRowIso3Candidates(row) {
   const direct = [
+    getGearBoxRowValue(row, "boundary_key"),
+    getGearBoxRowValue(row, "stable_id"),
     getGearBoxRowValue(row, "iso3"),
     getGearBoxRowValue(row, "parent_key"),
     getGearBoxRowValue(row, "adm0_a3"),
@@ -11357,7 +12189,7 @@ function getGearBoxRowIso3Candidates(row) {
   const fromAdmin1Index = [];
   const admin1Index = getNaturalEarthAdmin1EngineIndex();
   if (admin1Index?.feature_index?.length) {
-    const rowKeys = getGearBoxRowMatchKeys(row, "");
+    const rowKeys = getGearBoxRowStrongMatchKeys(row, "");
     admin1Index.feature_index.forEach((entry) => {
       const entryKeys = new Set();
       [
@@ -11367,8 +12199,6 @@ function getGearBoxRowIso3Candidates(row) {
         entry.iso_3166_2,
         entry.adm1_code,
         entry.wikidata_id,
-        entry.title,
-        ...(Array.isArray(entry.match_keys) ? entry.match_keys : []),
       ].forEach((value) => addGearBoxMatchKey(entryKeys, value));
       for (const key of rowKeys) {
         if (entryKeys.has(key) && /^[A-Z]{3}$/.test(entry.country_iso3 || "")) {
@@ -11467,9 +12297,14 @@ function getFrenchRegionCompositeEntryForRow(row, preferredTableKey = "") {
 function findLoadedAdmin1ChunkEntryForRow(row, preferredTableKey = "") {
   const compositeEntry = getFrenchRegionCompositeEntryForRow(row, preferredTableKey);
   if (compositeEntry) return compositeEntry;
-  const rowKeys = new Set(getGearBoxRowMatchKeys(row, preferredTableKey));
+  if (!isGearBoxRowLikelyAdmin1(row)) return null;
+  const rowKeys = new Set(getGearBoxRowStrongMatchKeys(row, preferredTableKey));
   if (!rowKeys.size || !state.naturalEarthAdmin1CountryChunkCache?.size) return null;
-  for (const dataset of state.naturalEarthAdmin1CountryChunkCache.values()) {
+  const allowedIso3s = new Set(getGearBoxRowIso3Candidates(row));
+  const datasets = [...state.naturalEarthAdmin1CountryChunkCache.entries()]
+    .filter(([iso3]) => !allowedIso3s.size || allowedIso3s.has(String(iso3 || "").toUpperCase()))
+    .map(([, dataset]) => dataset);
+  for (const dataset of datasets) {
     for (const feature of dataset?.features || []) {
       if (!hasDrawableBoundaryFeature(feature)) continue;
       const featureKeys = getGearBoxFeatureMatchKeys(feature);
@@ -11509,16 +12344,46 @@ function inferGearBoxIso3CandidatesFromNames(row) {
   return [...iso3s];
 }
 
+function isGearBoxRowLikelyAdmin1(row) {
+  const explicitLevel = String(
+    getGearBoxRowValue(row, "level")
+      || getGearBoxRowValue(row, "admin_level")
+      || getGearBoxRowValue(row, "boundary_level")
+      || "",
+  ).toUpperCase();
+  if (explicitLevel === "ADM1") return true;
+  if (explicitLevel === "ADM0") return false;
+  const regionalCodes = [
+    getGearBoxRowValue(row, "iso_3166_2"),
+    getGearBoxRowValue(row, "adm1_code"),
+    getGearBoxRowValue(row, "boundary_key"),
+    getGearBoxRowValue(row, "stable_id"),
+  ]
+    .map((value) => String(value || "").trim().toUpperCase())
+    .filter(Boolean);
+  return regionalCodes.some((value) => /^[A-Z]{2}-/.test(value) || FRENCH_REGION_TO_DEPARTMENT_ISO3166[value]);
+}
+
 async function ensureGearBoxBoundaryChunksForRows(rows = []) {
   await ensureNaturalEarthSearchBaseLoaded();
+  const admin0Iso3s = new Set();
   const iso3s = new Set();
   rows.forEach((row) => {
-    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+    getGearBoxRowIso3Candidates(row).forEach((iso3) => admin0Iso3s.add(iso3));
+    if (isGearBoxRowLikelyAdmin1(row)) {
+      getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+    }
   });
+  for (const iso3 of admin0Iso3s) {
+    const entry = getNaturalEarthAdmin0EngineEntryByIso3(iso3);
+    if (entry) await loadNaturalEarthAdmin0EngineFeature(entry);
+  }
   await loadNaturalEarthAdmin1Dataset();
   rows.forEach((row) => {
-    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
-    inferGearBoxIso3CandidatesFromNames(row).forEach((iso3) => iso3s.add(iso3));
+    if (isGearBoxRowLikelyAdmin1(row)) {
+      getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+      inferGearBoxIso3CandidatesFromNames(row).forEach((iso3) => iso3s.add(iso3));
+    }
   });
   if (!iso3s.size) return;
   await Promise.all([...iso3s].map((iso3) => loadNaturalEarthAdmin1CountryChunk(iso3)));
@@ -11527,15 +12392,27 @@ async function ensureGearBoxBoundaryChunksForRows(rows = []) {
 async function ensureGearBoxBoundaryChunksForRowsInBatches(rows = [], taskContext = {}) {
   await ensureNaturalEarthSearchBaseLoaded();
   if (taskContext.shouldPause?.()) return false;
+  const admin0Iso3s = new Set();
   const iso3s = new Set();
   rows.forEach((row) => {
-    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+    getGearBoxRowIso3Candidates(row).forEach((iso3) => admin0Iso3s.add(iso3));
+    if (isGearBoxRowLikelyAdmin1(row)) {
+      getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+    }
   });
+  for (const iso3 of admin0Iso3s) {
+    if (taskContext.shouldPause?.()) return false;
+    const entry = getNaturalEarthAdmin0EngineEntryByIso3(iso3);
+    if (entry) await loadNaturalEarthAdmin0EngineFeature(entry);
+    await taskContext.yield?.();
+  }
   await loadNaturalEarthAdmin1Dataset();
   if (taskContext.shouldPause?.()) return false;
   rows.forEach((row) => {
-    getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
-    inferGearBoxIso3CandidatesFromNames(row).forEach((iso3) => iso3s.add(iso3));
+    if (isGearBoxRowLikelyAdmin1(row)) {
+      getGearBoxRowIso3Candidates(row).forEach((iso3) => iso3s.add(iso3));
+      inferGearBoxIso3CandidatesFromNames(row).forEach((iso3) => iso3s.add(iso3));
+    }
   });
   for (const iso3 of iso3s) {
     if (taskContext.shouldPause?.()) return false;
@@ -11595,6 +12472,47 @@ function getGearBoxLayerClasses(layer) {
   }));
 }
 
+function getGearBoxContextStyle(layerOrGearBox) {
+  const style = layerOrGearBox?.gearBox?.style || layerOrGearBox?.style || layerOrGearBox || {};
+  const context = style.context || {};
+  return {
+    fill: normalizeColorValue(context.fill || style.context_fill, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor(),
+    outline: normalizeColorValue(context.outline || style.context_outline, getMapSearchSelectedOutlineColor()) || getMapSearchSelectedOutlineColor(),
+  };
+}
+
+function shouldRenderSearchLayerAsSearchResult(layer) {
+  return layer?.origin === "search" && layer?.gearBox?.style?.search_result_mode !== false;
+}
+
+function getDataLayerMatchDisplayStyle(layer, match) {
+  const isSearchLayer = layer?.origin === "search";
+  const role = match?.role || (isSearchLayer ? "context" : "focus");
+  const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
+  if (isSearchLayer && renderAsSearch) {
+    const isFocus = role === "focus";
+    if (!isFocus) return getGearBoxContextStyle(layer);
+    return {
+      fill: getMapSearchSpecialHighlightColor(),
+      outline: getMapSearchSpecialOutlineColor(),
+    };
+  }
+  if (isSearchLayer) {
+    if (role !== "focus") return getGearBoxContextStyle(layer);
+    const classes = getGearBoxLayerClasses(layer);
+    const classEntry = getGearBoxClassForValue(match?.value, classes) || classes[0];
+    return {
+      fill: normalizeGearBoxClassFill(classEntry?.fill || match?.fill || "#d6ecff"),
+      outline: match?.outline || getMapSearchSpecialOutlineColor(),
+    };
+  }
+  if (role !== "focus") return getGearBoxContextStyle(layer);
+  return {
+    fill: normalizeColorValue(match?.fill, "") || "",
+    outline: match?.outline || getMapSearchSpecialOutlineColor(),
+  };
+}
+
 function rebuildGearBoxDataLayerMatches(layer) {
   if (!layer?.table) return layer;
   const rows = Array.isArray(layer.table.rows) ? layer.table.rows : [];
@@ -11617,6 +12535,7 @@ function rebuildGearBoxDataLayerMatches(layer) {
       value,
       numericValue: parseGearBoxNumber(value),
       fill: normalizeGearBoxClassFill(classEntry.fill),
+      role: getGearBoxRowValue(row, "role") || "focus",
       source: {
         label: getGearBoxRowValue(row, "source_label") || "",
         url: getGearBoxRowValue(row, "source_url") || "",
@@ -11697,6 +12616,10 @@ function buildGearBoxFromDraft(draft = ensureGearBoxDraft()) {
       base_color: draft.baseColor || "#2166ac",
       lightness_min: Number(draft.lightnessMin) || 32,
       lightness_max: Number(draft.lightnessMax) || 84,
+      context: {
+        fill: normalizeColorValue(draft.contextFill, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor(),
+        outline: normalizeColorValue(draft.contextOutline, getMapSearchSelectedOutlineColor()) || getMapSearchSelectedOutlineColor(),
+      },
       classes: getGearBoxClassesForDraft(draft).map((entry) => ({
         from: entry.from === "" ? null : Number(entry.from),
         to: entry.to === "" ? null : Number(entry.to),
@@ -11716,39 +12639,154 @@ function ensureActiveProjectForDataImport() {
   if (project) return project;
   project = normalizeProject(createEarthMapProject("EarthMap Datenprojekt"));
   state.projects.push(project);
-  state.activeProjectId = project.id;
+  setActiveProjectExclusive(project.id);
   return project;
 }
 
-function createGearBoxDataLayerFromDraft(draft = ensureGearBoxDraft()) {
+function isSearchResultCsvTable(headers = [], rows = []) {
+  const normalizedHeaders = new Set(headers.map((header) => String(header || "").toLowerCase()));
+  const hasSearchRole = normalizedHeaders.has("role");
+  const hasBoundaryKey = normalizedHeaders.has("boundary_key")
+    || normalizedHeaders.has("stable_id")
+    || normalizedHeaders.has("provider_boundary_id")
+    || normalizedHeaders.has("feature_id");
+  const hasSearchShape = normalizedHeaders.has("level")
+    || normalizedHeaders.has("feature_id")
+    || normalizedHeaders.has("stable_id");
+  const sourceLooksLikeSearch = rows.some((row) => /earthmap-suche|suchkarte|search/i.test([
+    getGearBoxRowValue(row, "source_label"),
+    getGearBoxRowValue(row, "source_note"),
+  ].join(" ")));
+  // Suchkarten dürfen Wert- und Einheitsspalten besitzen, auch wenn sie leer
+  // sind. Diese Spalten sind vorbereitete Andockpunkte für spätere Statistik-
+  // daten; sie dürfen den Import nicht in den Statistik-Renderer zwingen.
+  return hasSearchRole && hasBoundaryKey && (hasSearchShape || sourceLooksLikeSearch);
+}
+
+function getSearchResultCsvTitle(draft = {}, parsedRows = []) {
+  const draftTitle = repairLegacyText(draft.title || "").trim();
+  if (draftTitle && !/^neue statistik$/i.test(draftTitle) && !/^statistikdaten$/i.test(draftTitle)) return draftTitle;
+  const commonNote = parsedRows
+    .map((row) => repairLegacyText(getGearBoxRowValue(row, "source_note")).trim())
+    .filter(Boolean)[0];
+  if (commonNote) return commonNote;
+  return "Suchkarte aus CSV";
+}
+
+function createSearchResultDataLayerFromCsvDraft(draft = ensureGearBoxDraft(), parsed = null) {
+  const parsedTable = parsed || parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
+  const delimiter = draft.delimiter || ";";
+  const sourceNote = parsedTable.rows
+    .map((row) => repairLegacyText(getGearBoxRowValue(row, "source_note")).trim())
+    .filter(Boolean)[0] || "";
+  const titleBase = getSearchResultCsvTitle(draft, parsedTable.rows);
+  const headers = parsedTable.headers.length
+    ? parsedTable.headers.slice()
+    : ["boundary_key", "boundary_label", "role", "level", "value", "unit", "source_label", "source_url", "source_accessed_at"];
+  const rows = parsedTable.rows.map((row) => ({ ...(row || {}) }));
+  const table = {
+    format: "csv",
+    delimiter,
+    hasHeader: draft.hasHeader !== false,
+    headers,
+    rows,
+    raw: serializeDelimitedRows(headers, rows, delimiter),
+  };
+  const layer = normalizeDataLayer({
+    id: `search-layer-${slugifyBoundaryId(titleBase, "suchkarte")}-${Date.now()}`,
+    kind: "gearbox-data-layer",
+    origin: "search",
+    title: titleBase,
+    importedAt: new Date().toISOString(),
+    gearBox: {
+      schema: EARTHMAP_GEARBOX_SCHEMA,
+      id: draft.id || `gearbox-${Date.now()}`,
+      title: titleBase,
+      target_boundary_set: {
+        version_id: draft.targetBoundarySetVersionId || getActiveBoundarySet(getActiveProject())?.version_id || "",
+      },
+      input: { format: "search-csv", has_header: draft.hasHeader !== false, delimiter, encoding: "utf-8" },
+      join: { table_key: "boundary_key", boundary_key: "stable_id", normalization: { trim: true, casefold: true, remove_diacritics: true } },
+      values: [{ id: "value", table_key: "value", label: "Wert", type: draft.valueType || "number", unit: draft.valueUnit || "" }],
+      style: {
+        value_id: "value",
+        mode: "manual",
+        search_result_mode: true,
+        context: {
+          fill: getMapSearchSelectedAreaColor(),
+          outline: getMapSearchSelectedOutlineColor(),
+        },
+        classes: [
+          { from: null, to: null, fill: getMapSearchSpecialHighlightColor() },
+        ],
+      },
+      source: {
+        label: "EarthMap-Suche",
+        url: "",
+        accessed_at: new Date().toISOString().slice(0, 10),
+        note: sourceNote || titleBase,
+        origin_type: "search",
+      },
+    },
+    table,
+    valueMatches: [],
+    matchPreview: {
+      headers,
+      rowCount: rows.length,
+      boundaryCount: rows.length,
+      matched: 0,
+      missing: [],
+      pending: true,
+    },
+  });
+  ensureSearchResultTechnicalHeaders(layer);
+  layer.table.raw = serializeDelimitedRows(layer.table.headers || [], layer.table.rows || [], layer.table.delimiter || ";");
+  return layer;
+}
+
+function createGearBoxDataLayerFromDraft(draft = ensureGearBoxDraft(), options = {}) {
   const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
-  const preview = evaluateGearBoxDraft(draft);
+  const skipInitialMatching = options.skipInitialMatching === true;
+  const preview = skipInitialMatching
+    ? {
+      headers: parsed.headers,
+      rowCount: parsed.rows.length,
+      boundaryCount: getBoundaryFeatureCandidatesForGearBox().length,
+      matched: 0,
+      missing: parsed.rows.slice(0, 12).map((row) => getGearBoxRowValue(row, draft.tableKey || "boundary_key") || getGearBoxRowValue(row, "boundary_label") || "—"),
+      pending: true,
+    }
+    : evaluateGearBoxDraft(draft);
   const classes = getGearBoxClassesForDraft(draft);
   const boundaryKey = draft.boundaryKey || "stable_id";
   const tableKey = draft.tableKey || getPreferredGearBoxTableKey(parsed.headers);
   const valueKey = draft.valueKey || getPreferredGearBoxValueKey(parsed.headers, tableKey);
-  const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), boundaryKey);
-  const valueMatches = parsed.rows.flatMap((row) => {
-    const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, tableKey, { requireDrawable: true });
-    const value = getGearBoxRowValue(row, valueKey);
-    const classEntry = getGearBoxClassForValue(value, classes);
-    if (!entry || !classEntry) return [];
-    return [{
-      boundaryKey: getGearBoxRowValue(row, tableKey),
-      featureId: entry.feature.id || entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
-      stable_id: entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
-      value,
-      numericValue: parseGearBoxNumber(value),
-      fill: normalizeGearBoxClassFill(classEntry.fill),
-      source: {
-        label: getGearBoxRowValue(row, "source_label") || "",
-        url: getGearBoxRowValue(row, "source_url") || "",
-        accessed_at: getGearBoxRowValue(row, "source_accessed_at") || "",
-        note: getGearBoxRowValue(row, "source_note") || "",
-      },
-      feature: entry.feature,
-    }];
-  });
+  let valueMatches = [];
+  if (!skipInitialMatching) {
+    const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), boundaryKey);
+    valueMatches = parsed.rows.flatMap((row) => {
+      const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, tableKey, { requireDrawable: true });
+      const value = getGearBoxRowValue(row, valueKey);
+      const classEntry = getGearBoxClassForValue(value, classes);
+      if (!entry || !classEntry) return [];
+      return [{
+        boundaryKey: getGearBoxRowValue(row, tableKey),
+        featureId: entry.feature.id || entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
+        stable_id: entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
+        value,
+        numericValue: parseGearBoxNumber(value),
+        fill: normalizeGearBoxClassFill(classEntry.fill),
+        role: getGearBoxRowValue(row, "role") || "focus",
+        source: {
+          label: getGearBoxRowValue(row, "source_label") || "",
+          url: getGearBoxRowValue(row, "source_url") || "",
+          accessed_at: getGearBoxRowValue(row, "source_accessed_at") || "",
+          note: getGearBoxRowValue(row, "source_note") || "",
+        },
+        feature: entry.feature,
+      }];
+    });
+  }
   return normalizeDataLayer({
     id: `data-layer-${slugifyBoundaryId(draft.title || "gearbox")}-${Date.now()}`,
     kind: "gearbox-data-layer",
@@ -11776,14 +12814,14 @@ async function importGearBoxCsvDraftToProject() {
   }
   const project = ensureActiveProjectForDataImport();
   const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
-  await ensureGearBoxBoundaryChunksForRows(parsed.rows);
-  const layer = createGearBoxDataLayerFromDraft(draft);
-  if (!layer.valueMatches.length) {
-    evaluateGearBoxDraft(draft);
-    renderGearBoxPanel();
-    window.alert("Die Werte wurden noch nicht importiert, weil keine Tabellenzeile einer Karte zugeordnet werden konnte. Bitte Matching-Felder und Boundary-Schlüssel prüfen.");
-    return;
-  }
+  const isSearchImport = isSearchResultCsvTable(parsed.headers, parsed.rows);
+  // Importregel: Das CSV ist ein Dokumentbestandteil und wird sofort im Projekt
+  // gespeichert. Das potenziell teure Matching/Hydrieren der Boundary-Geometrien
+  // läuft anschließend im Hintergrund. So blockiert ein großes Datenblatt nicht
+  // den Browser und verschwindet nicht, nur weil die Karten-Engine noch arbeitet.
+  const layer = isSearchImport
+    ? createSearchResultDataLayerFromCsvDraft(draft, parsed)
+    : createGearBoxDataLayerFromDraft(draft, { skipInitialMatching: true });
   project.dataLayers = Array.isArray(project.dataLayers) ? project.dataLayers : [];
   project.dataLayers.push(layer);
   project.activeLibraryItemId = layer.id;
@@ -11800,8 +12838,15 @@ async function importGearBoxCsvDraftToProject() {
   if (!persistProjects()) {
     window.alert("Der Datenlayer wurde im aktuellen Projekt angelegt, konnte aber nicht dauerhaft gespeichert werden. Bitte Browser-Speicher prüfen.");
   }
+  scheduleHeavyMapLayerWorkActivation(250);
+  window.setTimeout(() => {
+    if (isSearchImport) scheduleSearchResultLayerHydration(layer, { delay: 120 });
+    else scheduleGearBoxLayerGeometryHydration(layer, { force: true });
+    renderProjectBrowser();
+    renderGearBoxPanel();
+  }, 120);
   renderWorkspace();
-  renderGlobe();
+  requestPreviewDataLayerSync();
 }
 
 function getGearBoxAdminLevelChoices() {
@@ -11924,10 +12969,10 @@ function createGearBoxStyleEditor(draft, options = {}) {
   const section = document.createElement("div");
   section.className = "gearbox-style-editor";
   const title = document.createElement("h4");
-  title.textContent = "Darstellung";
+  title.textContent = "Focus-Elemente";
   const description = document.createElement("p");
   description.className = "structured-editor-field-help";
-  description.textContent = "Lege fest, welche Wertebereiche wie auf der Karte markiert werden.";
+  description.textContent = "Lege fest, welche Wertebereiche für Focus-Elemente wie auf der Karte markiert werden.";
   section.append(title, description);
   section.append(
     createSelectField("Farbzuweisung", draft.styleMode || "manual", [
@@ -12016,6 +13061,34 @@ function createGearBoxStyleEditor(draft, options = {}) {
     notifyChange();
   });
   section.append(classList, add);
+  return section;
+}
+
+function createGearBoxContextStyleEditor(draft, options = {}) {
+  const notifyChange = () => {
+    if (typeof options.onChange === "function") {
+      options.onChange(draft);
+      return;
+    }
+    renderGearBoxPanel();
+    scheduleGlobeRender();
+  };
+  const section = document.createElement("div");
+  section.className = "gearbox-style-editor gearbox-context-style-editor";
+  const title = document.createElement("h4");
+  title.textContent = "Context-Elemente";
+  const description = document.createElement("p");
+  description.className = "structured-editor-field-help";
+  description.textContent = "Diese eine Einstellung gilt für alle Context-Elemente dieser Karte. Die Rolle kommt aus der Spalte „role“.";
+  section.append(
+    title,
+    description,
+    createColorPickerField("Context-Farbe", draft.contextFill || getMapSearchSelectedAreaColor(), (value) => {
+      draft.contextFill = normalizeColorValue(value, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor();
+      draft.contextOutline = getMapSearchSelectedOutlineColor();
+      notifyChange();
+    }, { fallback: getMapSearchSelectedAreaColor() }),
+  );
   return section;
 }
 
@@ -12109,17 +13182,18 @@ function createGearBoxCreatePanel() {
   return panel;
 }
 
-function syncGearBoxLayerAfterTableEdit(layer, { rerender = false } = {}) {
+function syncGearBoxLayerTableRaw(layer) {
   if (!layer?.table) return;
   const headers = Array.isArray(layer.table.headers) ? layer.table.headers : [];
   const rows = Array.isArray(layer.table.rows) ? layer.table.rows : [];
   layer.table.raw = serializeDelimitedRows(headers, rows, layer.table.delimiter || ";");
-  rebuildGearBoxDataLayerMatches(layer);
   persistProjects();
-  renderProjectBrowser();
-  updateMapSearchAvailability();
-  renderGlobe();
-  if (rerender) renderGearBoxPanel();
+}
+
+async function applyStatisticLayerValues(layer, triggerButton = null) {
+  if (!layer?.table) return false;
+  const raw = serializeDelimitedRows(layer.table.headers || [], layer.table.rows || [], layer.table.delimiter || ";");
+  return applyCsvCodeToStatisticLayer(layer, raw, triggerButton);
 }
 
 function getGearBoxVisibleValueHeaders(headers = []) {
@@ -12160,7 +13234,9 @@ function createGearBoxValuesTable(layer) {
 
   const hint = document.createElement("p");
   hint.className = "structured-editor-field-help";
-  hint.textContent = "Änderungen an Werten oder Quellen werden direkt in den Datenlayer übernommen und auf der Karte neu dargestellt.";
+  hint.textContent = "Änderungen an Werten oder Quellen werden zuerst in den CSV-Code geschrieben. Mit „Änderungen übernehmen“ werden Wertetabelle, Matching und Karte neu aufgebaut.";
+
+  const applyActions = createStatisticApplyActions((button) => applyStatisticLayerValues(layer, button));
 
   const tableWrap = document.createElement("div");
   tableWrap.className = "gearbox-values-table-wrap";
@@ -12196,7 +13272,7 @@ function createGearBoxValuesTable(layer) {
       input.placeholder = header;
       input.addEventListener("change", () => {
         rowData[header] = input.value.trim();
-        syncGearBoxLayerAfterTableEdit(layer);
+        syncGearBoxLayerTableRaw(layer);
       });
       if (String(header).toLowerCase() === "boundary_key") {
         td.className = "gearbox-boundary-key-cell";
@@ -12229,7 +13305,8 @@ function createGearBoxValuesTable(layer) {
     addButton.addEventListener("click", () => {
       const nextRow = Object.fromEntries(headers.map((header) => [header, ""]));
       rows.splice(rowIndex + 1, 0, nextRow);
-      syncGearBoxLayerAfterTableEdit(layer, { rerender: true });
+      syncGearBoxLayerTableRaw(layer);
+      renderGearBoxPanel();
     });
     const removeButton = document.createElement("button");
     removeButton.type = "button";
@@ -12239,7 +13316,8 @@ function createGearBoxValuesTable(layer) {
     removeButton.addEventListener("click", () => {
       rows.splice(rowIndex, 1);
       if (!rows.length) rows.push(Object.fromEntries(headers.map((header) => [header, ""])));
-      syncGearBoxLayerAfterTableEdit(layer, { rerender: true });
+      syncGearBoxLayerTableRaw(layer);
+      renderGearBoxPanel();
     });
     actionCell.append(addButton, removeButton);
     tr.append(actionCell);
@@ -12257,18 +13335,12 @@ function createGearBoxValuesTable(layer) {
   addRow.textContent = "Zeile hinzufügen";
   addRow.addEventListener("click", () => {
     rows.push(Object.fromEntries(headers.map((header) => [header, ""])));
-    syncGearBoxLayerAfterTableEdit(layer, { rerender: true });
+    syncGearBoxLayerTableRaw(layer);
+    renderGearBoxPanel();
   });
-  const rebuild = document.createElement("button");
-  rebuild.type = "button";
-  rebuild.className = "secondary-button";
-  rebuild.textContent = "Matching neu prüfen";
-  rebuild.addEventListener("click", () => {
-    syncGearBoxLayerAfterTableEdit(layer, { rerender: true });
-  });
-  actions.append(addRow, rebuild);
+  actions.append(addRow);
 
-  panel.append(title, hint, tableWrap, actions);
+  panel.append(title, hint, applyActions, tableWrap, actions);
   return panel;
 }
 
@@ -12302,6 +13374,22 @@ function createGearBoxDraftValuesTable(draft = ensureGearBoxDraft()) {
     draft.csvCode = serializeDelimitedRows(headers, rows, draft.delimiter || ";");
     evaluateGearBoxDraft(draft);
   };
+
+  const applyActions = document.createElement("div");
+  applyActions.className = "gearbox-actions statistic-apply-actions";
+  const applyValues = createStatisticApplyButton();
+  applyValues.addEventListener("click", async () => {
+    setStatisticApplyButtonState(applyValues, "busy");
+    try {
+      persistRows();
+      await importGearBoxCsvDraftToProject();
+      setStatisticApplyButtonState(applyValues, "confirmed");
+      window.setTimeout(() => setStatisticApplyButtonState(applyValues, "idle"), 1200);
+    } finally {
+      if (!applyValues.classList.contains("is-confirmed")) setStatisticApplyButtonState(applyValues, "idle");
+    }
+  });
+  applyActions.append(applyValues);
 
   const tableWrap = document.createElement("div");
   tableWrap.className = "gearbox-values-table-wrap";
@@ -12394,34 +13482,8 @@ function createGearBoxDraftValuesTable(draft = ensureGearBoxDraft()) {
     persistRows();
     renderGearBoxPanel();
   });
-  const check = document.createElement("button");
-  check.type = "button";
-  check.className = "secondary-button";
-  check.textContent = "Matching prüfen";
-  check.addEventListener("click", async () => {
-    check.disabled = true;
-    check.setAttribute("aria-busy", "true");
-    await ensureGearBoxBoundaryChunksForRows(rows);
-    persistRows();
-    renderGearBoxPanel();
-  });
-  const importValues = document.createElement("button");
-  importValues.type = "button";
-  importValues.className = "secondary-button";
-  importValues.textContent = "Werte importieren";
-  importValues.addEventListener("click", async () => {
-    importValues.disabled = true;
-    importValues.setAttribute("aria-busy", "true");
-    try {
-      persistRows();
-      await importGearBoxCsvDraftToProject();
-    } finally {
-      importValues.disabled = false;
-      importValues.removeAttribute("aria-busy");
-    }
-  });
-  actions.append(addRow, check, importValues);
-  panel.append(title, tableWrap, actions);
+  actions.append(addRow);
+  panel.append(title, applyActions, tableWrap, actions);
   return panel;
 }
 
@@ -12481,39 +13543,38 @@ function renderGearBoxPanel() {
     importButton.className = "secondary-button";
     importButton.textContent = "CSV/JSON-Datei laden";
     importButton.addEventListener("click", () => ui.gearBoxCsvFileInput?.click());
-    const checkButton = document.createElement("button");
-    checkButton.type = "button";
-    checkButton.className = "secondary-button";
-    checkButton.textContent = "Matching prüfen";
-    checkButton.addEventListener("click", async () => {
-      checkButton.disabled = true;
-      checkButton.setAttribute("aria-busy", "true");
-      const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
-      await ensureGearBoxBoundaryChunksForRows(parsed.rows);
-      evaluateGearBoxDraft(draft);
-      renderGearBoxPanel();
+    const applyButton = createStatisticApplyButton();
+    actions.append(importButton, applyButton);
+    panel.append(actions);
+    const csvEditor = createEarthMapCsvCodeEditor({
+      value: draft.csvCode,
+      delimiter: draft.delimiter || ";",
+      placeholder: "boundary_key;boundary_label;value;unit;source_label\nDE-BW;Baden-Württemberg;4.2;%;Destatis",
+      onInput: (value) => {
+        draft.csvCode = value;
+      },
+      onCommit: (value) => {
+        draft.csvCode = value;
+      },
     });
-    const saveButton = document.createElement("button");
-    saveButton.type = "button";
-    saveButton.className = "secondary-button";
-    saveButton.textContent = "Werte importieren";
-    saveButton.addEventListener("click", async () => {
-      saveButton.disabled = true;
-      saveButton.setAttribute("aria-busy", "true");
+    applyButton.addEventListener("click", async () => {
+      setStatisticApplyButtonState(applyButton, "busy");
       try {
+        draft.csvCode = csvEditor.textarea.value;
         await importGearBoxCsvDraftToProject();
+        setStatisticApplyButtonState(applyButton, "confirmed");
       } finally {
-        saveButton.disabled = false;
-        saveButton.removeAttribute("aria-busy");
+        window.setTimeout(() => {
+          setStatisticApplyButtonState(applyButton, "idle");
+        }, 1200);
       }
     });
-    actions.append(importButton, checkButton, saveButton);
-    panel.append(actions);
-    panel.append(createTextInputField("CSV-Code", draft.csvCode, (value) => {
-      draft.csvCode = value;
-      evaluateGearBoxDraft(draft);
-      renderGearBoxPanel();
-    }, { multiline: true, placeholder: "ags;wert\n13003;8,4" }));
+    const csvField = document.createElement("div");
+    csvField.className = "structured-editor-field earthmap-csv-code-field";
+    const csvLabel = document.createElement("span");
+    csvLabel.textContent = "CSV-Code";
+    csvField.append(csvLabel, csvEditor.wrapper);
+    panel.append(csvField);
   }
 
   const preview = draft.matchPreview || evaluateGearBoxDraft(draft);
@@ -12534,8 +13595,8 @@ function renderWorkspace() {
   renderProjectBrowser();
   renderLibraryBrowser();
   renderBoundaryEditor();
-  renderBackgroundMapList();
   renderObjectEditor();
+  renderBackgroundMapList();
   renderCollectionImportEditor();
   renderGearBoxPanel();
   updateEditorModeView();
@@ -12544,7 +13605,6 @@ function renderWorkspace() {
 
 function getEditorTabForLibraryItem(item) {
   if (item?.kind === "boundary-collection") return "collections";
-  if (item?.kind === "continental-map") return "background";
   return "gearbox";
 }
 
@@ -12622,7 +13682,7 @@ async function openNaturalEarthArchiveItemEditor(datasetId, archiveKey) {
   state.activeArchiveItem = item;
   state.activeEditorItemId = archiveKey;
   state.activeEditorChapterKey = state.activeEditorChapterKey || "";
-  state.previousToolEditorTab = "background";
+  state.previousToolEditorTab = "gearbox";
   setEditorTab("properties", { mode: "archive-object" });
   renderProjectBrowser();
   renderObjectEditor();
@@ -12635,7 +13695,7 @@ function openProjectEditor(project = getActiveProject()) {
   state.activeArchiveItem = null;
   state.activeEditorItemId = `project:${project.id}`;
   state.activeEditorChapterKey = state.activeEditorChapterKey || "";
-  state.previousToolEditorTab = "background";
+  state.previousToolEditorTab = "gearbox";
   setEditorTab("properties", { mode: "project" });
   renderObjectEditor();
   updateEditorModeView();
@@ -12648,7 +13708,7 @@ function openSubfolderEditor(project, folderType, subfolderId) {
     : getLibraryFolder(project, folderType);
   const subfolder = (folder?.subfolders || []).find((candidate) => candidate.id === subfolderId);
   if (!folder || !subfolder) return;
-  state.activeProjectId = project.id;
+  setActiveProjectExclusive(project.id);
   state.activeSubfolderRef = { projectId: project.id, folderType, subfolderId };
   state.activeArchiveItem = null;
   state.activeEditorItemId = `subfolder:${project.id}:${folderType}:${subfolderId}`;
@@ -13441,7 +14501,7 @@ function ensureActiveProjectForSearchSave() {
   if (!normalizedTitle) return null;
   project = normalizeProject(createEarthMapProject(normalizedTitle));
   state.projects.push(project);
-  state.activeProjectId = project.id;
+  setActiveProjectExclusive(project.id);
   return project;
 }
 
@@ -13554,32 +14614,120 @@ function getBoundaryTechnicalDetails(rowData = {}, layer = null, rowIndex = -1) 
   ].map(([label, value]) => [label, repairLegacyText(value == null ? "" : String(value)).trim() || "—"]);
 }
 
-function openBoundaryKeyDetailsDialog(rowData = {}, layer = null, rowIndex = -1) {
-  const details = getBoundaryTechnicalDetails(rowData, layer, rowIndex);
-  const dialog = document.createElement("dialog");
-  dialog.className = "boundary-key-details-dialog";
+function getBoundaryDetailsMatch(rowData = {}, layer = null, rowIndex = -1) {
+  const boundaryKey = getGearBoxRowValue(rowData, "boundary_key");
+  return Array.isArray(layer?.valueMatches)
+    ? (layer.valueMatches[rowIndex]
+      || layer.valueMatches.find((candidate) => normalizeSearchText(candidate?.boundaryKey) === normalizeSearchText(boundaryKey))
+      || null)
+    : null;
+}
 
-  const title = document.createElement("h3");
-  title.textContent = "Boundary-Key: technische Details";
-  const intro = document.createElement("p");
-  intro.textContent = "Der sichtbare Schlüssel bleibt lesbar. Diese Übersicht zeigt die technischen Referenzen, über die EarthMap die Kartenfläche eindeutig zuordnet.";
+function getBoundaryDetailsFeature(rowData = {}, layer = null, rowIndex = -1) {
+  const match = getBoundaryDetailsMatch(rowData, layer, rowIndex);
+  if (match?.feature) return match.feature;
+  const boundaryKey = getGearBoxRowValue(rowData, "boundary_key");
+  if (!boundaryKey) return null;
+  const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), "stable_id");
+  return findGearBoxBoundaryEntryForRow(rowData, boundaryIndex, "boundary_key", { requireDrawable: false })?.feature || null;
+}
+
+async function resolveBoundaryArchiveTarget(rowData = {}, layer = null, rowIndex = -1) {
+  const feature = getBoundaryDetailsFeature(rowData, layer, rowIndex);
+  if (feature) {
+    const isAdmin1 = isNaturalEarthAdmin1Feature(feature);
+    return {
+      datasetId: isAdmin1 ? "admin_1_states_provinces" : "admin_0_countries",
+      archiveKey: isAdmin1 ? getNaturalEarthAdmin1ArchiveKey(feature) : getNaturalEarthAdmin0ArchiveKey(feature),
+    };
+  }
+
+  const rawCandidates = [
+    getGearBoxRowValue(rowData, "stable_id"),
+    getGearBoxRowValue(rowData, "feature_id"),
+    getGearBoxRowValue(rowData, "version_id"),
+    getGearBoxRowValue(rowData, "provider_boundary_id"),
+    getGearBoxRowValue(rowData, "boundary_key"),
+    getGearBoxRowValue(rowData, "iso_3166_2"),
+    getGearBoxRowValue(rowData, "adm1_code"),
+    getGearBoxRowValue(rowData, "iso3"),
+  ]
+    .map((value) => repairLegacyText(value).trim())
+    .filter(Boolean);
+
+  const explicitAdmin1 = String(getGearBoxRowValue(rowData, "level") || "").toUpperCase() === "ADM1"
+    || rawCandidates.some((value) => /^natural-earth:10m:admin1:/i.test(value) || /^[A-Z]{2}-/i.test(value));
+  if (explicitAdmin1) {
+    await loadNaturalEarthAdmin1EngineIndex();
+    const admin1Index = getNaturalEarthAdmin1EngineIndex();
+    const rowKeys = new Set();
+    rawCandidates.forEach((value) => addGearBoxMatchKey(rowKeys, value));
+    const entry = admin1Index?.feature_index?.find((candidate) => {
+      const entryKeys = new Set();
+      [
+        candidate.stable_id,
+        candidate.version_id,
+        candidate.provider_boundary_id,
+        candidate.iso_3166_2,
+        candidate.adm1_code,
+        candidate.wikidata_id,
+        candidate.title,
+        ...(Array.isArray(candidate.match_keys) ? candidate.match_keys : []),
+      ].forEach((value) => addGearBoxMatchKey(entryKeys, value));
+      for (const key of rowKeys) {
+        if (entryKeys.has(key)) return true;
+      }
+      return false;
+    });
+    if (entry?.stable_id) {
+      return { datasetId: "admin_1_states_provinces", archiveKey: entry.stable_id };
+    }
+  }
+
+  const archiveKey = rawCandidates.find((value) => /^natural-earth:10m:admin0:/i.test(value));
+  if (archiveKey) return { datasetId: "admin_0_countries", archiveKey };
+
+  const iso3 = rawCandidates.find((value) => /^[A-Z]{3}$/i.test(value));
+  const admin0Entry = iso3 ? getNaturalEarthAdmin0EngineEntryByIso3(iso3) : null;
+  if (admin0Entry?.stable_id) {
+    return { datasetId: "admin_0_countries", archiveKey: admin0Entry.stable_id };
+  }
+  return null;
+}
+
+function createTechnicalDetailValueNode(label, value, options = {}) {
+  if (typeof options.renderValue === "function") {
+    const custom = options.renderValue(label, value);
+    if (custom instanceof Node) return custom;
+  }
+  return document.createTextNode(value);
+}
+
+function openTechnicalDetailDialog({
+  title = "Technische Details",
+  intro = "",
+  details = [],
+  className = "",
+  actions = [],
+  renderValue = null,
+} = {}) {
+  const dialog = document.createElement("dialog");
+  dialog.className = ["technical-detail-dialog", "boundary-key-details-dialog", className].filter(Boolean).join(" ");
+
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  const introNode = document.createElement("p");
+  introNode.textContent = intro;
 
   const list = document.createElement("dl");
-  list.className = "boundary-key-details-list";
+  list.className = "technical-detail-list boundary-key-details-list";
   details.forEach(([label, value]) => {
+    const safeLabel = repairLegacyText(label == null ? "" : String(label)).trim() || "—";
+    const safeValue = repairLegacyText(value == null ? "" : String(value)).trim() || "—";
     const dt = document.createElement("dt");
-    dt.textContent = label;
+    dt.textContent = safeLabel;
     const dd = document.createElement("dd");
-    if (label === "Wikidata-ID" && /^Q\d+$/i.test(value)) {
-      const link = document.createElement("a");
-      link.href = `https://www.wikidata.org/wiki/${value.toUpperCase()}`;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = value.toUpperCase();
-      dd.append(link);
-    } else {
-      dd.textContent = value;
-    }
+    dd.append(createTechnicalDetailValueNode(safeLabel, safeValue, { renderValue }));
     list.append(dt, dd);
   });
 
@@ -13589,22 +14737,72 @@ function openBoundaryKeyDetailsDialog(rowData = {}, layer = null, rowIndex = -1)
   close.textContent = "Schließen";
   close.addEventListener("click", () => dialog.close());
 
-  dialog.append(title, intro, list, close);
+  const actionWrap = document.createElement("div");
+  actionWrap.className = "technical-detail-actions boundary-key-details-actions";
+  actions.forEach((action) => {
+    if (action instanceof Node) actionWrap.append(action);
+  });
+  actionWrap.append(close);
+
+  dialog.append(heading, introNode, list, actionWrap);
   dialog.addEventListener("close", () => dialog.remove());
   document.body.append(dialog);
   if (typeof dialog.showModal === "function") dialog.showModal();
   else window.alert(details.map(([label, value]) => `${label}: ${value}`).join("\n"));
+  return dialog;
+}
+
+function openBoundaryKeyDetailsDialog(rowData = {}, layer = null, rowIndex = -1) {
+  const details = getBoundaryTechnicalDetails(rowData, layer, rowIndex);
+  let dialog = null;
+  const propertiesButton = document.createElement("button");
+  propertiesButton.type = "button";
+  propertiesButton.className = "secondary-button";
+  propertiesButton.textContent = "Boundary-Eigenschaften";
+  propertiesButton.addEventListener("click", async () => {
+    propertiesButton.disabled = true;
+    propertiesButton.setAttribute("aria-busy", "true");
+    const target = await resolveBoundaryArchiveTarget(rowData, layer, rowIndex);
+    if (!target?.datasetId || !target.archiveKey) {
+      propertiesButton.disabled = false;
+      propertiesButton.removeAttribute("aria-busy");
+      window.alert("Zu diesem Boundary-Key konnte keine gespeicherte Boundary im Archivordner gefunden werden.");
+      return;
+    }
+    dialog.close();
+    await openNaturalEarthArchiveItemEditor(target.datasetId, target.archiveKey);
+  });
+
+  dialog = openTechnicalDetailDialog({
+    title: "Boundary-Key: technische Details",
+    intro: "Der sichtbare Schlüssel bleibt lesbar. Diese Übersicht zeigt die technischen Referenzen, über die EarthMap die Kartenfläche eindeutig zuordnet.",
+    details,
+    actions: [propertiesButton],
+    renderValue: (label, value) => {
+      if (label === "Wikidata-ID" && /^Q\d+$/i.test(value)) {
+        const link = document.createElement("a");
+        link.href = `https://www.wikidata.org/wiki/${value.toUpperCase()}`;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = value.toUpperCase();
+        return link;
+      }
+      return null;
+    },
+  });
 }
 
 function getSourceTechnicalDetails(rowData = {}, layer = null, rowIndex = -1) {
   const match = Array.isArray(layer?.valueMatches) ? layer.valueMatches[rowIndex] : null;
   const source = match?.source || {};
+  const layerSource = layer?.gearBox?.source || {};
   return [
     ["Quellenlabel", getGearBoxRowValue(rowData, "source_label") || source.label],
     ["URL", getGearBoxRowValue(rowData, "source_url") || source.url],
     ["Archiv-URL", getGearBoxRowValue(rowData, "archive_url") || source.archive_url],
     ["Abgerufen am", getGearBoxRowValue(rowData, "source_accessed_at") || getGearBoxRowValue(rowData, "accessed_date") || source.accessed_at],
-    ["Quellenhinweis", getGearBoxRowValue(rowData, "source_note") || source.note],
+    ["Quellenhinweis", getGearBoxRowValue(rowData, "source_note") || source.note || layerSource.note],
+    ["Herkunftstyp", layer?.origin === "search" ? "Suche" : "Statistik"],
     ["Boundary-Key", getGearBoxRowValue(rowData, "boundary_key") || match?.boundaryKey],
     ["Datensatz", layer?.title || layer?.name],
   ].map(([label, value]) => [label, repairLegacyText(value == null ? "" : String(value)).trim() || "—"]);
@@ -13612,44 +14810,23 @@ function getSourceTechnicalDetails(rowData = {}, layer = null, rowIndex = -1) {
 
 function openSourceDetailsDialog(rowData = {}, layer = null, rowIndex = -1) {
   const details = getSourceTechnicalDetails(rowData, layer, rowIndex);
-  const dialog = document.createElement("dialog");
-  dialog.className = "boundary-key-details-dialog source-details-dialog";
-
-  const title = document.createElement("h3");
-  title.textContent = "Quelle: Details";
-  const intro = document.createElement("p");
-  intro.textContent = "Die Wertetabelle zeigt nur das Quellenlabel. Hier stehen die vollständigen Quelleninformationen, die im Datensatz erhalten bleiben.";
-
-  const list = document.createElement("dl");
-  list.className = "boundary-key-details-list source-details-list";
-  details.forEach(([label, value]) => {
-    const dt = document.createElement("dt");
-    dt.textContent = label;
-    const dd = document.createElement("dd");
-    if (/^https?:\/\//i.test(value)) {
-      const link = document.createElement("a");
-      link.href = value;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = value;
-      dd.append(link);
-    } else {
-      dd.textContent = value;
-    }
-    list.append(dt, dd);
+  openTechnicalDetailDialog({
+    title: "Quelle: Details",
+    intro: "Die Wertetabelle zeigt nur das Quellenlabel. Hier stehen die vollständigen Quelleninformationen, die im Datensatz erhalten bleiben.",
+    details,
+    className: "source-details-dialog",
+    renderValue: (label, value) => {
+      if (/^https?:\/\//i.test(value)) {
+        const link = document.createElement("a");
+        link.href = value;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = value;
+        return link;
+      }
+      return null;
+    },
   });
-
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "secondary-button";
-  close.textContent = "Schließen";
-  close.addEventListener("click", () => dialog.close());
-
-  dialog.append(title, intro, list, close);
-  dialog.addEventListener("close", () => dialog.remove());
-  document.body.append(dialog);
-  if (typeof dialog.showModal === "function") dialog.showModal();
-  else window.alert(details.map(([label, value]) => `${label}: ${value}`).join("\n"));
 }
 
 function createBoundaryKeyInputControl(input, rowData, layer, rowIndex, fieldName = "boundary_key") {
@@ -13781,7 +14958,6 @@ function createSearchResultDataLayerFromHighlight(highlight) {
     "source_label",
     "source_url",
     "source_accessed_at",
-    "source_note",
     "stable_id",
     "feature_id",
     "version_id",
@@ -13801,9 +14977,9 @@ function createSearchResultDataLayerFromHighlight(highlight) {
     source_label: entry.feature?.properties?._earthMapSearchSource || "EarthMap-Suche",
     source_url: "",
     source_accessed_at: new Date().toISOString().slice(0, 10),
-    source_note: repairLegacyText(highlight?.query || ""),
     ...getSearchLayerBoundaryMetadata(entry.feature, index),
   }));
+  const searchQueryNote = repairLegacyText(highlight?.query || "");
   const valueMatches = entries.map((entry, index) => ({
     boundaryKey: rows[index].boundary_key,
     featureId: rows[index].feature_id || entry.feature.id || entry.feature.stable_id || rows[index].boundary_key,
@@ -13817,7 +14993,7 @@ function createSearchResultDataLayerFromHighlight(highlight) {
       label: rows[index].source_label,
       url: "",
       accessed_at: rows[index].source_accessed_at,
-      note: rows[index].source_note,
+      note: searchQueryNote,
     },
     feature: entry.feature,
   }));
@@ -13845,7 +15021,7 @@ function createSearchResultDataLayerFromHighlight(highlight) {
           { from: null, to: null, fill: getMapSearchSelectedAreaColor() },
         ],
       },
-      source: { label: "EarthMap-Suche", url: "", accessed_at: new Date().toISOString().slice(0, 10) },
+      source: { label: "EarthMap-Suche", url: "", accessed_at: new Date().toISOString().slice(0, 10), note: searchQueryNote, origin_type: "search" },
     },
     table: {
       format: "csv",
@@ -13870,6 +15046,7 @@ function rebuildSearchResultDataLayerMatches(layer) {
   if (!layer?.table) return layer;
   const rows = Array.isArray(layer.table.rows) ? layer.table.rows : [];
   ensureSearchResultTechnicalHeaders(layer);
+  const layerSource = layer.gearBox?.source || {};
   let rowsEnriched = false;
   const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), "stable_id");
   layer.valueMatches = rows.flatMap((row, index) => {
@@ -13878,8 +15055,16 @@ function rebuildSearchResultDataLayerMatches(layer) {
     rowsEnriched = enrichSearchResultRowFromFeature(row, entry.feature, index) || rowsEnriched;
     const role = row.role || "context";
     const isFocus = role === "focus";
-    const fill = isFocus ? getMapSearchSpecialHighlightColor() : getMapSearchSelectedAreaColor();
-    const outline = isFocus ? getMapSearchSpecialOutlineColor() : getMapSearchSelectedOutlineColor();
+    const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
+    const classes = getGearBoxLayerClasses(layer);
+    const classEntry = getGearBoxClassForValue(row.value, classes) || classes[0];
+    const contextStyle = getGearBoxContextStyle(layer);
+    const fill = renderAsSearch
+      ? (isFocus ? getMapSearchSpecialHighlightColor() : contextStyle.fill)
+      : (isFocus ? normalizeGearBoxClassFill(classEntry?.fill || "#d6ecff") : contextStyle.fill);
+    const outline = renderAsSearch
+      ? (isFocus ? getMapSearchSpecialOutlineColor() : contextStyle.outline)
+      : (isFocus ? getMapSearchSpecialOutlineColor() : contextStyle.outline);
     return [{
       boundaryKey: row.boundary_key || "",
       featureId: entry.feature.id || entry.feature.stable_id || row.boundary_key || `search-${index}`,
@@ -13893,7 +15078,7 @@ function rebuildSearchResultDataLayerMatches(layer) {
         label: row.source_label || "EarthMap-Suche",
         url: row.source_url || "",
         accessed_at: row.source_accessed_at || "",
-        note: row.source_note || "",
+        note: row.source_note || layerSource.note || "",
       },
       feature: entry.feature,
     }];
@@ -13933,10 +15118,63 @@ function getSearchResultRowIdentifierCandidates(row) {
     .filter(Boolean))];
 }
 
+function getSearchResultRowStrongIdentifierCandidates(row) {
+  const rawValues = [
+    getGearBoxRowValue(row, "boundary_key"),
+    getGearBoxRowValue(row, "stable_id"),
+    getGearBoxRowValue(row, "feature_id"),
+    getGearBoxRowValue(row, "version_id"),
+    getGearBoxRowValue(row, "provider_boundary_id"),
+    getGearBoxRowValue(row, "id"),
+    getGearBoxRowValue(row, "iso3"),
+    getGearBoxRowValue(row, "iso_3166_2"),
+    getGearBoxRowValue(row, "adm1_code"),
+    getGearBoxRowValue(row, "wikidata_id"),
+  ];
+  return [...new Set(rawValues
+    .flatMap((value) => String(value || "").split(/[,\s]+/))
+    .map((value) => repairLegacyText(value).trim())
+    .filter(Boolean))];
+}
+
 function getSearchResultRowEngineMatchKeys(row) {
   const keys = new Set(getGearBoxRowMatchKeys(row, "boundary_key"));
   getSearchResultRowIdentifierCandidates(row).forEach((value) => addGearBoxMatchKey(keys, value));
   return keys;
+}
+
+function getSearchResultRowStrongEngineMatchKeys(row) {
+  const keys = new Set(getGearBoxRowStrongMatchKeys(row, "boundary_key"));
+  getSearchResultRowStrongIdentifierCandidates(row).forEach((value) => addGearBoxMatchKey(keys, value));
+  return keys;
+}
+
+function getSearchResultRowLevel(row) {
+  return String(
+    getGearBoxRowValue(row, "level")
+      || getGearBoxRowValue(row, "admin_level")
+      || getGearBoxRowValue(row, "boundary_level")
+      || "",
+  ).trim().toUpperCase();
+}
+
+function isSearchResultRowExplicitAdmin1(row) {
+  const level = getSearchResultRowLevel(row);
+  if (level === "ADM1") return true;
+  if (level === "ADM0" || level === "COUNTRY" || level === "UNION") return false;
+  return Boolean(getGearBoxRowValue(row, "iso_3166_2") || getGearBoxRowValue(row, "adm1_code"));
+}
+
+function isSearchResultRowExplicitAdmin0(row) {
+  const level = getSearchResultRowLevel(row);
+  if (level === "ADM0" || level === "COUNTRY" || level === "UNION") return true;
+  if (level === "ADM1") return false;
+  const technicalValues = [
+    getGearBoxRowValue(row, "boundary_key"),
+    getGearBoxRowValue(row, "stable_id"),
+    getGearBoxRowValue(row, "iso3"),
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+  return technicalValues.some((value) => /^[A-Z]{3}$/.test(value));
 }
 
 async function createAdmin0SearchResultEntryFromEngineEntry(entry, taskContext = {}) {
@@ -14003,11 +15241,12 @@ async function findAdmin0SearchResultEntryForRow(row, taskContext = {}) {
 
 async function findAdmin1SearchResultEntryForRow(row, taskContext = {}) {
   if (taskContext.shouldPause?.()) return null;
+  if (!isSearchResultRowExplicitAdmin1(row)) return null;
   await loadNaturalEarthAdmin1Dataset();
   if (taskContext.shouldPause?.()) return null;
   const iso3s = new Set(getGearBoxRowIso3Candidates(row));
   const admin1Index = getNaturalEarthAdmin1EngineIndex();
-  const rowKeys = getSearchResultRowEngineMatchKeys(row);
+  const rowKeys = getSearchResultRowStrongEngineMatchKeys(row);
   if (admin1Index?.feature_index?.length) {
     admin1Index.feature_index.forEach((entry) => {
       const entryKeys = new Set();
@@ -14018,8 +15257,6 @@ async function findAdmin1SearchResultEntryForRow(row, taskContext = {}) {
         entry.iso_3166_2,
         entry.adm1_code,
         entry.wikidata_id,
-        entry.title,
-        ...(Array.isArray(entry.match_keys) ? entry.match_keys : []),
       ].forEach((value) => addGearBoxMatchKey(entryKeys, value));
       for (const key of rowKeys) {
         if (entryKeys.has(key) && /^[A-Z]{3}$/.test(entry.country_iso3 || "")) {
@@ -14045,15 +15282,14 @@ async function findSearchResultBoundaryEntryForRow(row, index = 0, taskContext =
   await ensureNaturalEarthSearchBaseLoaded();
   if (taskContext.shouldPause?.()) return null;
 
-  const level = String(getGearBoxRowValue(row, "level") || "").toUpperCase();
-  const shouldTryAdmin1 = level === "ADM1"
-    || Boolean(getGearBoxRowValue(row, "iso_3166_2"))
-    || Boolean(getGearBoxRowValue(row, "adm1_code"));
+  const shouldTryAdmin1 = isSearchResultRowExplicitAdmin1(row);
+  const shouldTryAdmin0 = isSearchResultRowExplicitAdmin0(row) || !shouldTryAdmin1;
 
   if (shouldTryAdmin1) {
     const admin1Entry = await findAdmin1SearchResultEntryForRow(row, taskContext);
     if (admin1Entry) return admin1Entry;
-  } else {
+  }
+  if (shouldTryAdmin0) {
     const admin0Entry = await findAdmin0SearchResultEntryForRow(row, taskContext);
     if (admin0Entry) return admin0Entry;
   }
@@ -14077,35 +15313,49 @@ async function findSearchResultBoundaryEntryForRow(row, index = 0, taskContext =
   return null;
 }
 
-function createSearchResultValueMatchFromEntry(row, entry, index = 0) {
+function createSearchResultValueMatchFromEntry(row, entry, index = 0, layer = null) {
   if (!entry?.feature) return null;
   enrichSearchResultRowFromFeature(row, entry.feature, index);
+  const layerSource = layer?.gearBox?.source || {};
   const role = row.role || "context";
   const isFocus = role === "focus";
+  const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
+  const classes = getGearBoxLayerClasses(layer);
+  const classEntry = getGearBoxClassForValue(row.value, classes) || classes[0];
   return {
     boundaryKey: row.boundary_key || "",
     featureId: row.feature_id || entry.feature.id || entry.feature.stable_id || row.boundary_key || `search-${index}`,
     stable_id: row.stable_id || entry.feature.stable_id || entry.feature.properties?._ziselinBoundarySetStableId || row.boundary_key || "",
     value: row.value || "",
     numericValue: parseGearBoxNumber(row.value),
-    fill: isFocus ? getMapSearchSpecialHighlightColor() : getMapSearchSelectedAreaColor(),
-    outline: isFocus ? getMapSearchSpecialOutlineColor() : getMapSearchSelectedOutlineColor(),
+    fill: renderAsSearch
+      ? (isFocus ? getMapSearchSpecialHighlightColor() : getMapSearchSelectedAreaColor())
+      : normalizeGearBoxClassFill(classEntry?.fill || "#d6ecff"),
+    outline: renderAsSearch
+      ? (isFocus ? getMapSearchSpecialOutlineColor() : getMapSearchSelectedOutlineColor())
+      : getMapSearchSelectedOutlineColor(),
     role,
     source: {
       label: row.source_label || "EarthMap-Suche",
       url: row.source_url || "",
       accessed_at: row.source_accessed_at || "",
-      note: row.source_note || "",
+      note: row.source_note || layerSource.note || "",
     },
     feature: entry.feature,
   };
 }
 
 function scheduleSearchResultLayerHydration(layer, options = {}) {
+  if (options.force === true && layer) {
+    layer._searchGeometryHydrationQueued = false;
+    layer._searchGeometryHydrationPending = false;
+  }
   if (!layer || layer._searchGeometryHydrationPending || layer._searchGeometryHydrationQueued) return;
   const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
   if (!rows.length) return;
   ensureSearchResultTechnicalHeaders(layer);
+  const hydrationRevision = (layer._searchHydrationRevision || 0) + 1;
+  layer._searchHydrationRevision = hydrationRevision;
   layer._searchGeometryHydrationQueued = true;
   const delay = Number.isFinite(Number(options.delay)) ? Math.max(0, Number(options.delay)) : 3200;
   window.setTimeout(() => {
@@ -14140,6 +15390,7 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
       };
       layer._searchHydrationLastRunAt = Date.now();
       for (let index = 0; index < rows.length; index += 1) {
+        if (layer._searchHydrationRevision !== hydrationRevision) return;
         if (taskContext.shouldPause?.()) {
           paused = true;
           break;
@@ -14154,11 +15405,12 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
           continue;
         }
         const entry = await findSearchResultBoundaryEntryForRow(row, index, taskContext);
+        if (layer._searchHydrationRevision !== hydrationRevision) return;
         if (taskContext.shouldPause?.()) {
           paused = true;
           break;
         }
-        const match = createSearchResultValueMatchFromEntry(row, entry, index);
+        const match = createSearchResultValueMatchFromEntry(row, entry, index, layer);
         if (match) matches.push(match);
         if (index % 3 === 2 || index === rows.length - 1) {
           layer.valueMatches = mergeWithPreviousDrawableMatches();
@@ -14182,6 +15434,7 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
           }
         }
       }
+      if (layer._searchHydrationRevision !== hydrationRevision) return;
       layer.valueMatches = paused ? mergeWithPreviousDrawableMatches() : matches.slice();
       layer._searchHydrationLastMatched = layer.valueMatches.length;
       layer._searchHydrationLastMissing = Math.max(0, rows.length - layer.valueMatches.length);
@@ -14220,8 +15473,15 @@ function rehydrateSavedSearchLayers(project = getActiveProject(), options = {}) 
     // Start-/Refresh-Regel: gespeicherte Suchkarten dürfen den ersten Globus
     // nicht blockieren. Ihre Geometrien werden deshalb nicht synchron gegen
     // die Boundary-Indizes rekonstruiert, sondern erst im Leerlauf hydratisiert.
-    if (hasRows && (!hasDrawableMatches || (layer.valueMatches || []).length < layer.table.rows.length)) {
-      scheduleSearchResultLayerHydration(layer);
+    if (hasRows && (
+      options.forceHydration === true
+      || !hasDrawableMatches
+      || (layer.valueMatches || []).length < layer.table.rows.length
+    )) {
+      scheduleSearchResultLayerHydration(layer, {
+        force: options.forceHydration === true,
+        delay: Number.isFinite(Number(options.hydrateDelay)) ? Number(options.hydrateDelay) : undefined,
+      });
     } else if (hasDrawableMatches && options.refreshExisting === true) {
       const beforeMatches = Array.isArray(layer.valueMatches) ? layer.valueMatches.length : 0;
       const beforeRaw = layer.table?.raw || "";
@@ -15285,7 +16545,7 @@ async function addPendingBoundarySetToProject() {
     }
     state.pendingBoundarySetImport = null;
     renderWorkspace();
-    renderGlobe();
+    requestPreviewDataLayerSync();
     openLibraryItemEditor(item);
   } catch (error) {
     console.error("Komplexe Karte konnte nicht übernommen werden.", error);
@@ -15344,7 +16604,7 @@ async function addBoundaryLayerFromSearchResult(result) {
   project.activeLibraryItemId = activeItem.id;
   persistProjects();
   renderWorkspace();
-  renderGlobe();
+  requestPreviewDataLayerSync();
   openLibraryItemEditor(activeItem);
 }
 
@@ -15439,6 +16699,28 @@ ui.viewToolsDrawerTab?.addEventListener("pointercancel", () => {
 ui.graticuleToggle?.addEventListener("click", () => setGraticuleVisible(state.showGraticule !== true));
 ui.admin1Toggle?.addEventListener("click", () => setAdmin1BoundariesVisible(state.showAdmin1Boundaries !== true));
 ui.projectionToggle?.addEventListener("click", toggleMapProjectionMode);
+
+function toggleDiagnosticsConsole(kind) {
+  if (kind === "engine") state.engineDiagnosticsCollapsed = !state.engineDiagnosticsCollapsed;
+  if (kind === "harmony") state.harmonyDiagnosticsCollapsed = !state.harmonyDiagnosticsCollapsed;
+  renderMapEngineDiagnostics();
+}
+
+ui.mapDiagnosticsStack?.addEventListener("pointerdown", (event) => {
+  const diagnosticsToggle = event.target instanceof Element
+    ? event.target.closest("[data-diagnostics-toggle]")
+    : null;
+  if (!diagnosticsToggle) return;
+  event.preventDefault();
+  event.stopPropagation();
+  toggleDiagnosticsConsole(diagnosticsToggle.dataset.diagnosticsToggle);
+});
+ui.mapDiagnosticsStack?.addEventListener("click", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-diagnostics-toggle]")) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
@@ -15462,6 +16744,15 @@ document.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
+  const diagnosticsToggle = event.target instanceof Element
+    ? event.target.closest("[data-diagnostics-toggle]")
+    : null;
+  if (diagnosticsToggle) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  if (event.target instanceof Element && event.target.closest(".earthmap-diagnostics-stack")) return;
   if (event.target instanceof Element && event.target.closest(".export-control")) return;
   if (event.target instanceof Element && event.target.closest(".app-view-drawer")) return;
   if (event.target instanceof Element && event.target.closest(".project-card-menu-shell")) return;
@@ -15496,7 +16787,7 @@ ui.editorBackButton?.addEventListener("click", () => {
     renderGearBoxPanel();
     return;
   }
-  setEditorTab(state.previousToolEditorTab || "background", { mode: "tool" });
+  setEditorTab(normalizeToolEditorTab(state.previousToolEditorTab), { mode: "tool" });
 });
 
 ui.gearBoxCreateButton?.addEventListener("click", () => {
@@ -15641,10 +16932,10 @@ ui.newProjectButton?.addEventListener("click", () => {
   setBrowserActionsMenuOpen(false);
   const project = normalizeProject(createEarthMapProject());
   state.projects.push(project);
-  state.activeProjectId = project.id;
+  setActiveProjectExclusive(project.id);
   persistProjects();
+  requestProjectDataLayerSync({ forceNow: true });
   renderWorkspace();
-  renderGlobe();
 });
 ui.importBoundarySetButton?.addEventListener("click", () => {
   setBrowserActionsMenuOpen(false);
@@ -15670,7 +16961,7 @@ ui.projectBrowserList.addEventListener("click", (event) => {
     const projectCard = layerCard.closest("[data-project-id]");
     const project = state.projects.find((candidate) => candidate.id === projectCard?.dataset.projectId) || getActiveProject();
     if (!project) return;
-    state.activeProjectId = project.id;
+    setActiveProjectExclusive(project.id);
     project.activeLibraryItemId = layerCard.dataset.libraryItemId || "";
     state.openProjectBrowserMenuId = null;
     state.openFolderBrowserMenuId = null;
@@ -15678,8 +16969,8 @@ ui.projectBrowserList.addEventListener("click", (event) => {
     resetProjectDeleteHold();
     resetLayerDeleteHold();
     persistProjects();
+    requestProjectDataLayerSync();
     renderWorkspace();
-    renderGlobe();
     openLibraryItemEditor(project.activeLibraryItemId ? getActiveLibraryItem(project) : null);
     return;
   }
@@ -15694,21 +16985,22 @@ ui.projectBrowserList.addEventListener("click", (event) => {
     state.openLayerBrowserMenuId = null;
     resetProjectDeleteHold();
     resetLayerDeleteHold();
+    setActiveProjectExclusive(project.id);
     persistProjects();
     openSubfolderEditor(project, folderType, subfolderId);
-    renderGlobe();
+    requestProjectDataLayerSync();
     return;
   }
   const card = event.target.closest("[data-project-id]");
   if (!card) return;
-  state.activeProjectId = card.dataset.projectId;
+  setActiveProjectExclusive(card.dataset.projectId);
   state.openProjectBrowserMenuId = null;
   state.openFolderBrowserMenuId = null;
   state.openLayerBrowserMenuId = null;
   resetProjectDeleteHold();
   resetLayerDeleteHold();
   persistProjects();
-  rehydrateSavedSearchLayers(getActiveProject(), { persist: true });
+  requestProjectDataLayerSync({ forceNow: true });
   renderWorkspace();
   openProjectEditor(getActiveProject());
 });
@@ -15728,8 +17020,8 @@ ui.libraryBrowserList?.addEventListener("click", (event) => {
   if (!project) return;
   project.activeLibraryItemId = card.dataset.libraryItemId || "";
   persistProjects();
+  requestPreviewDataLayerSync();
   renderWorkspace();
-  renderGlobe();
   openLibraryItemEditor(getActiveLibraryItem(project));
 });
 
