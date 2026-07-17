@@ -1,0 +1,234 @@
+:root {
+  --z-button-bg: rgba(255, 255, 248, 0.58);
+  --z-button-bg-hover: rgba(255, 255, 248, 0.82);
+  --z-button-bg-active: rgba(33, 54, 51, 0.075);
+  --z-button-bg-selected: rgba(154, 100, 25, 0.12);
+  --z-button-bg-busy: rgba(33, 54, 51, 0.055);
+  --z-button-bg-confirmed: rgba(113, 166, 112, 0.16);
+  --z-button-line: var(--line, rgba(33, 54, 51, 0.14));
+  --z-button-line-hover: var(--line-strong, rgba(33, 54, 51, 0.28));
+  --z-button-line-selected: rgba(154, 100, 25, 0.34);
+  --z-button-line-confirmed: rgba(113, 166, 112, 0.72);
+  --z-button-text: var(--ink, #213633);
+  --z-button-text-muted: var(--muted, rgba(33, 54, 51, 0.52));
+  --z-button-accent: var(--amber, #f2a33a);
+  --z-button-radius: 10px;
+  --z-button-shadow-hover: 0 7px 18px rgba(33, 54, 51, 0.08);
+  --z-button-shadow-active: inset 0 1px 2px rgba(33, 54, 51, 0.12);
+}
+
+body.earthmap-theme-dark,
+body.typemap-theme-dark,
+body.timemap-theme-dark,
+body[data-theme="dark"] {
+  --z-button-bg: rgba(255, 255, 255, 0.045);
+  --z-button-bg-hover: rgba(255, 255, 255, 0.074);
+  --z-button-bg-active: rgba(255, 179, 71, 0.105);
+  --z-button-bg-selected: rgba(255, 179, 71, 0.12);
+  --z-button-bg-busy: rgba(255, 255, 255, 0.04);
+  --z-button-bg-confirmed: rgba(198, 236, 255, 0.12);
+  --z-button-line: var(--line, rgba(207, 216, 222, 0.13));
+  --z-button-line-hover: rgba(255, 179, 71, 0.48);
+  --z-button-line-selected: rgba(255, 179, 71, 0.5);
+  --z-button-line-confirmed: rgba(198, 236, 255, 0.42);
+  --z-button-text: var(--ink, #d9dee2);
+  --z-button-text-muted: var(--muted, rgba(217, 222, 226, 0.48));
+  --z-button-shadow-hover: 0 8px 20px rgba(0, 0, 0, 0.18);
+  --z-button-shadow-active: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+) {
+  border-color: var(--z-button-line);
+  background: var(--z-button-bg);
+  color: var(--z-button-text);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 120ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+:is(.secondary-button, .z-ui-button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--z-button-icon-gap, 0.48rem);
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--z-button-line);
+  border-radius: var(--z-button-radius);
+}
+
+/* Optionale Button-Icons sind Teil der gemeinsamen Vorlage.
+   Die konkrete Maske kommt aus der jeweiligen App, Größe/Abstand/Verhalten
+   bleiben dadurch aber app-übergreifend konsistent. */
+.z-button-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--z-button-icon-size, 1.05em);
+  height: var(--z-button-icon-size, 1.05em);
+  background: currentColor;
+  mask: var(--z-button-icon-mask) center / contain no-repeat;
+  -webkit-mask: var(--z-button-icon-mask) center / contain no-repeat;
+}
+
+.z-button-label {
+  min-width: 0;
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):is(:hover, :focus-visible):not(:disabled, [aria-disabled="true"]) {
+  border-color: var(--z-button-line-hover);
+  background: var(--z-button-bg-hover);
+  box-shadow: var(--z-button-shadow-hover);
+  outline: none;
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):active:not(:disabled, [aria-disabled="true"]) {
+  transform: translateY(1px) scale(0.985);
+  background: var(--z-button-bg-active);
+  box-shadow: var(--z-button-shadow-active);
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):is(.is-active, .is-selected, [aria-pressed="true"], [aria-expanded="true"]) {
+  border-color: var(--z-button-line-selected);
+  background: var(--z-button-bg-selected);
+  color: var(--z-button-accent);
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):is([aria-busy="true"], .is-applying) {
+  transform: translateY(1px) scale(0.985);
+  border-color: var(--z-button-line-hover);
+  background: var(--z-button-bg-busy);
+  box-shadow: var(--z-button-shadow-active);
+  cursor: progress;
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):is(.is-confirmed) {
+  transform: translateY(1px) scale(0.985);
+  border-color: var(--z-button-line-confirmed);
+  background: var(--z-button-bg-confirmed);
+}
+
+:is(
+  .secondary-button,
+  .z-ui-button,
+  .topbar-icon-button,
+  .header-icon-button.topbar-icon-button,
+  .app-menu-button,
+  .type-menu-button,
+  .header-icon-button.menu-button,
+  .panel-layout-button,
+  .editor-back-button,
+  .background-map-settings-button,
+  .boundary-key-details-button,
+  .z-color-choice-button
+):is(:disabled, [aria-disabled="true"]) {
+  opacity: 0.44;
+  color: var(--z-button-text-muted);
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .secondary-button,
+    .z-ui-button,
+    .topbar-icon-button,
+    .header-icon-button.topbar-icon-button,
+    .app-menu-button,
+    .type-menu-button,
+    .header-icon-button.menu-button,
+    .panel-layout-button,
+    .editor-back-button,
+    .background-map-settings-button,
+    .boundary-key-details-button,
+    .z-color-choice-button
+  ) {
+    transition: none;
+  }
+}
