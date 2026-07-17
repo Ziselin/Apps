@@ -25,6 +25,10 @@ const MAP_SEARCH_INPUT_DEBOUNCE_MS = 260;
 const MAP_SEARCH_ADMIN1_SYNC_DELAY_MS = 180;
 const earthMapLazyAssetPromises = new Map();
 
+function resetMapSearchOptionCache() {
+  mapSearchOptionCache = null;
+}
+
 const DEFAULT_LAYER_FILL_COLOR = "#c6a86a";
 const DEFAULT_LAYER_OUTLINE_COLOR = "#8f9690";
 const LIGHT_MAP_SELECTED_COLOR = "#9fa29d";
@@ -1632,7 +1636,7 @@ function loadNaturalEarthCountries10m() {
     "../assets/geojson/natural-earth/10m/ne_10m_admin_0_countries.coast-aligned.js?v=20260709b",
     () => Boolean(window.EarthMapNaturalEarthCountries10m?.features?.length),
   ).then(() => {
-    mapSearchOptionCache = null;
+    resetMapSearchOptionCache();
     return getNaturalEarthCountryDataset();
   });
 }
@@ -1645,7 +1649,7 @@ async function loadNaturalEarthAdmin0EngineIndex() {
     () => Boolean(window.EarthMapBoundarySetIndexNaturalEarth10mAdmin0?.chunks?.length),
   );
   state.naturalEarthAdmin0EngineIndex = window.EarthMapBoundarySetIndexNaturalEarth10mAdmin0 || null;
-  mapSearchOptionCache = null;
+  resetMapSearchOptionCache();
   return state.naturalEarthAdmin0EngineIndex;
 }
 
@@ -1888,7 +1892,7 @@ async function loadNaturalEarthAdmin1EngineIndex() {
     () => Boolean(window.EarthMapBoundarySetIndexNaturalEarth10mAdmin1?.chunks?.length),
   );
   state.naturalEarthAdmin1EngineIndex = window.EarthMapBoundarySetIndexNaturalEarth10mAdmin1 || null;
-  mapSearchOptionCache = null;
+  resetMapSearchOptionCache();
   return state.naturalEarthAdmin1EngineIndex;
 }
 
@@ -14372,8 +14376,13 @@ function getMapSearchOptionLabelForAdmin1Feature(feature) {
   return [getNaturalEarthAdmin1Name(feature), countryName].filter(Boolean).join("; ");
 }
 
-function getMapSearchOptionCache() {
-  if (mapSearchOptionCache) return mapSearchOptionCache;
+function getMapSearchOptionCache(options = {}) {
+  const includeAdmin1 = options.includeAdmin1 === true;
+  const cacheKey = includeAdmin1 ? "full" : "light";
+  if (!mapSearchOptionCache || Array.isArray(mapSearchOptionCache)) {
+    mapSearchOptionCache = { light: null, full: null };
+  }
+  if (mapSearchOptionCache[cacheKey]) return mapSearchOptionCache[cacheKey];
   if (!ui.mapSearchOptions) return;
   const engineIndex = getNaturalEarthAdmin0EngineIndex();
   const countryOptions = engineIndex?.chunks?.length
@@ -14385,17 +14394,19 @@ function getMapSearchOptionCache() {
       .map((feature) => getNaturalEarthCountryName(feature))
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b, "de"));
-  const admin1Options = getNaturalEarthAdmin1MetadataFeatures().flatMap((feature) => {
-    const solo = getNaturalEarthAdmin1Name(feature);
-    const scoped = getMapSearchOptionLabelForAdmin1Feature(feature);
-    return [solo, scoped].filter(Boolean);
-  });
+  const admin1Options = includeAdmin1
+    ? getNaturalEarthAdmin1MetadataFeatures().flatMap((feature) => {
+      const solo = getNaturalEarthAdmin1Name(feature);
+      const scoped = getMapSearchOptionLabelForAdmin1Feature(feature);
+      return [solo, scoped].filter(Boolean);
+    })
+    : [];
   const unionOptions = MAP_SEARCH_UNION_ALIASES.flatMap((union) => union.names.slice(0, 3));
   const countryAliasOptions = MAP_SEARCH_COUNTRY_ALIASES.flatMap((alias) => alias.names.slice(0, 3));
-  mapSearchOptionCache = [...new Set([...unionOptions, ...countryAliasOptions, ...countryOptions, ...admin1Options])]
+  mapSearchOptionCache[cacheKey] = [...new Set([...unionOptions, ...countryAliasOptions, ...countryOptions, ...admin1Options])]
     .map((value) => ({ value, needles: getSearchNeedles(value) }))
     .sort((a, b) => a.value.localeCompare(b.value, "de"));
-  return mapSearchOptionCache;
+  return mapSearchOptionCache[cacheKey];
 }
 
 function populateMapSearchOptions(query = "") {
@@ -14407,17 +14418,15 @@ function populateMapSearchOptions(query = "") {
   }
   if (!getNaturalEarthAdmin0EngineIndex()?.chunks?.length && !earthMapLazyAssetPromises.has("earthmap-engine-natural-earth-admin0-index")) {
     void loadNaturalEarthAdmin0EngineIndex().then(() => {
-      mapSearchOptionCache = null;
+      resetMapSearchOptionCache();
       populateMapSearchOptions(ui.mapSearchInput?.value || "");
     });
   }
-  if (!getNaturalEarthAdmin1EngineIndex()?.feature_index?.length && !earthMapLazyAssetPromises.has("earthmap-engine-natural-earth-admin1-index")) {
-    void loadNaturalEarthAdmin1Dataset().then(() => {
-      mapSearchOptionCache = null;
-      populateMapSearchOptions(ui.mapSearchInput?.value || "");
-    });
-  }
-  const matches = getMapSearchOptionCache()
+  const isSmallScreen = window.matchMedia?.("(max-width: 760px)")?.matches === true;
+  const includeAdmin1 = !isSmallScreen
+    && needles.some((needle) => needle.length >= 3)
+    && getNaturalEarthAdmin1MetadataFeatures().length > 0;
+  const matches = getMapSearchOptionCache({ includeAdmin1 })
     .filter((option) => needles.some((needle) => option.needles.some((value) => value.startsWith(needle) || value.includes(needle))))
     .slice(0, 28);
   ui.mapSearchOptions.replaceChildren(...matches.map(({ value }) => {
@@ -16885,8 +16894,9 @@ ui.mapSearchInput?.addEventListener("change", () => {
   void applyMapSearchQuery(ui.mapSearchInput.value);
 });
 ui.mapSearchInput?.addEventListener("input", () => {
-  populateMapSearchOptions(ui.mapSearchInput.value);
-  if (!ui.mapSearchInput.value.trim()) {
+  const query = ui.mapSearchInput.value.trim();
+  populateMapSearchOptions(query);
+  if (!query) {
     clearTimeout(mapSearchDebounceTimer);
     clearMapSearchHighlight();
     return;
@@ -16896,11 +16906,15 @@ ui.mapSearchInput?.addEventListener("input", () => {
   // Weg für bewusst gesetzte Suchbegriffe.
   clearTimeout(mapSearchDebounceTimer);
   mapSearchDebounceTimer = setTimeout(() => {
+    if (ui.mapSearchInput.value.trim().length < 2) return;
     void applyMapSearchQuery(ui.mapSearchInput.value);
   }, MAP_SEARCH_INPUT_DEBOUNCE_MS);
 });
 ui.mapSearchInput?.addEventListener("focus", () => {
-  populateMapSearchOptions(ui.mapSearchInput.value);
+  // Mobile-Performance-Regel: Fokus allein darf keine Suchindizes laden und
+  // keine große Datalist bauen. Das Antippen der Suchzeile muss sofort weich
+  // bleiben; Vorschläge entstehen erst aus echter Eingabe.
+  if (!ui.mapSearchInput.value.trim()) ui.mapSearchOptions?.replaceChildren();
 });
 
 ui.openWorkspaceButton.addEventListener("click", () => setWorkspaceMode("details"));
