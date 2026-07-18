@@ -17,6 +17,7 @@ let mapSearchDebounceTimer = null;
 let mapSearchRequestSerial = 0;
 let mapLibreAdmin1RequestSerial = 0;
 let mapLibreAdmin1ViewportTimer = null;
+let mapLibreAdmin1PendingSignature = "";
 let mapLibreInitialFullLandTimer = null;
 let mapSearchOptionCache = null;
 let wikidataMapSearchLoadingCount = 0;
@@ -82,6 +83,7 @@ const MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID = "earthmap-search-context-fill";
 const MAPLIBRE_SEARCH_FOCUS_FILL_LAYER_ID = "earthmap-search-focus-fill";
 const MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID = "earthmap-search-context-outline";
 const MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID = "earthmap-search-focus-outline";
+const MAPLIBRE_VALUE_LABEL_OVERLAY_CLASS = "earthmap-value-label-overlay";
 // Architekturregel: Boundary-Sets speichern geografische Einheiten, Geometrie,
 // Provenienz, Lizenz und Gültigkeit. GearBoxes speichern dagegen nur die
 // Übersetzung externer Tabellen auf diese Boundaries: Join-Spalten, Wertspalten,
@@ -639,6 +641,8 @@ function initializeEarthMapEditorShell() {
 initializeEarthMapEditorShell();
 
 const STORAGE_KEY = "earthmap-projects-v1";
+const STORAGE_BACKUP_KEY = "earthmap-projects-v1-backup";
+const STORAGE_EMPTY_ALLOWED_KEY = "earthmap-projects-v1-empty-allowed";
 const LEGACY_STORAGE_KEY = "globemap-projects-v1";
 const ACTIVE_PROJECT_STORAGE_KEY = "earthmap-active-project-v1";
 const THEME_STORAGE_KEY = "earthmap-theme";
@@ -1055,23 +1059,40 @@ function isGeneratedStartProject(project) {
   return project?.title === "Weltkarte · Grundmodell" && !hasLayers && boundaryMaps.length === 0;
 }
 
+function readStoredEarthMapProjects(key = STORAGE_KEY) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "null");
+    return Array.isArray(parsed?.projects) ? parsed.projects : null;
+  } catch (error) {
+    console.warn("Earth-Map-Projektspeicher konnte nicht gelesen werden.", error);
+    return null;
+  }
+}
+
 function loadProjects() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (Array.isArray(parsed?.projects)) {
-      const projects = parsed.projects.map(normalizeProject).filter((project) => !isGeneratedStartProject(project));
-      if (projects.length !== parsed.projects.length) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects }));
+    const storedProjects = readStoredEarthMapProjects(STORAGE_KEY);
+    if (Array.isArray(storedProjects)) {
+      const projects = storedProjects.map(normalizeProject).filter((project) => !isGeneratedStartProject(project));
+      // Sicherheitsregel: Laden darf niemals stillschweigend einen ehemals
+      // nicht-leeren Projektspeicher zu einer leeren Projektliste machen. In
+      // diesem Fall versuchen wir zuerst das Backup und schreiben beim Laden
+      // grundsätzlich nicht direkt zurück.
+      if (storedProjects.length && !projects.length) {
+        const backupProjects = readStoredEarthMapProjects(STORAGE_BACKUP_KEY);
+        if (Array.isArray(backupProjects) && backupProjects.length) {
+          return backupProjects.map(normalizeProject).filter((project) => !isGeneratedStartProject(project));
+        }
       }
-      // Eine bewusst gespeicherte leere Projektliste ist ein gültiger Zustand:
-      // Sie bedeutet "neutrale Start-Erde". In diesem Fall darf der alte
-      // GlobeMap-Legacy-Speicher keine gelöschten Projekte wiederbeleben.
+      // Eine gespeicherte leere Projektliste ist ein gültiger Zustand: Sie
+      // bedeutet "neutrale Start-Erde". Backups dürfen gelöschte Projekte
+      // nicht wiederbeleben und dürfen neue Projektanlagen nicht blockieren.
       return projects;
     }
-    const legacyParsed = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "null");
-    if (Array.isArray(legacyParsed?.projects) && legacyParsed.projects.length) {
-      const projects = legacyParsed.projects.map(normalizeProject).filter((project) => !isGeneratedStartProject(project));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects }));
+    const legacyProjects = readStoredEarthMapProjects(LEGACY_STORAGE_KEY);
+    if (Array.isArray(legacyProjects) && legacyProjects.length) {
+      const projects = legacyProjects.map(normalizeProject).filter((project) => !isGeneratedStartProject(project));
+      if (projects.length) localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects }));
       return projects;
     }
   } catch (error) {
@@ -1206,6 +1227,7 @@ const state = {
   backgroundTaskQueue: [],
   backgroundTaskRunning: false,
   backgroundTaskSerial: 0,
+  projectDataLayerReloadSerial: 0,
   heavyMapLayerWorkEnabled: false,
   heavyMapLayerWorkTimer: 0,
   naturalEarthLakePolygons: null,
@@ -1222,10 +1244,36 @@ const PROJECT_DELETE_HOLD_MS = 820;
 let projectDeleteHoldState = null;
 let layerDeleteHoldState = null;
 
-function persistProjects() {
+function persistProjects(options = {}) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects: state.projects.map(sanitizeProjectForStorage) }));
+    const projects = state.projects.map(sanitizeProjectForStorage);
+    const storedProjects = readStoredEarthMapProjects(STORAGE_KEY);
+    if (!projects.length && Array.isArray(storedProjects) && storedProjects.length && options.allowEmpty !== true) {
+      console.warn("Earth-Map-Projekte: Leerspeichern wurde verhindert, weil vorher Projekte vorhanden waren.");
+      showEarthMapFeedback?.("Schutz aktiviert: Projektliste wurde nicht leer überschrieben.");
+      return false;
+    }
+    // Persistenzregel: Der Primärspeicher ist autoritativ. Das Backup ist nur
+    // Rettungsnetz und darf niemals verhindern, dass neue Projekte oder
+    // gespeicherte Suchen angelegt werden. Browser-Quotas treffen zuerst das
+    // Backup; deshalb wird es bewusst best-effort geschrieben.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects }));
+    if (!projects.length && options.allowEmpty === true) {
+      localStorage.setItem(STORAGE_EMPTY_ALLOWED_KEY, "true");
+    } else if (projects.length) {
+      localStorage.removeItem(STORAGE_EMPTY_ALLOWED_KEY);
+    }
     localStorage.setItem(ACTIVE_PROJECT_STORAGE_KEY, state.activeProjectId || "");
+    if (Array.isArray(storedProjects) && storedProjects.length) {
+      try {
+        localStorage.setItem(STORAGE_BACKUP_KEY, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          projects: storedProjects,
+        }));
+      } catch (backupError) {
+        console.warn("Earth-Map-Projektbackup konnte nicht aktualisiert werden.", backupError);
+      }
+    }
     return true;
   } catch (error) {
     console.warn("Earth-Map-Projekte konnten nicht gespeichert werden.", error);
@@ -1565,6 +1613,16 @@ function waitForEarthMapIdle(timeout = 1200) {
 
 function pauseEarthMapBackgroundTasks() {
   state.backgroundTaskSerial += 1;
+}
+
+function removeEarthMapBackgroundTasksByKeyPrefix(prefixes = []) {
+  const normalizedPrefixes = prefixes.map((prefix) => String(prefix || "")).filter(Boolean);
+  if (!normalizedPrefixes.length) return 0;
+  const before = state.backgroundTaskQueue.length;
+  state.backgroundTaskQueue = state.backgroundTaskQueue.filter((entry) => (
+    !normalizedPrefixes.some((prefix) => String(entry.key || "").startsWith(prefix))
+  ));
+  return before - state.backgroundTaskQueue.length;
 }
 
 function queueEarthMapBackgroundTask(label, task, options = {}) {
@@ -2460,20 +2518,22 @@ function refreshActiveProjectDataLayerDisplayStyles() {
   return changed;
 }
 
-function reloadActiveProjectFromStorageForRender() {
+function reloadActiveProjectFromStorageForRender(options = {}) {
   const activeProjectId = state.activeProjectId;
   const activeEditorItemId = state.activeEditorItemId;
   const activeChapterKey = state.activeEditorChapterKey;
   const hydrateNow = state.previewDataLayerSyncHydrateNow === true;
   state.previewDataLayerSyncHydrateNow = false;
-  state.projects = loadProjects();
-  state.activeProjectId = state.projects.some((project) => project.id === activeProjectId)
-    ? activeProjectId
-    : loadActiveProjectId(state.projects);
-  state.activeEditorItemId = activeEditorItemId;
-  state.activeEditorChapterKey = activeChapterKey;
+  if (options.skipStorageReload !== true) {
+    state.projects = loadProjects();
+    state.activeProjectId = state.projects.some((project) => project.id === activeProjectId)
+      ? activeProjectId
+      : loadActiveProjectId(state.projects);
+    state.activeEditorItemId = activeEditorItemId;
+    state.activeEditorChapterKey = activeChapterKey;
+  }
   const project = getActiveProject();
-  if (project) {
+  if (project && options.skipSavedSearchHydration !== true) {
     rehydrateSavedSearchLayers(project, {
       persist: false,
       refreshExisting: true,
@@ -2488,8 +2548,14 @@ function rebuildProjectDataLayerForRender(layer) {
   if (!layer || layer.kind !== "gearbox-data-layer") return false;
   if (layer.origin === "search") {
     rebuildSearchResultDataLayerMatches(layer);
-    if ((layer.valueMatches || []).some((match) => !hasDrawableBoundaryFeature(match?.feature))) {
-      scheduleSearchResultLayerHydration(layer, { delay: 40, force: true });
+    const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+    const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+    // Gespeicherte Suchkarten können nach einem Reload zunächst gar keine
+    // Matches besitzen. Dann reicht die alte Prüfung auf "kaputte Matches"
+    // nicht aus: Auch "noch keine zeichnungsfähigen Matches" muss die
+    // Hydration starten, sonst bleiben mehrere sichtbare Suchreihen leer.
+    if (rows.length && drawableMatches.length < rows.length) {
+      scheduleSearchResultLayerHydration(layer, { delay: 40 });
     }
   } else {
     rebuildGearBoxDataLayerMatches(layer);
@@ -2513,11 +2579,192 @@ function rebuildActiveProjectDataLayersForRender() {
   return changed;
 }
 
+function prepareProjectDataLayerRenderReload(layers = []) {
+  const activeLayers = layers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false);
+  if (!activeLayers.length) return 0;
+  const reloadSerial = state.projectDataLayerReloadSerial + 1;
+  state.projectDataLayerReloadSerial = reloadSerial;
+  // Vollreload-Regel: Sobald die Renderansicht betreten wird, gehören alte
+  // Such-/Statistik-Jobs nicht mehr zur Wahrheit. Sie werden aus der Queue
+  // entfernt und laufende Jobs über Serial/Revision entwertet. Nur die
+  // Engine-Grundlayer bleiben unberührt.
+  pauseEarthMapBackgroundTasks();
+  removeEarthMapBackgroundTasksByKeyPrefix(["search-layer-hydrate-", "gearbox-hydrate-"]);
+  activeLayers.forEach((layer) => {
+    layer._projectDataLayerReloadSerial = reloadSerial;
+    if (layer.origin === "search") {
+      const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+      const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+      layer._searchGeometryHydrationQueued = false;
+      layer._searchGeometryHydrationPending = false;
+      layer._searchHydrationRevision = (layer._searchHydrationRevision || 0) + 1;
+      layer._searchHydrationScheduleToken = "";
+      layer._searchHydrationActiveToken = "";
+      layer._searchHydrationLastMatched = drawableMatches.length;
+      layer._searchHydrationLastMissing = Math.max(0, rows.length - drawableMatches.length);
+      // Renderwechsel darf kein Abriss sein: vorhandene, bereits aufgelöste
+      // Boundary-Geometrien bleiben stehen. Nur fehlende Zeilen werden
+      // danach hydratisiert. Das verhindert die leere Zwischenlage
+      // "gespeicherte Zeilen · 0/0 drawable" bei größeren Suchkarten.
+      layer.valueMatches = drawableMatches;
+      layer.matchPreview = {
+        ...(layer.matchPreview || {}),
+        headers: layer.table?.headers || [],
+        rowCount: rows.length,
+        matched: drawableMatches.length,
+        missing: rows
+          .filter((row) => !drawableMatches.some((match) => doesSearchResultMatchRow(match, row)))
+          .slice(0, 12)
+          .map((row) => row.boundary_key || row.boundary_label || "—"),
+        pending: drawableMatches.length < rows.length,
+      };
+    } else {
+      const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+      const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+      layer._gearBoxGeometryHydrationPending = false;
+      layer._gearBoxGeometryHydrationLastAttemptAt = 0;
+      layer._gearBoxHydrationRevision = (layer._gearBoxHydrationRevision || 0) + 1;
+      layer.valueMatches = drawableMatches;
+      layer.matchPreview = {
+        ...(layer.matchPreview || {}),
+        headers: layer.table?.headers || [],
+        rowCount: rows.length,
+        matched: drawableMatches.length,
+        pending: drawableMatches.length < rows.length,
+      };
+    }
+  });
+  state.backgroundTaskRunning = false;
+  return reloadSerial;
+}
+
+function reloadVisibleProjectDataLayersForRender(project = getActiveProject(), options = {}) {
+  const layers = Array.isArray(project?.dataLayers)
+    ? project.dataLayers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false)
+    : [];
+  if (!layers.length) return false;
+  const reloadSerial = options.reloadSerial || prepareProjectDataLayerRenderReload(layers);
+  let searchDelay = Number.isFinite(Number(options.searchDelay)) ? Math.max(0, Number(options.searchDelay)) : 0;
+  layers.forEach((layer) => {
+    // Renderwechsel-Regel: Die Projektkarten sind die fachliche Darstellung,
+    // die Engine-Grundlayer nur der Hintergrund. Beim Wechsel in den Renderer
+    // werden daher alle sichtbaren Projektkarten neu an ihre Tabellen und
+    // Boundary-Geometrien gekoppelt; so hängt die Anzeige nicht mehr an
+    // schwer durchschaubaren Pending-/Cache-Bedingungen.
+    if (layer.origin === "search") {
+      const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+      const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+      const needsGeometryHydration = rows.length && drawableMatches.length < rows.length;
+      if (needsGeometryHydration) {
+        scheduleSearchResultLayerHydration(layer, {
+          force: options.force === true,
+          delay: searchDelay,
+          reloadSerial,
+        });
+        searchDelay += 110;
+      } else {
+        layer._searchHydrationLastMatched = drawableMatches.length;
+        layer._searchHydrationLastMissing = 0;
+        layer.matchPreview = {
+          ...(layer.matchPreview || {}),
+          headers: layer.table?.headers || [],
+          rowCount: rows.length,
+          matched: drawableMatches.length,
+          missing: [],
+          pending: false,
+        };
+      }
+    } else {
+      const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+      const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+      if (rows.length && drawableMatches.length < rows.length) {
+        scheduleGearBoxLayerGeometryHydration(layer, {
+          force: options.force === true,
+          reloadSerial,
+        });
+      } else {
+        layer.matchPreview = {
+          ...(layer.matchPreview || {}),
+          headers: layer.table?.headers || [],
+          rowCount: rows.length,
+          matched: drawableMatches.length,
+          pending: false,
+        };
+      }
+    }
+  });
+  ensureVisibleSearchLayersHydratedForRender(project, {
+    reloadSerial,
+    attempts: 8,
+  });
+  return true;
+}
+
+function ensureVisibleSearchLayersHydratedForRender(project = getActiveProject(), options = {}) {
+  const reloadSerial = Number(options.reloadSerial) || state.projectDataLayerReloadSerial || 0;
+  const attempt = Number(options.attempt) || 0;
+  const maxAttempts = Number.isFinite(Number(options.attempts)) ? Math.max(1, Number(options.attempts)) : 6;
+  const layers = Array.isArray(project?.dataLayers)
+    ? project.dataLayers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false)
+    : [];
+  if (!layers.length) return false;
+  const incompleteLayers = layers.filter((layer) => {
+    if (layer.visible === false) return false;
+    if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return false;
+    const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+    if (!rows.length) return false;
+    const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+    return drawableMatches.length < rows.length;
+  });
+  if (!incompleteLayers.length) {
+    syncMapLibreSearchHighlight({ syncAdmin1: false });
+    renderMapHarmonyDiagnostics();
+    return true;
+  }
+  if (attempt >= maxAttempts) {
+    renderMapHarmonyDiagnostics();
+    return false;
+  }
+  const delay = Math.min(2200, 520 + attempt * 360);
+  window.setTimeout(() => {
+    const now = Date.now();
+    const stillIncomplete = incompleteLayers.filter((layer) => {
+      if (layer.visible === false) return false;
+      if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return false;
+      const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+      const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+      return rows.length && drawableMatches.length < rows.length;
+    });
+    stillIncomplete.forEach((layer, index) => {
+      const lastActivityAt = Math.max(
+        Number(layer._searchHydrationScheduledAt) || 0,
+        Number(layer._searchHydrationLastRunAt) || 0,
+        Number(layer._searchHydrationPausedAt) || 0,
+      );
+      const looksStale = !lastActivityAt || now - lastActivityAt > 2600;
+      if ((layer._searchGeometryHydrationPending || layer._searchGeometryHydrationQueued) && !looksStale) return;
+      scheduleSearchResultLayerHydration(layer, {
+        force: true,
+        delay: index * 90,
+        reloadSerial,
+      });
+    });
+    syncMapLibreSearchHighlight({ syncAdmin1: false });
+    renderMapHarmonyDiagnostics();
+    ensureVisibleSearchLayersHydratedForRender(project, {
+      reloadSerial,
+      attempts: maxAttempts,
+      attempt: attempt + 1,
+    });
+  }, delay);
+  return true;
+}
+
 function isEarthMapPreviewMode() {
   return !ui.globeApp?.classList.contains("workspace-mode-details");
 }
 
-function flushPreviewDataLayerSync({ forceReinstall = false } = {}) {
+function flushPreviewDataLayerSync({ forceReinstall = false, reloadActiveLayers = false } = {}) {
   if (!state.previewDataLayerSyncRequested && !forceReinstall) return false;
   if (!isEarthMapPreviewMode()) return false;
   const map = mapLibreEngineState.map;
@@ -2531,10 +2778,36 @@ function flushPreviewDataLayerSync({ forceReinstall = false } = {}) {
   // erneut gematcht, Styles erneut auf Matches projiziert und die MapLibre-
   // Source neu installiert. Der Button "Änderungen übernehmen" ist damit ein
   // echter Commit und kein bloßes Formular-Update.
+  let shouldHydrateSearchNow = state.previewDataLayerSyncHydrateNow === true || reloadActiveLayers === true;
+  let renderReloadSerial = 0;
   const resync = () => {
+    const forceSearchHydration = shouldHydrateSearchNow;
+    shouldHydrateSearchNow = false;
     map.resize?.();
-    reloadActiveProjectFromStorageForRender();
+    reloadActiveProjectFromStorageForRender({
+      skipSavedSearchHydration: reloadActiveLayers === true,
+      skipStorageReload: reloadActiveLayers === true,
+    });
     rebuildActiveProjectDataLayersForRender();
+    if (reloadActiveLayers === true) {
+      if (!renderReloadSerial) {
+        const project = getActiveProject();
+        const layers = Array.isArray(project?.dataLayers)
+          ? project.dataLayers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false)
+          : [];
+        renderReloadSerial = prepareProjectDataLayerRenderReload(layers);
+      }
+      reloadVisibleProjectDataLayersForRender(getActiveProject(), {
+        force: forceSearchHydration,
+        searchDelay: forceSearchHydration ? 0 : 120,
+        reloadSerial: renderReloadSerial,
+      });
+    } else {
+      hydrateVisibleSavedSearchLayers(getActiveProject(), {
+        force: forceSearchHydration,
+        delay: forceSearchHydration ? 0 : 120,
+      });
+    }
     syncMapLibreSearchHighlight({ syncAdmin1: false, forceReinstall: true });
     orderMapLibreReadableBoundaryLayers();
     renderMapHarmonyDiagnostics();
@@ -2582,7 +2855,8 @@ function setWorkspaceMode(mode) {
   if (mode !== "details") {
     window.requestAnimationFrame?.(() => {
       applyPendingDisplayLayerChanges();
-      flushPreviewDataLayerSync({ forceReinstall: true });
+      state.previewDataLayerSyncHydrateNow = true;
+      flushPreviewDataLayerSync({ forceReinstall: true, reloadActiveLayers: true });
     });
   }
 }
@@ -3811,6 +4085,72 @@ function removeMapLibrePilotAdmin1Layer() {
   mapLibreEngineState.admin1LayerVisible = false;
 }
 
+function upsertMapLibreGeoJsonSource(sourceId, geojson) {
+  const map = mapLibreEngineState.map;
+  if (!map || !sourceId || !geojson) return false;
+  const data = cloneGeoJsonForMapLibre(geojson);
+  const source = map.getSource?.(sourceId);
+  if (source?.setData) {
+    source.setData(data);
+    return true;
+  }
+  map.addSource(sourceId, {
+    type: "geojson",
+    data,
+  });
+  return true;
+}
+
+function addMapLibreLayerIfMissing(layerDefinition, beforeLayerId = undefined) {
+  const map = mapLibreEngineState.map;
+  if (!map || !layerDefinition?.id) return false;
+  if (map.getLayer?.(layerDefinition.id)) return false;
+  map.addLayer(layerDefinition, beforeLayerId);
+  return true;
+}
+
+function refreshMapLibrePilotLandPaint() {
+  const map = mapLibreEngineState.map;
+  if (!map) return;
+  const renderStyle = getContinentalRenderStyle();
+  const coastlineWidth = isEarthMapDarkMode() ? 1.25 : 1;
+  if (map.getLayer?.(MAPLIBRE_LAND_FILL_LAYER_ID)) {
+    map.setPaintProperty?.(MAPLIBRE_LAND_FILL_LAYER_ID, "fill-color", renderStyle.land);
+    map.setPaintProperty?.(MAPLIBRE_LAND_FILL_LAYER_ID, "fill-opacity", 1);
+  }
+  if (map.getLayer?.(MAPLIBRE_COASTLINE_LAYER_ID)) {
+    map.setPaintProperty?.(MAPLIBRE_COASTLINE_LAYER_ID, "line-color", renderStyle.outline);
+    map.setPaintProperty?.(MAPLIBRE_COASTLINE_LAYER_ID, "line-width", coastlineWidth);
+    map.setPaintProperty?.(MAPLIBRE_COASTLINE_LAYER_ID, "line-opacity", 1);
+  }
+  mapLibreEngineState.coastlineColor = renderStyle.outline;
+  mapLibreEngineState.coastlineWidth = coastlineWidth;
+}
+
+function commitMapLibrePilotLandCollection(geojson, label = "natural-earth-10m-land-committed") {
+  // Engine-Regel: Landfüllung und Küstenlinie dürfen nie aus verschiedenen
+  // Detailständen stammen. Die Natural-Earth-Pipeline baut ihre 10m-Ableitungen
+  // in Commit-Schritten; jeder fertige Commit wird deshalb direkt auf dieselbe
+  // MapLibre-GeoJSON-Source geschrieben, die sowohl Fill als auch Line speist.
+  const map = mapLibreEngineState.map;
+  if (!map || !mapLibreEngineState.styleLoaded || !geojson?.features?.length) return false;
+  const source = map.getSource?.(MAPLIBRE_LAND_SOURCE_ID);
+  const hasLandLayers = Boolean(map.getLayer?.(MAPLIBRE_LAND_FILL_LAYER_ID))
+    && Boolean(map.getLayer?.(MAPLIBRE_COASTLINE_LAYER_ID));
+  if (!source?.setData || !hasLandLayers) return false;
+  const startedAt = performance.now();
+  source.setData(cloneGeoJsonForMapLibre(geojson));
+  refreshMapLibrePilotLandPaint();
+  mapLibreEngineState.landSource = label;
+  mapLibreEngineState.landFeatureCount = geojson.features.length;
+  mapLibreEngineState.landLoadMs = performance.now() - startedAt;
+  mapLibreEngineState.status = "ready";
+  mapLibreEngineState.error = "";
+  orderMapLibreReadableBoundaryLayers();
+  updateMapLibreDiagnosticsFrame();
+  return true;
+}
+
 function getMapLibrePilotWaterGeoJson() {
   if (mapLibreEngineState.waterGeoJson?.features?.length) {
     return cloneGeoJsonForMapLibre(mapLibreEngineState.waterGeoJson);
@@ -4253,6 +4593,7 @@ function installMapLibrePilotAdmin0Layer() {
     mapLibreEngineState.error = "";
     syncMapLibreSearchHighlight();
     void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
+    orderMapLibreReadableBoundaryLayers();
     updateMapLibreDiagnosticsFrame();
     return true;
   } catch (error) {
@@ -4288,7 +4629,7 @@ function requestMapLibrePilotAdmin0Layer() {
         mapLibreEngineState.error = error?.message || String(error);
         renderMapEngineDiagnostics();
       });
-  }, 900);
+  }, 120);
 }
 
 function collectMapLibreSearchFeatures(input, output = []) {
@@ -4693,16 +5034,18 @@ function getMapLibreViewportAdmin0Iso3s(options = {}) {
     .filter(Boolean);
 }
 
-function scheduleMapLibreAdmin1ViewportSync(delay = 760) {
+function scheduleMapLibreAdmin1ViewportSync(delay = 1200) {
   if (!mapLibreEngineState.active) return;
+  if (state.showAdmin1Boundaries !== true) return;
   window.clearTimeout(mapLibreAdmin1ViewportTimer);
+  const quietDelay = Math.max(620, Number(delay) || 1200);
   mapLibreAdmin1ViewportTimer = window.setTimeout(() => {
     if (isNavigatingGlobe) {
-      scheduleMapLibreAdmin1ViewportSync(900);
+      scheduleMapLibreAdmin1ViewportSync(1200);
       return;
     }
     void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
-  }, delay);
+  }, quietDelay);
 }
 
 function getMapLibreAdmin1Iso3DemandSet(includeViewport = false) {
@@ -4755,7 +5098,6 @@ function getMapLibreAdmin1Iso3DemandSet(includeViewport = false) {
 function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null) {
   const map = mapLibreEngineState.map;
   if (!map || !map.isStyleLoaded?.()) return false;
-  removeMapLibrePilotAdmin1Layer();
   if (!geojson?.features?.length) {
     updateMapLibreDiagnosticsFrame();
     return false;
@@ -4797,15 +5139,13 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     const preparedLineGeoJson = lineGeoJson?.features?.length
       ? lineGeoJson
       : createUniqueAdmin1BoundaryLineCollection(classifiedGeoJson);
-    map.addSource(MAPLIBRE_ADMIN1_SOURCE_ID, {
-      type: "geojson",
-      data: cloneGeoJsonForMapLibre(classifiedGeoJson),
-    });
-    map.addSource(MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID, {
-      type: "geojson",
-      data: cloneGeoJsonForMapLibre(preparedLineGeoJson),
-    });
-    map.addLayer({
+    // Engine-Prinzip: Render-Layer bleiben stehen, während neue Daten
+    // nachladen. Wir aktualisieren GeoJSON-Sources per setData(), statt
+    // Layer zu entfernen und wieder anzulegen. Dadurch verschwinden Admin-1-
+    // Grenzen beim Viewportwechsel nicht nervös aus der Karte.
+    upsertMapLibreGeoJsonSource(MAPLIBRE_ADMIN1_SOURCE_ID, classifiedGeoJson);
+    upsertMapLibreGeoJsonSource(MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID, preparedLineGeoJson);
+    addMapLibreLayerIfMissing({
       id: MAPLIBRE_ADMIN1_FILL_LAYER_ID,
       type: "fill",
       source: MAPLIBRE_ADMIN1_SOURCE_ID,
@@ -4816,7 +5156,7 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_FILL_LAYER_ID
       : (map.getLayer(MAPLIBRE_WATER_FILL_LAYER_ID) ? MAPLIBRE_WATER_FILL_LAYER_ID : undefined));
-    map.addLayer({
+    addMapLibreLayerIfMissing({
       id: MAPLIBRE_ADMIN1_BOUNDARY_LAYER_ID,
       type: "line",
       source: MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID,
@@ -4834,7 +5174,7 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
       : (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID) ? MAPLIBRE_WATER_OUTLINE_LAYER_ID : undefined));
-    map.addLayer({
+    addMapLibreLayerIfMissing({
       id: MAPLIBRE_ADMIN1_SPECIAL_BOUNDARY_LAYER_ID,
       type: "line",
       source: MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID,
@@ -4856,7 +5196,7 @@ function installMapLibrePilotAdmin1Layer(geojson, iso3s = [], lineGeoJson = null
     }, map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)
       ? MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID
       : (map.getLayer(MAPLIBRE_WATER_OUTLINE_LAYER_ID) ? MAPLIBRE_WATER_OUTLINE_LAYER_ID : undefined));
-    map.addLayer({
+    addMapLibreLayerIfMissing({
       id: MAPLIBRE_ADMIN1_SWISS_CANTON_BOUNDARY_LAYER_ID,
       type: "line",
       source: MAPLIBRE_ADMIN1_BOUNDARY_SOURCE_ID,
@@ -5008,12 +5348,15 @@ function orderMapLibreReadableBoundaryLayers() {
 async function syncMapLibreAdmin1LayerForSearch(options = {}) {
   const map = mapLibreEngineState.map;
   if (!map || !map.isStyleLoaded?.()) return;
+  if (state.showAdmin1Boundaries !== true) {
+    syncMapLibreAdmin1Visibility();
+    return;
+  }
   const includeViewport = options.includeViewport === true;
   const zoom = map.getZoom?.() ?? getMapLibreZoomFromGlobeZoom();
   if (includeViewport && zoom >= MAPLIBRE_ADMIN1_VIEWPORT_LOAD_ZOOM && !getNaturalEarthAdmin0EngineIndex()?.chunks?.length) {
     await loadNaturalEarthAdmin0EngineIndex();
   }
-  const requestSerial = ++mapLibreAdmin1RequestSerial;
   const viewportIso3s = includeViewport ? getMapLibreViewportAdmin0Iso3s() : [];
   const permanentViewportIso3s = includeViewport ? getMapLibreViewportAdmin0Iso3s({
     minZoom: MAPLIBRE_ADMIN1_PERMANENT_VIEWPORT_ZOOM,
@@ -5047,15 +5390,28 @@ async function syncMapLibreAdmin1LayerForSearch(options = {}) {
     orderMapLibreReadableBoundaryLayers();
     return;
   }
+  if (signature === mapLibreAdmin1PendingSignature) {
+    syncMapLibreAdmin1Visibility();
+    return;
+  }
+  mapLibreAdmin1PendingSignature = signature;
+  // Engine-Prinzip: Nur eine echte Signaturänderung erzeugt eine neue
+  // Admin-1-Arbeitseinheit. Kamera- oder Renderereignisse mit derselben
+  // Anforderung dürfen laufende Chunks nicht entwerten.
   const startedAt = performance.now();
+  const requestSerial = ++mapLibreAdmin1RequestSerial;
   mapLibreEngineState.status = "loading-admin1";
   mapLibreEngineState.error = `Admin-1 wird geladen (${mapLibreEngineState.admin1DemandMode}): ${signature}`;
   renderMapEngineDiagnostics();
   const features = [];
   const lineFeatures = [];
   for (const iso3 of iso3s) {
-    if (requestSerial !== mapLibreAdmin1RequestSerial) return;
+    if (requestSerial !== mapLibreAdmin1RequestSerial) {
+      if (mapLibreAdmin1PendingSignature === signature) mapLibreAdmin1PendingSignature = "";
+      return;
+    }
     if (includeViewport && isNavigatingGlobe) {
+      if (mapLibreAdmin1PendingSignature === signature) mapLibreAdmin1PendingSignature = "";
       scheduleMapLibreAdmin1ViewportSync(520);
       return;
     }
@@ -5069,7 +5425,10 @@ async function syncMapLibreAdmin1LayerForSearch(options = {}) {
     // bis MVT/PMTiles diese Zwischenstufe später ganz ersetzt.
     await waitForNextFrame();
   }
-  if (requestSerial !== mapLibreAdmin1RequestSerial) return;
+  if (requestSerial !== mapLibreAdmin1RequestSerial) {
+    if (mapLibreAdmin1PendingSignature === signature) mapLibreAdmin1PendingSignature = "";
+    return;
+  }
   mapLibreEngineState.admin1LoadMs = performance.now() - startedAt;
   installMapLibrePilotAdmin1Layer({
     type: "FeatureCollection",
@@ -5082,6 +5441,7 @@ async function syncMapLibreAdmin1LayerForSearch(options = {}) {
   });
   mapLibreEngineState.status = "ready";
   mapLibreEngineState.error = "";
+  if (mapLibreAdmin1PendingSignature === signature) mapLibreAdmin1PendingSignature = "";
   renderMapEngineDiagnostics();
 }
 
@@ -5216,6 +5576,7 @@ function getMapLibreSearchHighlightFeatureCollection() {
 function removeMapLibreSearchHighlightLayer() {
   const map = mapLibreEngineState.map;
   if (!map) return;
+  clearMapLibreValueLabelOverlay();
   [
     MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID,
     MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID,
@@ -5248,6 +5609,36 @@ function setMapLibreSearchHighlightFeatureCounts(features = []) {
   mapLibreEngineState.searchHighlightFocusFeatures = features.filter((feature) => feature?.properties?._earthMapSearchRole === "focus").length;
 }
 
+function getMapLibreSearchContextOutlineFilter() {
+  return [
+    "all",
+    ["!=", ["get", "_earthMapSearchRole"], "focus"],
+    // Statistikflächen sind thematische Füllungen. Ihre Grenzen dürfen nicht
+    // noch einmal in der Klassenfarbe gezeichnet werden; die politische
+    // Struktur kommt ausschließlich aus den normalen Admin0/Admin1-Layern.
+    ["!=", ["get", "_earthMapDisplaySource"], "statistics"],
+  ];
+}
+
+function getMapLibreSearchFocusOutlineFilter() {
+  return [
+    "all",
+    ["==", ["get", "_earthMapSearchRole"], "focus"],
+    ["!=", ["get", "_earthMapDisplaySource"], "statistics"],
+  ];
+}
+
+function refreshMapLibreSearchOutlineFilters() {
+  const map = mapLibreEngineState.map;
+  if (!map?.getLayer || !map?.setFilter) return;
+  if (map.getLayer(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID)) {
+    map.setFilter(MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID, getMapLibreSearchContextOutlineFilter());
+  }
+  if (map.getLayer(MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID)) {
+    map.setFilter(MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID, getMapLibreSearchFocusOutlineFilter());
+  }
+}
+
 function syncMapLibreSearchHighlight(options = {}) {
   const map = mapLibreEngineState.map;
   if (!map || !map.isStyleLoaded?.()) return;
@@ -5256,7 +5647,7 @@ function syncMapLibreSearchHighlight(options = {}) {
   }
   const collection = getMapLibreSearchHighlightFeatureCollection();
   const features = collection.features || [];
-  if (!features.length) {
+    if (!features.length) {
     removeMapLibreSearchHighlightLayer();
     orderMapLibreReadableBoundaryLayers();
     updateMapLibreDiagnosticsFrame();
@@ -5266,6 +5657,8 @@ function syncMapLibreSearchHighlight(options = {}) {
     if (features.length && hasCompleteMapLibreSearchHighlightLayers()) {
       const source = map.getSource(MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID);
       source?.setData?.(cloneGeoJsonForMapLibre(collection));
+      refreshMapLibreSearchOutlineFilters();
+      updateMapLibreValueLabelOverlay();
       setMapLibreSearchHighlightFeatureCounts(features);
       mapLibreEngineState.searchHighlightSourceReady = true;
       orderMapLibreReadableBoundaryLayers();
@@ -5313,7 +5706,7 @@ function syncMapLibreSearchHighlight(options = {}) {
       id: MAPLIBRE_SEARCH_CONTEXT_OUTLINE_LAYER_ID,
       type: "line",
       source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
-      filter: ["!=", ["get", "_earthMapSearchRole"], "focus"],
+      filter: getMapLibreSearchContextOutlineFilter(),
       layout: {
         "line-cap": "round",
         "line-join": "round",
@@ -5333,7 +5726,7 @@ function syncMapLibreSearchHighlight(options = {}) {
       id: MAPLIBRE_SEARCH_FOCUS_OUTLINE_LAYER_ID,
       type: "line",
       source: MAPLIBRE_SEARCH_HIGHLIGHT_SOURCE_ID,
-      filter: ["==", ["get", "_earthMapSearchRole"], "focus"],
+      filter: getMapLibreSearchFocusOutlineFilter(),
       layout: {
         "line-cap": "round",
         "line-join": "round",
@@ -5351,6 +5744,7 @@ function syncMapLibreSearchHighlight(options = {}) {
     }, outlineBeforeId);
     setMapLibreSearchHighlightFeatureCounts(features);
     mapLibreEngineState.searchHighlightSourceReady = true;
+    updateMapLibreValueLabelOverlay();
     orderMapLibreReadableBoundaryLayers();
     if (options.syncAdmin1 !== false) {
       scheduleMapLibreAdmin1ViewportSync(MAP_SEARCH_ADMIN1_SYNC_DELAY_MS);
@@ -5457,7 +5851,6 @@ function scheduleMapLibreInitialFullLandPreload(delay = 1400) {
 
 function maybeRequestMapLibrePilotFullLandLayer(zoom = getMapLibreZoomFromGlobeZoom()) {
   if (zoom < MAPLIBRE_FULL_LAND_LOAD_ZOOM) return;
-  if (mapLibreEngineState.landSource === "natural-earth-10m-land") return;
   requestMapLibrePilotFullLandLayer();
 }
 
@@ -5797,11 +6190,225 @@ function syncMapLibreCamera() {
     maybeRequestMapLibrePilotFullLandLayer(zoom);
     maybeRequestMapLibrePilotWaterLayer(zoom);
     scheduleMapLibreAdmin1ViewportSync();
+    updateMapLibreValueLabelOverlay();
   } catch (error) {
     mapLibreEngineState.status = "camera-error";
     mapLibreEngineState.error = error?.message || String(error);
     renderMapEngineDiagnostics();
   }
+}
+
+function getMapLibreValueLabelOverlay() {
+  if (!ui.mapLibreContainer) return null;
+  let overlay = ui.mapLibreContainer.querySelector(`.${MAPLIBRE_VALUE_LABEL_OVERLAY_CLASS}`);
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = MAPLIBRE_VALUE_LABEL_OVERLAY_CLASS;
+    overlay.setAttribute("aria-hidden", "true");
+    ui.mapLibreContainer.append(overlay);
+  }
+  return overlay;
+}
+
+function clearMapLibreValueLabelOverlay() {
+  const overlay = ui.mapLibreContainer?.querySelector?.(`.${MAPLIBRE_VALUE_LABEL_OVERLAY_CLASS}`);
+  if (overlay) {
+    overlay.dataset.signature = "";
+    overlay.replaceChildren();
+  }
+}
+
+function getRingPlanarArea(ring = []) {
+  if (!Array.isArray(ring) || ring.length < 4) return 0;
+  let area = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const current = ring[index];
+    const next = ring[index + 1];
+    if (!Array.isArray(current) || !Array.isArray(next)) continue;
+    area += (Number(current[0]) || 0) * (Number(next[1]) || 0)
+      - (Number(next[0]) || 0) * (Number(current[1]) || 0);
+  }
+  return Math.abs(area / 2);
+}
+
+function getRingCentroid(ring = []) {
+  if (!Array.isArray(ring) || ring.length < 3) return null;
+  let twiceArea = 0;
+  let centroidX = 0;
+  let centroidY = 0;
+  const fallback = { x: 0, y: 0, count: 0 };
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const current = ring[index];
+    const next = ring[index + 1];
+    if (!Array.isArray(current) || !Array.isArray(next)) continue;
+    const x0 = Number(current[0]);
+    const y0 = Number(current[1]);
+    const x1 = Number(next[0]);
+    const y1 = Number(next[1]);
+    if (![x0, y0, x1, y1].every(Number.isFinite)) continue;
+    const cross = x0 * y1 - x1 * y0;
+    twiceArea += cross;
+    centroidX += (x0 + x1) * cross;
+    centroidY += (y0 + y1) * cross;
+    fallback.x += x0;
+    fallback.y += y0;
+    fallback.count += 1;
+  }
+  if (Math.abs(twiceArea) > 1e-9) {
+    return [centroidX / (3 * twiceArea), centroidY / (3 * twiceArea)];
+  }
+  return fallback.count ? [fallback.x / fallback.count, fallback.y / fallback.count] : null;
+}
+
+function collectLargestExteriorRingFromGeometry(geometry, result = { ring: null, area: 0 }) {
+  if (!geometry) return result;
+  if (geometry.type === "Polygon") {
+    const ring = geometry.coordinates?.[0];
+    const area = getRingPlanarArea(ring);
+    if (area > result.area) {
+      result.ring = ring;
+      result.area = area;
+    }
+    return result;
+  }
+  if (geometry.type === "MultiPolygon") {
+    (geometry.coordinates || []).forEach((polygon) => {
+      const ring = polygon?.[0];
+      const area = getRingPlanarArea(ring);
+      if (area > result.area) {
+        result.ring = ring;
+        result.area = area;
+      }
+    });
+    return result;
+  }
+  if (geometry.type === "GeometryCollection") {
+    (geometry.geometries || []).forEach((child) => collectLargestExteriorRingFromGeometry(child, result));
+  }
+  return result;
+}
+
+function getLargestBoundaryLabelPlacement(input) {
+  const result = { ring: null, area: 0 };
+  const collect = (featureLike) => {
+    if (!featureLike) return;
+    if (featureLike.type === "FeatureCollection") {
+      (featureLike.features || []).forEach(collect);
+      return;
+    }
+    if (featureLike.type === "Feature") collectLargestExteriorRingFromGeometry(featureLike.geometry, result);
+    else collectLargestExteriorRingFromGeometry(featureLike, result);
+  };
+  collect(input);
+  const coordinate = getRingCentroid(result.ring);
+  return coordinate ? { coordinate, area: result.area || 0 } : null;
+}
+
+function shouldShowGearBoxValuesOnMap(layer) {
+  const style = layer?.gearBox?.style || {};
+  const activeValueKey = getActiveGearBoxValueKey(layer);
+  const activeStyle = getActiveGearBoxValueStyle(style, activeValueKey);
+  return activeStyle.show_values_on_map === true || style.show_values_on_map === true;
+}
+
+function formatGearBoxValueLabelForMap(layer, match) {
+  const value = String(match?.value ?? "").trim();
+  if (!value) return "";
+  return value;
+}
+
+function getMapLibreValueLabelItems() {
+  const project = getActiveProject();
+  const labels = [];
+  (project?.dataLayers || [])
+    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false && shouldShowGearBoxValuesOnMap(layer))
+    .forEach((layer) => {
+      (layer.valueMatches || []).forEach((match) => {
+        if ((match?.role || "focus") !== "focus") return;
+        if (isGearBoxValueBlank(match?.value) || !hasDrawableBoundaryFeature(match?.feature)) return;
+        const placement = getLargestBoundaryLabelPlacement(match.feature);
+        const label = formatGearBoxValueLabelForMap(layer, match);
+        if (!placement || !label) return;
+        labels.push({
+          id: `${layer.id || "layer"}:${match.boundaryKey || match.stable_id || match.featureId || labels.length}`,
+          coordinate: placement.coordinate,
+          area: placement.area || 0,
+          label,
+        });
+      });
+    });
+  return labels.sort((a, b) => (b.area || 0) - (a.area || 0));
+}
+
+function doMapLabelBoxesOverlap(a, b, padding = 8) {
+  return !(
+    a.right + padding < b.left
+    || a.left - padding > b.right
+    || a.bottom + padding < b.top
+    || a.top - padding > b.bottom
+  );
+}
+
+function updateMapLibreValueLabelOverlay() {
+  const map = mapLibreEngineState.map;
+  if (!map || !ui.mapLibreContainer || !isEarthMapPreviewMode()) {
+    clearMapLibreValueLabelOverlay();
+    return;
+  }
+  const labels = getMapLibreValueLabelItems();
+  if (!labels.length) {
+    clearMapLibreValueLabelOverlay();
+    return;
+  }
+  const overlay = getMapLibreValueLabelOverlay();
+  if (!overlay) return;
+  const bounds = ui.mapLibreContainer.getBoundingClientRect();
+  const signature = labels
+    .map((item) => `${item.id}:${item.label}:${item.coordinate[0].toFixed(5)},${item.coordinate[1].toFixed(5)}`)
+    .join("|");
+  if (overlay.dataset.signature !== signature) {
+    const fragment = document.createDocumentFragment();
+    labels.forEach((item) => {
+      const label = document.createElement("span");
+      label.className = "earthmap-value-label";
+      label.textContent = item.label;
+      label.dataset.lon = String(item.coordinate[0]);
+      label.dataset.lat = String(item.coordinate[1]);
+      label.dataset.area = String(item.area || 0);
+      fragment.append(label);
+    });
+    overlay.dataset.signature = signature;
+    overlay.replaceChildren(fragment);
+  }
+  const occupiedBoxes = [];
+  [...overlay.children].forEach((label) => {
+    const lon = Number(label.dataset.lon);
+    const lat = Number(label.dataset.lat);
+    const projected = map.project([lon, lat]);
+    const visible = projected
+      && Number.isFinite(projected.x)
+      && Number.isFinite(projected.y)
+      && projected.x >= -80
+      && projected.y >= -40
+      && projected.x <= bounds.width + 80
+      && projected.y <= bounds.height + 40;
+    label.style.display = visible ? "inline-block" : "none";
+    if (!visible) return;
+    label.style.transform = `translate(${projected.x}px, ${projected.y}px) translate(-50%, -50%)`;
+    const width = label.offsetWidth || 0;
+    const height = label.offsetHeight || 0;
+    const box = {
+      left: projected.x - width / 2,
+      right: projected.x + width / 2,
+      top: projected.y - height / 2,
+      bottom: projected.y + height / 2,
+    };
+    if (occupiedBoxes.some((occupied) => doMapLabelBoxesOverlap(box, occupied))) {
+      label.style.display = "none";
+      return;
+    }
+    occupiedBoxes.push(box);
+  });
 }
 
 function syncMapLibreTheme() {
@@ -5825,13 +6432,13 @@ function syncMapLibreTheme() {
     map.once("styledata", () => {
       mapLibreEngineState.styleLoaded = true;
       applyMapLibreProjection();
-      installMapLibrePilotLandLayer(mapLibreEngineState.fullLandGeoJson?.features?.length ? "full" : "start");
+      installMapLibrePilotLandLayer("start");
       if (mapLibreEngineState.waterGeoJson?.features?.length) installMapLibrePilotWaterLayer();
       if (mapLibreEngineState.admin0BoundaryGeoJson?.features?.length) installMapLibrePilotAdmin0Layer();
       resyncThemeDependentLayers();
       window.requestAnimationFrame?.(resyncThemeDependentLayers);
       window.setTimeout(resyncThemeDependentLayers, 180);
-      scheduleMapLibreInitialFullLandPreload(1200);
+      scheduleNaturalEarthDetailUpdate(420);
     });
     renderMapEngineDiagnostics();
   } catch (error) {
@@ -5887,6 +6494,8 @@ function initializeMapLibreEnginePilot() {
       mapLibreEngineState.error = event?.error?.message || "MapLibre-Fehler";
       renderMapEngineDiagnostics();
     });
+    mapLibreEngineState.map.on("render", () => updateMapLibreValueLabelOverlay());
+    mapLibreEngineState.map.on("resize", () => updateMapLibreValueLabelOverlay());
   } catch (error) {
     mapLibreEngineState.status = "error";
     mapLibreEngineState.error = error?.message || String(error);
@@ -6425,8 +7034,8 @@ function getBufferedViewportBounds() {
   const viewportHalfLat = Math.asin(clamp(height / (2 * radius), 0, 1)) / DEG;
   const bufferedHalfLon = clamp(viewportHalfLon * 3, 8, 180);
   const bufferedHalfLat = clamp(viewportHalfLat * 3, 8, 90);
-  const centerLon = normalizeLongitude(-rotation.lon);
-  const centerLat = clamp(-rotation.lat, -90, 90);
+  const centerLon = normalizeLongitude(rotation.lon);
+  const centerLat = clamp(rotation.lat, -90, 90);
   const minLat = clamp(centerLat - bufferedHalfLat, -90, 90);
   const maxLat = clamp(centerLat + bufferedHalfLat, -90, 90);
   const minLon = centerLon - bufferedHalfLon;
@@ -6670,11 +7279,16 @@ function buildNaturalEarth10mTileCollection(tiles) {
   const threshold = getNaturalEarth10mDetailThreshold();
   const globalKey = getNaturalEarthGlobalTile()?.key || index?.global?.key;
   const globalCollection = window.EarthMapNaturalEarthTileData?.[`10m-land-hierarchy-${globalKey}`];
-  if (globalCollection?.features?.length) collections.push(globalCollection);
+  // Detailregel: Sichtbare Tiles haben Vorrang vor der globalen Grobfassung.
+  // Beide können dieselben Feature-IDs enthalten; wenn die globale Fassung
+  // zuerst käme, würden detaillierte Insel- und Küstenpolygone im Deduping
+  // verworfen. Die globale Fassung ist deshalb nur Fallback für nicht geladene
+  // Bereiche.
   tiles.forEach((tile) => {
     const collection = window.EarthMapNaturalEarthTileData?.[getNaturalEarth10mTileDataKey(tile)];
     if (collection?.features?.length) collections.push(collection);
   });
+  if (globalCollection?.features?.length) collections.push(globalCollection);
   collections.forEach((collection) => {
     collection.features.forEach((feature) => {
       const id = feature.properties?._earthMapFeatureId || `${feature.bbox?.join(",")}-${candidates.length}`;
@@ -6708,11 +7322,15 @@ async function buildNaturalEarth10mTileCollectionInBatches(tiles, taskContext = 
   const threshold = getNaturalEarth10mDetailThreshold();
   const globalKey = getNaturalEarthGlobalTile()?.key || index?.global?.key;
   const globalCollection = window.EarthMapNaturalEarthTileData?.[`10m-land-hierarchy-${globalKey}`];
-  if (globalCollection?.features?.length) collections.push(globalCollection);
+  // Detailregel wie im synchronen Pfad: Detail-Tiles müssen vor der globalen
+  // Start-/Fallback-Geometrie dedupliziert werden, sonst bleiben Inseln und
+  // feine Küsten zwar als Linien sichtbar, aber als Fläche auf dem groben
+  // globalen Stand.
   tiles.forEach((tile) => {
     const collection = window.EarthMapNaturalEarthTileData?.[getNaturalEarth10mTileDataKey(tile)];
     if (collection?.features?.length) collections.push(collection);
   });
+  if (globalCollection?.features?.length) collections.push(globalCollection);
 
   let processed = 0;
   for (const collection of collections) {
@@ -6797,6 +7415,12 @@ function installNaturalEarthDetail(level, geojson) {
   resetNaturalEarthSurfaceCache();
   geoState.detailLevel = level;
   installLandGeoJson(geojson);
+  if (mapLibreEngineState.active) {
+    commitMapLibrePilotLandCollection(
+      geojson,
+      geojson.name || `natural-earth-${level}-committed`,
+    );
+  }
   buildLandSamplesDeferred();
 }
 
@@ -7791,24 +8415,41 @@ function scheduleGearBoxLayerGeometryHydration(layer, options = {}) {
   if (!force && !canRunHeavyMapLayerWork()) return;
   const now = Date.now();
   if (!force && layer._gearBoxGeometryHydrationLastAttemptAt && now - layer._gearBoxGeometryHydrationLastAttemptAt < 10000) return;
+  const reloadSerial = Number(options.reloadSerial) || layer._projectDataLayerReloadSerial || 0;
+  const hydrationRevision = (layer._gearBoxHydrationRevision || 0) + 1;
+  layer._gearBoxHydrationRevision = hydrationRevision;
+  const activeToken = `${reloadSerial || "gearbox"}-${hydrationRevision}-${Date.now()}`;
+  layer._gearBoxHydrationActiveToken = activeToken;
   layer._gearBoxGeometryHydrationPending = true;
   layer._gearBoxGeometryHydrationLastAttemptAt = now;
   const hydrate = async (taskContext = {}) => {
+    if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
+    if (layer._gearBoxHydrationRevision !== hydrationRevision) return;
     if (!canRunHeavyMapLayerWork()) {
-      layer._gearBoxGeometryHydrationPending = false;
+      if (layer._gearBoxHydrationActiveToken === activeToken) {
+        layer._gearBoxGeometryHydrationPending = false;
+        layer._gearBoxHydrationActiveToken = "";
+      }
       scheduleHeavyMapLayerWorkActivation(900);
-      window.setTimeout(() => scheduleGearBoxLayerGeometryHydration(layer, { force: true }), 1100);
+      window.setTimeout(() => scheduleGearBoxLayerGeometryHydration(layer, { force: true, reloadSerial }), 1100);
       return;
     }
     try {
       const completed = await ensureGearBoxBoundaryChunksForRowsInBatches(rows, taskContext);
+      if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
+      if (layer._gearBoxHydrationRevision !== hydrationRevision) return;
       if (!completed || taskContext.shouldPause?.()) {
-        layer._gearBoxGeometryHydrationPending = false;
+        if (layer._gearBoxHydrationActiveToken === activeToken) {
+          layer._gearBoxGeometryHydrationPending = false;
+          layer._gearBoxHydrationActiveToken = "";
+        }
         layer._gearBoxGeometryHydrationLastAttemptAt = 0;
-        scheduleGearBoxLayerGeometryHydration(layer);
+        scheduleGearBoxLayerGeometryHydration(layer, { reloadSerial });
         return;
       }
       await taskContext.yield?.();
+      if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
+      if (layer._gearBoxHydrationRevision !== hydrationRevision) return;
       rebuildGearBoxDataLayerMatches(layer);
       persistProjects();
       syncMapLibreSearchHighlight({ syncAdmin1: false });
@@ -7820,7 +8461,10 @@ function scheduleGearBoxLayerGeometryHydration(layer, options = {}) {
     } catch (error) {
       console.warn("Statistik-Geometrien konnten nicht nachgeladen werden.", error);
     } finally {
-      layer._gearBoxGeometryHydrationPending = false;
+      if (layer._gearBoxHydrationActiveToken === activeToken) {
+        layer._gearBoxGeometryHydrationPending = false;
+        layer._gearBoxHydrationActiveToken = "";
+      }
     }
   };
   queueEarthMapBackgroundTask(`Statistik-Geometrien: ${layer.title || layer.id}`, hydrate, {
@@ -8524,7 +9168,7 @@ function deleteProjectById(projectId) {
     state.activeProjectId = "";
   }
   state.openProjectBrowserMenuId = null;
-  persistProjects();
+  persistProjects({ allowEmpty: true });
   renderWorkspace();
   requestProjectDataLayerSync({ forceNow: true });
 }
@@ -11260,17 +11904,31 @@ function persistStatisticLayerMutation(layer, options = {}) {
 
 function createStatisticStyleDraftFromLayer(layer) {
   const style = layer?.gearBox?.style || {};
+  const activeValueKey = getActiveGearBoxValueKey(layer);
+  const activeStyle = getActiveGearBoxValueStyle(style, activeValueKey);
   const contextStyle = style.context || {};
+  const isSearchLayer = layer?.origin === "search";
+  const usesSearchResultMode = isSearchLayer
+    && activeStyle.search_result_mode !== false
+    && (activeStyle.auto_color_mode === "search_result" || activeStyle.search_result_mode === true);
   return {
-    styleMode: style.mode || "manual",
-    autoColorMode: style.auto_color_mode || "palette",
-    baseColor: style.base_color || "#2166ac",
-    lightnessMin: style.lightness_min ?? 32,
-    lightnessMax: style.lightness_max ?? 84,
+    activeValueKey,
+    valueStyles: style.value_styles || {},
+    styleMode: usesSearchResultMode ? "automatic" : (activeStyle.mode || "manual"),
+    autoColorMode: usesSearchResultMode ? "search_result" : (activeStyle.auto_color_mode === "palette" ? "value_range" : (activeStyle.auto_color_mode || "value_range")),
+    baseColor: activeStyle.base_color || "#2166ac",
+    lightnessMin: activeStyle.lightness_min ?? 32,
+    lightnessMax: activeStyle.lightness_max ?? 84,
+    valueRangeStart: activeStyle.value_range_start ?? activeStyle.value_range?.start ?? 0,
+    valueRangeEnd: activeStyle.value_range_end ?? activeStyle.value_range?.end ?? 100,
+    valueRangeStartColor: activeStyle.value_range_start_color || activeStyle.value_range?.start_color || "#c12737",
+    valueRangeEndColor: activeStyle.value_range_end_color || activeStyle.value_range?.end_color || "#5aa469",
+    valueRangeSteps: activeStyle.value_range_steps ?? activeStyle.value_range?.steps ?? 5,
+    showValuesOnMap: activeStyle.show_values_on_map === true,
     contextFill: contextStyle.fill || style.context_fill || getMapSearchSelectedAreaColor(),
     contextOutline: contextStyle.outline || style.context_outline || getMapSearchSelectedOutlineColor(),
-    classes: Array.isArray(style.classes) && style.classes.length
-      ? style.classes.map((entry) => ({
+    classes: Array.isArray(activeStyle.classes) && activeStyle.classes.length
+      ? activeStyle.classes.map((entry) => ({
         from: entry.from == null ? "" : String(entry.from),
         to: entry.to == null ? "" : String(entry.to),
         fill: entry.fill || "#d6ecff",
@@ -11285,13 +11943,24 @@ function syncStatisticStyleDraftToLayer(layer, styleDraft) {
     return parsed == null ? null : parsed;
   };
   layer.gearBox = layer.gearBox || {};
-  layer.gearBox.style = {
-    ...(layer.gearBox.style || {}),
+  const activeValueKey = styleDraft.activeValueKey || getActiveGearBoxValueKey(layer);
+  const renderAsSearchResult = layer.origin === "search"
+    && styleDraft.styleMode === "automatic"
+    && styleDraft.autoColorMode === "search_result";
+  const previousStyle = layer.gearBox.style || {};
+  const activeValueStyle = {
     mode: styleDraft.styleMode || "manual",
-    auto_color_mode: styleDraft.autoColorMode || "palette",
+    auto_color_mode: styleDraft.autoColorMode || "value_range",
+    search_result_mode: renderAsSearchResult,
     base_color: styleDraft.baseColor || "#2166ac",
     lightness_min: Number(styleDraft.lightnessMin) || 32,
     lightness_max: Number(styleDraft.lightnessMax) || 84,
+    value_range_start: Number.isFinite(Number(styleDraft.valueRangeStart)) ? Number(styleDraft.valueRangeStart) : 0,
+    value_range_end: Number.isFinite(Number(styleDraft.valueRangeEnd)) ? Number(styleDraft.valueRangeEnd) : 100,
+    value_range_start_color: normalizeColorValue(styleDraft.valueRangeStartColor, "#c12737") || "#c12737",
+    value_range_end_color: normalizeColorValue(styleDraft.valueRangeEndColor, "#5aa469") || "#5aa469",
+    value_range_steps: clamp(Math.round(Number(styleDraft.valueRangeSteps) || 5), 2, 24),
+    show_values_on_map: styleDraft.showValuesOnMap === true,
     context: {
       fill: normalizeColorValue(styleDraft.contextFill, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor(),
       outline: normalizeColorValue(styleDraft.contextOutline, getMapSearchSelectedOutlineColor()) || getMapSearchSelectedOutlineColor(),
@@ -11301,6 +11970,19 @@ function syncStatisticStyleDraftToLayer(layer, styleDraft) {
       to: toStoredBoundary(entry.to),
       fill: normalizeColorValue(entry.fill, "#d6ecff") || "#d6ecff",
     })),
+  };
+  layer.gearBox.style = {
+    ...previousStyle,
+    active_value_key: activeValueKey,
+    value_id: slugifyBoundaryId(activeValueKey, activeValueKey),
+    value_styles: {
+      ...(previousStyle.value_styles || {}),
+      [activeValueKey]: activeValueStyle,
+    },
+    // Kompatibilitätsbrücke für ältere Render-/Exportpfade: Die aktive
+    // Wertereihe spiegelt ihre Darstellung zusätzlich auf der bisherigen
+    // flachen style-Ebene.
+    ...activeValueStyle,
   };
 }
 
@@ -11412,41 +12094,38 @@ function createStatisticPropertySections(target, mode = "draft") {
         renderGearBoxPanel();
       }
     }),
-    createSelectField("Wertspalte", isLayer ? (gearBox.values[0].table_key || "") : target.valueKey, headers.map((header) => ({ value: header, label: header })), (value) => {
-      if (isLayer) {
-        gearBox.values[0].table_key = value;
-        rerenderLayerEditor();
-      } else {
-        target.valueKey = value;
-        evaluateGearBoxDraft(target);
-        renderGearBoxPanel();
-      }
-    }),
   );
 
   const display = createEditorSection("Darstellung", "Diese Werte steuern, wie Focus- und Context-Elemente auf der Karte eingefärbt werden.", {
     key: "statistic-display",
     icon: "https://api.iconify.design/mdi/palette-outline.svg",
   });
-  if (isLayer && target.origin === "search") {
-    const searchMode = target.gearBox?.style?.search_result_mode !== false;
-    display.append(createCheckboxField("Darstellung wie Suchergebnis", searchMode, (checked) => {
+  display.append(createGearBoxStyleEditor(draft, isLayer ? {
+    allowSearchResultMode: target.origin === "search",
+    valueDefinitions: getGearBoxValueDefinitions(target),
+    onActiveValueChange: (valueKey) => {
       target.gearBox = target.gearBox || {};
       target.gearBox.style = target.gearBox.style || {};
-      target.gearBox.style.search_result_mode = checked;
+      target.gearBox.style.active_value_key = valueKey;
+      target.gearBox.style.value_id = slugifyBoundaryId(valueKey, valueKey);
       markDisplayLayerPending(target);
       persistStatisticLayerMutation(target, { renderBrowser: false, renderGlobe: false, deferMapRender: true });
       renderObjectEditor();
-    }));
-  }
-  display.append(createGearBoxStyleEditor(draft, isLayer ? {
+    },
     onChange: (styleDraft) => {
       syncStatisticStyleDraftToLayer(target, styleDraft);
       markDisplayLayerPending(target);
       persistStatisticLayerMutation(target, { renderBrowser: false, renderGlobe: false, deferMapRender: true });
       renderObjectEditor();
     },
-  } : undefined));
+  } : {
+    valueDefinitions: getGearBoxValueDefinitions(draft),
+    onActiveValueChange: (valueKey) => {
+      draft.activeValueKey = valueKey;
+      draft.valueKey = valueKey;
+      renderGearBoxPanel();
+    },
+  }));
   display.append(createGearBoxContextStyleEditor(draft, isLayer ? {
     onChange: (styleDraft) => {
       syncStatisticStyleDraftToLayer(target, styleDraft);
@@ -11543,9 +12222,18 @@ async function applyCsvCodeToStatisticLayer(layer, csvText, triggerButton = null
     layer.table = layer.table || {};
     const delimiter = layer.table.delimiter || ";";
     const parsed = parseDelimitedRows(csvText, delimiter, layer.table.hasHeader !== false);
-    layer.table.headers = parsed.headers;
+    const normalizedHeaders = ensureGearBoxValueTableHeaders(parsed.headers);
+    normalizeGearBoxValueColumns(normalizedHeaders, parsed.rows, { unit: layer?.gearBox?.values?.[0]?.unit || "" });
+    layer.table.headers = normalizedHeaders;
     layer.table.rows = parsed.rows;
-    layer.table.raw = serializeDelimitedRows(parsed.headers, parsed.rows, delimiter);
+    layer.table.raw = serializeDelimitedRows(normalizedHeaders, parsed.rows, delimiter);
+    if (layer.gearBox?.values?.[0]) {
+      const currentValueKey = layer.gearBox.values[0].table_key || "";
+      if (!currentValueKey || String(currentValueKey).toLowerCase() === "value" || !normalizedHeaders.includes(currentValueKey)) {
+        layer.gearBox.values[0].table_key = "value1";
+      }
+    }
+    syncGearBoxLayerValueDefinitions(layer);
 
     if (layer.origin === "search") {
       normalizeSearchDataLayerProvenance(layer);
@@ -11630,7 +12318,7 @@ function createStatisticLayerCsvEditor(layer) {
   const csvEditor = createEarthMapCsvCodeEditor({
     value: csvValue,
     delimiter: layer.table?.delimiter || ";",
-    placeholder: "boundary_key;boundary_label;value;unit;source_label",
+    placeholder: "boundary_key;boundary_label;role;value1;unit1;source_label",
     onInput: (value) => {
       layer.table = layer.table || {};
       layer.table.raw = value;
@@ -11714,13 +12402,20 @@ function createEmptyGearBoxDraft() {
       { from: "0", to: "100", fill: "#d6ecff" },
     ],
     styleMode: "manual",
-    autoColorMode: "palette",
+    autoColorMode: "value_range",
     baseColor: "#2166ac",
     lightnessMin: 32,
     lightnessMax: 84,
+    valueRangeStart: 0,
+    valueRangeEnd: 100,
+    valueRangeStartColor: "#c12737",
+    valueRangeEndColor: "#5aa469",
+    valueRangeSteps: 5,
+    showValuesOnMap: false,
     sourceLabel: "",
     sourceUrl: "",
     matchPreview: null,
+    importedLayerId: "",
   };
 }
 
@@ -11965,15 +12660,38 @@ function hslToHex(hue, saturation, lightness) {
   );
 }
 
-function getGearBoxAutoPaletteColors(count) {
-  const palette = ["#d6ecff", "#b8d8f0", "#8ebfdf", "#5f9dcc", "#2166ac", "#173f73"];
-  if (count <= palette.length) return palette.slice(0, count);
-  return Array.from({ length: count }, (_, index) => palette[Math.min(palette.length - 1, Math.floor(index * palette.length / count))]);
+function interpolateHexColor(startColor, endColor, t) {
+  const start = hexToRgbParts(startColor || "#c12737", "#c12737");
+  const end = hexToRgbParts(endColor || "#5aa469", "#5aa469");
+  return rgbToHex(
+    start.red + (end.red - start.red) * t,
+    start.green + (end.green - start.green) * t,
+    start.blue + (end.blue - start.blue) * t,
+  );
 }
 
 function getGearBoxClassesForDraft(draft) {
   const rawClasses = Array.isArray(draft.classes) && draft.classes.length ? draft.classes : [{ from: "0", to: "100", fill: "#d6ecff" }];
   if (draft.styleMode !== "automatic") return rawClasses;
+  if (draft.autoColorMode === "search_result") return rawClasses;
+  if (draft.autoColorMode === "value_range" || draft.autoColorMode === "palette") {
+    const start = Number.isFinite(Number(draft.valueRangeStart)) ? Number(draft.valueRangeStart) : 0;
+    const end = Number.isFinite(Number(draft.valueRangeEnd)) ? Number(draft.valueRangeEnd) : 100;
+    const steps = clamp(Math.round(Number(draft.valueRangeSteps) || rawClasses.length || 5), 2, 24);
+    const min = Math.min(start, end);
+    const max = Math.max(start, end);
+    const span = max - min || 1;
+    return Array.from({ length: steps }, (_, index) => {
+      const from = min + (span / steps) * index;
+      const to = index === steps - 1 ? max : min + (span / steps) * (index + 1);
+      const t = steps <= 1 ? 1 : index / (steps - 1);
+      return {
+        from: Number(from.toFixed(6)).toString(),
+        to: Number(to.toFixed(6)).toString(),
+        fill: interpolateHexColor(draft.valueRangeStartColor || "#c12737", draft.valueRangeEndColor || "#5aa469", start <= end ? t : 1 - t),
+      };
+    });
+  }
   if (draft.autoColorMode === "lightness") {
     const { red, green, blue } = hexToRgbParts(draft.baseColor || "#2166ac");
     const hsl = rgbToHsl(red, green, blue);
@@ -11985,8 +12703,7 @@ function getGearBoxClassesForDraft(draft) {
       return { ...entry, fill: hslToHex(hsl.hue, hsl.saturation, lightness) };
     });
   }
-  const palette = getGearBoxAutoPaletteColors(rawClasses.length);
-  return rawClasses.map((entry, index) => ({ ...entry, fill: palette[index] || entry.fill || "#d6ecff" }));
+  return rawClasses;
 }
 
 function parseGearBoxRangeBoundary(value, fallback) {
@@ -12086,7 +12803,8 @@ function getPreferredGearBoxTableKey(headers = []) {
 
 function getPreferredGearBoxValueKey(headers = [], tableKey = "") {
   const lowered = new Map(headers.map((header) => [String(header).toLowerCase(), header]));
-  return lowered.get("value")
+  return lowered.get("value1")
+    || lowered.get("value")
     || lowered.get("wert")
     || headers.find((header) => header !== tableKey && !/^source_/i.test(header) && !/^(unit|boundary_label|boundary_key|iso3|iso_3166_2|wikidata_id|parent_key|valid_at|aggregation_method)$/i.test(header))
     || "";
@@ -12465,8 +13183,10 @@ function findGearBoxBoundaryEntryForRow(row, boundaryIndex, preferredTableKey = 
 }
 
 function getGearBoxLayerClasses(layer) {
-  const classes = Array.isArray(layer?.gearBox?.style?.classes) && layer.gearBox.style.classes.length
-    ? layer.gearBox.style.classes
+  const valueKey = getActiveGearBoxValueKey(layer);
+  const style = getActiveGearBoxValueStyle(layer?.gearBox?.style || {}, valueKey);
+  const classes = Array.isArray(style.classes) && style.classes.length
+    ? style.classes
     : [{ from: 0, to: 100, fill: "#d6ecff" }];
   return classes.map((entry) => ({
     ...entry,
@@ -12485,21 +13205,58 @@ function getGearBoxContextStyle(layerOrGearBox) {
   };
 }
 
+function isGearBoxValueBlank(value) {
+  return String(value ?? "").trim() === "";
+}
+
+function hasGearBoxContextData(layer) {
+  const rows = Array.isArray(layer?.table?.rows) ? layer.table.rows : [];
+  const matches = Array.isArray(layer?.valueMatches) ? layer.valueMatches : [];
+  return rows.some((row) => isGearBoxContextRole(getGearBoxRowValue(row, "role")))
+    || matches.some((match) => isGearBoxContextRole(match?.role));
+}
+
+function hasActiveProjectGearBoxContextData(project = getActiveProject()) {
+  const layers = Array.isArray(project?.dataLayers) ? project.dataLayers : [];
+  return layers
+    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false)
+    .some((layer) => hasGearBoxContextData(layer));
+}
+
+function getSearchLikeDisplayStyleForRole(layer, role) {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  // Suchlogik auch für leere Wertetabellen: Focus wird nur dann zur roten
+  // Hervorhebung, wenn wirklich ein Context existiert. Eine einfache
+  // kommaseparierte Liste ohne Context bleibt gelbliche Markierung.
+  if (normalizedRole === "focus" && (hasGearBoxContextData(layer) || hasActiveProjectGearBoxContextData())) {
+    return {
+      fill: getMapSearchSpecialHighlightColor(),
+      outline: getMapSearchSpecialOutlineColor(),
+    };
+  }
+  return getGearBoxContextStyle(layer);
+}
+
 function shouldRenderSearchLayerAsSearchResult(layer) {
-  return layer?.origin === "search" && layer?.gearBox?.style?.search_result_mode !== false;
+  if (layer?.origin !== "search") return false;
+  const style = layer?.gearBox?.style || {};
+  const activeStyle = getActiveGearBoxValueStyle(style, getActiveGearBoxValueKey(layer));
+  return activeStyle.mode === "automatic" && activeStyle.auto_color_mode === "search_result"
+    // Legacy-Brücke: ältere gespeicherte Suchkarten hatten dafür noch eine
+    // Checkbox. Sobald sie im neuen Editor gespeichert werden, wird diese
+    // Wahrheit in die Automatik-Auswahl überführt.
+    || activeStyle.search_result_mode === true;
 }
 
 function getDataLayerMatchDisplayStyle(layer, match) {
   const isSearchLayer = layer?.origin === "search";
   const role = match?.role || (isSearchLayer ? "context" : "focus");
   const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
-  if (isSearchLayer && renderAsSearch) {
-    const isFocus = role === "focus";
-    if (!isFocus) return getGearBoxContextStyle(layer);
-    return {
-      fill: getMapSearchSpecialHighlightColor(),
-      outline: getMapSearchSpecialOutlineColor(),
-    };
+  // Architekturregel: Ein leerer Wert ist kein Statistikwert. Solche Zeilen
+  // bleiben reine Kartenmarkierungen und werden wie Suchergebnisse gerendert;
+  // Werteklassen dürfen erst greifen, wenn value tatsächlich befüllt ist.
+  if ((isSearchLayer && renderAsSearch) || isGearBoxValueBlank(match?.value)) {
+    return getSearchLikeDisplayStyleForRole(layer, role);
   }
   if (isSearchLayer) {
     if (role !== "focus") return getGearBoxContextStyle(layer);
@@ -12524,22 +13281,28 @@ function rebuildGearBoxDataLayerMatches(layer) {
   const gearBox = layer.gearBox || {};
   const tableKey = gearBox.join?.table_key || getPreferredGearBoxTableKey(headers);
   const boundaryKey = gearBox.join?.boundary_key || "stable_id";
-  const valueKey = gearBox.values?.[0]?.table_key || getPreferredGearBoxValueKey(headers, tableKey);
+  const valueKey = getActiveGearBoxValueKey(layer) || getPreferredGearBoxValueKey(headers, tableKey);
   const classes = getGearBoxLayerClasses(layer);
   const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), boundaryKey);
   layer.valueMatches = rows.flatMap((row) => {
     const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, tableKey, { requireDrawable: true });
     const value = getGearBoxRowValue(row, valueKey);
+    const role = getGearBoxRowValue(row, "role") || "focus";
+    const valueIsBlank = isGearBoxValueBlank(value);
     const classEntry = getGearBoxClassForValue(value, classes);
-    if (!entry || !classEntry) return [];
+    if (!entry || (!valueIsBlank && !classEntry)) return [];
+    const displayStyle = valueIsBlank
+      ? getSearchLikeDisplayStyleForRole(layer, role)
+      : { fill: normalizeGearBoxClassFill(classEntry.fill), outline: getMapSearchSpecialOutlineColor() };
     return [{
       boundaryKey: getGearBoxRowValue(row, tableKey) || getGearBoxRowValue(row, "boundary_key") || "",
       featureId: entry.feature.id || entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
       stable_id: entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
       value,
       numericValue: parseGearBoxNumber(value),
-      fill: normalizeGearBoxClassFill(classEntry.fill),
-      role: getGearBoxRowValue(row, "role") || "focus",
+      fill: displayStyle.fill,
+      outline: displayStyle.outline,
+      role,
       source: {
         label: getGearBoxRowValue(row, "source_label") || "",
         url: getGearBoxRowValue(row, "source_url") || "",
@@ -12588,6 +13351,33 @@ function evaluateGearBoxDraft(draft = ensureGearBoxDraft()) {
 }
 
 function buildGearBoxFromDraft(draft = ensureGearBoxDraft()) {
+  const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
+  parsed.headers = ensureGearBoxValueTableHeaders(parsed.headers);
+  normalizeGearBoxValueColumns(parsed.headers, parsed.rows, { unit: draft.valueUnit || "" });
+  const values = getGearBoxValueDefinitionsFromTable(parsed.headers, parsed.rows, {
+    type: draft.valueType || "number",
+    unit: draft.valueUnit || "",
+  });
+  const activeValueKey = draft.activeValueKey || values[0]?.table_key || draft.valueKey || "value1";
+  const activeStyle = {
+    mode: draft.styleMode || "manual",
+    auto_color_mode: draft.autoColorMode || "value_range",
+    search_result_mode: draft.styleMode === "automatic" && draft.autoColorMode === "search_result",
+    base_color: draft.baseColor || "#2166ac",
+    lightness_min: Number(draft.lightnessMin) || 32,
+    lightness_max: Number(draft.lightnessMax) || 84,
+    value_range_start: Number.isFinite(Number(draft.valueRangeStart)) ? Number(draft.valueRangeStart) : 0,
+    value_range_end: Number.isFinite(Number(draft.valueRangeEnd)) ? Number(draft.valueRangeEnd) : 100,
+    value_range_start_color: normalizeColorValue(draft.valueRangeStartColor, "#c12737") || "#c12737",
+    value_range_end_color: normalizeColorValue(draft.valueRangeEndColor, "#5aa469") || "#5aa469",
+    value_range_steps: clamp(Math.round(Number(draft.valueRangeSteps) || 5), 2, 24),
+    show_values_on_map: draft.showValuesOnMap === true,
+    classes: getGearBoxClassesForDraft(draft).map((entry) => ({
+      from: parseGearBoxNumber(entry.from),
+      to: parseGearBoxNumber(entry.to),
+      fill: normalizeColorValue(entry.fill, "#d6ecff") || "#d6ecff",
+    })),
+  };
   return {
     schema: EARTHMAP_GEARBOX_SCHEMA,
     id: draft.id || `gearbox-${Date.now()}`,
@@ -12606,29 +13396,18 @@ function buildGearBoxFromDraft(draft = ensureGearBoxDraft()) {
       boundary_key: draft.boundaryKey || "stable_id",
       normalization: { trim: true, casefold: true, remove_diacritics: true },
     },
-    values: [{
-      id: slugifyBoundaryId(draft.valueKey || "value", "value"),
-      table_key: draft.valueKey || "",
-      label: draft.valueKey || "Wert",
-      type: draft.valueType || "number",
-      unit: draft.valueUnit || "",
-    }],
+    values,
     style: {
-      value_id: slugifyBoundaryId(draft.valueKey || "value", "value"),
-      mode: draft.styleMode || "manual",
-      auto_color_mode: draft.autoColorMode || "palette",
-      base_color: draft.baseColor || "#2166ac",
-      lightness_min: Number(draft.lightnessMin) || 32,
-      lightness_max: Number(draft.lightnessMax) || 84,
+      active_value_key: activeValueKey,
+      value_id: slugifyBoundaryId(activeValueKey, "value1"),
+      ...activeStyle,
+      value_styles: {
+        [activeValueKey]: activeStyle,
+      },
       context: {
         fill: normalizeColorValue(draft.contextFill, getMapSearchSelectedAreaColor()) || getMapSearchSelectedAreaColor(),
         outline: normalizeColorValue(draft.contextOutline, getMapSearchSelectedOutlineColor()) || getMapSearchSelectedOutlineColor(),
       },
-      classes: getGearBoxClassesForDraft(draft).map((entry) => ({
-        from: entry.from === "" ? null : Number(entry.from),
-        to: entry.to === "" ? null : Number(entry.to),
-        fill: entry.fill || "",
-      })),
     },
     source: {
       label: draft.sourceLabel || "",
@@ -12714,7 +13493,8 @@ function createSearchResultDataLayerFromCsvDraft(draft = ensureGearBoxDraft(), p
       values: [{ id: "value", table_key: "value", label: "Wert", type: draft.valueType || "number", unit: draft.valueUnit || "" }],
       style: {
         value_id: "value",
-        mode: "manual",
+        mode: "automatic",
+        auto_color_mode: "search_result",
         search_result_mode: true,
         context: {
           fill: getMapSearchSelectedAreaColor(),
@@ -12750,6 +13530,11 @@ function createSearchResultDataLayerFromCsvDraft(draft = ensureGearBoxDraft(), p
 
 function createGearBoxDataLayerFromDraft(draft = ensureGearBoxDraft(), options = {}) {
   const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
+  parsed.headers = ensureGearBoxValueTableHeaders(parsed.headers);
+  normalizeGearBoxValueColumns(parsed.headers, parsed.rows, { unit: draft.valueUnit || "" });
+  if (!draft.valueKey || String(draft.valueKey).toLowerCase() === "value" || !parsed.headers.includes(draft.valueKey)) {
+    draft.valueKey = "value1";
+  }
   const skipInitialMatching = options.skipInitialMatching === true;
   const preview = skipInitialMatching
     ? {
@@ -12771,16 +13556,22 @@ function createGearBoxDataLayerFromDraft(draft = ensureGearBoxDraft(), options =
     valueMatches = parsed.rows.flatMap((row) => {
       const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, tableKey, { requireDrawable: true });
       const value = getGearBoxRowValue(row, valueKey);
+      const role = getGearBoxRowValue(row, "role") || "focus";
+      const valueIsBlank = isGearBoxValueBlank(value);
       const classEntry = getGearBoxClassForValue(value, classes);
-      if (!entry || !classEntry) return [];
+      if (!entry || (!valueIsBlank && !classEntry)) return [];
+      const displayStyle = valueIsBlank
+        ? getSearchLikeDisplayStyleForRole(null, role)
+        : { fill: normalizeGearBoxClassFill(classEntry.fill), outline: getMapSearchSpecialOutlineColor() };
       return [{
         boundaryKey: getGearBoxRowValue(row, tableKey),
         featureId: entry.feature.id || entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
         stable_id: entry.feature.stable_id || entry.feature.properties?.iso_3166_2 || entry.feature.properties?.adm1_code || "",
         value,
         numericValue: parseGearBoxNumber(value),
-        fill: normalizeGearBoxClassFill(classEntry.fill),
-        role: getGearBoxRowValue(row, "role") || "focus",
+        fill: displayStyle.fill,
+        outline: displayStyle.outline,
+        role,
         source: {
           label: getGearBoxRowValue(row, "source_label") || "",
           url: getGearBoxRowValue(row, "source_url") || "",
@@ -12814,20 +13605,38 @@ async function importGearBoxCsvDraftToProject() {
   const draft = ensureGearBoxDraft();
   if (!String(draft.csvCode || "").trim()) {
     window.alert("Bitte zuerst CSV-Code einfügen oder eine CSV/TSV-Datei laden.");
-    return;
+    return null;
   }
   const project = ensureActiveProjectForDataImport();
   const parsed = parseDelimitedRows(draft.csvCode, draft.delimiter || ";", draft.hasHeader !== false);
   const isSearchImport = isSearchResultCsvTable(parsed.headers, parsed.rows);
-  // Importregel: Das CSV ist ein Dokumentbestandteil und wird sofort im Projekt
-  // gespeichert. Das potenziell teure Matching/Hydrieren der Boundary-Geometrien
-  // läuft anschließend im Hintergrund. So blockiert ein großes Datenblatt nicht
-  // den Browser und verschwindet nicht, nur weil die Karten-Engine noch arbeitet.
-  const layer = isSearchImport
+  // Importregel: Der CSV-Code ist die führende Arbeitsquelle. Ein Klick auf
+  // „Änderungen übernehmen“ muss deshalb bereits das Projektobjekt erzeugen
+  // oder den zugehörigen Layer aktualisieren; der Werte-Tab ist danach nur noch
+  // eine bequeme Tabellenansicht auf denselben Datenbestand.
+  const nextLayer = isSearchImport
     ? createSearchResultDataLayerFromCsvDraft(draft, parsed)
     : createGearBoxDataLayerFromDraft(draft, { skipInitialMatching: true });
   project.dataLayers = Array.isArray(project.dataLayers) ? project.dataLayers : [];
-  project.dataLayers.push(layer);
+  const existingLayer = draft.importedLayerId
+    ? project.dataLayers.find((candidate) => candidate.id === draft.importedLayerId)
+    : null;
+  let layer = nextLayer;
+  if (existingLayer) {
+    const stableId = existingLayer.id;
+    const importedAt = existingLayer.importedAt || nextLayer.importedAt;
+    const visible = existingLayer.visible !== false;
+    Object.keys(existingLayer).forEach((key) => delete existingLayer[key]);
+    Object.assign(existingLayer, normalizeDataLayer({
+      ...nextLayer,
+      id: stableId,
+      importedAt,
+      visible,
+    }));
+    layer = existingLayer;
+  } else {
+    project.dataLayers.push(layer);
+  }
   project.activeLibraryItemId = layer.id;
   state.gearBoxDraft = {
     ...draft,
@@ -12836,8 +13645,10 @@ async function importGearBoxCsvDraftToProject() {
     activeTab: "values",
     csvCode: "",
     matchPreview: null,
+    importedLayerId: layer.id,
   };
   state.gearBoxModeAction = "work";
+  state.statisticLayerActiveTab = "values";
   renderEditorTabs();
   if (!persistProjects()) {
     window.alert("Der Datenlayer wurde im aktuellen Projekt angelegt, konnte aber nicht dauerhaft gespeichert werden. Bitte Browser-Speicher prüfen.");
@@ -12851,6 +13662,8 @@ async function importGearBoxCsvDraftToProject() {
   }, 120);
   renderWorkspace();
   requestPreviewDataLayerSync();
+  showEarthMapFeedback(`${isSearchImport ? "Suchkarte" : "Statistik"} „${layer.title || "Daten"}“ wurde im Projekt „${project.title || "EarthMap"}“ gespeichert.`);
+  return layer;
 }
 
 function getGearBoxAdminLevelChoices() {
@@ -12867,12 +13680,12 @@ function getGearBoxAdminLevelChoices() {
 function getGearBoxAdminLevelPromptHint(level) {
   const choice = getGearBoxAdminLevelChoices().find((entry) => entry.value === level);
   const joinHint = level === "ADM0"
-    ? "Nutze bevorzugt ISO-3, ADM0_A3, stable_id oder Wikidata-ID."
+    ? "Nutze bevorzugt ISO-3 als boundary_key, z. B. DEU, FRA, AUT. Ergänze Wikidata-ID und ISO-3 zusätzlich in den eigenen Spalten."
     : level === "ADM1"
-      ? "Nutze bevorzugt ISO-3166-2, stable_id, parent_id + Name oder Wikidata-ID."
+      ? "Nutze bevorzugt ISO-3166-2 als boundary_key, z. B. DE-BW, AT-1, FR-IDF. Ergänze ISO-3 des Parent-Staats, Wikidata-ID und Parent-Key zusätzlich."
       : level === "electoral_district"
-        ? "Nutze bevorzugt amtliche Wahlkreisnummern, stable_id oder eindeutige Wahlkreisnamen mit Parent-Bezug."
-        : "Nutze bevorzugt amtliche Schlüssel, stable_id, parent_id + Name oder Wikidata-ID.";
+        ? "Nutze bevorzugt amtliche Wahlkreisnummern oder einen stabilen Schlüssel mit Parent-Bezug. Ergänze Name, Parent-Key und Quelle."
+        : "Nutze bevorzugt amtliche Schlüssel oder einen stabilen, lesbaren Schlüssel mit Parent-Bezug. Ergänze Wikidata-ID und Parent-Key, soweit vorhanden.";
   return `${choice?.label || level}. ${choice?.description || ""} ${joinHint}`.trim();
 }
 
@@ -12892,13 +13705,15 @@ function getGearBoxScopePromptHint(scopeText = "") {
 }
 
 function buildGearBoxGenerationPrompt(requestText = "", adminLevel = state.gearBoxPromptAdminLevel || "ADM0", scopeText = state.gearBoxPromptScope || "") {
-  return `Du erstellst für EarthMap ein CSV-Datenblatt, das anschließend über die GearBox an Boundary-Sets gekoppelt wird.
+  return `Du erstellst für EarthMap ein CSV-Datenblatt, das anschließend über die GearBox an Boundary-Sets gekoppelt und direkt auf einer Karte gerendert wird.
 
 Ziel:
 - Eine externe CSV-/TSV-/JSON-Tabelle soll an ein vorhandenes Boundary-Set gekoppelt werden.
 - Speichere keine Geometrien.
 - Speichere keine zweite Boundary-Wahrheit.
-- Erzeuge konkrete Tabellenwerte, die EarthMap über eine eindeutige Karten-ID oder einen eindeutigen geografischen Schlüssel matchen kann.
+- Erzeuge konkrete Tabellenwerte, die EarthMap über boundary_key und ergänzende Identifikatoren zuverlässig matchen kann.
+- boundary_key soll für Menschen lesbar und stabil sein: ADM0 bevorzugt ISO-3, ADM1 bevorzugt ISO-3166-2, feinere Ebenen bevorzugt amtliche Schlüssel.
+- Nutze nicht die lange interne Natural-Earth-ID als boundary_key, wenn ein einfacher amtlicher Schlüssel existiert.
 - Jeder Datenpunkt muss eigene Quellenfelder besitzen. Eine globale Quellenangabe reicht nicht.
 - Nutze für jeden Datenpunkt die jeweils belastbarste verfügbare Quelle. Bevorzuge amtliche Statistikdatenbanken, Primärdaten, API-Endpunkte, herunterladbare Tabellen oder fachlich einschlägige Originalveröffentlichungen.
 - Verwende keineswegs aus Bequemlichkeit nur eine einzige Quelle für alle Datenpunkte, wenn für einzelne Boundaries bessere, aktuellere oder genauere Quellen verfügbar sind.
@@ -12917,6 +13732,14 @@ Ziel:
 Nutzerwunsch:
 ${requestText || "Erstelle ein CSV-Datenblatt mit geografischem Schlüssel, numerischem Wert und Quellenangaben pro Datenpunkt."}
 
+EarthMap-Rollenlogik:
+- role beschreibt, wie ein Eintrag gerendert wird.
+- focus: Gebiet wird als eigentliche Aussage der Karte markiert und kann Werte tragen.
+- context: Gebiet bildet einen Rahmen/Geltungsbereich. Context-Elemente können leer bleiben und müssen keine Werte tragen.
+- Wenn keine Rolle angegeben ist, behandelt EarthMap die Zeile als focus.
+- Für reine Such-/Markierungskarten dürfen value-Felder leer bleiben. Dann wird die Fläche wie ein Suchergebnis markiert.
+- Für Statistikkarten müssen focus-Zeilen den aktiven Wert enthalten.
+
 CSV-Regeln:
 - Gib die CSV ausschließlich in einem Markdown-Codeblock aus.
 - Verwende Semikolon als Trennzeichen.
@@ -12925,6 +13748,9 @@ CSV-Regeln:
 - Wenn du aggregierst, kennzeichne die Zeile mit aggregation_method=arithmetic_mean und erkläre knapp, welche feineren Werte einbezogen wurden.
 - Erzeuge für jede angefragte Boundary genau eine Datenzeile, sofern nicht ausdrücklich mehrere Werte/Zeitpunkte angefordert wurden.
 - Lasse keine angefragte Boundary aus. Wenn ein Wert in der belastbarsten Quelle fehlt, recherchiere eine alternative belastbare Quelle statt die Boundary zu überspringen.
+- Wenn mehrere Messwerte pro Boundary sinnvoll sind, nutze value1/unit1, value2/unit2, value3/unit3 usw.
+- unit1, unit2 usw. sind globale Einheiten der jeweiligen Wertereihe. Schreibe dieselbe Einheit in jeder Zeile der jeweiligen Spalte.
+- Wenn nur ein Messwert dargestellt werden soll, darfst du weiterhin value und unit verwenden; bevorzugt ist aber value1 und unit1, weil EarthMap mehrere Wertereihen unterstützt.
 - Füge pro Datenpunkt mindestens diese Quellenfelder hinzu:
   - source_label: Kurzbeleg oder Institution/Publikation
   - source_url: konkrete URL, DOI oder leer, falls keine URL existiert
@@ -12932,16 +13758,19 @@ CSV-Regeln:
   - source_note: knapper Hinweis zur konkreten Herleitung, Aggregation oder Tabellenspalte
 
 Pflichtspalten der CSV:
-- boundary_key: eindeutiger Schlüssel, der später gegen stable_id, ISO-Code, AGS, ISO-3166-2, Wikidata-ID oder einen anderen Boundary-Schlüssel gematcht werden kann. Bei ADM1 möglichst ISO-3166-2 oder stable_id, nicht NUTS, sofern kein NUTS-Boundary-Set vorliegt.
+- boundary_key: eindeutiger, stabiler und möglichst kurzer Schlüssel. ADM0: ISO-3. ADM1: ISO-3166-2. Andere Ebenen: amtlicher Schlüssel oder stable_id. Nicht NUTS verwenden, sofern kein NUTS-Boundary-Set vorliegt.
 - boundary_label: menschlich lesbarer Name der Gebietseinheit
-- value: darzustellender numerischer Wert
-- unit: Einheit des Wertes, z. B. %, Einwohner, Stimmen, Indexpunkte
+- role: focus oder context; bei Statistikdaten in der Regel focus
+- value1: darzustellender numerischer Wert der ersten Wertereihe; darf bei reinen Markierungskarten leer bleiben
+- unit1: Einheit der ersten Wertereihe, z. B. %, Einwohner, Stimmen, Indexpunkte
 - source_label
 - source_url
 - source_accessed_at
 - source_note
 
 Empfohlene Zusatzspalten:
+- feature_id
+- stable_id
 - wikidata_id
 - iso3
 - iso_3166_2
@@ -12951,11 +13780,17 @@ Empfohlene Zusatzspalten:
 
 Beispielstruktur:
 \`\`\`csv
-boundary_key;boundary_label;value;unit;source_label;source_url;source_accessed_at;source_note;wikidata_id;iso3;iso_3166_2;parent_key;valid_at;aggregation_method
-DEU;Deutschland;42.1;%;Beispielquelle;https://example.org/table;2026-07-11;Wert direkt aus Tabelle 1;Q183;DEU;;;2024;
+boundary_key;boundary_label;role;value1;unit1;source_label;source_url;source_accessed_at;source_note;wikidata_id;iso3;iso_3166_2;parent_key;valid_at;aggregation_method
+DEU;Deutschland;focus;42.1;%;Beispielquelle;https://example.org/table;2026-07-18;Wert direkt aus Tabelle 1;Q183;DEU;;EU;2024;
+DE-BW;Baden-Württemberg;focus;4.2;%;Beispielquelle;https://example.org/table;2026-07-18;Wert direkt aus Tabelle 2;Q985;DEU;DE-BW;DEU;2024;
 \`\`\`
 
-Gib außerhalb des Codeblocks höchstens eine kurze Notiz aus, falls Annahmen oder Aggregationen fachlich unsicher sind.`;
+Qualitätskontrolle vor Ausgabe:
+- Prüfe, ob jeder boundary_key zum angeforderten administrativen Level passt.
+- Prüfe, ob alle angefragten Boundaries enthalten sind.
+- Prüfe, ob jede Datenzeile eine konkrete Quelle trägt.
+- Prüfe, ob source_note erklärt, ob der Wert direkt übernommen, aggregiert oder geschätzt wurde.
+- Gib außerhalb des Codeblocks höchstens eine kurze Notiz aus, falls Annahmen, Aggregationen oder fehlende Werte fachlich unsicher sind.`;
 }
 
 function createGearBoxStyleEditor(draft, options = {}) {
@@ -12976,8 +13811,49 @@ function createGearBoxStyleEditor(draft, options = {}) {
   title.textContent = "Focus-Elemente";
   const description = document.createElement("p");
   description.className = "structured-editor-field-help";
-  description.textContent = "Lege fest, welche Wertebereiche für Focus-Elemente wie auf der Karte markiert werden.";
+  description.textContent = "Lege fest, wie Werte von Focus-Elementen auf der Karte farblich markiert werden.";
   section.append(title, description);
+  const appendValueLabelToggle = () => {
+    if (section.dataset.valueLabelToggleAppended === "true") return;
+    section.dataset.valueLabelToggleAppended = "true";
+    const toggle = createCheckboxField("Werte auf der Karte anzeigen", draft.showValuesOnMap === true, (checked) => {
+      draft.showValuesOnMap = checked;
+      notifyChange();
+    });
+    toggle.classList.add("is-checkbox-end");
+    section.append(toggle);
+  };
+  const valueDefinitions = Array.isArray(options.valueDefinitions) && options.valueDefinitions.length
+    ? options.valueDefinitions
+    : [{ table_key: draft.activeValueKey || draft.valueKey || "value1", unit: draft.valueUnit || "", label: draft.valueKey || "value1" }];
+  if (!draft.activeValueKey || !valueDefinitions.some((entry) => entry.table_key === draft.activeValueKey)) {
+    draft.activeValueKey = valueDefinitions[0]?.table_key || "value1";
+  }
+  const valueSelector = document.createElement("div");
+  valueSelector.className = "gearbox-value-style-tabs";
+  valueDefinitions.forEach((definition) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = `editor-tab gearbox-value-style-tab${definition.table_key === draft.activeValueKey ? " is-active" : ""}`;
+    tab.textContent = getGearBoxValueDefinitionLabel(definition);
+    tab.addEventListener("click", () => {
+      draft.activeValueKey = definition.table_key;
+      if (typeof options.onActiveValueChange === "function") options.onActiveValueChange(draft.activeValueKey);
+      else notifyChange();
+    });
+    valueSelector.append(tab);
+  });
+  if (valueDefinitions.length > 1) {
+    section.append(valueSelector);
+    section.append(createSelectField("Aktiv gerendert", draft.activeValueKey, valueDefinitions.map((definition) => ({
+      value: definition.table_key,
+      label: getGearBoxValueDefinitionLabel(definition),
+    })), (value) => {
+      draft.activeValueKey = value;
+      if (typeof options.onActiveValueChange === "function") options.onActiveValueChange(value);
+      else notifyChange();
+    }, { help: "EarthMap rendert immer genau eine Wertereihe. Die Darstellungseinstellungen darunter gelten für die aktuell ausgewählte Wertereihe." }));
+  }
   section.append(
     createSelectField("Farbzuweisung", draft.styleMode || "manual", [
       { value: "manual", label: "Manuell" },
@@ -12988,15 +13864,70 @@ function createGearBoxStyleEditor(draft, options = {}) {
     }),
   );
   if (draft.styleMode === "automatic") {
+    const automaticChoices = [
+      ...(options.allowSearchResultMode ? [{ value: "search_result", label: "Darstellung wie Suchergebnis" }] : []),
+      { value: "value_range", label: "Wertespektrum" },
+      { value: "lightness", label: "Wertebereich" },
+    ];
+    if (!automaticChoices.some((choice) => choice.value === draft.autoColorMode)) {
+      draft.autoColorMode = options.allowSearchResultMode ? "search_result" : "value_range";
+    }
     section.append(
-      createSelectField("Automatik", draft.autoColorMode || "palette", [
-        { value: "palette", label: "Vordefinierte Farben" },
-        { value: "lightness", label: "Grundfarbe mit Helligkeitsabständen" },
-      ], (value) => {
+      createSelectField("Automatik", draft.autoColorMode || "value_range", automaticChoices, (value) => {
         draft.autoColorMode = value;
         notifyChange();
       }),
     );
+    if (draft.autoColorMode === "search_result") {
+      const hint = document.createElement("p");
+      hint.className = "structured-editor-field-help";
+      hint.textContent = "Die Karte nutzt die gleichen Focus- und Context-Farben wie die ursprüngliche Suchanzeige. Zahlenwerte werden dabei nicht ausgewertet.";
+      section.append(hint);
+      appendValueLabelToggle();
+      return section;
+    }
+    if (draft.autoColorMode === "value_range") {
+      section.append(
+        createTextInputField("Startwert", draft.valueRangeStart ?? 0, (value) => {
+          draft.valueRangeStart = Number.isFinite(Number(value)) ? Number(value) : 0;
+          notifyChange();
+        }, { type: "number", step: "any" }),
+        createColorPickerField("Startfarbe", draft.valueRangeStartColor || "#c12737", (value) => {
+          draft.valueRangeStartColor = normalizeColorValue(value, "#c12737") || "#c12737";
+          notifyChange();
+        }, { fallback: "#c12737" }),
+        createTextInputField("Endwert", draft.valueRangeEnd ?? 100, (value) => {
+          draft.valueRangeEnd = Number.isFinite(Number(value)) ? Number(value) : 100;
+          notifyChange();
+        }, { type: "number", step: "any" }),
+        createColorPickerField("Endfarbe", draft.valueRangeEndColor || "#5aa469", (value) => {
+          draft.valueRangeEndColor = normalizeColorValue(value, "#5aa469") || "#5aa469";
+          notifyChange();
+        }, { fallback: "#5aa469" }),
+        createTextInputField("Abstufungen", draft.valueRangeSteps ?? 5, (value) => {
+          draft.valueRangeSteps = clamp(Math.round(Number(value) || 5), 2, 24);
+          notifyChange();
+        }, { type: "number", min: 2, max: 24, step: 1 }),
+      );
+      const rangePreview = document.createElement("div");
+      rangePreview.className = "gearbox-class-list";
+      getGearBoxClassesForDraft(draft).forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "gearbox-class-row";
+        const label = document.createElement("div");
+        label.className = "gearbox-class-range-label";
+        label.textContent = `${entry.from} – ${entry.to}`;
+        const swatch = document.createElement("div");
+        swatch.className = "gearbox-class-swatch";
+        swatch.style.background = entry.fill || "#d6ecff";
+        swatch.textContent = entry.fill || "—";
+        row.append(label, swatch);
+        rangePreview.append(row);
+      });
+      section.append(rangePreview);
+      appendValueLabelToggle();
+      return section;
+    }
     if (draft.autoColorMode === "lightness") {
       section.append(
         createColorPickerField("Grundfarbe", draft.baseColor || "#2166ac", (value) => {
@@ -13065,6 +13996,7 @@ function createGearBoxStyleEditor(draft, options = {}) {
     notifyChange();
   });
   section.append(classList, add);
+  appendValueLabelToggle();
   return section;
 }
 
@@ -13166,7 +14098,7 @@ function createGearBoxCreatePanel() {
   title.textContent = "Statistik erstellen";
   const description = document.createElement("p");
   description.className = "structured-editor-field-help";
-  description.textContent = "Lege eine Statistik aus bereits vorhandenem CSV-Code an. Im nächsten Schritt fügst du den Code ein, prüfst das Matching und importierst die Werte in das aktive Projekt.";
+  description.textContent = "Lege eine Statistik aus bereits vorhandenem CSV-Code an. Im nächsten Schritt fügst du den Code ein; „Änderungen übernehmen“ baut Wertetabelle, Matching und Karte neu auf.";
   const actions = document.createElement("div");
   actions.className = "gearbox-actions";
   const csv = document.createElement("button");
@@ -13191,6 +14123,7 @@ function syncGearBoxLayerTableRaw(layer) {
   const headers = Array.isArray(layer.table.headers) ? layer.table.headers : [];
   const rows = Array.isArray(layer.table.rows) ? layer.table.rows : [];
   layer.table.raw = serializeDelimitedRows(headers, rows, layer.table.delimiter || ";");
+  syncGearBoxLayerValueDefinitions(layer);
   persistProjects();
 }
 
@@ -13203,6 +14136,7 @@ async function applyStatisticLayerValues(layer, triggerButton = null) {
 function getGearBoxVisibleValueHeaders(headers = []) {
   const normalized = new Set(headers.map((header) => String(header).toLowerCase()));
   const hasSourceLabel = normalized.has("source_label");
+  let valueColumnAdded = false;
   const hiddenTechnicalHeaders = new Set([
     "stable_id",
     "feature_id",
@@ -13213,15 +14147,156 @@ function getGearBoxVisibleValueHeaders(headers = []) {
     "adm1_code",
     "wikidata_id",
   ]);
-  return headers.filter((header) => {
+  return headers.flatMap((header) => {
     const key = String(header).toLowerCase();
-    return !hiddenTechnicalHeaders.has(key)
-      && !(hasSourceLabel && ["source_url", "source_accessed_at", "source_note", "archive_url"].includes(key));
+    if (isGearBoxValueColumnHeader(header) || isGearBoxUnitColumnHeader(header)) {
+      if (valueColumnAdded) return [];
+      valueColumnAdded = true;
+      return ["value"];
+    }
+    if (hiddenTechnicalHeaders.has(key)) return [];
+    if (hasSourceLabel && ["source_url", "source_accessed_at", "source_note", "archive_url"].includes(key)) return [];
+    return [header];
   });
 }
 
 function getGearBoxValueHeaderLabel(header) {
-  return String(header).toLowerCase() === "source_label" ? "source" : header;
+  const normalized = String(header).toLowerCase();
+  if (normalized === "source_label") return "source";
+  if (normalized === "value") return "Value";
+  return header;
+}
+
+function isGearBoxValueColumnHeader(header) {
+  return /^value(?:\d+)?$/i.test(String(header || ""));
+}
+
+function isGearBoxUnitColumnHeader(header) {
+  return /^unit(?:\d+)?$/i.test(String(header || ""));
+}
+
+function getGearBoxValueColumnIndex(header) {
+  const match = String(header || "").match(/^(?:value|unit)(\d*)$/i);
+  return match ? Math.max(1, Number(match[1] || 1)) : 0;
+}
+
+function getGearBoxValueColumnIndexes(headers = []) {
+  const indexes = new Set();
+  headers.forEach((header) => {
+    const index = getGearBoxValueColumnIndex(header);
+    if (index) indexes.add(index);
+  });
+  if (!indexes.size) indexes.add(1);
+  return [...indexes].sort((a, b) => a - b);
+}
+
+function getGearBoxNextValueColumnIndex(headers = []) {
+  const indexes = getGearBoxValueColumnIndexes(headers);
+  return Math.max(0, ...indexes) + 1;
+}
+
+function normalizeGearBoxValueColumns(headers = [], rows = [], defaults = {}) {
+  const normalizedHeaders = Array.isArray(headers) ? headers : [];
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  const hasLegacyValue = normalizedHeaders.some((header) => String(header).toLowerCase() === "value");
+  const hasLegacyUnit = normalizedHeaders.some((header) => String(header).toLowerCase() === "unit");
+  if (!normalizedHeaders.some((header) => String(header).toLowerCase() === "value1")) normalizedHeaders.push("value1");
+  if (!normalizedHeaders.some((header) => String(header).toLowerCase() === "unit1")) normalizedHeaders.push("unit1");
+  normalizedRows.forEach((row) => {
+    if (!row) return;
+    if (hasLegacyValue && !row.value1 && row.value) row.value1 = row.value;
+    if (hasLegacyUnit && !row.unit1 && row.unit) row.unit1 = row.unit;
+    if (defaults.unit && !row.unit1) row.unit1 = defaults.unit;
+    getGearBoxValueColumnIndexes(normalizedHeaders).forEach((index) => {
+      const valueKey = `value${index}`;
+      const unitKey = `unit${index}`;
+      if (row[valueKey] == null) row[valueKey] = "";
+      if (row[unitKey] == null) row[unitKey] = "";
+    });
+  });
+  for (let index = normalizedHeaders.length - 1; index >= 0; index -= 1) {
+    const key = String(normalizedHeaders[index]).toLowerCase();
+    if (key === "value" || key === "unit") normalizedHeaders.splice(index, 1);
+  }
+  return normalizedHeaders;
+}
+
+function getGearBoxValueSummary(rowData, headers = []) {
+  return getGearBoxValueColumnIndexes(headers)
+    .map((index) => String(rowData?.[`value${index}`] ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function getGearBoxValueDefinitionsFromTable(headers = [], rows = [], fallback = {}) {
+  return getGearBoxValueColumnIndexes(headers).map((index) => {
+    const valueKey = `value${index}`;
+    const unitKey = `unit${index}`;
+    const unit = (Array.isArray(rows) ? rows : [])
+      .map((row) => String(row?.[unitKey] ?? "").trim())
+      .find(Boolean) || fallback.unit || "";
+    return {
+      id: slugifyBoundaryId(valueKey, valueKey),
+      table_key: valueKey,
+      label: valueKey,
+      type: fallback.type || "number",
+      unit,
+    };
+  });
+}
+
+function getGearBoxValueDefinitions(layerOrDraft) {
+  if (Array.isArray(layerOrDraft?.gearBox?.values) && layerOrDraft.gearBox.values.length) {
+    return layerOrDraft.gearBox.values;
+  }
+  if (Array.isArray(layerOrDraft?.values) && layerOrDraft.values.length) return layerOrDraft.values;
+  const headers = Array.isArray(layerOrDraft?.table?.headers) && layerOrDraft.table.headers.length
+    ? layerOrDraft.table.headers
+    : (Array.isArray(layerOrDraft?.matchPreview?.headers) ? layerOrDraft.matchPreview.headers : []);
+  const rows = Array.isArray(layerOrDraft?.table?.rows)
+    ? layerOrDraft.table.rows
+    : [];
+  return getGearBoxValueDefinitionsFromTable(headers, rows, {
+    type: layerOrDraft?.valueType || "number",
+    unit: layerOrDraft?.valueUnit || "",
+  });
+}
+
+function getGearBoxValueDefinitionLabel(definition) {
+  return definition?.unit || definition?.label || definition?.table_key || "Wert";
+}
+
+function getActiveGearBoxValueKey(layerOrDraft) {
+  const values = getGearBoxValueDefinitions(layerOrDraft);
+  const style = layerOrDraft?.gearBox?.style || layerOrDraft?.style || {};
+  const candidate = style.active_value_key
+    || values.find((entry) => entry.id === style.value_id)?.table_key
+    || values[0]?.table_key
+    || layerOrDraft?.valueKey
+    || "value1";
+  return values.some((entry) => entry.table_key === candidate) ? candidate : (values[0]?.table_key || candidate);
+}
+
+function getActiveGearBoxValueStyle(style = {}, valueKey = "") {
+  const valueStyles = style.value_styles || {};
+  const specific = valueKey ? (valueStyles[valueKey] || {}) : {};
+  return { ...style, ...specific };
+}
+
+function syncGearBoxLayerValueDefinitions(layer) {
+  if (!layer?.gearBox || !layer?.table) return;
+  const headers = Array.isArray(layer.table.headers) ? layer.table.headers : [];
+  const rows = Array.isArray(layer.table.rows) ? layer.table.rows : [];
+  layer.gearBox.values = getGearBoxValueDefinitionsFromTable(headers, rows, {
+    type: layer.gearBox.values?.[0]?.type || "number",
+    unit: layer.gearBox.values?.[0]?.unit || "",
+  });
+  if (!layer.gearBox.style) layer.gearBox.style = {};
+  const currentValueKey = layer.gearBox.style.active_value_key || "";
+  if (!currentValueKey || currentValueKey === "value" || !layer.gearBox.values.some((entry) => entry.table_key === currentValueKey)) {
+    layer.gearBox.style.active_value_key = layer.gearBox.values[0]?.table_key || "value1";
+    layer.gearBox.style.value_id = layer.gearBox.values[0]?.id || "value1";
+  }
 }
 
 function createGearBoxValuesTable(layer) {
@@ -13246,11 +14321,21 @@ function createGearBoxValuesTable(layer) {
   tableWrap.className = "gearbox-values-table-wrap";
   const table = document.createElement("table");
   table.className = "gearbox-values-table";
-  const headers = Array.isArray(layer?.table?.headers) && layer.table.headers.length
-    ? layer.table.headers
-    : ["boundary_key", "boundary_label", "value", "unit", "source_label", "source_url", "source_accessed_at", "source_note"];
+  const headers = ensureGearBoxValueTableHeaders(
+    Array.isArray(layer?.table?.headers) && layer.table.headers.length
+      ? layer.table.headers
+      : ["boundary_key", "boundary_label", "value", "unit", "source_label", "source_url", "source_accessed_at", "source_note"],
+  );
+  normalizeGearBoxValueColumns(headers, rows, { unit: layer?.gearBox?.values?.[0]?.unit || "" });
+  if (layer?.gearBox?.values?.[0]) {
+    const currentValueKey = layer.gearBox.values[0].table_key || "";
+    if (!currentValueKey || String(currentValueKey).toLowerCase() === "value" || !headers.includes(currentValueKey)) {
+      layer.gearBox.values[0].table_key = "value1";
+    }
+  }
   layer.table.headers = headers;
   layer.table.rows = rows;
+  syncGearBoxLayerValueDefinitions(layer);
   const visibleHeaders = getGearBoxVisibleValueHeaders(headers);
 
   const thead = document.createElement("thead");
@@ -13284,6 +14369,9 @@ function createGearBoxValuesTable(layer) {
       } else if (String(header).toLowerCase() === "source_label") {
         td.className = "gearbox-source-cell";
         td.append(createSourceInputControl(input, rowData, layer, rowIndex, header));
+      } else if (String(header).toLowerCase() === "value") {
+        td.className = "gearbox-value-cell";
+        td.append(createValueInputControl(input, rowData, rows, headers, () => syncGearBoxLayerTableRaw(layer), renderLayerEditor));
       } else {
         td.append(input);
       }
@@ -13336,11 +14424,22 @@ function createGearBoxValuesTable(layer) {
   const addRow = document.createElement("button");
   addRow.type = "button";
   addRow.className = "secondary-button";
-  addRow.textContent = "Zeile hinzufügen";
+  addRow.textContent = "Hinzufügen";
   addRow.addEventListener("click", () => {
-    rows.push(Object.fromEntries(headers.map((header) => [header, ""])));
-    syncGearBoxLayerTableRaw(layer);
-    renderGearBoxPanel();
+    openGearBoxBoundaryAddDialog({
+      headers,
+      defaults: {
+        unit: rows.find((row) => row?.unit)?.unit || layer?.gearBox?.values?.[0]?.unit || "",
+        source_label: layer?.origin === "search" ? "EarthMap-Suche" : "",
+        source_accessed_at: new Date().toISOString().slice(0, 10),
+      },
+      onApply: (newRows) => {
+        rows.push(...newRows);
+        syncGearBoxLayerTableRaw(layer);
+        renderGearBoxPanel();
+        renderLayerEditor();
+      },
+    });
   });
   actions.append(addRow);
 
@@ -13371,8 +14470,20 @@ function createGearBoxDraftValuesTable(draft = ensureGearBoxDraft()) {
     return panel;
   }
 
-  const headers = parsed.headers;
-  const rows = parsed.rows.length ? parsed.rows : [Object.fromEntries(headers.map((header) => [header, ""]))];
+  const headers = ensureGearBoxValueTableHeaders(parsed.headers);
+  const rows = parsed.rows.length
+    ? parsed.rows.map((row) => {
+      const normalized = Object.fromEntries(headers.map((header) => [header, row?.[header] ?? ""]));
+      Object.keys(row || {}).forEach((key) => {
+        if (!(key in normalized)) normalized[key] = row[key];
+      });
+      return normalized;
+    })
+    : [Object.fromEntries(headers.map((header) => [header, ""]))];
+  normalizeGearBoxValueColumns(headers, rows, { unit: draft?.valueUnit || "" });
+  if (!draft.valueKey || String(draft.valueKey).toLowerCase() === "value" || !headers.includes(draft.valueKey)) {
+    draft.valueKey = "value1";
+  }
   const visibleHeaders = getGearBoxVisibleValueHeaders(headers);
   const persistRows = () => {
     draft.csvCode = serializeDelimitedRows(headers, rows, draft.delimiter || ";");
@@ -13430,6 +14541,9 @@ function createGearBoxDraftValuesTable(draft = ensureGearBoxDraft()) {
       } else if (String(header).toLowerCase() === "source_label") {
         td.className = "gearbox-source-cell";
         td.append(createSourceInputControl(input, rowData, null, rowIndex, header));
+      } else if (String(header).toLowerCase() === "value") {
+        td.className = "gearbox-value-cell";
+        td.append(createValueInputControl(input, rowData, rows, headers, persistRows, renderGearBoxPanel));
       } else {
         td.append(input);
       }
@@ -13480,11 +14594,21 @@ function createGearBoxDraftValuesTable(draft = ensureGearBoxDraft()) {
   const addRow = document.createElement("button");
   addRow.type = "button";
   addRow.className = "secondary-button";
-  addRow.textContent = "Zeile hinzufügen";
+  addRow.textContent = "Hinzufügen";
   addRow.addEventListener("click", () => {
-    rows.push(Object.fromEntries(headers.map((header) => [header, ""])));
-    persistRows();
-    renderGearBoxPanel();
+    openGearBoxBoundaryAddDialog({
+      headers,
+      defaults: {
+        unit: rows.find((row) => row?.unit)?.unit || draft?.valueUnit || "",
+        source_accessed_at: new Date().toISOString().slice(0, 10),
+      },
+      onApply: (newRows) => {
+        rows.push(...newRows);
+        persistRows();
+        renderGearBoxPanel();
+        renderLayerEditor();
+      },
+    });
   });
   actions.append(addRow);
   panel.append(title, applyActions, tableWrap, actions);
@@ -13553,7 +14677,7 @@ function renderGearBoxPanel() {
     const csvEditor = createEarthMapCsvCodeEditor({
       value: draft.csvCode,
       delimiter: draft.delimiter || ";",
-      placeholder: "boundary_key;boundary_label;value;unit;source_label\nDE-BW;Baden-Württemberg;4.2;%;Destatis",
+      placeholder: "boundary_key;boundary_label;role;value1;unit1;source_label\nDE-BW;Baden-Württemberg;focus;4.2;%;Destatis",
       onInput: (value) => {
         draft.csvCode = value;
       },
@@ -14878,6 +16002,379 @@ function createSourceInputControl(input, rowData, layer, rowIndex, fieldName = "
   return wrap;
 }
 
+function createValueInputControl(input, rowData, rows, headers, persist, rerender) {
+  const wrap = document.createElement("div");
+  wrap.className = "gearbox-value-control";
+  input.readOnly = true;
+  input.value = getGearBoxValueSummary(rowData, headers);
+  input.placeholder = "—";
+  input.addEventListener("click", () => {
+    openValueDetailsDialog({ rowData, rows, headers, persist, rerender });
+  });
+  const detailsButton = document.createElement("button");
+  detailsButton.type = "button";
+  detailsButton.className = "boundary-key-details-button value-details-button";
+  detailsButton.title = "Value-Details bearbeiten";
+  detailsButton.setAttribute("aria-label", "Value-Details bearbeiten");
+  const icon = document.createElement("span");
+  icon.className = "boundary-key-details-icon";
+  icon.setAttribute("aria-hidden", "true");
+  detailsButton.append(icon);
+  detailsButton.addEventListener("click", () => openValueDetailsDialog({ rowData, rows, headers, persist, rerender }));
+  wrap.append(input, detailsButton);
+  return wrap;
+}
+
+function openValueDetailsDialog({ rowData, rows, headers, persist, rerender } = {}) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "technical-detail-dialog value-details-dialog";
+  const title = document.createElement("h3");
+  title.textContent = "Value";
+  const intro = document.createElement("p");
+  intro.textContent = "Mehrere Werte werden als value1/unit1, value2/unit2 … gespeichert. Neue Wertefelder gelten für das ganze Boundary-Set; Unit ist darum ein globales Feld und wird für alle Zeilen derselben Wertspalte übernommen.";
+  const list = document.createElement("div");
+  list.className = "value-details-list";
+
+  const syncAndPersist = () => {
+    persist?.();
+    rerender?.();
+  };
+
+  const renderValueRows = () => {
+    list.replaceChildren();
+    getGearBoxValueColumnIndexes(headers).forEach((index) => {
+      const row = document.createElement("div");
+      row.className = "value-details-row";
+      const valueField = document.createElement("label");
+      valueField.className = "value-details-field";
+      const valueLabel = document.createElement("span");
+      valueLabel.textContent = `value${index}`;
+      const valueInput = document.createElement("input");
+      valueInput.type = "text";
+      valueInput.value = rowData?.[`value${index}`] ?? "";
+      valueInput.addEventListener("input", () => {
+        rowData[`value${index}`] = valueInput.value.trim();
+        syncAndPersist();
+      });
+      valueField.append(valueLabel, valueInput);
+
+      const unitField = document.createElement("label");
+      unitField.className = "value-details-field";
+      const unitLabel = document.createElement("span");
+      unitLabel.textContent = `unit${index}`;
+      const unitInput = document.createElement("input");
+      unitInput.type = "text";
+      unitInput.value = rowData?.[`unit${index}`] ?? "";
+      unitInput.addEventListener("input", () => {
+        const unitValue = unitInput.value.trim();
+        (Array.isArray(rows) ? rows : []).forEach((candidate) => {
+          candidate[`unit${index}`] = unitValue;
+        });
+        syncAndPersist();
+      });
+      unitField.append(unitLabel, unitInput);
+      row.append(valueField, unitField);
+      list.append(row);
+    });
+  };
+
+  const actions = document.createElement("div");
+  actions.className = "technical-detail-actions boundary-key-details-actions";
+  const addValue = document.createElement("button");
+  addValue.type = "button";
+  addValue.className = "secondary-button";
+  addValue.textContent = "Wert hinzufügen";
+  addValue.addEventListener("click", () => {
+    const nextIndex = getGearBoxNextValueColumnIndex(headers);
+    headers.push(`value${nextIndex}`, `unit${nextIndex}`);
+    (Array.isArray(rows) ? rows : []).forEach((candidate) => {
+      candidate[`value${nextIndex}`] = "";
+      candidate[`unit${nextIndex}`] = "";
+    });
+    syncAndPersist();
+    renderValueRows();
+  });
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "secondary-button";
+  close.textContent = "Schließen";
+  close.addEventListener("click", () => dialog.close());
+  actions.append(addValue, close);
+
+  renderValueRows();
+  dialog.append(title, intro, list, actions);
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    rerender?.();
+  });
+  document.body.append(dialog);
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  return dialog;
+}
+
+function ensureGearBoxValueTableHeaders(headers = []) {
+  const normalizedHeaders = Array.isArray(headers) ? [...headers] : [];
+  [
+    "boundary_key",
+    "boundary_label",
+    "role",
+    "level",
+    "value1",
+    "unit1",
+    "source_label",
+    "source_url",
+    "source_accessed_at",
+    "source_note",
+    "stable_id",
+    "feature_id",
+    "version_id",
+    "provider_boundary_id",
+    "iso3",
+    "iso_3166_2",
+    "adm1_code",
+    "wikidata_id",
+  ].forEach((header) => {
+    if (!normalizedHeaders.includes(header)) normalizedHeaders.push(header);
+  });
+  return normalizedHeaders;
+}
+
+function createGearBoxBoundaryRowFromFeature(feature, headers = [], index = 0, defaults = {}) {
+  const row = Object.fromEntries(headers.map((header) => [header, ""]));
+  row.boundary_key = getSearchLayerBoundaryKey(feature, index);
+  row.boundary_label = getSearchLayerBoundaryLabel(feature, index);
+  row.role = defaults.role || "focus";
+  row.level = getSearchLayerBoundaryLevel(feature);
+  Object.assign(row, getSearchLayerBoundaryMetadata(feature, index));
+  if (defaults.unit && !row.unit1) row.unit1 = defaults.unit;
+  if (defaults.source_label && !row.source_label) row.source_label = defaults.source_label;
+  if (defaults.source_accessed_at && !row.source_accessed_at) row.source_accessed_at = defaults.source_accessed_at;
+  headers.forEach((header) => {
+    if (row[header] == null) row[header] = "";
+  });
+  return row;
+}
+
+function isGearBoxContextRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  // Architekturregel: Die räumliche Einschränkung beim Hinzufügen neuer
+  // Focus-Werte entsteht ausschließlich durch echte Context-Zeilen. Visuelle
+  // Varianten wie context_hatched sind Darstellungsrollen, aber keine eigene
+  // Geltungsbereichs-Weiche für die Wertetabelle.
+  return normalized === "context";
+}
+
+function createMapSearchEntryFromBoundaryFeature(feature) {
+  if (!feature?.geometry) return null;
+  return createEarthMapBoundaryEntry(isNaturalEarthAdmin1Feature(feature) ? "admin1" : "country", feature);
+}
+
+function getGearBoxContextEntryKey(entry) {
+  return [entry?.kind, entry?.stableId, entry?.iso3, entry?.wikidataId].filter(Boolean).join(":");
+}
+
+function appendUniqueGearBoxContextEntry(entries, seen, feature) {
+  const entry = createMapSearchEntryFromBoundaryFeature(feature);
+  if (!entry) return;
+  const key = getGearBoxContextEntryKey(entry);
+  if (seen.has(key)) return;
+  seen.add(key);
+  entries.push(entry);
+}
+
+function getActiveGearBoxContextEntriesForBoundaryAdd(project = getActiveProject()) {
+  const entries = [];
+  const seen = new Set();
+  const layers = Array.isArray(project?.dataLayers)
+    ? project.dataLayers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false)
+    : [];
+  const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), "stable_id");
+
+  layers.forEach((layer) => {
+    (Array.isArray(layer.valueMatches) ? layer.valueMatches : [])
+      .filter((match) => isGearBoxContextRole(match?.role))
+      .forEach((match) => appendUniqueGearBoxContextEntry(entries, seen, match.feature));
+
+    const headers = Array.isArray(layer.table?.headers) ? layer.table.headers : [];
+    const tableKey = layer.gearBox?.join?.table_key || getPreferredGearBoxTableKey(headers);
+    (Array.isArray(layer.table?.rows) ? layer.table.rows : [])
+      .filter((row) => isGearBoxContextRole(getGearBoxRowValue(row, "role")))
+      .forEach((row) => {
+        const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, tableKey, { requireDrawable: true });
+        appendUniqueGearBoxContextEntry(entries, seen, entry?.feature);
+      });
+  });
+  return entries;
+}
+
+async function resolveActiveGearBoxContextEntriesForBoundaryAdd(project = getActiveProject()) {
+  const entries = getActiveGearBoxContextEntriesForBoundaryAdd(project);
+  const seen = new Set(entries.map(getGearBoxContextEntryKey).filter(Boolean));
+  const layers = Array.isArray(project?.dataLayers)
+    ? project.dataLayers.filter((layer) => layer?.kind === "gearbox-data-layer" && layer.visible !== false)
+    : [];
+
+  for (const layer of layers) {
+    const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex];
+      if (!isGearBoxContextRole(getGearBoxRowValue(row, "role"))) continue;
+      const entry = await findSearchResultBoundaryEntryForRow(row, rowIndex);
+      appendUniqueGearBoxContextEntry(entries, seen, entry?.feature);
+    }
+  }
+  return entries;
+}
+
+function isBoundaryFeatureAllowedByGearBoxContext(feature, contextEntries = []) {
+  if (!contextEntries.length) return true;
+  const focusEntry = createMapSearchEntryFromBoundaryFeature(feature);
+  return Boolean(focusEntry && isMapSearchFocusInsideContext(focusEntry, contextEntries));
+}
+
+function createBoundarySelectionPreviewRow(entry) {
+  const row = document.createElement("div");
+  row.className = `boundary-selection-row ${
+    entry.status === "found" ? "is-found" : entry.status === "blocked" ? "is-blocked" : "is-missing"
+  }`;
+  const term = document.createElement("span");
+  term.className = "boundary-selection-term";
+  term.textContent = entry.term || "—";
+  const key = document.createElement("code");
+  key.className = "boundary-selection-key";
+  key.textContent = entry.row?.boundary_key || "—";
+  const label = document.createElement("strong");
+  label.className = "boundary-selection-label";
+  label.textContent = entry.row?.boundary_label || (entry.status === "blocked" ? "außerhalb Context" : "nicht erkannt");
+  const note = document.createElement("span");
+  note.className = "boundary-selection-note";
+  note.textContent = entry.note || (entry.status === "found" ? "wird übernommen" : "wird nicht übernommen");
+  row.append(term, key, label, note);
+  return row;
+}
+
+function openGearBoxBoundaryAddDialog({ headers = [], defaults = {}, onApply } = {}) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "technical-detail-dialog boundary-add-dialog";
+  const title = document.createElement("h3");
+  title.textContent = "Boundaries hinzufügen";
+  const intro = document.createElement("p");
+  intro.textContent = "Gib Boundary-Namen kommasepariert ein. Die Vorschau zeigt live, welche Kartenflächen eindeutig erkannt werden.";
+  let contextEntries = getActiveGearBoxContextEntriesForBoundaryAdd();
+  const contextEntriesPromise = resolveActiveGearBoxContextEntriesForBoundaryAdd().then((resolved) => {
+    contextEntries = resolved;
+    contextInfo.textContent = contextEntries.length
+      ? "Eine Context-Karte ist aktiv: EarthMap übernimmt hier nur Boundaries, die innerhalb dieser Context-Elemente liegen. So bleibt die Wertetabelle räumlich eindeutig an den eingerichteten Geltungsbereich gebunden."
+      : "Keine Context-Karte aktiv: erkannte Boundaries können ohne räumliche Einschränkung übernommen werden.";
+    return resolved;
+  });
+  const contextInfo = document.createElement("p");
+  contextInfo.className = "boundary-add-context-info";
+  contextInfo.textContent = contextEntries.length
+    ? "Eine Context-Karte ist aktiv: EarthMap übernimmt hier nur Boundaries, die innerhalb dieser Context-Elemente liegen. So bleibt die Wertetabelle räumlich eindeutig an den eingerichteten Geltungsbereich gebunden."
+    : "Keine Context-Karte aktiv: erkannte Boundaries können ohne räumliche Einschränkung übernommen werden.";
+
+  const field = document.createElement("label");
+  field.className = "boundary-add-search-field";
+  const fieldLabel = document.createElement("span");
+  fieldLabel.textContent = "Suche";
+  const input = document.createElement("input");
+  input.type = "search";
+  input.placeholder = "z. B. Deutschland, Frankreich, Bayern";
+  input.autocomplete = "off";
+  field.append(fieldLabel, input);
+
+  const status = document.createElement("p");
+  status.className = "boundary-add-status structured-editor-field-help";
+  status.textContent = "Noch keine Eingabe.";
+  const resultList = document.createElement("div");
+  resultList.className = "boundary-selection-list";
+
+  const actions = document.createElement("div");
+  actions.className = "technical-detail-actions boundary-key-details-actions";
+  const apply = createStatisticApplyButton("Änderungen übernehmen");
+  apply.disabled = true;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "secondary-button";
+  close.textContent = "Schließen";
+  close.addEventListener("click", () => dialog.close());
+  actions.append(apply, close);
+
+  let resolutionSerial = 0;
+  let debounceTimer = null;
+  let resolvedRows = [];
+  const resolveInput = async () => {
+    const serial = ++resolutionSerial;
+    const terms = String(input.value || "")
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    resolvedRows = [];
+    resultList.replaceChildren();
+    apply.disabled = true;
+    if (!terms.length) {
+      status.textContent = "Noch keine Eingabe.";
+      return;
+    }
+    status.textContent = "Erkenne Boundaries …";
+    const activeContextEntries = await contextEntriesPromise;
+    if (serial !== resolutionSerial) return;
+    const entries = [];
+    for (let index = 0; index < terms.length; index += 1) {
+      const term = terms[index];
+      const boundaryEntry = await resolveEarthMapBoundaryTerm(term, {
+        includeUnions: false,
+        focus: Boolean(activeContextEntries.length),
+        contextEntries: activeContextEntries,
+      });
+      if (serial !== resolutionSerial) return;
+      if (boundaryEntry?.feature) {
+        const row = createGearBoxBoundaryRowFromFeature(boundaryEntry.feature, headers, index, defaults);
+        if (isBoundaryFeatureAllowedByGearBoxContext(boundaryEntry.feature, activeContextEntries)) {
+          entries.push({ term, status: "found", row });
+        } else {
+          entries.push({
+            term,
+            status: "blocked",
+            row,
+            note: "liegt nicht in der aktiven Context-Karte",
+          });
+        }
+      } else {
+        entries.push({ term, status: "missing", row: null });
+      }
+    }
+    if (serial !== resolutionSerial) return;
+    resolvedRows = entries.filter((entry) => entry.status === "found" && entry.row).map((entry) => entry.row);
+    resultList.replaceChildren(...entries.map(createBoundarySelectionPreviewRow));
+    const found = resolvedRows.length;
+    const blocked = entries.filter((entry) => entry.status === "blocked").length;
+    const notRecognized = entries.filter((entry) => entry.status === "missing").length;
+    status.textContent = `${found} übernehmbar${blocked ? ` · ${blocked} außerhalb Context` : ""}${notRecognized ? ` · ${notRecognized} nicht erkannt` : ""}`;
+    apply.disabled = found === 0;
+  };
+  input.addEventListener("input", () => {
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(resolveInput, 220);
+  });
+  apply.addEventListener("click", () => {
+    if (!resolvedRows.length) return;
+    onApply?.(resolvedRows);
+    dialog.close();
+  });
+
+  dialog.append(title, intro, contextInfo, field, status, resultList, actions);
+  dialog.addEventListener("close", () => {
+    window.clearTimeout(debounceTimer);
+    dialog.remove();
+  });
+  document.body.append(dialog);
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  input.focus();
+  return dialog;
+}
+
 function getSearchLayerBoundaryMetadata(feature, fallbackIndex = 0) {
   const props = feature?.properties || {};
   const isAdmin1 = isNaturalEarthAdmin1Feature(feature);
@@ -15024,7 +16521,8 @@ function createSearchResultDataLayerFromHighlight(highlight) {
       values: [{ id: "value", table_key: "value", label: "Wert", type: "number", unit: "" }],
       style: {
         value_id: "value",
-        mode: "manual",
+        mode: "automatic",
+        auto_color_mode: "search_result",
         search_result_mode: true,
         classes: [
           { from: null, to: null, fill: getMapSearchSelectedAreaColor() },
@@ -15058,28 +16556,38 @@ function rebuildSearchResultDataLayerMatches(layer) {
   const layerSource = layer.gearBox?.source || {};
   let rowsEnriched = false;
   const boundaryIndex = createGearBoxBoundaryIndex(getBoundaryFeatureCandidatesForGearBox(), "stable_id");
+  const valueKey = getActiveGearBoxValueKey(layer);
+  const previousDrawableMatches = Array.isArray(layer.valueMatches)
+    ? layer.valueMatches.filter((match) => hasDrawableBoundaryFeature(match?.feature))
+    : [];
   layer.valueMatches = rows.flatMap((row, index) => {
     const entry = findGearBoxBoundaryEntryForRow(row, boundaryIndex, "boundary_key", { requireDrawable: true });
-    if (!entry) return [];
+    if (!entry) {
+      const previous = previousDrawableMatches.find((match) => doesSearchResultMatchRow(match, row));
+      return previous ? [previous] : [];
+    }
     rowsEnriched = enrichSearchResultRowFromFeature(row, entry.feature, index) || rowsEnriched;
     const role = row.role || "context";
     const isFocus = role === "focus";
     const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
     const classes = getGearBoxLayerClasses(layer);
-    const classEntry = getGearBoxClassForValue(row.value, classes) || classes[0];
+    const value = getGearBoxRowValue(row, valueKey);
+    const valueIsBlank = isGearBoxValueBlank(value);
+    const classEntry = valueIsBlank ? null : (getGearBoxClassForValue(value, classes) || classes[0]);
     const contextStyle = getGearBoxContextStyle(layer);
-    const fill = renderAsSearch
-      ? (isFocus ? getMapSearchSpecialHighlightColor() : contextStyle.fill)
+    const searchLikeStyle = getSearchLikeDisplayStyleForRole(layer, role);
+    const fill = renderAsSearch || valueIsBlank
+      ? searchLikeStyle.fill
       : (isFocus ? normalizeGearBoxClassFill(classEntry?.fill || "#d6ecff") : contextStyle.fill);
-    const outline = renderAsSearch
-      ? (isFocus ? getMapSearchSpecialOutlineColor() : contextStyle.outline)
+    const outline = renderAsSearch || valueIsBlank
+      ? searchLikeStyle.outline
       : (isFocus ? getMapSearchSpecialOutlineColor() : contextStyle.outline);
     return [{
       boundaryKey: row.boundary_key || "",
       featureId: entry.feature.id || entry.feature.stable_id || row.boundary_key || `search-${index}`,
       stable_id: entry.feature.stable_id || entry.feature.properties?._ziselinBoundarySetStableId || row.boundary_key || "",
-      value: row.value || "",
-      numericValue: parseGearBoxNumber(row.value),
+      value,
+      numericValue: parseGearBoxNumber(value),
       fill,
       outline,
       role,
@@ -15098,7 +16606,7 @@ function rebuildSearchResultDataLayerMatches(layer) {
     rowCount: rows.length,
     matched: layer.valueMatches.length,
     missing: rows
-      .filter((row) => !layer.valueMatches.some((match) => match.boundaryKey === row.boundary_key))
+      .filter((row) => !layer.valueMatches.some((match) => doesSearchResultMatchRow(match, row)))
       .slice(0, 12)
       .map((row) => row.boundary_key || row.boundary_label || "—"),
   };
@@ -15121,10 +16629,14 @@ function getSearchResultRowIdentifierCandidates(row) {
     getGearBoxRowValue(row, "wikidata_id"),
     getGearBoxRowValue(row, "boundary_label"),
   ];
-  return [...new Set(rawValues
+  const fullValues = rawValues
+    .map((value) => repairLegacyText(value).trim())
+    .filter(Boolean);
+  const splitValues = fullValues
     .flatMap((value) => String(value || "").split(/[,\s]+/))
     .map((value) => repairLegacyText(value).trim())
-    .filter(Boolean))];
+    .filter(Boolean);
+  return [...new Set([...fullValues, ...splitValues])];
 }
 
 function getSearchResultRowStrongIdentifierCandidates(row) {
@@ -15140,16 +16652,53 @@ function getSearchResultRowStrongIdentifierCandidates(row) {
     getGearBoxRowValue(row, "adm1_code"),
     getGearBoxRowValue(row, "wikidata_id"),
   ];
-  return [...new Set(rawValues
+  const fullValues = rawValues
+    .map((value) => repairLegacyText(value).trim())
+    .filter(Boolean);
+  const splitValues = fullValues
     .flatMap((value) => String(value || "").split(/[,\s]+/))
     .map((value) => repairLegacyText(value).trim())
-    .filter(Boolean))];
+    .filter(Boolean);
+  return [...new Set([...fullValues, ...splitValues])];
 }
 
 function getSearchResultRowEngineMatchKeys(row) {
   const keys = new Set(getGearBoxRowMatchKeys(row, "boundary_key"));
   getSearchResultRowIdentifierCandidates(row).forEach((value) => addGearBoxMatchKey(keys, value));
   return keys;
+}
+
+function getSearchResultMatchEngineKeys(match) {
+  const keys = new Set();
+  [
+    match?.boundaryKey,
+    match?.stable_id,
+    match?.featureId,
+    match?.feature?.stable_id,
+    match?.feature?.id,
+    match?.feature?.version_id,
+    match?.feature?.properties?._ziselinBoundarySetStableId,
+    match?.feature?.properties?.provider_boundary_id,
+    match?.feature?.properties?.ISO_A3,
+    match?.feature?.properties?.ADM0_A3,
+    match?.feature?.properties?.iso3,
+    match?.feature?.properties?.iso_3166_2,
+    match?.feature?.properties?.adm1_code,
+    match?.feature?.properties?.wikidata_id,
+    match?.feature?.properties?.wikidataid,
+    match?.feature?.properties?.WIKIDATAID,
+  ].forEach((value) => addGearBoxMatchKey(keys, value));
+  return keys;
+}
+
+function doesSearchResultMatchRow(match, row) {
+  const rowKeys = getSearchResultRowEngineMatchKeys(row);
+  if (!rowKeys.size) return false;
+  const matchKeys = getSearchResultMatchEngineKeys(match);
+  for (const key of rowKeys) {
+    if (matchKeys.has(key)) return true;
+  }
+  return false;
 }
 
 function getSearchResultRowStrongEngineMatchKeys(row) {
@@ -15330,18 +16879,22 @@ function createSearchResultValueMatchFromEntry(row, entry, index = 0, layer = nu
   const isFocus = role === "focus";
   const renderAsSearch = shouldRenderSearchLayerAsSearchResult(layer);
   const classes = getGearBoxLayerClasses(layer);
-  const classEntry = getGearBoxClassForValue(row.value, classes) || classes[0];
+  const valueKey = getActiveGearBoxValueKey(layer);
+  const value = getGearBoxRowValue(row, valueKey);
+  const valueIsBlank = isGearBoxValueBlank(value);
+  const classEntry = valueIsBlank ? null : (getGearBoxClassForValue(value, classes) || classes[0]);
+  const searchLikeStyle = getSearchLikeDisplayStyleForRole(layer, role);
   return {
     boundaryKey: row.boundary_key || "",
     featureId: row.feature_id || entry.feature.id || entry.feature.stable_id || row.boundary_key || `search-${index}`,
     stable_id: row.stable_id || entry.feature.stable_id || entry.feature.properties?._ziselinBoundarySetStableId || row.boundary_key || "",
-    value: row.value || "",
-    numericValue: parseGearBoxNumber(row.value),
-    fill: renderAsSearch
-      ? (isFocus ? getMapSearchSpecialHighlightColor() : getMapSearchSelectedAreaColor())
+    value,
+    numericValue: parseGearBoxNumber(value),
+    fill: renderAsSearch || valueIsBlank
+      ? searchLikeStyle.fill
       : normalizeGearBoxClassFill(classEntry?.fill || "#d6ecff"),
-    outline: renderAsSearch
-      ? (isFocus ? getMapSearchSpecialOutlineColor() : getMapSearchSelectedOutlineColor())
+    outline: renderAsSearch || valueIsBlank
+      ? searchLikeStyle.outline
       : getMapSearchSelectedOutlineColor(),
     role,
     source: {
@@ -15358,6 +16911,9 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
   if (options.force === true && layer) {
     layer._searchGeometryHydrationQueued = false;
     layer._searchGeometryHydrationPending = false;
+    layer._searchHydrationScheduleToken = "";
+    layer._searchHydrationActiveToken = "";
+    removeEarthMapBackgroundTasksByKeyPrefix([`search-layer-hydrate-${layer.id}`]);
   }
   if (!layer || layer._searchGeometryHydrationPending || layer._searchGeometryHydrationQueued) return;
   const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
@@ -15365,11 +16921,23 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
   ensureSearchResultTechnicalHeaders(layer);
   const hydrationRevision = (layer._searchHydrationRevision || 0) + 1;
   layer._searchHydrationRevision = hydrationRevision;
+  const reloadSerial = Number(options.reloadSerial) || layer._projectDataLayerReloadSerial || 0;
+  const scheduleToken = `${reloadSerial || "search"}-${hydrationRevision}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  layer._searchHydrationScheduleToken = scheduleToken;
+  layer._searchHydrationScheduledAt = Date.now();
   layer._searchGeometryHydrationQueued = true;
   const delay = Number.isFinite(Number(options.delay)) ? Math.max(0, Number(options.delay)) : 3200;
   window.setTimeout(() => {
+    if (layer._searchHydrationScheduleToken !== scheduleToken) return;
+    layer._searchHydrationScheduleToken = "";
+    if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) {
+      layer._searchGeometryHydrationQueued = false;
+      return;
+    }
     layer._searchGeometryHydrationQueued = false;
     if (layer._searchGeometryHydrationPending) return;
+    const activeToken = `${reloadSerial || "search"}-${hydrationRevision}-${Date.now()}`;
+    layer._searchHydrationActiveToken = activeToken;
     layer._searchGeometryHydrationPending = true;
     queueEarthMapBackgroundTask(`Suchkarte-Geometrien: ${layer.title || layer.id}`, async (taskContext) => {
     let paused = false;
@@ -15380,13 +16948,16 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
         : [];
       const mergeWithPreviousDrawableMatches = () => {
         const byKey = new Map();
+        const addMatchToIndex = (match) => {
+          getSearchResultMatchEngineKeys(match).forEach((key) => {
+            if (key && !byKey.has(key)) byKey.set(key, match);
+          });
+        };
         previousDrawableMatches.forEach((match) => {
-          const key = normalizeSearchText(match?.boundaryKey || match?.stable_id || match?.featureId || "");
-          if (key && !byKey.has(key)) byKey.set(key, match);
+          addMatchToIndex(match);
         });
         matches.forEach((match) => {
-          const key = normalizeSearchText(match?.boundaryKey || match?.stable_id || match?.featureId || "");
-          if (key) byKey.set(key, match);
+          addMatchToIndex(match);
         });
         return rows.flatMap((row) => {
           const rowKeys = getSearchResultRowEngineMatchKeys(row);
@@ -15398,7 +16969,35 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
         });
       };
       layer._searchHydrationLastRunAt = Date.now();
+      const commitEvery = rows.length > 300 ? 48 : rows.length > 120 ? 28 : rows.length > 40 ? 12 : 4;
+      const yieldEvery = rows.length > 300 ? 12 : rows.length > 120 ? 8 : 4;
+      let lastUiCommitAt = 0;
+      const commitSearchHydrationProgress = async (index) => {
+        layer.valueMatches = mergeWithPreviousDrawableMatches();
+        layer.matchPreview = {
+          ...(layer.matchPreview || {}),
+          headers: layer.table.headers || [],
+          rowCount: rows.length,
+          matched: layer.valueMatches.length,
+          missing: rows
+            .filter((candidate) => !layer.valueMatches.some((matchCandidate) => doesSearchResultMatchRow(matchCandidate, candidate)))
+            .slice(0, 12)
+            .map((candidate) => candidate.boundary_key || candidate.boundary_label || "—"),
+          pending: layer.valueMatches.length < rows.length,
+        };
+        if (index >= 0) {
+          layer._searchHydrationLastMatched = layer.valueMatches.length;
+          layer._searchHydrationLastMissing = Math.max(0, rows.length - layer.valueMatches.length);
+        }
+        // Große Such-/Statistikkarten dürfen die MapLibre-Source nicht nach
+        // jeder Zeile neu setzen. Wir committen in Paketen und geben der UI
+        // dazwischen Luft; so bleibt die Engine auch bei 500+ Werten bedienbar.
+        syncMapLibreSearchHighlight({ syncAdmin1: false });
+        scheduleGlobeRender();
+        await taskContext.yield?.();
+      };
       for (let index = 0; index < rows.length; index += 1) {
+        if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
         if (layer._searchHydrationRevision !== hydrationRevision) return;
         if (taskContext.shouldPause?.()) {
           paused = true;
@@ -15406,7 +17005,7 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
         }
         const row = rows[index];
         const existing = (layer.valueMatches || []).find((match) => (
-          normalizeSearchText(match?.boundaryKey) === normalizeSearchText(row.boundary_key)
+          doesSearchResultMatchRow(match, row)
           && hasDrawableBoundaryFeature(match?.feature)
         ));
         if (existing) {
@@ -15414,6 +17013,7 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
           continue;
         }
         const entry = await findSearchResultBoundaryEntryForRow(row, index, taskContext);
+        if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
         if (layer._searchHydrationRevision !== hydrationRevision) return;
         if (taskContext.shouldPause?.()) {
           paused = true;
@@ -15421,47 +17021,57 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
         }
         const match = createSearchResultValueMatchFromEntry(row, entry, index, layer);
         if (match) matches.push(match);
-        if (index % 3 === 2 || index === rows.length - 1) {
-          layer.valueMatches = mergeWithPreviousDrawableMatches();
-          layer.matchPreview = {
-            ...(layer.matchPreview || {}),
-            headers: layer.table.headers || [],
-            rowCount: rows.length,
-            matched: layer.valueMatches.length,
-            missing: rows
-              .filter((candidate) => !layer.valueMatches.some((matchCandidate) => matchCandidate.boundaryKey === candidate.boundary_key))
-              .slice(0, 12)
-              .map((candidate) => candidate.boundary_key || candidate.boundary_label || "—"),
-          };
-          layer.table.raw = serializeDelimitedRows(layer.table.headers || [], rows, layer.table.delimiter || ";");
-          syncMapLibreSearchHighlight({ syncAdmin1: false });
-          scheduleGlobeRender();
+        const now = performance.now();
+        const shouldCommit = index === rows.length - 1
+          || index % commitEvery === commitEvery - 1
+          || now - lastUiCommitAt > 420;
+        if (shouldCommit) {
+          lastUiCommitAt = now;
+          await commitSearchHydrationProgress(index);
+        } else if (index % yieldEvery === yieldEvery - 1) {
           await taskContext.yield?.();
-          if (taskContext.shouldPause?.()) {
-            paused = true;
-            break;
-          }
+        }
+        if (taskContext.shouldPause?.()) {
+          paused = true;
+          break;
         }
       }
+      if (reloadSerial && layer._projectDataLayerReloadSerial !== reloadSerial) return;
       if (layer._searchHydrationRevision !== hydrationRevision) return;
       layer.valueMatches = paused ? mergeWithPreviousDrawableMatches() : matches.slice();
       layer._searchHydrationLastMatched = layer.valueMatches.length;
       layer._searchHydrationLastMissing = Math.max(0, rows.length - layer.valueMatches.length);
       layer._searchHydrationLastMissingExamples = rows
-        .filter((candidate) => !layer.valueMatches.some((matchCandidate) => matchCandidate.boundaryKey === candidate.boundary_key))
+        .filter((candidate) => !layer.valueMatches.some((matchCandidate) => doesSearchResultMatchRow(matchCandidate, candidate)))
         .slice(0, 8)
         .map((candidate) => candidate.boundary_key || candidate.stable_id || candidate.boundary_label || "—");
       if (!paused && !taskContext.shouldPause?.()) {
+        layer.matchPreview = {
+          ...(layer.matchPreview || {}),
+          headers: layer.table.headers || [],
+          rowCount: rows.length,
+          matched: layer.valueMatches.length,
+          missing: layer._searchHydrationLastMissingExamples,
+          pending: false,
+        };
+        layer.table.raw = serializeDelimitedRows(layer.table.headers || [], rows, layer.table.delimiter || ";");
         syncMapLibreSearchHighlight({ syncAdmin1: false });
         scheduleGlobeRender();
-        persistProjects();
+        // Die Geometrien sind Render-Cache, keine dauerhafte Dokumentwahrheit.
+        // Persistiert werden nur Tabelle/Metadaten; sanitizeDataLayerForStorage
+        // entfernt Features ohnehin. Während der Hydrierung vermeiden wir
+        // zusätzliche Storage-Schreiblast.
+        if (layer._searchHydrationLastMissing === 0) persistProjects();
         orderMapLibreReadableBoundaryLayers();
       }
     } finally {
-      layer._searchGeometryHydrationPending = false;
-      if (paused) {
+      if (layer._searchHydrationActiveToken === activeToken) {
+        layer._searchGeometryHydrationPending = false;
+        layer._searchHydrationActiveToken = "";
+      }
+      if (paused && (!reloadSerial || layer._projectDataLayerReloadSerial === reloadSerial)) {
         layer._searchHydrationPausedAt = Date.now();
-        scheduleSearchResultLayerHydration(layer, { delay: 900 });
+        scheduleSearchResultLayerHydration(layer, { delay: 900, reloadSerial });
       }
     }
     }, {
@@ -15471,12 +17081,36 @@ function scheduleSearchResultLayerHydration(layer, options = {}) {
   }, delay);
 }
 
+function hydrateVisibleSavedSearchLayers(project = getActiveProject(), options = {}) {
+  const layers = (project?.dataLayers || [])
+    .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false);
+  if (!layers.length) return false;
+  const baseDelay = Number.isFinite(Number(options.delay)) ? Math.max(0, Number(options.delay)) : 220;
+  let queued = false;
+  layers.forEach((layer, index) => {
+    const rows = Array.isArray(layer.table?.rows) ? layer.table.rows : [];
+    if (!rows.length) return;
+    const drawableMatches = (layer.valueMatches || []).filter((match) => hasDrawableBoundaryFeature(match?.feature));
+    const needsHydration = options.force === true
+      || drawableMatches.length < rows.length
+      || (layer.valueMatches || []).length < rows.length;
+    if (!needsHydration) return;
+    scheduleSearchResultLayerHydration(layer, {
+      force: options.force === true,
+      delay: baseDelay + index * 110,
+    });
+    queued = true;
+  });
+  return queued;
+}
+
 function rehydrateSavedSearchLayers(project = getActiveProject(), options = {}) {
   const layers = (project?.dataLayers || [])
     .filter((layer) => layer?.kind === "gearbox-data-layer" && layer.origin === "search" && layer.visible !== false);
   if (!layers.length) return false;
   let changed = false;
-  layers.forEach((layer) => {
+  const hydrateDelay = Number.isFinite(Number(options.hydrateDelay)) ? Number(options.hydrateDelay) : undefined;
+  layers.forEach((layer, index) => {
     const hasRows = Array.isArray(layer.table?.rows) && layer.table.rows.length;
     const hasDrawableMatches = (layer.valueMatches || []).some((match) => hasDrawableBoundaryFeature(match?.feature));
     // Start-/Refresh-Regel: gespeicherte Suchkarten dürfen den ersten Globus
@@ -15489,7 +17123,7 @@ function rehydrateSavedSearchLayers(project = getActiveProject(), options = {}) 
     )) {
       scheduleSearchResultLayerHydration(layer, {
         force: options.forceHydration === true,
-        delay: Number.isFinite(Number(options.hydrateDelay)) ? Number(options.hydrateDelay) : undefined,
+        delay: Number.isFinite(Number(hydrateDelay)) ? hydrateDelay + index * 110 : undefined,
       });
     } else if (hasDrawableMatches && options.refreshExisting === true) {
       const beforeMatches = Array.isArray(layer.valueMatches) ? layer.valueMatches.length : 0;
