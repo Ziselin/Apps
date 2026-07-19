@@ -4084,11 +4084,14 @@ function getMapLibrePilotLandDataset(detail = "start") {
       featureCount: mapLibreEngineState.fullLandGeoJson.features.length,
     };
   }
-  const start = window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start"] || null;
+  const start = window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start-surface"]
+    || window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start"]
+    || null;
   if (start?.features?.length) {
     return {
-      label: "natural-earth-global-start",
+      label: start.name || "natural-earth-global-start-surface",
       geojson: cloneGeoJsonForMapLibre(start),
+      featureCount: start.features.length,
     };
   }
   return null;
@@ -7223,7 +7226,7 @@ function getSurfaceBudgetSignature() {
 
 function getNaturalEarthSurfaceFeatureBudget() {
   const mobileFactor = window.matchMedia?.("(max-width: 760px)")?.matches ? 0.58 : 1;
-  const base = globeZoom < 2.4 ? 420
+  const base = globeZoom < 2.4 ? 900
     : globeZoom < 4.2 ? 760
       : globeZoom < 7 ? 1250
         : globeZoom < 12 ? 1900
@@ -7244,6 +7247,9 @@ function getNaturalEarth10mTileDataKey(tile) {
 
 function getNaturalEarthGlobalTile() {
   const index = getNaturalEarth10mTileIndex();
+  if (window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start-surface"]) {
+    return { key: "global-start-surface", file: "ne_10m_land_hierarchy_global_start_surface.js", isGlobal: true };
+  }
   if (window.EarthMapNaturalEarthTileData?.["10m-land-hierarchy-global-start"]) {
     return { key: "global-start", file: "ne_10m_land_hierarchy_global_start.js", isGlobal: true };
   }
@@ -7546,7 +7552,7 @@ function requestNaturalEarthDetailForZoom() {
     if (!index) return;
     const threshold = getNaturalEarth10mDetailThreshold();
     const startupGlobal = threshold >= 0.52 && globeZoom < 1.35
-      ? { key: "global-start", file: "ne_10m_land_hierarchy_global_start.js", isGlobal: true }
+      ? getNaturalEarthGlobalTile()
       : null;
     const tiles = startupGlobal ? [] : getVisibleNaturalEarth10mTiles();
     const globalTile = getNaturalEarthGlobalTile();
