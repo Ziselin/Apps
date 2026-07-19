@@ -20,6 +20,7 @@ let mapLibreAdmin1ViewportTimer = null;
 let mapLibreAdmin1PendingSignature = "";
 let mapLibreInitialFullLandTimer = null;
 let mapSearchOptionCache = null;
+const mapSearchSegmentResolveCache = new Map();
 let wikidataMapSearchLoadingCount = 0;
 const wikidataMapSearchCache = new Map();
 const MAP_SEARCH_INPUT_DEBOUNCE_MS = 260;
@@ -152,7 +153,12 @@ const CONTINENTAL_MAP_OPTIONS = [
 const MAP_SEARCH_UNION_ALIASES = [
   {
     id: "european-union",
+    wikidataId: "Q458",
     names: ["Europäische Union", "EU", "European Union", "Union européenne", "Europaeische Union"],
+    // EarthMap nutzt "EU" als kartografischen Kurzanker für die
+    // europäische Integrationslinie ab EWG/EG. Der rechtliche Name ändert
+    // sich historisch, der Suchanker bleibt für Nutzer bewusst stabil.
+    valid_from: "1958-01-01",
     iso3: [
       "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN",
       "FRA", "DEU", "GRC", "HUN", "IRL", "ITA", "LVA", "LTU", "LUX",
@@ -168,6 +174,7 @@ const MAP_SEARCH_UNION_ALIASES = [
   },
   {
     id: "united-nations",
+    wikidataId: "Q1065",
     names: ["Vereinte Nationen", "United Nations", "UN", "UNO", "United Nations Organization"],
     // UN-Regel: Diese Liste bildet aktuelle Mitgliedstaaten ab, nicht
     // Gründungsmitglieder. Wikidata führt für Q1065 u. a. P112 (Gründer);
@@ -201,11 +208,13 @@ const MAP_SEARCH_UNION_ALIASES = [
   },
   {
     id: "g7",
+    wikidataId: "Q176451",
     names: ["G7", "Gruppe der Sieben", "Group of Seven"],
     iso3: ["CAN", "FRA", "DEU", "ITA", "JPN", "GBR", "USA"],
   },
   {
     id: "nato",
+    wikidataId: "Q7184",
     names: ["NATO", "North Atlantic Treaty Organization", "Organisation des Nordatlantikvertrags", "Nordatlantikpakt"],
     iso3: [
       "ALB", "BEL", "BGR", "CAN", "HRV", "CZE", "DNK", "EST", "FIN",
@@ -216,16 +225,20 @@ const MAP_SEARCH_UNION_ALIASES = [
   },
   {
     id: "asean",
+    wikidataId: "Q7768",
     names: ["ASEAN", "Verband Südostasiatischer Nationen", "Association of Southeast Asian Nations"],
+    valid_from: "1967-08-08",
     iso3: ["BRN", "KHM", "IDN", "LAO", "MYS", "MMR", "PHL", "SGP", "THA", "TLS", "VNM"],
   },
   {
     id: "brics",
+    wikidataId: "Q243630",
     names: ["BRICS", "BRICS-Staaten", "BRICS Plus"],
     iso3: ["BRA", "RUS", "IND", "CHN", "ZAF", "EGY", "ETH", "IDN", "IRN", "ARE"],
   },
   {
     id: "g20",
+    wikidataId: "Q19771",
     names: ["G20", "Gruppe der Zwanzig", "Group of Twenty"],
     iso3: [
       "ARG", "AUS", "BRA", "CAN", "CHN", "FRA", "DEU", "IND", "IDN",
@@ -234,6 +247,7 @@ const MAP_SEARCH_UNION_ALIASES = [
   },
   {
     id: "oecd",
+    wikidataId: "Q41550",
     names: ["OECD", "Organisation für wirtschaftliche Zusammenarbeit und Entwicklung"],
     iso3: [
       "AUS", "AUT", "BEL", "CAN", "CHL", "COL", "CRI", "CZE", "DNK",
@@ -245,26 +259,50 @@ const MAP_SEARCH_UNION_ALIASES = [
   },
   {
     id: "opec",
+    wikidataId: "Q7795",
     names: ["OPEC", "Organisation erdölexportierender Länder"],
     iso3: ["DZA", "COG", "GNQ", "GAB", "IRN", "IRQ", "KWT", "LBY", "NGA", "SAU", "ARE", "VEN"],
   },
   {
     id: "mercosur",
+    wikidataId: "Q4264",
     names: ["Mercosur", "Mercosul", "Gemeinsamer Markt des Südens"],
     iso3: ["ARG", "BOL", "BRA", "PRY", "URY"],
   },
   {
+    id: "ecsc",
+    wikidataId: "Q161549",
+    names: [
+      "EGKS",
+      "Europäische Gemeinschaft für Kohle und Stahl",
+      "European Coal and Steel Community",
+      "ECSC",
+    ],
+    // Wikidata führt Luxemburg aktuell nicht in der P463-Mitgliedschaft der
+    // EGKS, obwohl Luxemburg Gründungsmitglied war. Diese kuratierte Liste ist
+    // deshalb eine fachliche Ergänzung zur Wikidata-Antwort. Ohne Jahresangabe
+    // bleibt die EGKS wegen ihres Enddatums weiterhin nicht darstellbar.
+    valid_from: "1952-07-23",
+    valid_to: "2002-07-23",
+    iso3: ["BEL", "DEU", "FRA", "ITA", "LUX", "NLD"],
+    supplementWikidataIso3: true,
+    requiresTemporalQuery: true,
+  },
+  {
     id: "usmca",
+    wikidataId: "Q28959740",
     names: ["USMCA", "CUSMA", "T-MEC", "NAFTA", "Nordamerikanisches Freihandelsabkommen"],
     iso3: ["CAN", "MEX", "USA"],
   },
   {
     id: "cis",
+    wikidataId: "Q7779",
     names: ["GUS", "CIS", "Gemeinschaft Unabhängiger Staaten", "Commonwealth of Independent States"],
     iso3: ["ARM", "AZE", "BLR", "KAZ", "KGZ", "MDA", "RUS", "TJK", "UZB"],
   },
   {
     id: "au",
+    wikidataId: "Q7159",
     names: ["Afrikanische Union", "AU", "African Union"],
     iso3: [
       "DZA", "AGO", "BEN", "BWA", "BFA", "BDI", "CMR", "CPV", "CAF",
@@ -302,6 +340,51 @@ const MAP_SEARCH_ADMIN0_RELATION_OVERRIDES = [
       search_parent_context: true,
       search_parent_display: true,
       eu_scope: true,
+      organization_scope: ["european-union"],
+    },
+  },
+  {
+    child_iso3: "GRL",
+    parent_iso3: "DNK",
+    valid_from: "1973-01-01",
+    valid_to: "1985-02-01",
+    // Generische Geltungsraum-Ergänzung: Grönland war über Dänemark Teil des
+    // EG/EU-Geltungsraums, ist aber kein eigener Mitgliedstaat. Solche Fälle
+    // werden deshalb nicht in die Mitgliederliste geschrieben, sondern als
+    // zeitgebundene territoriale Scope-Relation modelliert.
+    classification: {
+      type: "associated_territory",
+      rank: 1,
+      sovereignty_status: "associated",
+      constitutional_status: "autonomous_territory",
+      relation_to_parent: "territorial_scope_via_parent",
+      parent_id: "DNK",
+      geometry_scope: "associated_territory",
+    },
+    applies_to: {
+      organization_scope: ["european-union"],
+    },
+  },
+  {
+    child_iso3: "DZA",
+    parent_iso3: "FRA",
+    valid_from: "1958-01-01",
+    valid_to: "1962-07-05",
+    // Algerien lag als Teil Frankreichs im frühen EWG-Geltungsraum. Das ist
+    // keine eigenständige Mitgliedschaft, sondern eine historische territoriale
+    // Anwendung. Die Relation bleibt darum zeitlich eng begrenzt und allgemein
+    // als Organisation-Geltungsraum kodiert.
+    classification: {
+      type: "associated_territory",
+      rank: 1,
+      sovereignty_status: "integrated_overseas_territory",
+      constitutional_status: "former_integral_territory",
+      relation_to_parent: "territorial_scope_via_parent",
+      parent_id: "FRA",
+      geometry_scope: "historical_associated_territory",
+    },
+    applies_to: {
+      organization_scope: ["european-union"],
     },
   },
 ];
@@ -317,6 +400,21 @@ const MAP_SEARCH_COUNTRY_ALIASES = [
   { names: ["Vereinigte Arabische Emirate", "VAE", "UAE", "United Arab Emirates"], iso3: "ARE" },
   { names: ["Elfenbeinküste", "Côte d’Ivoire", "Cote d Ivoire", "Ivory Coast"], iso3: "CIV" },
 ];
+
+// Historische Geltungsraum-Regel:
+// Wikidata kann für Organisationen sauber sagen, dass "Deutschland" zu einem
+// Zeitpunkt Mitglied war. Für Karten vor der Wiedervereinigung ist die heutige
+// ADM0-Fläche DEU aber fachlich falsch. Bis echte historische Boundary-Sets
+// vorliegen, ersetzen wir DEU bei Organisationssuchen vor dem 03.10.1990 durch
+// heutige ADM1-Flächen als transparente Approximation. Berlin wird nach der
+// aktuellen Projektentscheidung pauschal dem Osten zugerechnet; Saarland gehört
+// erst ab 1957 zur westdeutschen Ersatzfläche.
+const HISTORICAL_GERMANY_REUNIFICATION_DATE = "1990-10-03";
+const HISTORICAL_GERMANY_SAARLAND_EFFECTIVE_YEAR = 1957;
+const HISTORICAL_WEST_GERMANY_ADM1_CODES = [
+  "DE-BW", "DE-BY", "DE-HB", "DE-HH", "DE-HE", "DE-NI", "DE-NW", "DE-RP", "DE-SH",
+];
+const HISTORICAL_EAST_GERMANY_ADM1_CODES = ["DE-BB", "DE-BE", "DE-MV", "DE-SN", "DE-ST", "DE-TH"];
 
 const MAP_TYPE_CHOICES = [
   { value: "", label: "—", description: "Noch nicht fachlich zugeordnet." },
@@ -1735,6 +1833,18 @@ function getNaturalEarthAdmin0EngineEntryByIso3(iso3) {
   const index = getNaturalEarthAdmin0EngineIndex();
   return index?.chunks?.find((candidate) => (
     String(candidate.country_iso3 || candidate.provider_boundary_id || "").toUpperCase() === normalizedIso3
+  )) || null;
+}
+
+function getNaturalEarthAdmin0EngineEntryByWikidataId(wikidataId) {
+  const normalizedWikidataId = normalizeWikidataId(wikidataId);
+  if (!normalizedWikidataId) return null;
+  const index = getNaturalEarthAdmin0EngineIndex();
+  return index?.chunks?.find((candidate) => (
+    normalizeWikidataId(candidate.wikidata_id) === normalizedWikidataId
+    || (Array.isArray(candidate.match_keys) && candidate.match_keys.some((key) => (
+      normalizeWikidataId(key) === normalizedWikidataId
+    )))
   )) || null;
 }
 
@@ -14990,7 +15100,7 @@ function scoreSearchValues(values, needles) {
       if (!needle || !value) return;
       if (value === needle) score = Math.max(score, 100);
       else if (tokens.includes(needle)) score = Math.max(score, 86);
-      else if (value.startsWith(needle)) score = Math.max(score, 72);
+      else if (needle.length >= 3 && value.startsWith(needle)) score = Math.max(score, 72);
       // Suchregel: Kurze Kürzel wie USA, EU, UK oder UN dürfen nicht als
       // zufällige Binnenzeichenfolge in langen Wörtern gewinnen. "USA" soll
       // die Vereinigten Staaten finden, nicht "zUSAmmenarbeit". Unscharfe
@@ -15050,14 +15160,29 @@ async function getNaturalEarthCountryFeatureByIso3Async(iso3) {
   return getNaturalEarthCountryFeatureByIso3(normalizedIso3);
 }
 
-async function findMapSearchUnionFeature(query) {
-  const union = MAP_SEARCH_UNION_ALIASES
+function findMapSearchUnionAlias(query) {
+  return MAP_SEARCH_UNION_ALIASES
     .map((candidate) => ({
       union: candidate,
       score: scoreSearchValues(candidate.names, getSearchNeedles(query)),
     }))
     .filter((candidate) => candidate.score > 0)
     .sort((a, b) => b.score - a.score)[0]?.union || null;
+}
+
+function findExactMapSearchUnionAlias(query) {
+  const needles = getSearchNeedles(query);
+  if (!needles.length) return null;
+  return MAP_SEARCH_UNION_ALIASES.find((union) => (
+    union.names.some((name) => {
+      const aliases = getSearchNeedles(name);
+      return aliases.some((alias) => needles.includes(alias));
+    })
+  )) || null;
+}
+
+async function findMapSearchUnionFeature(query) {
+  const union = findMapSearchUnionAlias(query);
   if (!union) return null;
   const unionIso3 = [...new Set([
     ...union.iso3,
@@ -15117,10 +15242,268 @@ function endWikidataMapSearchLoading() {
 async function findWikidataEntityId(query) {
   const search = encodeURIComponent(String(query || "").trim());
   if (!search) return "";
+  if (/^Q\d+$/i.test(String(query || "").trim())) return String(query).trim().toUpperCase();
   const url = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${search}&language=de&uselang=de&format=json&origin=*`;
   const data = await fetchJsonWithTimeout(url);
   const first = (data?.search || []).find((entry) => /^Q\d+$/.test(entry.id));
   return first?.id || "";
+}
+
+function parseTemporalMapSearchQuery(query) {
+  const raw = String(query || "").trim();
+  const match = raw.match(/\s*\((\d{4})\)\s*$/);
+  if (!match) return { raw, entityQuery: raw, year: null, from: "", until: "" };
+  const year = Number(match[1]);
+  if (!Number.isInteger(year) || year < 1 || year > 9999) {
+    return { raw, entityQuery: raw, year: null, from: "", until: "" };
+  }
+  return {
+    raw,
+    entityQuery: raw.slice(0, match.index).trim(),
+    year,
+    from: `${String(year).padStart(4, "0")}-01-01T00:00:00Z`,
+    until: `${String(year).padStart(4, "0")}-12-31T23:59:59Z`,
+  };
+}
+
+function isIncompleteTemporalMapSearchTerm(query) {
+  const raw = String(query || "").trim();
+  if (!raw) return false;
+  // Während der Eingabe darf "ASEAN (" oder "ASEAN (19" nicht als "ASEAN"
+  // aufgelöst werden. Die offene Jahresklammer ist bereits Semantik, aber noch
+  // keine fertige temporale Abfrage.
+  if (/\(\s*\d{0,3}$/.test(raw)) return true;
+  const openIndex = raw.lastIndexOf("(");
+  const closeIndex = raw.lastIndexOf(")");
+  return openIndex > closeIndex;
+}
+
+function getMapSearchTermSyntaxKey(query) {
+  const raw = String(query || "").trim();
+  if (!raw) return "";
+  const temporalQuery = parseTemporalMapSearchQuery(raw);
+  if (temporalQuery.year) {
+    return `${normalizeSearchText(temporalQuery.entityQuery)}@year:${temporalQuery.year}`;
+  }
+  return `${normalizeSearchText(raw)}@current`;
+}
+
+function parseMapSearchTermList(rawList) {
+  return String(rawList || "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((term, index) => ({
+      term,
+      index,
+      syntaxKey: getMapSearchTermSyntaxKey(term),
+      pending: isIncompleteTemporalMapSearchTerm(term),
+    }));
+}
+
+function getMapSearchEntriesSignature(entries = []) {
+  return entries.map((entry) => {
+    const feature = entry?.feature;
+    const props = feature?.properties || {};
+    return [
+      entry?.kind || "",
+      getReadableBoundaryKey(feature, ""),
+      props.id || props.name || props.NAME || "",
+      Array.isArray(props.iso3) ? props.iso3.join("|") : "",
+    ].join(":");
+  }).join(";");
+}
+
+function getMapSearchSegmentCacheKey(segment, options = {}) {
+  if (!segment?.syntaxKey) return "";
+  const role = options.focus ? "focus" : "context";
+  const contextSignature = options.focus ? getMapSearchEntriesSignature(options.contextEntries || []) : "";
+  return `${role}|${segment.syntaxKey}|ctx:${contextSignature}`;
+}
+
+async function resolveMapSearchSegment(segment, options = {}) {
+  if (!segment || segment.pending) return null;
+  const cacheKey = getMapSearchSegmentCacheKey(segment, options);
+  if (!cacheKey) return null;
+  if (!mapSearchSegmentResolveCache.has(cacheKey)) {
+    mapSearchSegmentResolveCache.set(cacheKey, (options.focus
+      ? resolveMapSearchFocusTerm(segment.term, options.contextEntries || [])
+      : resolveMapSearchTerm(segment.term)
+    ).catch((error) => {
+      mapSearchSegmentResolveCache.delete(cacheKey);
+      throw error;
+    }));
+  }
+  return mapSearchSegmentResolveCache.get(cacheKey);
+}
+
+function getHistoricalGermanyReplacementCodes(year, iso3) {
+  const normalizedIso3 = String(iso3 || "").toUpperCase();
+  if (!year || year >= 1990) return null;
+  if (normalizedIso3 === "DEU") {
+    return [
+      ...HISTORICAL_WEST_GERMANY_ADM1_CODES,
+      ...(year >= HISTORICAL_GERMANY_SAARLAND_EFFECTIVE_YEAR ? ["DE-SL"] : []),
+    ];
+  }
+  // DDR/GDR wird aktuell nicht über ISO-3 aus Natural Earth 10m geliefert.
+  // Falls Wikidata oder ein späterer Fallback sie als DDR/GDR kodiert, nutzen
+  // wir die vereinbarte pragmatische Ost-Zuordnung inklusive Berlin.
+  if (["DDR", "GDR"].includes(normalizedIso3)) return HISTORICAL_EAST_GERMANY_ADM1_CODES;
+  return null;
+}
+
+async function getHistoricalGermanyAdm1Features(year, iso3) {
+  const replacementCodes = getHistoricalGermanyReplacementCodes(year, iso3);
+  if (!replacementCodes?.length) return null;
+  const dataset = await loadNaturalEarthAdmin1CountryChunk("DEU");
+  const allowed = new Set(replacementCodes.map((code) => String(code).toUpperCase()));
+  const features = (dataset?.features || [])
+    .filter((feature) => allowed.has(String(feature?.properties?.iso_3166_2 || feature?.properties?.ISO3166_2 || "").toUpperCase()))
+    .map((feature) => ({
+      ...feature,
+      properties: {
+        ...(feature.properties || {}),
+        _earthMapHistoricalScope: "germany-pre-1990-approximation",
+        _earthMapHistoricalScopeYear: year,
+      },
+    }));
+  return features.length ? features : null;
+}
+
+function getTemporalQueryDateRange(temporalQuery = {}) {
+  if (temporalQuery.year) {
+    return {
+      from: temporalQuery.from.slice(0, 10),
+      until: temporalQuery.until.slice(0, 10),
+    };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  return { from: today, until: today };
+}
+
+function doesDateRangeOverlap(leftFrom, leftTo, rightFrom, rightTo) {
+  const min = "0001-01-01";
+  const max = "9999-12-31";
+  const aFrom = leftFrom || min;
+  const aTo = leftTo || max;
+  const bFrom = rightFrom || min;
+  const bTo = rightTo || max;
+  return aFrom <= bTo && aTo >= bFrom;
+}
+
+function relationAppliesToTemporalQuery(relation, temporalQuery = {}) {
+  const range = getTemporalQueryDateRange(temporalQuery);
+  return doesDateRangeOverlap(relation.valid_from || "", relation.valid_to || "", range.from, range.until);
+}
+
+function unionAliasAppliesToTemporalQuery(unionAlias, temporalQuery = {}) {
+  if (!unionAlias || !temporalQuery.year) return true;
+  if (!unionAlias.valid_from && !unionAlias.valid_to) return true;
+  const range = getTemporalQueryDateRange(temporalQuery);
+  return doesDateRangeOverlap(unionAlias.valid_from || "", unionAlias.valid_to || "", range.from, range.until);
+}
+
+function getOrganizationTerritorialScopeRelations(unionAlias, temporalQuery = {}) {
+  const organizationId = unionAlias?.id || "";
+  if (!organizationId) return [];
+  return MAP_SEARCH_ADMIN0_RELATION_OVERRIDES.filter((relation) => (
+    Array.isArray(relation.applies_to?.organization_scope)
+    && relation.applies_to.organization_scope.includes(organizationId)
+    && relationAppliesToTemporalQuery(relation, temporalQuery)
+  ));
+}
+
+function getUnionAliasCurrentMemberIso3Set(unionAlias) {
+  const values = Array.isArray(unionAlias?.iso3) ? unionAlias.iso3 : [];
+  return new Set(values.map((value) => String(value || "").toUpperCase()).filter(Boolean));
+}
+
+function shouldValidateCurrentWikidataMembers(unionAlias, temporalQuery = {}) {
+  // Architekturregel: Wikidata liefert Kandidaten, EarthMap entscheidet die
+  // kartografische Darstellung. Bei bekannten Organisationen ist die lokale
+  // ISO-Liste die geprüfte Gegenwartsdefinition; sie filtert unscharfe
+  // Wikidata-P463-Beziehungen wie Dialogpartner, Beobachter oder fehlerhaft
+  // als Mitglied eingetragene Staaten heraus. Historische Jahresabfragen
+  // bleiben dagegen zeitabhängig und werden nicht gegen eine Gegenwartsliste
+  // gekürzt.
+  return Boolean(unionAlias?.id && !temporalQuery.year && getUnionAliasCurrentMemberIso3Set(unionAlias).size);
+}
+
+function validateWikidataOrganizationMemberIso3(iso3List, unionAlias, temporalQuery = {}) {
+  const normalized = [...new Set((iso3List || [])
+    .map((value) => String(value || "").toUpperCase())
+    .filter(Boolean))];
+  if (!shouldValidateCurrentWikidataMembers(unionAlias, temporalQuery)) {
+    return { accepted: normalized, rejected: [] };
+  }
+  const acceptedSet = getUnionAliasCurrentMemberIso3Set(unionAlias);
+  const accepted = normalized.filter((iso3) => acceptedSet.has(iso3));
+  const rejected = normalized.filter((iso3) => !acceptedSet.has(iso3));
+  return { accepted, rejected };
+}
+
+async function resolveOrganizationMemberFeaturesForMap(iso3List, temporalQuery, unionAlias = null) {
+  const features = [];
+  const resolvedIso3 = [];
+  for (const iso3 of iso3List) {
+    const normalizedIso3 = String(iso3 || "").toUpperCase();
+    const historicalFeatures = await getHistoricalGermanyAdm1Features(temporalQuery.year, normalizedIso3);
+    if (historicalFeatures?.length) {
+      features.push(...historicalFeatures);
+      resolvedIso3.push(...historicalFeatures.map((feature) => String(feature?.properties?.iso_3166_2 || feature?.stable_id || "").toUpperCase()).filter(Boolean));
+      continue;
+    }
+    const feature = await getNaturalEarthCountryFeatureByIso3Async(normalizedIso3);
+    if (feature) {
+      features.push(feature);
+      resolvedIso3.push(normalizedIso3);
+    }
+  }
+  const scopeRelations = getOrganizationTerritorialScopeRelations(unionAlias, temporalQuery);
+  for (const relation of scopeRelations) {
+    const childIso3 = String(relation.child_iso3 || "").toUpperCase();
+    if (!childIso3 || resolvedIso3.includes(childIso3)) continue;
+    const feature = await getNaturalEarthCountryFeatureByIso3Async(childIso3);
+    if (feature) {
+      features.push(applyMapSearchBoundaryClassification(feature, relation));
+      resolvedIso3.push(childIso3);
+    }
+  }
+  return {
+    features,
+    iso3: [...new Set(resolvedIso3.filter(Boolean))],
+  };
+}
+
+async function getNaturalEarthAdmin0Iso3ByWikidataId(wikidataId) {
+  const normalizedWikidataId = normalizeWikidataId(wikidataId);
+  if (!normalizedWikidataId) return "";
+  await loadNaturalEarthAdmin0EngineIndex();
+  const entry = getNaturalEarthAdmin0EngineEntryByWikidataId(normalizedWikidataId);
+  return String(entry?.country_iso3 || entry?.provider_boundary_id || "").toUpperCase();
+}
+
+async function getWikidataBindingIso3(binding) {
+  const directIso3 = String(binding?.iso3?.value || "").toUpperCase();
+  if (directIso3) return directIso3;
+  // Wikidata ist nicht in allen Fällen gleichmäßig gepflegt. Q55
+  // (Niederlande) besitzt z. B. die EU-Mitgliedschaft, aber aktuell keinen
+  // direkten P298-ISO-3-Wert. Damit solche korrekten Mitgliedschaften nicht
+  // aus der Karte fallen, nehmen wir die QID der Mitgliedsentität mit und
+  // mappen sie gegen unseren lokalen Natural-Earth-Index.
+  return getNaturalEarthAdmin0Iso3ByWikidataId(binding?.entity?.value || "");
+}
+
+async function getWikidataBindingsIso3(bindings, kinds) {
+  const allowedKinds = new Set(kinds);
+  const resolved = [];
+  for (const binding of bindings) {
+    if (!allowedKinds.has(binding?.kind?.value)) continue;
+    const iso3 = await getWikidataBindingIso3(binding);
+    if (iso3) resolved.push(iso3);
+  }
+  return [...new Set(resolved)];
 }
 
 async function resolveWikidataMapSearchTerm(query) {
@@ -15131,40 +15514,115 @@ async function resolveWikidataMapSearchTerm(query) {
   const promise = (async () => {
     beginWikidataMapSearchLoading();
     try {
-      const qid = await findWikidataEntityId(query);
+      const temporalQuery = parseTemporalMapSearchQuery(query);
+      const entityQuery = temporalQuery.entityQuery || temporalQuery.raw;
+      const unionAlias = findMapSearchUnionAlias(entityQuery);
+      const qid = unionAlias?.wikidataId || await findWikidataEntityId(entityQuery);
       if (!qid) return null;
+      if (unionAlias && !unionAliasAppliesToTemporalQuery(unionAlias, temporalQuery)) return null;
       // Wikidata-Regel: Für lebendige Verbände fragen wir nicht manuell
       // kuratierte Listen ab, sondern lesen Staaten über P463 (Mitglied von)
       // und mappen deren ISO-3-Code (P298) auf unsere lokalen Natural-Earth-
-      // Geometrien. Wenn der Suchtreffer selbst ein Staat ist, liefert P298
-      // direkt dessen Fläche.
-      const sparql = `
-        SELECT ?kind ?iso3 WHERE {
-          { wd:${qid} wdt:P298 ?iso3. BIND("country" AS ?kind) }
+      // Geometrien. Wichtig: Die Statement-Abfrage filtert historische
+      // Mitgliedschaften mit Enddatum heraus. Darstellungen ohne Jahresklammer
+      // zeigen aktuelle Verbandszugehörigkeit. Eine Suche wie "EFTA (1980)"
+      // aktiviert bewusst einen historischen Jahreszeitraum.
+      const membershipTemporalFilter = temporalQuery.year
+        ? `
+            OPTIONAL { ?membership pq:P580 ?memberFrom. }
+            OPTIONAL { ?membership pq:P582 ?memberUntil. }
+            FILTER(BOUND(?memberFrom))
+            FILTER(?memberFrom <= "${temporalQuery.until}"^^xsd:dateTime)
+            FILTER(!BOUND(?memberUntil) || ?memberUntil >= "${temporalQuery.from}"^^xsd:dateTime)
+          `
+        : `
+            OPTIONAL { ?membership pq:P580 ?memberFrom. }
+            OPTIONAL { ?membership pq:P582 ?memberUntil. }
+            FILTER(!BOUND(?memberFrom) || ?memberFrom <= NOW())
+            FILTER(!BOUND(?memberUntil) || ?memberUntil > NOW())
+          `;
+      const includeAgreementPartyBranches = !temporalQuery.year || unionAlias?.usesAgreementParties === true;
+      const agreementPartyBranches = includeAgreementPartyBranches
+        ? `
           UNION
-          { ?country wdt:P463 wd:${qid}; wdt:P298 ?iso3. BIND("member" AS ?kind) }
+          {
+            wd:${qid} ?agreementPartyPredicate ?party.
+            VALUES ?agreementPartyPredicate { wdt:P710 wdt:P1891 wdt:P1001 wdt:P527 }
+            OPTIONAL { ?party wdt:P298 ?iso3. }
+            BIND(?party AS ?entity)
+            BIND("agreement-country" AS ?kind)
+          }
+          UNION
+          {
+            wd:${qid} ?agreementPartyPredicate ?partyOrganization.
+            VALUES ?agreementPartyPredicate { wdt:P710 wdt:P1891 wdt:P1001 wdt:P527 }
+            ?country p:P463 ?membership.
+            ?membership ps:P463 ?partyOrganization.
+            OPTIONAL { ?country wdt:P298 ?iso3. }
+            ${membershipTemporalFilter}
+            BIND(?country AS ?entity)
+            BIND("agreement-member" AS ?kind)
+          }
+        `
+        : "";
+      const sparql = `
+        PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+        SELECT ?kind ?iso3 ?entity WHERE {
+          {
+            OPTIONAL { wd:${qid} wdt:P298 ?iso3. }
+            BIND(wd:${qid} AS ?entity)
+            BIND("country" AS ?kind)
+          }
+          UNION
+          { wd:${qid} wdt:P576|wdt:P582 ?entityEnd. BIND("entity-end" AS ?kind) }
+          UNION
+          {
+            ?country p:P463 ?membership.
+            ?membership ps:P463 wd:${qid}.
+            OPTIONAL { ?country wdt:P298 ?iso3. }
+            ${membershipTemporalFilter}
+            BIND(?country AS ?entity)
+            BIND("member" AS ?kind)
+          }
+          ${agreementPartyBranches}
         }
       `;
       const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
       const data = await fetchJsonWithTimeout(url, 9000);
       const bindings = data?.results?.bindings || [];
-      const countryIso = bindings.find((binding) => binding.kind?.value === "country")?.iso3?.value || "";
+      const countryIso = await getWikidataBindingsIso3(bindings, ["country"]).then((items) => items[0] || "");
       if (countryIso) {
         const feature = await getNaturalEarthCountryFeatureByIso3Async(countryIso);
         return feature ? { kind: "country", feature, wikidataId: qid } : null;
       }
-      const iso3 = [...new Set(bindings
-        .filter((binding) => binding.kind?.value === "member")
-        .map((binding) => String(binding.iso3?.value || "").toUpperCase())
-        .filter(Boolean))];
-      const features = (await Promise.all(iso3.map(getNaturalEarthCountryFeatureByIso3Async))).filter(Boolean);
+      const hasHistoricalOnlyEntity = bindings.some((binding) => binding.kind?.value === "entity-end");
+      if (hasHistoricalOnlyEntity && !temporalQuery.year) return null;
+      const wikidataIso3 = await getWikidataBindingsIso3(bindings, ["member", "agreement-country", "agreement-member"]);
+      const validatedWikidataIso3 = validateWikidataOrganizationMemberIso3(wikidataIso3, unionAlias, temporalQuery);
+      const supplementalIso3 = unionAlias?.supplementWikidataIso3 === true
+        ? (unionAlias.iso3 || []).map((value) => String(value || "").toUpperCase()).filter(Boolean)
+        : [];
+      const iso3 = [...new Set([...validatedWikidataIso3.accepted, ...supplementalIso3])];
+      const resolvedMembers = await resolveOrganizationMemberFeaturesForMap(iso3, temporalQuery, unionAlias);
+      const features = resolvedMembers.features;
       if (!features.length) return null;
       return {
         kind: "union",
         wikidataId: qid,
         feature: {
           type: "FeatureCollection",
-          properties: { name: String(query || qid), id: qid, iso3, source: "Wikidata" },
+          properties: {
+            name: String(query || qid),
+            id: qid,
+            iso3: resolvedMembers.iso3.length ? resolvedMembers.iso3 : iso3,
+            source_iso3: iso3,
+            wikidata_candidate_iso3: wikidataIso3,
+            rejected_wikidata_candidate_iso3: validatedWikidataIso3.rejected,
+            member_validation: shouldValidateCurrentWikidataMembers(unionAlias, temporalQuery) ? "curated-current-membership" : "temporal-wikidata",
+            source: "Wikidata",
+            alias_id: unionAlias?.id || "",
+            temporal_query_year: temporalQuery.year || "",
+          },
           features,
         },
       };
@@ -15432,6 +15890,27 @@ async function resolveEarthMapBoundaryTerm(query, options = {}) {
   if (!trimmed) return null;
   await ensureNaturalEarthSearchBaseLoaded();
   const contextEntries = Array.isArray(options.contextEntries) ? options.contextEntries : [];
+  if (!options.focus && options.includeUnions !== false) {
+    // Kurze Organisationskürzel wie "EU" oder "UN" haben Vorrang vor
+    // Länder- und Provinzsuche. Sonst gewinnt bei "EU" z. B. ein lokaler
+    // Admin-1-Prefix-Treffer wie ein französisches Département, bevor die
+    // Organisationsauflösung überhaupt erreicht wird.
+    const temporalQuery = parseTemporalMapSearchQuery(trimmed);
+    const exactUnionAlias = findExactMapSearchUnionAlias(temporalQuery.entityQuery || trimmed);
+    if (exactUnionAlias) {
+      if (!unionAliasAppliesToTemporalQuery(exactUnionAlias, temporalQuery)) return null;
+      const wikidataQuery = temporalQuery.year
+        ? `${exactUnionAlias.names[0]} (${temporalQuery.year})`
+        : exactUnionAlias.names[0];
+      const wikidataFeature = await resolveWikidataMapSearchTerm(wikidataQuery);
+      if (wikidataFeature) return createEarthMapBoundaryEntry(wikidataFeature.kind, wikidataFeature.feature, { label: trimmed, source: "wikidata" });
+      if (exactUnionAlias.requiresTemporalQuery === true && !temporalQuery.year) return null;
+      if (!temporalQuery.year) {
+        const unionFeature = await findMapSearchUnionFeature(trimmed);
+        if (unionFeature) return createEarthMapBoundaryEntry("union", unionFeature, { label: unionFeature.properties?.name || trimmed, source: "local-fallback" });
+      }
+    }
+  }
   if (options.focus && contextEntries.length) {
     const countryAliasFeature = await findMapSearchCountryAliasFeature(trimmed);
     if (countryAliasFeature) return createMapSearchCountryBoundaryEntry(countryAliasFeature);
@@ -15456,18 +15935,26 @@ async function resolveEarthMapBoundaryTerm(query, options = {}) {
       }
     }
   }
-  if (options.includeUnions !== false) {
-    const unionFeature = await findMapSearchUnionFeature(trimmed);
-    if (unionFeature) return createEarthMapBoundaryEntry("union", unionFeature, { label: unionFeature.properties?.name || trimmed });
-  }
   const countryAliasFeature = await findMapSearchCountryAliasFeature(trimmed);
   if (countryAliasFeature) return createMapSearchCountryBoundaryEntry(countryAliasFeature);
   const countryFeature = await findNaturalEarthCountryFeatureAsync(trimmed);
   if (countryFeature) return createMapSearchCountryBoundaryEntry(countryFeature);
   const provinceFeature = await findNaturalEarthAdmin1Feature(trimmed);
   if (provinceFeature) return createEarthMapBoundaryEntry("admin1", provinceFeature);
-  const wikidataFeature = await resolveWikidataMapSearchTerm(trimmed);
-  if (wikidataFeature) return createEarthMapBoundaryEntry(wikidataFeature.kind, wikidataFeature.feature, { label: trimmed, source: "wikidata" });
+  if (options.includeUnions !== false) {
+    const wikidataFeature = await resolveWikidataMapSearchTerm(trimmed);
+    if (wikidataFeature) return createEarthMapBoundaryEntry(wikidataFeature.kind, wikidataFeature.feature, { label: trimmed, source: "wikidata" });
+    // Fallback-Regel: Lokale Organisationslisten sind keine autoritative
+    // Mitgliederquelle mehr. Sie helfen nur noch, wenn Wikidata nicht erreichbar
+    // ist oder keinen Treffer liefert. Historische Jahresabfragen dürfen nicht
+    // auf eine Gegenwartsliste zurückfallen.
+    if (!parseTemporalMapSearchQuery(trimmed).year) {
+      const unionAlias = findMapSearchUnionAlias(trimmed);
+      if (unionAlias?.requiresTemporalQuery === true) return null;
+      const unionFeature = await findMapSearchUnionFeature(trimmed);
+      if (unionFeature) return createEarthMapBoundaryEntry("union", unionFeature, { label: unionFeature.properties?.name || trimmed, source: "local-fallback" });
+    }
+  }
   return null;
 }
 
@@ -15482,15 +15969,8 @@ async function resolveMapSearchFocusTerm(query, contextEntries = []) {
 }
 
 async function resolveMapSearchTermList(rawList, options = {}) {
-  const terms = String(rawList || "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const entries = await Promise.all(terms.map((term) => (
-    options.focus
-      ? resolveMapSearchFocusTerm(term, options.contextEntries || [])
-      : resolveMapSearchTerm(term)
-  )));
+  const segments = parseMapSearchTermList(rawList);
+  const entries = await Promise.all(segments.map((segment) => resolveMapSearchSegment(segment, options)));
   return entries.filter(Boolean);
 }
 
@@ -17288,6 +17768,7 @@ async function applyMapSearchQuery(rawQuery) {
     syncSaveSearchLayerButton();
     ui.mapSearchInput?.classList.add("has-search-error");
     ui.mapSearchInput?.setAttribute("title", "Keine passende Karte im lokalen Natural-Earth-Archiv gefunden.");
+    syncMapLibreSearchHighlight();
     void syncMapLibreAdmin1LayerForSearch({ includeViewport: true });
     scheduleGlobeRender();
     return;
