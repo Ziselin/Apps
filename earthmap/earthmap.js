@@ -15896,11 +15896,13 @@ async function resolveEarthMapBoundaryTerm(query, options = {}) {
   if (!trimmed) return null;
   await ensureNaturalEarthSearchBaseLoaded();
   const contextEntries = Array.isArray(options.contextEntries) ? options.contextEntries : [];
-  if (!options.focus && options.includeUnions !== false) {
+  if (options.includeUnions !== false) {
     // Kurze Organisationskürzel wie "EU" oder "UN" haben Vorrang vor
-    // Länder- und Provinzsuche. Sonst gewinnt bei "EU" z. B. ein lokaler
-    // Admin-1-Prefix-Treffer wie ein französisches Département, bevor die
-    // Organisationsauflösung überhaupt erreicht wird.
+    // Länder- und Provinzsuche — unabhängig davon, ob der Suchterm links
+    // (Fokus) oder rechts (Kontext) vom Semikolon steht. Sonst gewinnt bei
+    // "EU;" im Fokuspfad wieder ein lokaler Admin-1-Prefix-Treffer wie ein
+    // französisches Département, bevor die Organisationsauflösung erreicht
+    // wird.
     const temporalQuery = parseTemporalMapSearchQuery(trimmed);
     const exactUnionAlias = findExactMapSearchUnionAlias(temporalQuery.entityQuery || trimmed);
     if (exactUnionAlias) {
@@ -17759,6 +17761,9 @@ async function applyMapSearchQuery(rawQuery) {
   // gesetzt, wenn sie zu mindestens einem Kontextobjekt gehören. Dadurch
   // bleibt z. B. "Vereinigtes Königreich; EU" fachlich sichtbar falsch:
   // Die EU wird markiert, das Vereinigte Königreich aber nicht hervorgehoben.
+  // Ohne Kontext gibt es keine Ausschlusslogik: Fokusobjekte können dann frei
+  // nebeneinander stehen, weil kein fachlicher Bezugsraum ihre Zugehörigkeit
+  // einschränkt.
   const contextEntries = await resolveMapSearchTermList(contextExpression);
   const rawFocusEntries = await resolveMapSearchTermList(focusExpression, { focus: true, contextEntries });
   const focusEntries = rawFocusEntries.filter((entry) => isMapSearchFocusInsideContext(entry, contextEntries));

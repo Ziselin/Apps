@@ -37,12 +37,13 @@
             <button type="button" id="mapSearchInfoButton" class="map-search-info-button" aria-label="Suchsyntax erklären" aria-expanded="false" aria-controls="mapSearchInfoPopup">
               <span aria-hidden="true"></span>
             </button>
-            <input id="mapSearchInput" class="app-search earthmap-map-search" type="search" list="mapSearchOptions" placeholder="Staat oder Region suchen" aria-label="Staat oder Region suchen" autocomplete="off">
+            <input id="mapSearchInput" class="app-search earthmap-map-search" type="search" list="mapSearchOptions" placeholder="Gebiet, Bündnis oder Jahr suchen" aria-label="Gebiet, Bündnis oder Jahr suchen" autocomplete="off">
             <div id="mapSearchInfoPopup" class="map-search-info-popup" role="dialog" aria-label="Suchsyntax" hidden>
               <strong>Suchlogik</strong>
-              <p><code>Deutschland</code> markiert ein Gebiet.</p>
-              <p><code>Bayern; Deutschland</code> hebt Bayern besonders hervor und markiert Deutschland als Kontext.</p>
-              <p>Kommas bilden Aufzählungen: links vom Semikolon werden alle Einträge hervorgehoben, rechts davon wird der erste flächig und weitere schraffiert markiert.</p>
+              <p><code>Deutschland</code> markiert ein Gebiet. Ohne Kontext wird nichts ausgeschlossen.</p>
+              <p><code>Bayern; Deutschland</code> setzt Deutschland als Kontext und hebt Bayern nur hervor, wenn Bayern Teil dieses Kontexts ist.</p>
+              <p>Kommas bilden Aufzählungen innerhalb einer Seite des Semikolons, z. B. <code>Bayern, Sachsen; Deutschland</code>.</p>
+              <p>Historische Abbildungen werden mit Jahreszahl abgefragt: <code>ASEAN (1967)</code> oder <code>EU (1995)</code>.</p>
             </div>
           </div>
           <datalist id="mapSearchOptions"></datalist>
@@ -225,6 +226,6 @@
   <script src="../assets/geojson/natural-earth/10m/ne_10m_enclosed_seas.js?v=20260709a"></script>
   <script src="../assets/geojson/natural-earth/10m/ne_10m_admin_1_states_provinces.by-country-index.js?v=20260710b"></script>
   <script src="../assets/vendor/maplibre-gl.v5.js?v=20260715a"></script>
-  <script src="earthmap.js?v=20260719q"></script>
+  <script src="earthmap.js?v=20260719r"></script>
 </body>
 </html>
