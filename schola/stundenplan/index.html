@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Stundenplan · Schola</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
+  <link rel="stylesheet" href="stundenplan.css?v=20260727ah">
+</head>
+<body>
+  <div id="scheduleApp" class="app-frame workspace-mode-render">
+    <section class="render-view" aria-label="Stundenplan">
+      <header class="topbar">
+        <div class="brand-plate">
+          <button type="button" id="menuButton" class="header-icon-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="menu-lines" aria-hidden="true"></span>
+          </button>
+          <div class="brand-mark">
+            <a class="brand-home-link" href="../../index.html?project=schola" aria-label="Zur Schola-Startseite">
+              <img class="brand-bird" src="../../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true">
+            </a>
+            <span class="brand-name">stundenplan</span>
+          </div>
+        </div>
+      </header>
+
+      <div id="menuOverlay" class="menu-overlay" hidden></div>
+      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+        <div class="side-menu-inner">
+          <div class="side-menu-head">
+            <div><span class="label">Menü</span><strong>Stundenplan</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          </div>
+          <div class="side-menu-list">
+            <details>
+              <summary>Projekte</summary>
+              <div class="project-choice-list">
+                <a class="project-choice" href="../../index.html">Atlas</a>
+                <a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a>
+              </div>
+            </details>
+            <details>
+              <summary>Funktionsweise</summary>
+              <p>Der Kalender bildet später ein Schuljahr ab. Zeitraum, Stunden und schulfreie Tage werden im Einstellungsbereich festgelegt.</p>
+            </details>
+            <details>
+              <summary>Datenstand</summary>
+              <p>Noch keine Daten hinterlegt.</p>
+            </details>
+            <details>
+              <summary>Appbeschreibung</summary>
+              <p>Stundenplan ist die zweite App des Projekts Schola. Diese erste Fassung zeigt ausschließlich die formale Grundstruktur.</p>
+            </details>
+          </div>
+        </div>
+      </aside>
+
+      <main class="render-stage">
+        <section class="calendar-shell" aria-labelledby="calendarTitle">
+          <div class="calendar-heading">
+            <div class="calendar-view-switcher" aria-label="Kalenderansicht">
+              <button type="button" data-calendar-view="day" aria-pressed="false">Tag</button>
+              <button type="button" data-calendar-view="week" aria-pressed="false">Woche</button>
+              <button type="button" data-calendar-view="year" aria-pressed="true">Jahr</button>
+            </div>
+            <h1 id="calendarTitle" class="visually-hidden">Jahresübersicht</h1>
+            <span id="yearLabel" class="year-label"></span>
+          </div>
+          <div id="yearCalendar" class="year-calendar" aria-label="Blanko-Jahreskalender"></div>
+        </section>
+      </main>
+
+      <button type="button" id="openSettingsButton" class="workspace-strip" aria-label="Einstellungen öffnen">
+        <span>Einstellungen</span>
+      </button>
+    </section>
+
+    <section class="settings-view" aria-label="Einstellungen">
+      <button type="button" id="returnRenderButton" class="workspace-strip workspace-strip-top" aria-label="Zum Stundenplan zurückkehren">
+        <span>Stundenplan</span>
+      </button>
+      <main class="settings-stage">
+        <section class="settings-panel browser-panel" aria-labelledby="calendarSettingsTitle">
+          <div class="panel-head">
+            <div><span class="label">Browser</span><h2 id="calendarSettingsTitle">Projekte</h2></div>
+            <div class="browser-actions-menu-shell">
+              <button type="button" id="browserActionsButton" class="browser-actions-button" aria-label="Projektaktionen" aria-expanded="false" aria-controls="browserActionsMenu">
+                <span class="browser-actions-dots" aria-hidden="true"></span>
+              </button>
+              <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
+                <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
+                <button type="button" role="menuitem" disabled>Importieren</button>
+                <button type="button" role="menuitem" disabled>Exportieren</button>
+              </div>
+            </div>
+          </div>
+          <div id="projectBrowserList" class="project-browser-list" aria-label="Stundenplan-Projekte"></div>
+        </section>
+        <section class="settings-panel" aria-labelledby="detailPanelTitle">
+          <div class="panel-head">
+            <div><span id="detailPanelLabel" class="label">Einstellungen</span><h2 id="detailPanelTitle">Stundenplan</h2></div>
+          </div>
+          <div id="projectDetail" class="project-detail">
+            <p class="empty-state">Wählen Sie links einen Projektordner aus oder legen Sie ein neues Projekt an.</p>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <dialog id="newProjectDialog" class="project-dialog" aria-labelledby="newProjectTitle">
+    <form id="newProjectForm" method="dialog">
+      <div>
+        <span class="label">Projektordner</span>
+        <h2 id="newProjectTitle">Neues Projekt</h2>
+      </div>
+      <label class="dialog-field">
+        <span>Name</span>
+        <input id="newProjectName" type="text" maxlength="80" autocomplete="off" required placeholder="z. B. Schuljahr 2026/27">
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelProjectButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" class="secondary-button primary-action">Projekt anlegen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="lessonDialog" class="project-dialog lesson-dialog" aria-labelledby="lessonDialogTitle">
+    <form id="lessonForm" method="dialog">
+      <div><span class="label">Unterrichtsstunde</span><h2 id="lessonDialogTitle">Stunde hinzufügen</h2></div>
+      <input id="lessonDay" type="hidden">
+      <div class="lesson-dialog-grid">
+        <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="900" required></label>
+        <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="900" required></label>
+        <label class="dialog-field"><span>Klassenstufe</span><input id="lessonGrade" type="text" maxlength="40" required placeholder="z. B. 8a"></label>
+        <label class="dialog-field"><span>Fach</span><input id="lessonSubject" type="text" maxlength="80" required placeholder="z. B. Deutsch"></label>
+        <label class="dialog-field lesson-dialog-wide"><span>Raum</span><input id="lessonRoom" type="text" maxlength="40" required placeholder="z. B. 204"></label>
+        <fieldset class="lesson-color-field lesson-dialog-wide">
+          <legend>Farbe</legend>
+          <input id="lessonColor" type="hidden" value="#bfd2e2">
+          <div id="lessonColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
+        </fieldset>
+        <label class="dialog-field lesson-dialog-wide"><span>Unterrichtsform</span><select id="lessonEpochal" required><option value="regular">Nicht epochal</option><option value="epochal">Epochal</option></select></label>
+      </div>
+      <p id="lessonDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelLessonButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="lessonSubmitButton" class="secondary-button primary-action">Stunde hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="scheduleDisplayDialog" class="project-dialog schedule-display-dialog" aria-labelledby="scheduleDisplayTitle">
+    <form id="scheduleDisplayForm" method="dialog">
+      <div>
+        <span class="label">Wochenkalender</span>
+        <h2 id="scheduleDisplayTitle">Darstellung anpassen</h2>
+        <p class="dialog-intro">Diese Reihenfolge gilt für alle fünf Wochentage. Unterrichtszeiten und Pausen bestimmen das Raster.</p>
+      </div>
+      <label class="dialog-field display-name-field">
+        <span>Name des Kalenders</span>
+        <input id="scheduleDisplayName" type="text" maxlength="80" autocomplete="off" required>
+      </label>
+      <div class="display-default-fields" aria-label="Voreinstellungen">
+        <div class="display-default-group">
+          <span>Dauer des Schultages</span>
+          <span class="display-day-range">
+            <label><span>von</span><input id="schoolDayStart" type="time" step="300" value="07:00"></label>
+            <label><span>bis</span><input id="schoolDayEnd" type="time" step="300" value="18:00"></label>
+          </span>
+        </div>
+        <label>
+          <span>Stundenlänge</span>
+          <span class="display-number-field"><input id="defaultLessonDuration" type="number" min="15" max="180" step="15" value="45"><span>Min.</span></span>
+        </label>
+      </div>
+      <p class="display-default-note">Diese Werte erzeugen die Voreinstellung. Alle Zeilen können anschließend individuell geändert werden.</p>
+      <div id="scheduleDisplayRows" class="display-row-list"></div>
+      <div class="display-add-actions">
+        <button type="button" id="addLessonRowButton" class="secondary-button">Unterrichtszeit hinzufügen</button>
+        <button type="button" id="addBreakRowButton" class="secondary-button">Pause hinzufügen</button>
+      </div>
+      <p id="scheduleDisplayStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelScheduleDisplayButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" class="secondary-button primary-action">Darstellung übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="stundenplan.js?v=20260727ah"></script>
+</body>
+</html>
