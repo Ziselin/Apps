@@ -195,7 +195,7 @@ button { color: inherit; font: inherit; touch-action: manipulation; }
 .day.is-empty { visibility: hidden; }
 
 .workspace-strip {
-  position: absolute;
+  position: fixed;
   right: 0;
   bottom: 0;
   left: 0;
@@ -204,7 +204,8 @@ button { color: inherit; font: inherit; touch-action: manipulation; }
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 16px;
+  min-height: 54px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   border: 0;
   border-top: 1px solid var(--line);
   background: rgba(239,239,232,.94);
@@ -218,7 +219,14 @@ button { color: inherit; font: inherit; touch-action: manipulation; }
   color: var(--ink);
   background: rgba(248,248,242,.96);
 }
-.workspace-strip-top { top: 0; bottom: auto; border-top: 0; border-bottom: 1px solid var(--line); }
+.workspace-strip-top {
+  top: 0;
+  bottom: auto;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: 16px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
 .settings-stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -966,7 +974,7 @@ button { color: inherit; font: inherit; touch-action: manipulation; }
   .brand-plate { padding: 0 5px; gap: 8px; }
   .brand-home-link, .brand-bird { width: 44px; height: 44px; }
   .brand-name { font-size: 1.36rem; }
-  .render-stage { padding: 10px 10px 78px; }
+  .render-stage { padding: 10px 10px calc(78px + env(safe-area-inset-bottom, 0px)); }
   .calendar-shell { padding: 15px; border-radius: 16px; }
   .calendar-shell.is-timeline-view { height: 100%; }
   .calendar-heading { align-items: stretch; flex-direction: column; }
