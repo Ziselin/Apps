@@ -19,6 +19,25 @@ const newProjectName = document.getElementById("newProjectName");
 const cancelProjectButton = document.getElementById("cancelProjectButton");
 const detailPanelLabel = document.getElementById("detailPanelLabel");
 const detailPanelTitle = document.getElementById("detailPanelTitle");
+const classTripDialog = document.getElementById("classTripDialog");
+const classTripDialogTitle = document.getElementById("classTripDialogTitle");
+const classTripForm = document.getElementById("classTripForm");
+const classTripName = document.getElementById("classTripName");
+const classTripClass = document.getElementById("classTripClass");
+const classTripStart = document.getElementById("classTripStart");
+const classTripEnd = document.getElementById("classTripEnd");
+const classTripDialogStatus = document.getElementById("classTripDialogStatus");
+const cancelClassTripButton = document.getElementById("cancelClassTripButton");
+const classTripSubmitButton = document.getElementById("classTripSubmitButton");
+const schoolProjectDialog = document.getElementById("schoolProjectDialog");
+const schoolProjectDialogTitle = document.getElementById("schoolProjectDialogTitle");
+const schoolProjectForm = document.getElementById("schoolProjectForm");
+const schoolProjectName = document.getElementById("schoolProjectName");
+const schoolProjectStart = document.getElementById("schoolProjectStart");
+const schoolProjectEnd = document.getElementById("schoolProjectEnd");
+const schoolProjectDialogStatus = document.getElementById("schoolProjectDialogStatus");
+const cancelSchoolProjectButton = document.getElementById("cancelSchoolProjectButton");
+const schoolProjectSubmitButton = document.getElementById("schoolProjectSubmitButton");
 const lessonDialog = document.getElementById("lessonDialog");
 const lessonDialogTitle = document.getElementById("lessonDialogTitle");
 const lessonForm = document.getElementById("lessonForm");
@@ -46,8 +65,13 @@ const schoolDayEnd = document.getElementById("schoolDayEnd");
 const defaultLessonDuration = document.getElementById("defaultLessonDuration");
 const scheduleDisplayName = document.getElementById("scheduleDisplayName");
 const calendarViewButtons = [...document.querySelectorAll("[data-calendar-view]")];
+const calendarDateNavigation = document.getElementById("calendarDateNavigation");
+const previousCalendarPeriod = document.getElementById("previousCalendarPeriod");
+const todayCalendarPeriod = document.getElementById("todayCalendarPeriod");
+const nextCalendarPeriod = document.getElementById("nextCalendarPeriod");
 
 const PROJECT_STORAGE_KEY = "schola-stundenplan-projects-v1";
+const SCHEDULE_DELETE_HOLD_MS = 820;
 const HOLIDAY_NORMALIZATION_VERSION = "mv-school-types-2026-07-27-1";
 const MV_VOCATIONAL_ONLY_DATES = new Set(["2026-11-26", "2026-11-27"]);
 const LESSON_COLORS = [
@@ -91,6 +115,8 @@ let activeLayerType = null;
 let activeScheduleId = null;
 let displayRowsDraft = [];
 let mainCalendarView = "year";
+let calendarReferenceDate = new Date();
+let scheduleDeleteHoldState = null;
 const expandedProjectIds = new Set(projects.map((project) => project.id));
 
 const monthNames = [
@@ -178,6 +204,9 @@ function renderActiveCalendar(project = projects.find((entry) => entry.id === ac
   calendarViewButtons.forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.calendarView === mainCalendarView));
   });
+  calendarDateNavigation.hidden = mainCalendarView === "year";
+  previousCalendarPeriod.setAttribute("aria-label", mainCalendarView === "day" ? "Voriger Tag" : "Vorige Woche");
+  nextCalendarPeriod.setAttribute("aria-label", mainCalendarView === "day" ? "Nächster Tag" : "Nächste Woche");
   if (mainCalendarView === "day" || mainCalendarView === "week") {
     renderCombinedScheduleView(mainCalendarView);
     return;
@@ -204,8 +233,50 @@ function getCombinedSchedules() {
   });
 }
 
+function getLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isScheduleValidOn(schedule, date) {
+  const dateKey = getLocalDateKey(date);
+  return (!schedule.validFrom || dateKey >= schedule.validFrom)
+    && (!schedule.validUntil || dateKey <= schedule.validUntil);
+}
+
+function isSchoolHolidayForSchedule(schedule, date) {
+  const project = projects.find((entry) => entry.id === schedule.projectId);
+  const holidayLayer = project?.layers?.find((entry) => entry.type === "holidays");
+  const dateKey = getLocalDateKey(date);
+  return (Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : []).some((entry) => (
+    entry.type === "school-holiday"
+    && dateKey >= entry.startDate
+    && dateKey <= entry.endDate
+  ));
+}
+
+function getSchoolHolidaysForDate(date, schedules) {
+  const dateKey = getLocalDateKey(date);
+  const projectIds = new Set(schedules.map((schedule) => schedule.projectId));
+  const holidayNames = projects
+    .filter((project) => !projectIds.size || projectIds.has(project.id))
+    .flatMap((project) => {
+      const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
+      return Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : [];
+    })
+    .filter((entry) => (
+      entry.type === "school-holiday"
+      && dateKey >= entry.startDate
+      && dateKey <= entry.endDate
+    ))
+    .map((entry) => entry.name);
+  return [...new Set(holidayNames)];
+}
+
 function getScheduleReferenceDate() {
-  return new Date();
+  return new Date(calendarReferenceDate);
 }
 
 function renderLessonCard(lesson, schedule) {
@@ -262,6 +333,7 @@ function renderCombinedScheduleView(view) {
   const reference = getScheduleReferenceDate(schedules);
   if (reference.getDay() === 0) reference.setDate(reference.getDate() + 1);
   if (reference.getDay() === 6) reference.setDate(reference.getDate() + 2);
+  calendarReferenceDate = new Date(reference);
   const monday = new Date(reference);
   monday.setDate(reference.getDate() - ((reference.getDay() + 6) % 7));
   const dates = view === "day"
@@ -271,10 +343,18 @@ function renderCombinedScheduleView(view) {
       date.setDate(monday.getDate() + index);
       return date;
     });
+  const holidaysByDate = new Map(dates.map((date) => [
+    getLocalDateKey(date),
+    getSchoolHolidaysForDate(date, schedules)
+  ]));
   const timedLessons = [];
   schedules.forEach((schedule) => {
     (Array.isArray(schedule.lessons) ? schedule.lessons : []).forEach((lesson) => {
-      if (dates.some((date) => lesson.day === ((date.getDay() + 6) % 7) + 1)) {
+      if (dates.some((date) => (
+        lesson.day === ((date.getDay() + 6) % 7) + 1
+        && isScheduleValidOn(schedule, date)
+        && !isSchoolHolidayForSchedule(schedule, date)
+      ))) {
         timedLessons.push({ lesson, schedule });
       }
     });
@@ -286,7 +366,8 @@ function renderCombinedScheduleView(view) {
   yearLabel.textContent = view === "day"
     ? dates[0].toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
     : `${dates[0].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}–${dates[4].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
-  if (!timedLessons.length) {
+  const hasVisibleHolidays = [...holidaysByDate.values()].some((names) => names.length);
+  if (!timedLessons.length && !hasVisibleHolidays) {
     const empty = document.createElement("p");
     empty.className = "combined-schedule-empty";
     empty.textContent = "Für diese Ansicht sind noch keine Unterrichtsstunden eingetragen.";
@@ -294,8 +375,8 @@ function renderCombinedScheduleView(view) {
     return;
   }
 
-  const earliestMinutes = Math.min(...timedLessons.map(({ lesson }) => timeToMinutes(lesson.start)));
-  const latestMinutes = Math.max(...timedLessons.map(({ lesson }) => timeToMinutes(lesson.end)));
+  const lessonStarts = timedLessons.map(({ lesson }) => timeToMinutes(lesson.start));
+  const lessonEnds = timedLessons.map(({ lesson }) => timeToMinutes(lesson.end));
   const configuredStarts = schedules.map((schedule) => schedule.displayDefaults?.dayStart).filter(Boolean).map(timeToMinutes);
   const configuredEnds = schedules.map((schedule) => {
     if (schedule.displayDefaults?.dayEnd) return timeToMinutes(schedule.displayDefaults.dayEnd);
@@ -304,8 +385,12 @@ function renderCombinedScheduleView(view) {
     }
     return null;
   }).filter(Number.isFinite);
-  const timelineStart = Math.max(0, Math.floor(Math.min(earliestMinutes, ...configuredStarts) / 60) * 60 - 30);
-  const timelineEnd = Math.min(24 * 60, Math.ceil(Math.max(latestMinutes, ...configuredEnds) / 60) * 60 + 30);
+  const rangeStarts = [...lessonStarts, ...configuredStarts];
+  const rangeEnds = [...lessonEnds, ...configuredEnds];
+  const earliestMinutes = rangeStarts.length ? Math.min(...rangeStarts) : 8 * 60;
+  const latestMinutes = rangeEnds.length ? Math.max(...rangeEnds) : 16 * 60;
+  const timelineStart = Math.max(0, Math.floor(earliestMinutes / 60) * 60 - 30);
+  const timelineEnd = Math.min(24 * 60, Math.ceil(latestMinutes / 60) * 60 + 30);
   const timelineMinutes = timelineEnd - timelineStart;
   const firstHourMark = Math.ceil(timelineStart / 60) * 60;
   calendar.style.setProperty("--timeline-columns", `66px repeat(${dates.length}, minmax(${view === "day" ? "280px" : "150px"}, 1fr))`);
@@ -340,16 +425,27 @@ function renderCombinedScheduleView(view) {
   body.append(axis);
   dates.forEach((date) => {
     const weekday = ((date.getDay() + 6) % 7) + 1;
+    const holidayNames = holidaysByDate.get(getLocalDateKey(date)) || [];
     const column = document.createElement("div");
-    column.className = "timeline-day-column";
+    column.className = `timeline-day-column${holidayNames.length ? " is-holiday" : ""}`;
     for (let minutes = firstHourMark; minutes <= timelineEnd; minutes += 60) {
       const guide = document.createElement("span");
       guide.className = "timeline-hour-guide";
       guide.style.top = `${((minutes - timelineStart) / timelineMinutes) * 100}%`;
       column.append(guide);
     }
+    if (holidayNames.length) {
+      const holidayLabel = document.createElement("div");
+      holidayLabel.className = "timeline-holiday-label";
+      holidayLabel.textContent = holidayNames.join(" · ");
+      column.append(holidayLabel);
+    }
     const entries = layoutTimelineEntries(
-      timedLessons.filter(({ lesson }) => lesson.day === weekday)
+      timedLessons.filter(({ lesson, schedule }) => (
+        lesson.day === weekday
+        && isScheduleValidOn(schedule, date)
+        && !isSchoolHolidayForSchedule(schedule, date)
+      ))
     );
     entries.forEach(({ lesson, schedule, lane, laneCount }) => {
       const card = renderLessonCard(lesson, schedule);
@@ -636,6 +732,104 @@ function getDefaultDisplayRows(dayStart = "07:00", dayEndValue = "18:00", lesson
   return rows;
 }
 
+function resetScheduleDeleteHold() {
+  if (!scheduleDeleteHoldState) return;
+  const { button, frame, pointerId } = scheduleDeleteHoldState;
+  if (frame) cancelAnimationFrame(frame);
+  button.classList.remove("is-hold-active", "is-hold-ready");
+  button.style.removeProperty("--hold-progress");
+  if (Number.isFinite(pointerId) && button.hasPointerCapture?.(pointerId)) {
+    try {
+      button.releasePointerCapture(pointerId);
+    } catch {
+      // Pointer capture may already have been released.
+    }
+  }
+  scheduleDeleteHoldState = null;
+}
+
+function tickScheduleDeleteHold() {
+  if (!scheduleDeleteHoldState) return;
+  const progress = Math.max(0, Math.min(1, (performance.now() - scheduleDeleteHoldState.startedAt) / SCHEDULE_DELETE_HOLD_MS));
+  scheduleDeleteHoldState.button.style.setProperty("--hold-progress", `${progress * 100}%`);
+  if (progress >= 1) {
+    scheduleDeleteHoldState.armed = true;
+    scheduleDeleteHoldState.button.classList.add("is-hold-ready");
+    scheduleDeleteHoldState.frame = null;
+    return;
+  }
+  scheduleDeleteHoldState.frame = requestAnimationFrame(tickScheduleDeleteHold);
+}
+
+function deleteSchedule(projectId, scheduleId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "schedules");
+  if (!project || !layer || !Array.isArray(layer.schedules)) return;
+  layer.schedules = layer.schedules.filter((entry) => entry.id !== scheduleId);
+  if (activeScheduleId === scheduleId) activeScheduleId = null;
+  activeProjectId = project.id;
+  activeLayerType = "schedules";
+  saveProjects();
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function deleteClassTrip(projectId, tripId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "individual");
+  if (!project || !layer || !Array.isArray(layer.entries)) return;
+  layer.entries = layer.entries.filter((entry) => entry.id !== tripId);
+  if (Array.isArray(layer.appliedEntries)) {
+    layer.appliedEntries = layer.appliedEntries.filter((entry) => entry.id !== tripId);
+  }
+  saveProjects();
+  renderIndividualProjectsProperties(project);
+  renderActiveCalendar(project);
+}
+
+function beginScheduleDeleteHold(event) {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLButtonElement)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resetScheduleDeleteHold();
+  scheduleDeleteHoldState = {
+    button,
+    projectId: button.dataset.projectId,
+    scheduleId: button.dataset.scheduleId,
+    tripId: button.dataset.tripId,
+    pointerId: Number.isFinite(event.pointerId) ? event.pointerId : null,
+    startedAt: performance.now(),
+    armed: false,
+    frame: null
+  };
+  button.setPointerCapture?.(event.pointerId);
+  button.classList.add("is-hold-active");
+  button.style.setProperty("--hold-progress", "0%");
+  scheduleDeleteHoldState.frame = requestAnimationFrame(tickScheduleDeleteHold);
+}
+
+function finishScheduleDeleteHold(event) {
+  if (!scheduleDeleteHoldState) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const { button, projectId, scheduleId, tripId, armed } = scheduleDeleteHoldState;
+  const releaseTarget = document.elementFromPoint(event.clientX, event.clientY);
+  const releasedOnButton = Boolean(releaseTarget && (releaseTarget === button || button.contains(releaseTarget)));
+  resetScheduleDeleteHold();
+  if (!armed || !releasedOnButton) return;
+  if (tripId) deleteClassTrip(projectId, tripId);
+  else deleteSchedule(projectId, scheduleId);
+}
+
+function cancelScheduleDeleteHold(event) {
+  if (!scheduleDeleteHoldState) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resetScheduleDeleteHold();
+}
+
 function renderSchedulesProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Stundenpläne";
@@ -712,11 +906,22 @@ function renderSchedulesProperties(project) {
     menuButton.setAttribute("aria-expanded", "false");
     openScheduleDisplayDialog(project, schedule);
   });
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "schedule-menu-delete";
+  deleteButton.textContent = "Löschen";
+  deleteButton.dataset.projectId = project.id;
+  deleteButton.dataset.scheduleId = schedule.id;
+  deleteButton.setAttribute("aria-label", `${schedule.name} löschen – gedrückt halten`);
+  deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+  deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+  deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+  deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
   menuButton.addEventListener("click", () => {
     menu.hidden = !menu.hidden;
     menuButton.setAttribute("aria-expanded", String(!menu.hidden));
   });
-  menu.append(displayButton);
+  menu.append(displayButton, deleteButton);
   menuShell.append(menuButton, menu);
   titleLine.append(title, menuShell);
   const intro = document.createElement("p");
@@ -1016,6 +1221,47 @@ function addScheduleDisplayRow(type) {
   scheduleDisplayRows.lastElementChild?.scrollIntoView({ block: "nearest" });
 }
 
+function openClassTripDialog(project, trip = null) {
+  classTripForm.reset();
+  classTripDialogStatus.textContent = "";
+  classTripDialog.dataset.projectId = project.id;
+  if (trip) {
+    classTripDialog.dataset.tripId = trip.id;
+    classTripDialogTitle.textContent = "Klassenfahrt bearbeiten";
+    classTripSubmitButton.textContent = "Änderungen speichern";
+    classTripName.value = trip.name || "";
+    classTripClass.value = trip.className || "";
+    classTripStart.value = trip.startDate || "";
+    classTripEnd.value = trip.endDate || "";
+  } else {
+    delete classTripDialog.dataset.tripId;
+    classTripDialogTitle.textContent = "Klassenfahrt hinzufügen";
+    classTripSubmitButton.textContent = "Klassenfahrt hinzufügen";
+  }
+  classTripDialog.showModal();
+  classTripName.focus();
+}
+
+function openSchoolProjectDialog(project, schoolProject = null) {
+  schoolProjectForm.reset();
+  schoolProjectDialogStatus.textContent = "";
+  schoolProjectDialog.dataset.projectId = project.id;
+  if (schoolProject) {
+    schoolProjectDialog.dataset.entryId = schoolProject.id;
+    schoolProjectDialogTitle.textContent = "Schulprojekt bearbeiten";
+    schoolProjectSubmitButton.textContent = "Änderungen speichern";
+    schoolProjectName.value = schoolProject.name || "";
+    schoolProjectStart.value = schoolProject.startDate || "";
+    schoolProjectEnd.value = schoolProject.endDate || "";
+  } else {
+    delete schoolProjectDialog.dataset.entryId;
+    schoolProjectDialogTitle.textContent = "Schulprojekt hinzufügen";
+    schoolProjectSubmitButton.textContent = "Schulprojekt hinzufügen";
+  }
+  schoolProjectDialog.showModal();
+  schoolProjectName.focus();
+}
+
 function renderIndividualProjectsProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Individuelle Projekte";
@@ -1023,6 +1269,7 @@ function renderIndividualProjectsProperties(project) {
   const layer = getProjectLayer(project, "individual");
   layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
   const trips = layer.entries.filter((entry) => entry.type === "class-trip");
+  const schoolProjects = layer.entries.filter((entry) => entry.type === "school-project");
 
   const sheet = document.createElement("section");
   sheet.className = "property-sheet";
@@ -1109,6 +1356,12 @@ function renderIndividualProjectsProperties(project) {
     renderIndividualProjectsProperties(project);
   });
 
+  const launcherButton = document.createElement("button");
+  launcherButton.type = "button";
+  launcherButton.className = "secondary-button primary-action trip-add-button";
+  launcherButton.textContent = "Klassenfahrt hinzufügen";
+  launcherButton.addEventListener("click", () => openClassTripDialog(project));
+
   const list = document.createElement("div");
   list.className = "trip-entry-list";
   if (!trips.length) {
@@ -1128,21 +1381,124 @@ function renderIndividualProjectsProperties(project) {
         tripName.textContent = trip.name;
         const dates = document.createElement("span");
         dates.textContent = `${formatGermanDate(trip.startDate)}–${formatGermanDate(trip.endDate)}`;
-        copy.append(tripName, dates);
+        copy.append(tripName);
+        if (trip.className) {
+          const classLabel = document.createElement("span");
+          classLabel.textContent = `Klasse ${trip.className}`;
+          copy.append(classLabel);
+        }
+        copy.append(dates);
+        const menuShell = document.createElement("div");
+        menuShell.className = "schedule-menu-shell";
+        const menuButton = document.createElement("button");
+        menuButton.type = "button";
+        menuButton.className = "schedule-menu-button";
+        menuButton.setAttribute("aria-label", `Menü für ${trip.name}`);
+        menuButton.setAttribute("aria-expanded", "false");
+        menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+        const menu = document.createElement("div");
+        menu.className = "schedule-menu trip-entry-menu";
+        menu.hidden = true;
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.textContent = "Bearbeiten";
+        editButton.addEventListener("click", () => {
+          menu.hidden = true;
+          menuButton.setAttribute("aria-expanded", "false");
+          openClassTripDialog(project, trip);
+        });
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
-        deleteButton.className = "trip-delete-button";
+        deleteButton.className = "schedule-menu-delete";
         deleteButton.textContent = "Löschen";
-        deleteButton.setAttribute("aria-label", `${trip.name} löschen`);
-        deleteButton.addEventListener("click", () => {
-          layer.entries = layer.entries.filter((entry) => entry.id !== trip.id);
-          saveProjects();
-          renderIndividualProjectsProperties(project);
+        deleteButton.dataset.projectId = project.id;
+        deleteButton.dataset.tripId = trip.id;
+        deleteButton.setAttribute("aria-label", `${trip.name} löschen – gedrückt halten`);
+        deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+        deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+        deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+        deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+        menuButton.addEventListener("click", () => {
+          menu.hidden = !menu.hidden;
+          menuButton.setAttribute("aria-expanded", String(!menu.hidden));
         });
-        row.append(copy, deleteButton);
+        menu.append(editButton, deleteButton);
+        menuShell.append(menuButton, menu);
+        row.append(copy, menuShell);
         list.append(row);
       });
   }
+
+  const schoolProjectSection = document.createElement("section");
+  schoolProjectSection.className = "property-section";
+  const schoolProjectSectionTitle = document.createElement("h3");
+  schoolProjectSectionTitle.textContent = "Schulprojekte";
+  const schoolProjectLauncher = document.createElement("button");
+  schoolProjectLauncher.type = "button";
+  schoolProjectLauncher.className = "secondary-button primary-action trip-add-button";
+  schoolProjectLauncher.textContent = "Schulprojekt hinzufügen";
+  schoolProjectLauncher.addEventListener("click", () => openSchoolProjectDialog(project));
+  const schoolProjectList = document.createElement("div");
+  schoolProjectList.className = "trip-entry-list";
+  if (!schoolProjects.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Noch kein Schulprojekt eingetragen.";
+    schoolProjectList.append(empty);
+  } else {
+    schoolProjects
+      .slice()
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .forEach((schoolProject) => {
+        const row = document.createElement("article");
+        row.className = "trip-entry";
+        const copy = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = schoolProject.name;
+        const dates = document.createElement("span");
+        dates.textContent = `${formatGermanDate(schoolProject.startDate)}–${formatGermanDate(schoolProject.endDate)}`;
+        copy.append(name, dates);
+        const menuShell = document.createElement("div");
+        menuShell.className = "schedule-menu-shell";
+        const menuButton = document.createElement("button");
+        menuButton.type = "button";
+        menuButton.className = "schedule-menu-button";
+        menuButton.setAttribute("aria-label", `Menü für ${schoolProject.name}`);
+        menuButton.setAttribute("aria-expanded", "false");
+        menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+        const menu = document.createElement("div");
+        menu.className = "schedule-menu trip-entry-menu";
+        menu.hidden = true;
+        const editButton = document.createElement("button");
+        editButton.type = "button";
+        editButton.textContent = "Bearbeiten";
+        editButton.addEventListener("click", () => {
+          menu.hidden = true;
+          menuButton.setAttribute("aria-expanded", "false");
+          openSchoolProjectDialog(project, schoolProject);
+        });
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "schedule-menu-delete";
+        deleteButton.textContent = "Löschen";
+        deleteButton.dataset.projectId = project.id;
+        deleteButton.dataset.tripId = schoolProject.id;
+        deleteButton.setAttribute("aria-label", `${schoolProject.name} löschen – gedrückt halten`);
+        deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+        deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+        deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+        deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+        menuButton.addEventListener("click", () => {
+          menu.hidden = !menu.hidden;
+          menuButton.setAttribute("aria-expanded", String(!menu.hidden));
+        });
+        menu.append(editButton, deleteButton);
+        menuShell.append(menuButton, menu);
+        row.append(copy, menuShell);
+        schoolProjectList.append(row);
+      });
+  }
+  schoolProjectSection.append(schoolProjectSectionTitle, schoolProjectLauncher, schoolProjectList);
 
   const applyStatus = document.createElement("p");
   applyStatus.className = "property-status";
@@ -1160,8 +1516,8 @@ function renderIndividualProjectsProperties(project) {
     applyStatus.textContent = "Einstellungen übernommen und Kalenderansicht aktualisiert.";
   });
 
-  section.append(sectionTitle, form, list, applyButton, applyStatus);
-  sheet.append(head, section);
+  section.append(sectionTitle, launcherButton, list);
+  sheet.append(head, section, schoolProjectSection, applyButton, applyStatus);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -1512,6 +1868,97 @@ calendarViewButtons.forEach((button) => {
     mainCalendarView = button.dataset.calendarView;
     renderActiveCalendar();
   });
+});
+function moveCalendarPeriod(direction) {
+  if (mainCalendarView === "week") {
+    calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction * 7);
+  } else if (mainCalendarView === "day") {
+    calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction);
+    while (calendarReferenceDate.getDay() === 0 || calendarReferenceDate.getDay() === 6) {
+      calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction);
+    }
+  }
+  renderActiveCalendar();
+}
+previousCalendarPeriod.addEventListener("click", () => moveCalendarPeriod(-1));
+nextCalendarPeriod.addEventListener("click", () => moveCalendarPeriod(1));
+todayCalendarPeriod.addEventListener("click", () => {
+  calendarReferenceDate = new Date();
+  renderActiveCalendar();
+});
+cancelSchoolProjectButton.addEventListener("click", () => schoolProjectDialog.close());
+schoolProjectForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const project = projects.find((entry) => entry.id === schoolProjectDialog.dataset.projectId);
+  const layer = project && getProjectLayer(project, "individual");
+  const name = schoolProjectName.value.trim();
+  if (!project || !layer) return;
+  if (!name || !schoolProjectStart.value || !schoolProjectEnd.value) {
+    schoolProjectDialogStatus.textContent = "Bitte Bezeichnung sowie Anfangs- und Enddatum eintragen.";
+    return;
+  }
+  if (schoolProjectEnd.value < schoolProjectStart.value) {
+    schoolProjectDialogStatus.textContent = "Das Enddatum darf nicht vor dem Anfangsdatum liegen.";
+    schoolProjectEnd.focus();
+    return;
+  }
+  layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+  const entryData = {
+    name,
+    startDate: schoolProjectStart.value,
+    endDate: schoolProjectEnd.value
+  };
+  const existingEntry = layer.entries.find((entry) => entry.id === schoolProjectDialog.dataset.entryId);
+  if (existingEntry) Object.assign(existingEntry, entryData);
+  else {
+    layer.entries.push({
+      id: globalThis.crypto?.randomUUID?.() ?? `school-project-${Date.now()}`,
+      type: "school-project",
+      ...entryData,
+      createdAt: new Date().toISOString()
+    });
+  }
+  saveProjects();
+  schoolProjectDialog.close();
+  renderIndividualProjectsProperties(project);
+});
+cancelClassTripButton.addEventListener("click", () => classTripDialog.close());
+classTripForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const project = projects.find((entry) => entry.id === classTripDialog.dataset.projectId);
+  const layer = project && getProjectLayer(project, "individual");
+  const name = classTripName.value.trim();
+  const className = classTripClass.value.trim();
+  if (!project || !layer) return;
+  if (!name || !className || !classTripStart.value || !classTripEnd.value) {
+    classTripDialogStatus.textContent = "Bitte Bezeichnung, Klasse sowie Anfangs- und Enddatum eintragen.";
+    return;
+  }
+  if (classTripEnd.value < classTripStart.value) {
+    classTripDialogStatus.textContent = "Das Enddatum darf nicht vor dem Anfangsdatum liegen.";
+    classTripEnd.focus();
+    return;
+  }
+  layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+  const tripData = {
+    name,
+    className,
+    startDate: classTripStart.value,
+    endDate: classTripEnd.value
+  };
+  const existingTrip = layer.entries.find((entry) => entry.id === classTripDialog.dataset.tripId);
+  if (existingTrip) Object.assign(existingTrip, tripData);
+  else {
+    layer.entries.push({
+      id: globalThis.crypto?.randomUUID?.() ?? `class-trip-${Date.now()}`,
+      type: "class-trip",
+      ...tripData,
+      createdAt: new Date().toISOString()
+    });
+  }
+  saveProjects();
+  classTripDialog.close();
+  renderIndividualProjectsProperties(project);
 });
 cancelLessonButton.addEventListener("click", () => lessonDialog.close());
 cancelScheduleDisplayButton.addEventListener("click", () => scheduleDisplayDialog.close());

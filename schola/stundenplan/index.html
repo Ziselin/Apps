@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-  <link rel="stylesheet" href="stundenplan.css?v=20260727ai">
+  <link rel="stylesheet" href="stundenplan.css?v=20260728k">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -59,10 +59,17 @@
       <main class="render-stage">
         <section class="calendar-shell" aria-labelledby="calendarTitle">
           <div class="calendar-heading">
-            <div class="calendar-view-switcher" aria-label="Kalenderansicht">
-              <button type="button" data-calendar-view="day" aria-pressed="false">Tag</button>
-              <button type="button" data-calendar-view="week" aria-pressed="false">Woche</button>
-              <button type="button" data-calendar-view="year" aria-pressed="true">Jahr</button>
+            <div class="calendar-heading-controls">
+              <div class="calendar-view-switcher" aria-label="Kalenderansicht">
+                <button type="button" data-calendar-view="day" aria-pressed="false">Tag</button>
+                <button type="button" data-calendar-view="week" aria-pressed="false">Woche</button>
+                <button type="button" data-calendar-view="year" aria-pressed="true">Jahr</button>
+              </div>
+              <div id="calendarDateNavigation" class="calendar-date-navigation" aria-label="Zeitraum wechseln" hidden>
+                <button type="button" id="previousCalendarPeriod" aria-label="Voriger Zeitraum">←</button>
+                <button type="button" id="todayCalendarPeriod">Heute</button>
+                <button type="button" id="nextCalendarPeriod" aria-label="Nächster Zeitraum">→</button>
+              </div>
             </div>
             <h1 id="calendarTitle" class="visually-hidden">Jahresübersicht</h1>
             <span id="yearLabel" class="year-label"></span>
@@ -122,6 +129,56 @@
       <div class="dialog-actions">
         <button type="button" id="cancelProjectButton" class="secondary-button">Abbrechen</button>
         <button type="submit" class="secondary-button primary-action">Projekt anlegen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="classTripDialog" class="project-dialog" aria-labelledby="classTripDialogTitle">
+    <form id="classTripForm" method="dialog">
+      <div>
+        <span class="label">Individuelles Projekt</span>
+        <h2 id="classTripDialogTitle">Klassenfahrt hinzufügen</h2>
+      </div>
+      <div class="class-trip-dialog-grid">
+        <label class="dialog-field">
+          <span>Bezeichnung</span>
+          <input id="classTripName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Berlinfahrt">
+        </label>
+        <label class="dialog-field">
+          <span>Klasse</span>
+          <input id="classTripClass" type="text" maxlength="40" autocomplete="off" required placeholder="z. B. 8a">
+        </label>
+        <div class="class-trip-date-fields">
+          <label class="dialog-field"><span>Von</span><input id="classTripStart" type="date" required></label>
+          <label class="dialog-field"><span>Bis</span><input id="classTripEnd" type="date" required></label>
+        </div>
+      </div>
+      <p id="classTripDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelClassTripButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="classTripSubmitButton" class="secondary-button primary-action">Klassenfahrt hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="schoolProjectDialog" class="project-dialog" aria-labelledby="schoolProjectDialogTitle">
+    <form id="schoolProjectForm" method="dialog">
+      <div>
+        <span class="label">Individuelles Projekt</span>
+        <h2 id="schoolProjectDialogTitle">Schulprojekt hinzufügen</h2>
+      </div>
+      <div class="class-trip-dialog-grid">
+        <label class="dialog-field">
+          <span>Bezeichnung</span>
+          <input id="schoolProjectName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Theaterprojekt">
+        </label>
+        <div class="class-trip-date-fields">
+          <label class="dialog-field"><span>Von</span><input id="schoolProjectStart" type="date" required></label>
+          <label class="dialog-field"><span>Bis</span><input id="schoolProjectEnd" type="date" required></label>
+        </div>
+      </div>
+      <p id="schoolProjectDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelSchoolProjectButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="schoolProjectSubmitButton" class="secondary-button primary-action">Schulprojekt hinzufügen</button>
       </div>
     </form>
   </dialog>
@@ -186,6 +243,6 @@
       </div>
     </form>
   </dialog>
-  <script src="stundenplan.js?v=20260727ah"></script>
+  <script src="stundenplan.js?v=20260728k"></script>
 </body>
 </html>
