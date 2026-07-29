@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-  <link rel="stylesheet" href="stundenplan.css?v=20260728k">
+    <link rel="stylesheet" href="stundenplan.css?v=20260728zm">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -22,6 +22,11 @@
             </a>
             <span class="brand-name">stundenplan</span>
           </div>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" id="lessonSignalsToggle" class="header-icon-button topbar-icon-button lesson-signals-toggle" aria-pressed="false" title="Stundensignale aktivieren">
+            <span class="lesson-signals-icon" aria-hidden="true">♪</span>
+          </button>
         </div>
       </header>
 
@@ -72,7 +77,9 @@
               </div>
             </div>
             <h1 id="calendarTitle" class="visually-hidden">Jahresübersicht</h1>
-            <span id="yearLabel" class="year-label"></span>
+            <div class="calendar-heading-actions">
+              <span id="yearLabel" class="year-label"></span>
+            </div>
           </div>
           <div id="yearCalendar" class="year-calendar" aria-label="Blanko-Jahreskalender"></div>
         </section>
@@ -132,6 +139,71 @@
       </div>
     </form>
   </dialog>
+  <dialog id="appointmentGroupDialog" class="project-dialog" aria-labelledby="appointmentGroupDialogTitle">
+    <form id="appointmentGroupForm" method="dialog">
+      <div>
+        <span class="label">Termine</span>
+        <h2 id="appointmentGroupDialogTitle">Gruppe hinzufügen</h2>
+      </div>
+      <label class="dialog-field">
+        <span>Name der Gruppe</span>
+        <input id="appointmentGroupName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Fachschaft Deutsch">
+      </label>
+      <fieldset class="lesson-color-field">
+        <legend>Farbe</legend>
+        <input id="appointmentGroupColor" type="hidden" value="#c9c1dd">
+        <div id="appointmentGroupColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
+      </fieldset>
+      <p id="appointmentGroupDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelAppointmentGroupButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="appointmentGroupSubmitButton" class="secondary-button primary-action">Gruppe hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="appointmentDialog" class="project-dialog" aria-labelledby="appointmentDialogTitle">
+    <form id="appointmentForm" method="dialog">
+      <div>
+        <span class="label">Termin</span>
+        <h2 id="appointmentDialogTitle">Termin hinzufügen</h2>
+      </div>
+      <div class="class-trip-dialog-grid">
+        <label class="dialog-field">
+          <span>Bezeichnung</span>
+          <input id="appointmentName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Fachkonferenz">
+        </label>
+        <label class="dialog-field"><span>Datum</span><input id="appointmentDate" type="date" required></label>
+        <div class="event-time-fields">
+          <label class="dialog-field"><span>Beginn</span><input id="appointmentStartTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Ende</span><input id="appointmentEndTime" type="time" step="900" required></label>
+        </div>
+      </div>
+      <p id="appointmentDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelAppointmentButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="appointmentSubmitButton" class="secondary-button primary-action">Termin hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="sicknessDialog" class="project-dialog" aria-labelledby="sicknessDialogTitle">
+    <form id="sicknessForm" method="dialog">
+      <div>
+        <span class="label">Krankschreibungen</span>
+        <h2 id="sicknessDialogTitle">Krankschreibung hinzufügen</h2>
+      </div>
+      <div class="class-trip-dialog-grid">
+        <div class="class-trip-date-fields">
+          <label class="dialog-field"><span>Von</span><input id="sicknessStartDate" type="date" required></label>
+          <label class="dialog-field"><span>Bis</span><input id="sicknessEndDate" type="date" required></label>
+        </div>
+      </div>
+      <p id="sicknessDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelSicknessButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="sicknessSubmitButton" class="secondary-button primary-action">Krankschreibung hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="classTripDialog" class="project-dialog" aria-labelledby="classTripDialogTitle">
     <form id="classTripForm" method="dialog">
       <div>
@@ -147,9 +219,13 @@
           <span>Klasse</span>
           <input id="classTripClass" type="text" maxlength="40" autocomplete="off" required placeholder="z. B. 8a">
         </label>
-        <div class="class-trip-date-fields">
-          <label class="dialog-field"><span>Von</span><input id="classTripStart" type="date" required></label>
-          <label class="dialog-field"><span>Bis</span><input id="classTripEnd" type="date" required></label>
+        <label class="dialog-field">
+          <span>Datum</span>
+          <input id="classTripDate" type="date" required>
+        </label>
+        <div class="event-time-fields">
+          <label class="dialog-field"><span>Beginn</span><input id="classTripStartTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Ende</span><input id="classTripEndTime" type="time" step="900" required></label>
         </div>
       </div>
       <p id="classTripDialogStatus" class="property-status" role="status" aria-live="polite"></p>
@@ -170,9 +246,13 @@
           <span>Bezeichnung</span>
           <input id="schoolProjectName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Theaterprojekt">
         </label>
-        <div class="class-trip-date-fields">
-          <label class="dialog-field"><span>Von</span><input id="schoolProjectStart" type="date" required></label>
-          <label class="dialog-field"><span>Bis</span><input id="schoolProjectEnd" type="date" required></label>
+        <div class="event-time-fields">
+          <label class="dialog-field"><span>Startdatum</span><input id="schoolProjectDate" type="date" required></label>
+          <label class="dialog-field"><span>Enddatum</span><input id="schoolProjectEndDate" type="date" required></label>
+        </div>
+        <div class="event-time-fields">
+          <label class="dialog-field"><span>Beginn</span><input id="schoolProjectStartTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Ende</span><input id="schoolProjectEndTime" type="time" step="900" required></label>
         </div>
       </div>
       <p id="schoolProjectDialogStatus" class="property-status" role="status" aria-live="polite"></p>
@@ -182,24 +262,71 @@
       </div>
     </form>
   </dialog>
+  <dialog id="classCatalogDialog" class="project-dialog" aria-labelledby="classCatalogDialogTitle">
+    <form id="classCatalogForm" method="dialog">
+      <div>
+        <span class="label">Klassen</span>
+        <h2 id="classCatalogDialogTitle">Fach hinzufügen</h2>
+      </div>
+      <input id="classCatalogMode" type="hidden">
+      <label id="classCatalogNameField" class="dialog-field">
+        <span id="classCatalogNameLabel">Bezeichnung</span>
+        <input id="classCatalogName" type="text" maxlength="80" autocomplete="off">
+      </label>
+      <label id="classCatalogGradeField" class="dialog-field" hidden>
+        <span>Klassenstufe</span>
+        <select id="classCatalogGrade"></select>
+      </label>
+      <p id="classCatalogDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelClassCatalogButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" id="classCatalogSubmitButton" class="secondary-button primary-action">Hinzufügen</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="lessonDialog" class="project-dialog lesson-dialog" aria-labelledby="lessonDialogTitle">
     <form id="lessonForm" method="dialog">
       <div><span class="label">Unterrichtsstunde</span><h2 id="lessonDialogTitle">Stunde hinzufügen</h2></div>
       <input id="lessonDay" type="hidden">
-      <div class="lesson-dialog-grid">
-        <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="900" required></label>
-        <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="900" required></label>
-        <label class="dialog-field"><span>Klassenstufe</span><input id="lessonGrade" type="text" maxlength="40" required placeholder="z. B. 8a"></label>
-        <label class="dialog-field"><span>Fach</span><input id="lessonSubject" type="text" maxlength="80" required placeholder="z. B. Deutsch"></label>
-        <label class="dialog-field lesson-dialog-wide"><span>Raum</span><input id="lessonRoom" type="text" maxlength="40" required placeholder="z. B. 204"></label>
-        <fieldset class="lesson-color-field lesson-dialog-wide">
-          <legend>Farbe</legend>
-          <input id="lessonColor" type="hidden" value="#bfd2e2">
-          <div id="lessonColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
-        </fieldset>
-        <label class="dialog-field lesson-dialog-wide"><span>Unterrichtsform</span><select id="lessonEpochal" required><option value="regular">Nicht epochal</option><option value="epochal">Epochal</option></select></label>
+      <div class="lesson-dialog-tabs" role="tablist" aria-label="Stundendetails">
+        <button type="button" id="lessonPropertiesTab" role="tab" aria-selected="true" aria-controls="lessonPropertiesPanel">Eigenschaften</button>
+        <button type="button" id="lessonStatisticsTab" role="tab" aria-selected="false" aria-controls="lessonStatisticsPanel">Statistik</button>
+        <button type="button" id="lessonProgressTab" role="tab" aria-selected="false" aria-controls="lessonProgressPanel">Verlauf</button>
       </div>
-      <p id="lessonDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      <section id="lessonPropertiesPanel" class="lesson-tab-panel" role="tabpanel" aria-labelledby="lessonPropertiesTab">
+        <div class="lesson-dialog-grid">
+          <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Fach</span><select id="lessonSubject" required></select></label>
+          <label class="dialog-field"><span>Klasse</span><select id="lessonGrade" required></select></label>
+          <label class="dialog-field lesson-dialog-wide"><span>Raum</span><input id="lessonRoom" type="text" maxlength="40" required placeholder="z. B. 204"></label>
+          <fieldset class="lesson-color-field lesson-dialog-wide">
+            <legend>Farbe</legend>
+            <input id="lessonColor" type="hidden" value="#bfd2e2">
+            <div id="lessonColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
+          </fieldset>
+          <label class="dialog-field lesson-dialog-wide"><span>Unterrichtsform</span><select id="lessonEpochal" required><option value="regular">Nicht epochal</option><option value="epochal">Epochal</option></select></label>
+        </div>
+        <p id="lessonDialogStatus" class="property-status" role="status" aria-live="polite"></p>
+      </section>
+      <section id="lessonStatisticsPanel" class="lesson-tab-panel lesson-statistics" role="tabpanel" aria-labelledby="lessonStatisticsTab" hidden>
+        <article class="lesson-stat-card">
+          <span>Gesamtjahr</span>
+          <strong id="lessonYearStatistic">–</strong>
+          <small id="lessonYearStatisticPeriod"></small>
+        </article>
+        <article class="lesson-stat-card is-unavailable">
+          <span>Aktuelles Halbjahr</span>
+          <strong>–</strong>
+          <small>Die Halbjahresgrenzen sind im Kalender noch nicht festgelegt.</small>
+        </article>
+      </section>
+      <section id="lessonProgressPanel" class="lesson-tab-panel lesson-progress-settings" role="tabpanel" aria-labelledby="lessonProgressTab" hidden>
+        <p class="lesson-progress-intro">Ohne eingestellte Phasen wird die gesamte Unterrichtsstunde als eine Phase behandelt.</p>
+        <div id="lessonPhaseList" class="lesson-phase-list"></div>
+        <button type="button" id="addLessonPhaseButton" class="secondary-button">Phase hinzufügen</button>
+        <p id="lessonPhaseStatus" class="property-status" role="status" aria-live="polite"></p>
+      </section>
       <div class="dialog-actions">
         <button type="button" id="cancelLessonButton" class="secondary-button">Abbrechen</button>
         <button type="submit" id="lessonSubmitButton" class="secondary-button primary-action">Stunde hinzufügen</button>
@@ -243,6 +370,6 @@
       </div>
     </form>
   </dialog>
-  <script src="stundenplan.js?v=20260728k"></script>
+    <script src="stundenplan.js?v=20260728zv"></script>
 </body>
 </html>
