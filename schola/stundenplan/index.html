@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260728zm">
+    <link rel="stylesheet" href="stundenplan.css?v=20260730v">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -24,6 +24,21 @@
           </div>
         </div>
         <div class="topbar-actions">
+          <div class="export-control">
+            <button type="button" id="exportButton" class="header-icon-button topbar-icon-button" aria-label="Exportieren" title="Exportieren" aria-expanded="false" aria-controls="exportMenu">
+              <span class="topbar-action-icon topbar-export-icon" aria-hidden="true"></span>
+            </button>
+            <div id="exportMenu" class="export-menu" hidden>
+              <button type="button" data-export-format="json">
+                <span class="file-format-badge" aria-hidden="true">JSON</span>
+                <span><strong>Projektordner</strong><small>Zur späteren Wiederherstellung</small></span>
+              </button>
+              <button type="button" data-export-format="ics">
+                <span class="file-format-badge" aria-hidden="true">ICS</span>
+                <span><strong>Kalenderdatei</strong><small>Für Google, Apple und Outlook</small></span>
+              </button>
+            </div>
+          </div>
           <button type="button" id="lessonSignalsToggle" class="header-icon-button topbar-icon-button lesson-signals-toggle" aria-pressed="false" title="Stundensignale aktivieren">
             <span class="lesson-signals-icon" aria-hidden="true">♪</span>
           </button>
@@ -104,8 +119,7 @@
               </button>
               <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
                 <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
-                <button type="button" role="menuitem" disabled>Importieren</button>
-                <button type="button" role="menuitem" disabled>Exportieren</button>
+                <button type="button" id="importProjectButton" role="menuitem">Importieren</button>
               </div>
             </div>
           </div>
@@ -136,6 +150,52 @@
       <div class="dialog-actions">
         <button type="button" id="cancelProjectButton" class="secondary-button">Abbrechen</button>
         <button type="submit" class="secondary-button primary-action">Projekt anlegen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="importProjectDialog" class="project-dialog import-project-dialog" aria-labelledby="importProjectDialogTitle">
+    <form id="importProjectForm" method="dialog">
+      <div>
+        <span class="label">Projektordner</span>
+        <h2 id="importProjectDialogTitle">Projekt importieren</h2>
+        <p class="dialog-intro">Wählen Sie eine zuvor aus Stundenplan exportierte JSON-Datei aus.</p>
+      </div>
+      <label class="dialog-field">
+        <span>Projektdatei</span>
+        <input id="importProjectFile" type="file" accept=".json,application/json" required>
+      </label>
+      <p id="importProjectStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelImportProjectButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" class="secondary-button primary-action">Projekt importieren</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="calendarExportDialog" class="project-dialog calendar-export-dialog" aria-labelledby="calendarExportDialogTitle">
+    <form id="calendarExportForm" method="dialog">
+      <div>
+        <span class="label">Kalenderexport</span>
+        <h2 id="calendarExportDialogTitle">Inhalte der ICS-Datei</h2>
+      </div>
+      <div class="calendar-export-presets" role="radiogroup" aria-label="Umfang des Kalenderexports">
+        <label>
+          <input type="radio" name="calendarExportPreset" value="lessons" checked>
+          <span><strong>Nur Unterricht</strong><small>Alle tatsächlichen Stunden aus sämtlichen Stundenplänen</small></span>
+        </label>
+        <label>
+          <input type="radio" name="calendarExportPreset" value="lessons-holidays">
+          <span><strong>Unterricht und Ferien</strong><small>Unterricht plus Ferien als ganztägige Ereignisse</small></span>
+        </label>
+        <label>
+          <input type="radio" name="calendarExportPreset" value="custom">
+          <span><strong>Individuelle Auswahl</strong><small>Kalenderschichten und Einträge selbst zusammenstellen</small></span>
+        </label>
+      </div>
+      <div id="calendarExportChoices" class="calendar-export-choices" hidden></div>
+      <p id="calendarExportStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelCalendarExportButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" class="secondary-button primary-action">ICS exportieren</button>
       </div>
     </form>
   </dialog>
@@ -295,8 +355,20 @@
       </div>
       <section id="lessonPropertiesPanel" class="lesson-tab-panel" role="tabpanel" aria-labelledby="lessonPropertiesTab">
         <div class="lesson-dialog-grid">
-          <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="900" required></label>
-          <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="900" required></label>
+          <fieldset class="lesson-day-field lesson-dialog-wide">
+            <legend>Wochentage</legend>
+            <div id="lessonDayButtons" class="lesson-day-buttons" aria-label="Wochentage auswählen">
+              <button type="button" data-lesson-day="1" aria-pressed="false">Mo</button>
+              <button type="button" data-lesson-day="2" aria-pressed="false">Di</button>
+              <button type="button" data-lesson-day="3" aria-pressed="false">Mi</button>
+              <button type="button" data-lesson-day="4" aria-pressed="false">Do</button>
+              <button type="button" data-lesson-day="5" aria-pressed="false">Fr</button>
+              <button type="button" data-lesson-day="6" aria-pressed="false">Sa</button>
+              <button type="button" data-lesson-day="7" aria-pressed="false">So</button>
+            </div>
+          </fieldset>
+          <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="60" required></label>
+          <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="60" required></label>
           <label class="dialog-field"><span>Fach</span><select id="lessonSubject" required></select></label>
           <label class="dialog-field"><span>Klasse</span><select id="lessonGrade" required></select></label>
           <label class="dialog-field lesson-dialog-wide"><span>Raum</span><input id="lessonRoom" type="text" maxlength="40" required placeholder="z. B. 204"></label>
@@ -305,7 +377,18 @@
             <input id="lessonColor" type="hidden" value="#bfd2e2">
             <div id="lessonColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
           </fieldset>
-          <label class="dialog-field lesson-dialog-wide"><span>Unterrichtsform</span><select id="lessonEpochal" required><option value="regular">Nicht epochal</option><option value="epochal">Epochal</option></select></label>
+          <div class="dialog-field lesson-dialog-wide lesson-teaching-form">
+            <span>Unterrichtsform</span>
+            <select id="lessonTeachingForm" required></select>
+            <div id="lessonAbWeekChoice" class="lesson-form-choice" role="group" aria-label="A- oder B-Woche" hidden>
+              <button type="button" data-lesson-ab-week="A" aria-pressed="true">A-Woche</button>
+              <button type="button" data-lesson-ab-week="B" aria-pressed="false">B-Woche</button>
+            </div>
+            <div id="lessonEpochHalfChoice" class="lesson-form-choice" role="group" aria-label="Halbjahr" hidden>
+              <button type="button" data-lesson-epoch-half="first" aria-pressed="true">1. Halbjahr</button>
+              <button type="button" data-lesson-epoch-half="second" aria-pressed="false">2. Halbjahr</button>
+            </div>
+          </div>
         </div>
         <p id="lessonDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       </section>
@@ -331,6 +414,7 @@
         <button type="button" id="cancelLessonButton" class="secondary-button">Abbrechen</button>
         <button type="submit" id="lessonSubmitButton" class="secondary-button primary-action">Stunde hinzufügen</button>
       </div>
+      <button type="button" id="deleteLessonButton" class="secondary-button lesson-delete-button" hidden>Stunde löschen</button>
     </form>
   </dialog>
   <dialog id="scheduleDisplayDialog" class="project-dialog schedule-display-dialog" aria-labelledby="scheduleDisplayTitle">
@@ -370,6 +454,6 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260728zv"></script>
+    <script src="stundenplan.js?v=20260730x"></script>
 </body>
 </html>

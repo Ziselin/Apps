@@ -17,6 +17,12 @@ const newProjectDialog = document.getElementById("newProjectDialog");
 const newProjectForm = document.getElementById("newProjectForm");
 const newProjectName = document.getElementById("newProjectName");
 const cancelProjectButton = document.getElementById("cancelProjectButton");
+const importProjectButton = document.getElementById("importProjectButton");
+const importProjectDialog = document.getElementById("importProjectDialog");
+const importProjectForm = document.getElementById("importProjectForm");
+const importProjectFile = document.getElementById("importProjectFile");
+const importProjectStatus = document.getElementById("importProjectStatus");
+const cancelImportProjectButton = document.getElementById("cancelImportProjectButton");
 const detailPanelLabel = document.getElementById("detailPanelLabel");
 const detailPanelTitle = document.getElementById("detailPanelTitle");
 const appointmentGroupDialog = document.getElementById("appointmentGroupDialog");
@@ -84,6 +90,7 @@ const lessonDialog = document.getElementById("lessonDialog");
 const lessonDialogTitle = document.getElementById("lessonDialogTitle");
 const lessonForm = document.getElementById("lessonForm");
 const lessonDay = document.getElementById("lessonDay");
+const lessonDayButtons = [...document.querySelectorAll("[data-lesson-day]")];
 const lessonStart = document.getElementById("lessonStart");
 const lessonEnd = document.getElementById("lessonEnd");
 const lessonGrade = document.getElementById("lessonGrade");
@@ -91,10 +98,15 @@ const lessonSubject = document.getElementById("lessonSubject");
 const lessonRoom = document.getElementById("lessonRoom");
 const lessonColor = document.getElementById("lessonColor");
 const lessonColorPalette = document.getElementById("lessonColorPalette");
-const lessonEpochal = document.getElementById("lessonEpochal");
+const lessonTeachingForm = document.getElementById("lessonTeachingForm");
+const lessonAbWeekChoice = document.getElementById("lessonAbWeekChoice");
+const lessonAbWeekButtons = [...document.querySelectorAll("[data-lesson-ab-week]")];
+const lessonEpochHalfChoice = document.getElementById("lessonEpochHalfChoice");
+const lessonEpochHalfButtons = [...document.querySelectorAll("[data-lesson-epoch-half]")];
 const lessonDialogStatus = document.getElementById("lessonDialogStatus");
 const cancelLessonButton = document.getElementById("cancelLessonButton");
 const lessonSubmitButton = document.getElementById("lessonSubmitButton");
+const deleteLessonButton = document.getElementById("deleteLessonButton");
 const lessonPropertiesTab = document.getElementById("lessonPropertiesTab");
 const lessonStatisticsTab = document.getElementById("lessonStatisticsTab");
 const lessonPropertiesPanel = document.getElementById("lessonPropertiesPanel");
@@ -123,6 +135,13 @@ const previousCalendarPeriod = document.getElementById("previousCalendarPeriod")
 const todayCalendarPeriod = document.getElementById("todayCalendarPeriod");
 const nextCalendarPeriod = document.getElementById("nextCalendarPeriod");
 const lessonSignalsToggle = document.getElementById("lessonSignalsToggle");
+const exportButton = document.getElementById("exportButton");
+const exportMenu = document.getElementById("exportMenu");
+const calendarExportDialog = document.getElementById("calendarExportDialog");
+const calendarExportForm = document.getElementById("calendarExportForm");
+const calendarExportChoices = document.getElementById("calendarExportChoices");
+const calendarExportStatus = document.getElementById("calendarExportStatus");
+const cancelCalendarExportButton = document.getElementById("cancelCalendarExportButton");
 
 const PROJECT_STORAGE_KEY = "schola-stundenplan-projects-v1";
 const DISPLAY_PROJECT_STORAGE_KEY = "schola-stundenplan-display-project-v1";
@@ -142,12 +161,12 @@ const LESSON_COLORS = [
 ];
 const LAYER_TYPES = [
   { id: "holidays", title: "Ferien", description: "Bundesland- und schuljahrabhängige Kalenderschicht" },
-  { id: "individual", title: "Individuelle Projekte", description: "Klassenfahrten, Projekttage und persönliche Beteiligungen" },
-  { id: "classes", title: "Projekttage nach Klassen", description: "Klassenbezogene Projektschichten" },
+  { id: "classCatalog", title: "Klassen", description: "Fächer, Klassenstufen und semantisch eindeutige Einzelklassen" },
   { id: "schedules", title: "Stundenpläne", description: "Wochenpläne mit Gültigkeitszeitraum und Unterrichtsstunden" },
+  { id: "individual", title: "Individuelle Projekte", description: "Klassenfahrten, Projekttage und persönliche Beteiligungen" },
   { id: "appointments", title: "Termine", description: "Gruppen für unregelmäßig wiederkehrende Termine" },
-  { id: "sickness", title: "Krankschreibungen", description: "Zeiträume persönlicher Verhinderung ohne Unterricht" },
-  { id: "classCatalog", title: "Klassen", description: "Fächer, Klassenstufen und semantisch eindeutige Einzelklassen" }
+  { id: "classes", title: "Projekttage nach Klassen", description: "Klassenbezogene Projektschichten" },
+  { id: "sickness", title: "Krankschreibungen", description: "Zeiträume persönlicher Verhinderung ohne Unterricht" }
 ];
 const FEDERAL_STATES = [
   ["BW", "Baden-Württemberg"],
@@ -305,6 +324,7 @@ function renderActiveCalendar() {
   const appointmentLayer = project?.layers?.find((entry) => entry.type === "appointments");
   const sicknessLayer = project?.layers?.find((entry) => entry.type === "sickness");
   const appliedSettings = holidayLayer?.appliedSettings || holidayLayer?.settings;
+  const semanticSchoolYearStart = Number(project?.periods?.schoolYear?.startDate?.slice(0, 4));
   const appointmentEntries = (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
     .flatMap((group) => (Array.isArray(group.appointments) ? group.appointments : []).map((appointment) => ({
       id: appointment.id,
@@ -320,11 +340,11 @@ function renderActiveCalendar() {
     ...appointmentEntries,
     ...(Array.isArray(sicknessLayer?.entries) ? sicknessLayer.entries : [])
   ];
-  if (!project || !appliedSettings?.startYear) {
+  if (!project || (!semanticSchoolYearStart && !appliedSettings?.startYear)) {
     renderYear(new Date().getFullYear(), calendarEntries);
     return;
   }
-  renderYear(Number(appliedSettings.startYear), calendarEntries, true);
+  renderYear(semanticSchoolYearStart || Number(appliedSettings.startYear), calendarEntries, true);
 }
 
 function getCombinedSchedules() {
@@ -373,12 +393,45 @@ function isScheduleValidOn(schedule, date) {
     && (!schedule.validUntil || dateKey <= schedule.validUntil);
 }
 
+function getLessonTeachingForm(lesson) {
+  if (lesson.teachingForm === "abWeek" || lesson.teachingForm === "epochal") return lesson.teachingForm;
+  return lesson.epochal ? "epochal" : "regular";
+}
+
+function isLessonActiveOnDate(lesson, schedule, date) {
+  const teachingForm = getLessonTeachingForm(lesson);
+  if (teachingForm === "regular") return true;
+  const project = projects.find((entry) => entry.id === schedule.projectId);
+  if (!project) return true;
+  const dateKey = getLocalDateKey(date);
+  if (teachingForm === "abWeek") {
+    const weeks = project.periods?.models?.alternatingWeeks?.weeks;
+    const week = (Array.isArray(weeks) ? weeks : []).find((entry) => (
+      dateKey >= entry.startDate && dateKey <= entry.endDate
+    ));
+    return !week || week.variant === (lesson.abWeek === "B" ? "B" : "A");
+  }
+  const halfKey = lesson.epochHalf === "second" ? "second" : "first";
+  const half = project.periods?.models?.halves?.[halfKey];
+  if (!half?.startDate || !half?.endDate) return true;
+  return dateKey >= half.startDate && dateKey <= half.endDate;
+}
+
+function getScheduleHolidayScope(schedule) {
+  if (schedule.holidayScopeType) return schedule.holidayScopeType;
+  return String(schedule.validityPeriodId || "").startsWith("schoolYear.")
+    ? String(schedule.validityPeriodId).split(".")[1]
+    : null;
+}
+
 function isSchoolHolidayForSchedule(schedule, date) {
   const project = projects.find((entry) => entry.id === schedule.projectId);
   const holidayLayer = project?.layers?.find((entry) => entry.type === "holidays");
   const dateKey = getLocalDateKey(date);
+  const scopeType = getScheduleHolidayScope(schedule);
   return (Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : []).some((entry) => (
     entry.type === "school-holiday"
+    && (!scopeType || !entry.scopeType || entry.scopeType === scopeType)
     && dateKey >= entry.startDate
     && dateKey <= entry.endDate
   ));
@@ -438,7 +491,15 @@ function getTodaysLessonSignalEvents(now = new Date()) {
       || isSchoolHolidayForSchedule(schedule, now)
       || isSicknessForSchedule(schedule, now)) return;
     (Array.isArray(schedule.lessons) ? schedule.lessons : [])
-      .filter((lesson) => lesson.day === weekday)
+      .filter((lesson) => (
+        lesson.day === weekday
+        && isLessonActiveOnDate(lesson, schedule, now)
+        && !isLessonSuppressedByClassProject(
+          projects.find((project) => project.id === schedule.projectId),
+          lesson,
+          now
+        )
+      ))
       .forEach((lesson) => {
         events.push({
           type: "start",
@@ -475,7 +536,12 @@ function getSchoolHolidaysForDate(date, schedules) {
     .filter((project) => !projectIds.size || projectIds.has(project.id))
     .flatMap((project) => {
       const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
-      return Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : [];
+      const projectSchedules = schedules.filter((schedule) => schedule.projectId === project.id);
+      return (Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : []).filter((entry) => (
+        !entry.scopeType
+        || !projectSchedules.length
+        || projectSchedules.some((schedule) => getScheduleHolidayScope(schedule) === entry.scopeType)
+      ));
     })
     .filter((entry) => (
       entry.type === "school-holiday"
@@ -715,11 +781,13 @@ function renderCombinedScheduleView(view) {
   calendarReferenceDate = new Date(reference);
   const monday = new Date(reference);
   monday.setDate(reference.getDate() - ((reference.getDay() + 6) % 7));
+  const activeWeekdays = [...new Set(schedules.flatMap(getScheduleActiveDays))].sort((a, b) => a - b);
+  if (!activeWeekdays.length) activeWeekdays.push(1, 2, 3, 4, 5);
   const dates = view === "day"
     ? [reference]
-    : Array.from({ length: 5 }, (_, index) => {
+    : activeWeekdays.map((weekday) => {
       const date = new Date(monday);
-      date.setDate(monday.getDate() + index);
+      date.setDate(monday.getDate() + weekday - 1);
       return date;
     });
   const holidaysByDate = new Map(dates.map((date) => [
@@ -732,8 +800,14 @@ function renderCombinedScheduleView(view) {
       if (dates.some((date) => (
         lesson.day === ((date.getDay() + 6) % 7) + 1
         && isScheduleValidOn(schedule, date)
+        && isLessonActiveOnDate(lesson, schedule, date)
         && !isSchoolHolidayForSchedule(schedule, date)
         && !isSicknessForSchedule(schedule, date)
+        && !isLessonSuppressedByClassProject(
+          projects.find((project) => project.id === schedule.projectId),
+          lesson,
+          date
+        )
       ))) {
         timedLessons.push({ lesson, schedule });
       }
@@ -752,20 +826,7 @@ function renderCombinedScheduleView(view) {
   calendarTitle.textContent = view === "day" ? "Tagesansicht" : "Wochenansicht";
   yearLabel.textContent = view === "day"
     ? dates[0].toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
-    : `${dates[0].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}–${dates[4].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
-  const hasVisibleHolidays = [...holidaysByDate.values()].some((names) => names.length);
-  if (!timedLessons.length && !visibleSchoolProjects.length && !visibleAppointments.length && !hasVisibleHolidays) {
-    const empty = document.createElement("p");
-    empty.className = "combined-schedule-empty";
-    empty.textContent = "Für diese Ansicht sind noch keine Unterrichtsstunden eingetragen.";
-    calendar.append(empty);
-    return;
-  }
-
-  const lessonStarts = timedLessons.map(({ lesson }) => timeToMinutes(lesson.start));
-  const lessonEnds = timedLessons.map(({ lesson }) => timeToMinutes(lesson.end));
-  const appointmentStarts = visibleAppointments.map((appointment) => timeToMinutes(appointment.startTime));
-  const appointmentEnds = visibleAppointments.map((appointment) => timeToMinutes(appointment.endTime));
+    : `${dates[0].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}–${dates[dates.length - 1].toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
   const configuredStarts = schedules.map((schedule) => schedule.displayDefaults?.dayStart).filter(Boolean).map(timeToMinutes);
   const configuredEnds = schedules.map((schedule) => {
     if (schedule.displayDefaults?.dayEnd) return timeToMinutes(schedule.displayDefaults.dayEnd);
@@ -776,14 +837,10 @@ function renderCombinedScheduleView(view) {
   }).filter(Number.isFinite);
   const schoolDayStart = configuredStarts.length ? Math.min(...configuredStarts) : 8 * 60;
   const schoolDayEnd = configuredEnds.length ? Math.max(...configuredEnds) : 16 * 60;
-  const rangeStarts = [...lessonStarts, ...appointmentStarts, ...configuredStarts];
-  const rangeEnds = [...lessonEnds, ...appointmentEnds, ...configuredEnds];
-  const earliestMinutes = rangeStarts.length ? Math.min(...rangeStarts) : 8 * 60;
-  const latestMinutes = rangeEnds.length ? Math.max(...rangeEnds) : 16 * 60;
-  const timelineStart = Math.max(0, Math.floor(earliestMinutes / 60) * 60 - 30);
-  const timelineEnd = Math.min(24 * 60, Math.ceil(latestMinutes / 60) * 60 + 30);
+  const timelineStart = 0;
+  const timelineEnd = 24 * 60;
   const timelineMinutes = timelineEnd - timelineStart;
-  const firstHourMark = Math.ceil(timelineStart / 60) * 60;
+  const firstHourMark = 0;
   calendar.style.setProperty("--timeline-columns", `66px repeat(${dates.length}, minmax(${view === "day" ? "280px" : "150px"}, 1fr))`);
 
   const header = document.createElement("div");
@@ -795,9 +852,19 @@ function renderCombinedScheduleView(view) {
   dates.forEach((date) => {
     const head = document.createElement("div");
     head.className = "timeline-day-head";
-    head.textContent = view === "day"
+    const dateLabel = document.createElement("span");
+    dateLabel.className = "timeline-day-date";
+    dateLabel.textContent = view === "day"
       ? date.toLocaleDateString("de-DE", { weekday: "long" })
       : date.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
+    head.append(dateLabel);
+    const holidayNames = holidaysByDate.get(getLocalDateKey(date)) || [];
+    if (holidayNames.length) {
+      const holidayLabel = document.createElement("span");
+      holidayLabel.className = "timeline-day-holiday";
+      holidayLabel.textContent = holidayNames.join(" · ");
+      head.append(holidayLabel);
+    }
     header.append(head);
   });
   calendar.append(header);
@@ -850,17 +917,17 @@ function renderCombinedScheduleView(view) {
       guide.style.top = `${((minutes - timelineStart) / timelineMinutes) * 100}%`;
       column.append(guide);
     }
-    if (holidayNames.length) {
-      const holidayLabel = document.createElement("div");
-      holidayLabel.className = "timeline-holiday-label";
-      holidayLabel.textContent = holidayNames.join(" · ");
-      column.append(holidayLabel);
-    }
     const lessonEntries = timedLessons.filter(({ lesson, schedule }) => (
         lesson.day === weekday
         && isScheduleValidOn(schedule, date)
+        && isLessonActiveOnDate(lesson, schedule, date)
         && !isSchoolHolidayForSchedule(schedule, date)
         && !isSicknessForSchedule(schedule, date)
+        && !isLessonSuppressedByClassProject(
+          projects.find((project) => project.id === schedule.projectId),
+          lesson,
+          date
+        )
       ));
     const projectEntries = visibleSchoolProjects
       .filter((schoolProject) => {
@@ -905,7 +972,20 @@ function renderCombinedScheduleView(view) {
     body.append(column);
   });
   calendar.append(body);
-  updateCurrentTimeIndicator();
+  requestAnimationFrame(() => updateCurrentTimeIndicator());
+}
+
+function centerCurrentTimeIndicator(indicator) {
+  const timeline = indicator.closest(".combined-timeline");
+  const body = indicator.closest(".timeline-body");
+  const header = timeline?.querySelector(".timeline-header");
+  if (!timeline || !body || !header) return;
+  const headerHeight = header.offsetHeight;
+  const visibleBodyHeight = Math.max(0, timeline.clientHeight - headerHeight);
+  const desiredViewportPosition = headerHeight + visibleBodyHeight / 2;
+  const indicatorPosition = body.offsetTop + indicator.offsetTop;
+  const maximumScroll = Math.max(0, timeline.scrollHeight - timeline.clientHeight);
+  timeline.scrollTop = Math.max(0, Math.min(maximumScroll, indicatorPosition - desiredViewportPosition));
 }
 
 function updateCurrentTimeIndicator(now = new Date()) {
@@ -921,6 +1001,7 @@ function updateCurrentTimeIndicator(now = new Date()) {
     indicator.hidden = !isVisible;
     if (!isVisible) return;
     indicator.style.top = `${((currentMinutes - timelineStart) / (timelineEnd - timelineStart)) * 100}%`;
+    centerCurrentTimeIndicator(indicator);
   });
 }
 
@@ -952,6 +1033,530 @@ function saveProjects() {
   localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
 }
 
+function setExportMenuOpen(isOpen) {
+  exportMenu.hidden = !isOpen;
+  exportButton.setAttribute("aria-expanded", String(isOpen));
+}
+
+function makeExportFilename(value) {
+  return String(value || "stundenplan")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase() || "stundenplan";
+}
+
+function downloadExportFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportDisplayedProject() {
+  const project = projects.find((entry) => entry.id === displayedProjectId);
+  if (!project) {
+    window.alert("Bitte wählen Sie zuerst einen Projektordner für die Kalenderanzeige aus.");
+    return;
+  }
+  const payload = {
+    type: "schola-stundenplan-project",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    project: structuredClone(project)
+  };
+  downloadExportFile(
+    JSON.stringify(payload, null, 2),
+    `${makeExportFilename(project.name)}.stundenplan.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function normalizeImportedProject(payload) {
+  if (!payload || payload.type !== "schola-stundenplan-project" || Number(payload.version) !== 1) {
+    throw new Error("Die Datei ist kein gültiger Stundenplan-Projektexport.");
+  }
+  const sourceProject = payload.project;
+  if (!sourceProject || typeof sourceProject !== "object" || Array.isArray(sourceProject)) {
+    throw new Error("In der Datei fehlt der Projektordner.");
+  }
+  const name = String(sourceProject.name || "").trim();
+  if (!name) throw new Error("Der Projektordner besitzt keinen gültigen Namen.");
+  if (!Array.isArray(sourceProject.layers)) {
+    throw new Error("Die Kalenderschichten des Projektordners fehlen.");
+  }
+
+  const layers = LAYER_TYPES.map(({ id }) => {
+    const importedLayer = sourceProject.layers.find((entry) => entry?.type === id);
+    const layer = importedLayer && typeof importedLayer === "object"
+      ? structuredClone(importedLayer)
+      : { type: id, entries: [] };
+    layer.type = id;
+    if (id === "schedules") layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
+    else if (id === "appointments") layer.groups = Array.isArray(layer.groups) ? layer.groups : [];
+    else if (id === "classCatalog") layer.subjects = Array.isArray(layer.subjects) ? layer.subjects : [];
+    else layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+    if (id === "individual" && !Array.isArray(layer.appliedEntries)) {
+      layer.appliedEntries = structuredClone(layer.entries);
+    }
+    return layer;
+  });
+
+  const importedId = String(sourceProject.id || "");
+  const id = importedId && !projects.some((project) => project.id === importedId)
+    ? importedId
+    : globalThis.crypto?.randomUUID?.() ?? `project-${Date.now()}`;
+  return {
+    ...structuredClone(sourceProject),
+    id,
+    name,
+    layers,
+    importedAt: new Date().toISOString(),
+    importedFromProjectId: importedId || null
+  };
+}
+
+async function importProjectFromFile(file) {
+  if (!file) throw new Error("Bitte wählen Sie eine JSON-Datei aus.");
+  if (file.size > 25 * 1024 * 1024) throw new Error("Die Projektdatei ist größer als 25 MB.");
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    throw new Error("Die ausgewählte Datei enthält kein gültiges JSON.");
+  }
+  const project = normalizeImportedProject(payload);
+  projects.push(project);
+  migrateKnownHolidayCorrections([project]);
+  activeProjectId = project.id;
+  displayedProjectId = project.id;
+  activeLayerType = null;
+  activeScheduleId = null;
+  expandedProjectIds.add(project.id);
+  localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
+  saveProjects();
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+  return project;
+}
+
+function escapeIcalendarText(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+}
+
+function formatIcalendarDate(dateKey) {
+  return String(dateKey).replaceAll("-", "");
+}
+
+function formatIcalendarDateTime(dateKey, time) {
+  return `${formatIcalendarDate(dateKey)}T${String(time || "00:00").replace(":", "")}00`;
+}
+
+function getIcalendarColor(value) {
+  const colors = new Map([
+    ["#bfd2e2", "lightblue"],
+    ["#b8d6d1", "lightcyan"],
+    ["#c6d7bd", "lightgreen"],
+    ["#e6d8a8", "khaki"],
+    ["#e4c0a8", "peachpuff"],
+    ["#dfb9bd", "pink"],
+    ["#c9c1dd", "thistle"],
+    ["#d7c4b4", "tan"]
+  ]);
+  return colors.get(String(value || "").toLowerCase()) || "";
+}
+
+function addDaysToDateKey(dateKey, days = 1) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return getLocalDateKey(date);
+}
+
+function forEachDateKey(startDate, endDate, callback) {
+  if (!startDate || !endDate || endDate < startDate) return;
+  const cursor = new Date(`${startDate}T12:00:00`);
+  const last = new Date(`${endDate}T12:00:00`);
+  while (cursor <= last) {
+    callback(getLocalDateKey(cursor), new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+}
+
+function createIcalendarEvent({
+  uid,
+  title,
+  description = "",
+  location = "",
+  startDate,
+  endDate = startDate,
+  startTime = "",
+  endTime = "",
+  category = "",
+  color = "",
+  recurrenceRule = "",
+  exclusionDates = []
+}) {
+  const lines = [
+    "BEGIN:VEVENT",
+    `UID:${escapeIcalendarText(uid)}@stundenplan.schola`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}`,
+    `SUMMARY:${escapeIcalendarText(title)}`
+  ];
+  if (startTime && endTime) {
+    lines.push(`DTSTART:${formatIcalendarDateTime(startDate, startTime)}`);
+    lines.push(`DTEND:${formatIcalendarDateTime(endDate, endTime)}`);
+    if (recurrenceRule) lines.push(`RRULE:${recurrenceRule}`);
+    for (let index = 0; index < exclusionDates.length; index += 4) {
+      lines.push(`EXDATE:${exclusionDates.slice(index, index + 4)
+        .map((dateKey) => formatIcalendarDateTime(dateKey, startTime))
+        .join(",")}`);
+    }
+  } else {
+    lines.push(`DTSTART;VALUE=DATE:${formatIcalendarDate(startDate)}`);
+    lines.push(`DTEND;VALUE=DATE:${formatIcalendarDate(addDaysToDateKey(endDate, 1))}`);
+  }
+  if (description) lines.push(`DESCRIPTION:${escapeIcalendarText(description)}`);
+  if (location) lines.push(`LOCATION:${escapeIcalendarText(location)}`);
+  if (category) lines.push(`CATEGORIES:${escapeIcalendarText(category)}`);
+  const standardColor = getIcalendarColor(color);
+  if (standardColor) lines.push(`COLOR:${standardColor}`);
+  if (color) lines.push(`X-SCHOLA-COLOR:${escapeIcalendarText(color)}`);
+  lines.push("END:VEVENT");
+  return lines;
+}
+
+function isLessonSuppressedByClassProject(project, lesson, date) {
+  const layer = project?.layers?.find((entry) => entry.type === "classes");
+  const dateKey = getLocalDateKey(date);
+  return (Array.isArray(layer?.entries) ? layer.entries : []).some((entry) => {
+    const startDate = entry.startDate || entry.date;
+    const endDate = entry.endDate || entry.date;
+    if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
+    const normalizedEntryClass = String(entry.className || entry.class || "").trim().toLowerCase();
+    const normalizedLessonClass = String(lesson.grade || "").trim().toLowerCase();
+    const sameClass = Boolean(
+      (entry.classId && lesson.classId && entry.classId === lesson.classId)
+      || (Array.isArray(entry.classIds) && lesson.classId && entry.classIds.includes(lesson.classId))
+      || (normalizedEntryClass && normalizedEntryClass === normalizedLessonClass)
+    );
+    if (!sameClass) return false;
+    const allDay = typeof entry.allDay === "boolean"
+      ? entry.allDay
+      : !(entry.startTime && entry.endTime);
+    if (allDay) return true;
+    if (!entry.startTime || !entry.endTime) return false;
+    return lesson.start < entry.endTime && lesson.end > entry.startTime;
+  });
+}
+
+function getCompleteIcalendarSelection(project) {
+  const schedulesLayer = project.layers?.find((entry) => entry.type === "schedules");
+  const individualLayer = project.layers?.find((entry) => entry.type === "individual");
+  const appointmentLayer = project.layers?.find((entry) => entry.type === "appointments");
+  const sicknessLayer = project.layers?.find((entry) => entry.type === "sickness");
+  const classProjectsLayer = project.layers?.find((entry) => entry.type === "classes");
+  return {
+    scheduleIds: new Set((schedulesLayer?.schedules || []).map((entry) => entry.id)),
+    holidays: true,
+    individualEntryIds: new Set((individualLayer?.appliedEntries || []).map((entry) => entry.id)),
+    appointmentIds: new Set((appointmentLayer?.groups || []).flatMap((group) => (
+      (group.appointments || []).map((entry) => entry.id)
+    ))),
+    sicknessIds: new Set((sicknessLayer?.entries || []).map((entry) => entry.id)),
+    classProjectIds: new Set((classProjectsLayer?.entries || []).map((entry) => entry.id))
+  };
+}
+
+function buildProjectIcalendar(project, selection = getCompleteIcalendarSelection(project)) {
+  const events = [];
+  const schedulesLayer = project.layers?.find((entry) => entry.type === "schedules");
+  const individualLayer = project.layers?.find((entry) => entry.type === "individual");
+  const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
+  const appointmentLayer = project.layers?.find((entry) => entry.type === "appointments");
+  const sicknessLayer = project.layers?.find((entry) => entry.type === "sickness");
+  const classProjectsLayer = project.layers?.find((entry) => entry.type === "classes");
+  const projectPeriod = getLessonStatisticsPeriod(project);
+
+  (Array.isArray(schedulesLayer?.schedules) ? schedulesLayer.schedules : [])
+    .filter((schedule) => selection.scheduleIds.has(schedule.id))
+    .forEach((schedule) => {
+    const rangeStart = schedule.validFrom || projectPeriod.startDate;
+    const rangeEnd = schedule.validUntil || projectPeriod.endDate;
+    const combinedSchedule = { ...schedule, projectId: project.id };
+    (Array.isArray(schedule.lessons) ? schedule.lessons : []).forEach((lesson) => {
+      const occurrenceDates = [];
+      const exclusionDates = [];
+      forEachDateKey(rangeStart, rangeEnd, (dateKey, date) => {
+        const weekday = ((date.getDay() + 6) % 7) + 1;
+        if (lesson.day !== weekday) return;
+        occurrenceDates.push(dateKey);
+        if (
+          !isLessonActiveOnDate(lesson, combinedSchedule, date)
+          || isSchoolHolidayForSchedule(combinedSchedule, date)
+          || isSicknessForSchedule(combinedSchedule, date)
+          || isLessonSuppressedByClassProject(project, lesson, date)
+        ) {
+          exclusionDates.push(dateKey);
+        }
+      });
+      if (!occurrenceDates.length || exclusionDates.length === occurrenceDates.length) return;
+      const firstActualDate = occurrenceDates.find((dateKey) => !exclusionDates.includes(dateKey));
+      const effectiveExclusionDates = exclusionDates.filter((dateKey) => dateKey >= firstActualDate);
+      const className = lesson.grade || "";
+      events.push(...createIcalendarEvent({
+        uid: `lesson-series-${schedule.id}-${lesson.id}`,
+        title: [lesson.subject || "Unterricht", className].filter(Boolean).join(" · "),
+        description: `Stundenplan: ${schedule.name}`,
+        location: lesson.room || "",
+        startDate: firstActualDate,
+        startTime: lesson.start,
+        endTime: lesson.end,
+        category: "Unterricht",
+        color: lesson.color || "#bfd2e2",
+        recurrenceRule: `FREQ=WEEKLY;UNTIL=${formatIcalendarDateTime(rangeEnd, "23:59").replace(/00$/, "59")}`,
+        exclusionDates: effectiveExclusionDates
+      }));
+    });
+  });
+
+  if (selection.holidays) (Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : [])
+    .filter((entry) => entry.type === "school-holiday")
+    .forEach((entry) => {
+      events.push(...createIcalendarEvent({
+        uid: `holiday-${entry.id}`,
+        title: entry.name || "Ferien",
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        category: "Ferien",
+        color: "#c6d7bd"
+      }));
+    });
+
+  (Array.isArray(individualLayer?.appliedEntries) ? individualLayer.appliedEntries : [])
+    .filter((entry) => (
+      selection.individualEntryIds.has(entry.id)
+      && (entry.type === "school-project" || entry.type === "class-trip")
+    ))
+    .forEach((entry) => {
+      forEachDateKey(entry.startDate, entry.endDate || entry.startDate, (dateKey) => {
+        events.push(...createIcalendarEvent({
+          uid: `${entry.type}-${entry.id}-${dateKey}`,
+          title: entry.name || (entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt"),
+          description: entry.className || entry.class || "",
+          startDate: dateKey,
+          startTime: entry.startTime,
+          endTime: entry.endTime,
+          category: entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt",
+          color: entry.color || "#bfd2e2"
+        }));
+      });
+    });
+
+  (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
+    .forEach((group) => {
+    (Array.isArray(group.appointments) ? group.appointments : [])
+      .filter((appointment) => selection.appointmentIds.has(appointment.id))
+      .forEach((appointment) => {
+      events.push(...createIcalendarEvent({
+        uid: `appointment-${group.id}-${appointment.id}`,
+        title: appointment.name || group.name || "Termin",
+        description: group.name || "",
+        startDate: appointment.date,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        category: "Termin",
+        color: group.color || "#c9c1dd"
+      }));
+    });
+  });
+
+  (Array.isArray(sicknessLayer?.entries) ? sicknessLayer.entries : [])
+    .filter((entry) => selection.sicknessIds.has(entry.id))
+    .forEach((entry) => {
+    events.push(...createIcalendarEvent({
+      uid: `sickness-${entry.id}`,
+      title: entry.name || "Krankschreibung",
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+      category: "Abwesenheit",
+      color: "#d7c4b4"
+    }));
+  });
+
+  (Array.isArray(classProjectsLayer?.entries) ? classProjectsLayer.entries : [])
+    .filter((entry) => selection.classProjectIds.has(entry.id))
+    .forEach((entry) => {
+      events.push(...createIcalendarEvent({
+        uid: `class-project-${entry.id}`,
+        title: entry.name || "Projekttag",
+        description: entry.className || entry.class || "",
+        startDate: entry.startDate || entry.date,
+        endDate: entry.endDate || entry.date,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        category: "Projekttag",
+        color: entry.color || "#e6d8a8"
+      }));
+    });
+
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "PRODID:-//Schola//Stundenplan//DE",
+    `X-WR-CALNAME:${escapeIcalendarText(project.name)}`,
+    ...events,
+    "END:VCALENDAR",
+    ""
+  ].join("\r\n");
+}
+
+function appendCalendarExportChoiceGroup(title, options) {
+  if (!options.length) return;
+  const group = document.createElement("section");
+  group.className = "calendar-export-choice-group";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  group.append(heading);
+  options.forEach(({ kind, id, label }) => {
+    const choice = document.createElement("label");
+    choice.className = "calendar-export-choice";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = true;
+    input.dataset.exportKind = kind;
+    input.dataset.exportId = id || "";
+    const copy = document.createElement("span");
+    copy.textContent = label;
+    choice.append(input, copy);
+    group.append(choice);
+  });
+  calendarExportChoices.append(group);
+}
+
+function renderCalendarExportChoices(project) {
+  calendarExportChoices.replaceChildren();
+  const schedulesLayer = project.layers?.find((entry) => entry.type === "schedules");
+  const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
+  const individualLayer = project.layers?.find((entry) => entry.type === "individual");
+  const appointmentLayer = project.layers?.find((entry) => entry.type === "appointments");
+  const classProjectsLayer = project.layers?.find((entry) => entry.type === "classes");
+  const sicknessLayer = project.layers?.find((entry) => entry.type === "sickness");
+
+  appendCalendarExportChoiceGroup("Stundenpläne", (schedulesLayer?.schedules || []).map((schedule) => ({
+    kind: "schedule",
+    id: schedule.id,
+    label: schedule.name
+  })));
+  if ((holidayLayer?.entries || []).some((entry) => entry.type === "school-holiday")) {
+    appendCalendarExportChoiceGroup("Ferien", [{
+      kind: "holidays",
+      id: "",
+      label: "Alle Ferientermine"
+    }]);
+  }
+  appendCalendarExportChoiceGroup("Individuelle Projekte", (individualLayer?.appliedEntries || [])
+    .filter((entry) => entry.type === "school-project" || entry.type === "class-trip")
+    .map((entry) => ({
+      kind: "individual",
+      id: entry.id,
+      label: entry.name || (entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt")
+    })));
+  appendCalendarExportChoiceGroup("Termine", (appointmentLayer?.groups || []).flatMap((group) => (
+    (group.appointments || []).map((appointment) => ({
+      kind: "appointment",
+      id: appointment.id,
+      label: `${group.name}: ${appointment.name}`
+    }))
+  )));
+  appendCalendarExportChoiceGroup("Projekttage nach Klassen", (classProjectsLayer?.entries || []).map((entry) => ({
+    kind: "classProject",
+    id: entry.id,
+    label: entry.name || entry.className || entry.class || "Projekttag"
+  })));
+  appendCalendarExportChoiceGroup("Krankschreibungen", (sicknessLayer?.entries || []).map((entry) => ({
+    kind: "sickness",
+    id: entry.id,
+    label: entry.startDate === entry.endDate
+      ? formatGermanDate(entry.startDate)
+      : `${formatGermanDate(entry.startDate)}–${formatGermanDate(entry.endDate)}`
+  })));
+
+  if (!calendarExportChoices.children.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "In diesem Projektordner sind noch keine exportierbaren Inhalte angelegt.";
+    calendarExportChoices.append(empty);
+  }
+}
+
+function openCalendarExportDialog() {
+  const project = projects.find((entry) => entry.id === displayedProjectId);
+  if (!project) {
+    window.alert("Bitte wählen Sie zuerst einen Projektordner für die Kalenderanzeige aus.");
+    return;
+  }
+  calendarExportForm.reset();
+  calendarExportDialog.dataset.projectId = project.id;
+  calendarExportStatus.textContent = "";
+  renderCalendarExportChoices(project);
+  calendarExportChoices.hidden = true;
+  calendarExportDialog.showModal();
+}
+
+function getCalendarExportSelection(project) {
+  const preset = calendarExportForm.elements.calendarExportPreset.value;
+  const allSchedules = project.layers?.find((entry) => entry.type === "schedules")?.schedules || [];
+  const selection = {
+    scheduleIds: new Set(),
+    holidays: false,
+    individualEntryIds: new Set(),
+    appointmentIds: new Set(),
+    sicknessIds: new Set(),
+    classProjectIds: new Set()
+  };
+  if (preset === "lessons" || preset === "lessons-holidays") {
+    allSchedules.forEach((schedule) => selection.scheduleIds.add(schedule.id));
+    selection.holidays = preset === "lessons-holidays";
+    return selection;
+  }
+  calendarExportChoices.querySelectorAll("input[type=\"checkbox\"]:checked").forEach((input) => {
+    const id = input.dataset.exportId;
+    if (input.dataset.exportKind === "schedule") selection.scheduleIds.add(id);
+    if (input.dataset.exportKind === "holidays") selection.holidays = true;
+    if (input.dataset.exportKind === "individual") selection.individualEntryIds.add(id);
+    if (input.dataset.exportKind === "appointment") selection.appointmentIds.add(id);
+    if (input.dataset.exportKind === "sickness") selection.sicknessIds.add(id);
+    if (input.dataset.exportKind === "classProject") selection.classProjectIds.add(id);
+  });
+  return selection;
+}
+
+function downloadDisplayedCalendar(selection) {
+  const project = projects.find((entry) => entry.id === displayedProjectId);
+  if (!project) {
+    window.alert("Bitte wählen Sie zuerst einen Projektordner für die Kalenderanzeige aus.");
+    return;
+  }
+  downloadExportFile(
+    buildProjectIcalendar(project, selection),
+    `${makeExportFilename(project.name)}.ics`,
+    "text/calendar;charset=utf-8"
+  );
+}
+
 function setDisplayedProject(projectId) {
   if (!projects.some((project) => project.id === projectId)) return;
   displayedProjectId = projectId;
@@ -963,6 +1568,16 @@ function setDisplayedProject(projectId) {
 function setBrowserMenuOpen(isOpen) {
   browserActionsButton.setAttribute("aria-expanded", String(isOpen));
   browserActionsMenu.hidden = !isOpen;
+}
+
+function closeCardMenus(exceptShell = null) {
+  document.querySelectorAll(".schedule-menu-shell").forEach((shell) => {
+    if (shell === exceptShell) return;
+    const menu = shell.querySelector(".schedule-menu");
+    const button = shell.querySelector(".schedule-menu-button");
+    if (menu) menu.hidden = true;
+    button?.setAttribute("aria-expanded", "false");
+  });
 }
 
 function selectProject(projectId) {
@@ -1132,6 +1747,287 @@ function renderProjectDetail() {
   renderProjectSettings(project);
 }
 
+function createGradeLevelSelect(value, label) {
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", label);
+  for (let grade = 1; grade <= 13; grade += 1) {
+    const option = document.createElement("option");
+    option.value = String(grade);
+    option.textContent = String(grade);
+    option.selected = String(value || 1) === String(grade);
+    select.append(option);
+  }
+  return select;
+}
+
+function renderHalfYearConfiguration(panel, halvesDraft) {
+  const render = () => {
+    panel.replaceChildren();
+    const intro = document.createElement("p");
+    intro.textContent = "Legen Sie die Grenzen beider Halbjahre und bei Bedarf Zensurenstopps für bestimmte Klassenstufen fest.";
+    panel.append(intro);
+
+    [
+      ["first", "1. Halbjahr"],
+      ["second", "2. Halbjahr"]
+    ].forEach(([key, title]) => {
+      const half = halvesDraft[key];
+      const section = document.createElement("section");
+      section.className = "half-year-period";
+      const heading = document.createElement("h4");
+      heading.textContent = title;
+      const range = document.createElement("div");
+      range.className = "half-year-range";
+      const startLabel = document.createElement("label");
+      startLabel.textContent = "von";
+      const start = document.createElement("input");
+      start.type = "date";
+      start.value = half.startDate || "";
+      start.addEventListener("input", () => { half.startDate = start.value; });
+      startLabel.append(start);
+      const endLabel = document.createElement("label");
+      endLabel.textContent = "bis";
+      const end = document.createElement("input");
+      end.type = "date";
+      end.value = half.endDate || "";
+      end.addEventListener("input", () => { half.endDate = end.value; });
+      endLabel.append(end);
+      range.append(startLabel, endLabel);
+
+      const stopHeading = document.createElement("h5");
+      stopHeading.className = "grading-stop-heading";
+      stopHeading.textContent = "Zensurenstopp";
+      const stopList = document.createElement("div");
+      stopList.className = "grading-stop-list";
+      half.gradingStops.forEach((stop, index) => {
+        const row = document.createElement("div");
+        row.className = "grading-stop-row";
+        const dateLabel = document.createElement("label");
+        dateLabel.textContent = "Datum";
+        const date = document.createElement("input");
+        date.type = "date";
+        date.value = stop.date || "";
+        date.addEventListener("input", () => { stop.date = date.value; });
+        dateLabel.append(date);
+        const grades = document.createElement("div");
+        grades.className = "grading-stop-grades";
+        const fromLabel = document.createElement("label");
+        fromLabel.textContent = "Klassenstufe von";
+        const gradeFrom = createGradeLevelSelect(stop.gradeFrom, `Klassenstufe von für Zensurenstopp ${index + 1}`);
+        gradeFrom.addEventListener("change", () => { stop.gradeFrom = Number(gradeFrom.value); });
+        fromLabel.append(gradeFrom);
+        const untilLabel = document.createElement("label");
+        untilLabel.textContent = "bis";
+        const gradeUntil = createGradeLevelSelect(stop.gradeUntil, `Klassenstufe bis für Zensurenstopp ${index + 1}`);
+        gradeUntil.addEventListener("change", () => { stop.gradeUntil = Number(gradeUntil.value); });
+        untilLabel.append(gradeUntil);
+        grades.append(fromLabel, untilLabel);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "display-row-delete grading-stop-delete";
+        remove.textContent = "Löschen";
+        remove.addEventListener("click", () => {
+          half.gradingStops.splice(index, 1);
+          render();
+        });
+        row.append(dateLabel, grades, remove);
+        stopList.append(row);
+      });
+
+      const addStop = document.createElement("button");
+      addStop.type = "button";
+      addStop.className = "secondary-button grading-stop-add";
+      addStop.textContent = "Zensurenstopp hinzufügen";
+      addStop.addEventListener("click", () => {
+        half.gradingStops.push({
+          id: globalThis.crypto?.randomUUID?.() ?? `grading-stop-${Date.now()}-${half.gradingStops.length}`,
+          date: "",
+          gradeFrom: 1,
+          gradeUntil: 13
+        });
+        render();
+      });
+      section.append(heading, range, stopHeading, stopList, addStop);
+      panel.append(section);
+    });
+  };
+  render();
+}
+
+function renderPeriodRanges(panel, draft, definitions, introText) {
+  const intro = document.createElement("p");
+  intro.textContent = introText;
+  panel.append(intro);
+
+  definitions.forEach(([key, title]) => {
+    const period = draft[key];
+    const section = document.createElement("section");
+    section.className = "half-year-period";
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    const range = document.createElement("div");
+    range.className = "half-year-range";
+    const startLabel = document.createElement("label");
+    startLabel.textContent = "von";
+    const start = document.createElement("input");
+    start.type = "date";
+    start.value = period.startDate;
+    start.addEventListener("input", () => { period.startDate = start.value; });
+    startLabel.append(start);
+    const endLabel = document.createElement("label");
+    endLabel.textContent = "bis";
+    const end = document.createElement("input");
+    end.type = "date";
+    end.value = period.endDate;
+    end.addEventListener("input", () => { period.endDate = end.value; });
+    endLabel.append(end);
+    range.append(startLabel, endLabel);
+    section.append(heading, range);
+    panel.append(section);
+  });
+}
+
+function getIsoWeekDetails(date) {
+  const thursday = new Date(date);
+  const weekday = thursday.getDay() || 7;
+  thursday.setDate(thursday.getDate() + 4 - weekday);
+  const isoYear = thursday.getFullYear();
+  const yearStart = new Date(isoYear, 0, 1, 12);
+  const week = Math.ceil((((thursday - yearStart) / 86400000) + 1) / 7);
+  return { isoYear, week };
+}
+
+function getSchoolYearWeeks(startDate, endDate) {
+  if (!startDate || !endDate || endDate < startDate) return [];
+  const firstDate = new Date(`${startDate}T12:00:00`);
+  const lastDate = new Date(`${endDate}T12:00:00`);
+  const firstWeekday = firstDate.getDay() || 7;
+  const monday = new Date(firstDate);
+  monday.setDate(monday.getDate() - firstWeekday + 1);
+  const weeks = [];
+  while (monday <= lastDate) {
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    const { isoYear, week } = getIsoWeekDetails(monday);
+    weeks.push({
+      key: `${isoYear}-W${String(week).padStart(2, "0")}`,
+      isoYear,
+      week,
+      startDate: getLocalDateKey(monday),
+      endDate: getLocalDateKey(sunday)
+    });
+    monday.setDate(monday.getDate() + 7);
+  }
+  return weeks;
+}
+
+function syncAlternatingWeekDraft(draft, startDate, endDate) {
+  const existing = new Map((Array.isArray(draft.weeks) ? draft.weeks : []).map((week) => [week.key, week]));
+  draft.weeks = getSchoolYearWeeks(startDate, endDate).map((week, index) => ({
+    ...week,
+    variant: existing.get(week.key)?.variant === "B" ? "B" : existing.get(week.key)?.variant === "A" ? "A" : index % 2 ? "B" : "A"
+  }));
+  if (draft.mode === "alternating" && draft.weeks.length) {
+    const firstVariant = draft.weeks[0].variant;
+    draft.weeks.forEach((week, index) => {
+      week.variant = index % 2 ? (firstVariant === "A" ? "B" : "A") : firstVariant;
+    });
+  }
+}
+
+function renderAlternatingWeeksConfiguration(panel, draft, getSchoolYearRange) {
+  const render = (listScrollTop = 0) => {
+    const { startDate, endDate } = getSchoolYearRange();
+    syncAlternatingWeekDraft(draft, startDate, endDate);
+    panel.replaceChildren();
+
+    const intro = document.createElement("p");
+    intro.textContent = "Ordnen Sie den Kalenderwochen des Schuljahres eine A- oder B-Woche zu. Ferien unterbrechen den Wechsel nicht.";
+    const modeGroup = document.createElement("div");
+    modeGroup.className = "ab-week-mode";
+    modeGroup.setAttribute("role", "group");
+    modeGroup.setAttribute("aria-label", "Logik der A- und B-Wochen");
+    [["alternating", "Abwechselnd"], ["individual", "Individuell"]].forEach(([mode, label]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.setAttribute("aria-pressed", String(draft.mode === mode));
+      button.addEventListener("click", () => {
+        if (draft.mode === mode) return;
+        const currentScrollTop = panel.querySelector(".ab-week-list")?.scrollTop || 0;
+        if (mode === "alternating" && draft.hasIndividualChanges) {
+          const confirmed = globalThis.confirm("Beim Umschalten auf „Abwechselnd“ werden Ihre individuellen A/B-Einstellungen entfernt. Möchten Sie fortfahren?");
+          if (!confirmed) return;
+        }
+        draft.mode = mode;
+        if (mode === "alternating") draft.hasIndividualChanges = false;
+        render(currentScrollTop);
+      });
+      modeGroup.append(button);
+    });
+
+    const modeHint = document.createElement("p");
+    modeHint.className = "ab-week-mode-hint";
+    modeHint.textContent = draft.mode === "alternating"
+      ? "Eine Änderung setzt alle Kalenderwochen wieder in einen durchgängigen A/B-Wechsel."
+      : "Jede Kalenderwoche kann unabhängig eingestellt werden.";
+    const list = document.createElement("div");
+    list.className = "ab-week-list";
+    if (!draft.weeks.length) {
+      const empty = document.createElement("p");
+      empty.className = "ab-week-empty";
+      empty.textContent = "Legen Sie zuerst gültige Schuljahresgrenzen fest.";
+      list.append(empty);
+    }
+    draft.weeks.forEach((week, index) => {
+      const row = document.createElement("div");
+      row.className = "ab-week-row";
+      const calendarWeek = document.createElement("strong");
+      calendarWeek.textContent = `KW ${week.week}`;
+      const dates = document.createElement("span");
+      dates.textContent = `${formatGermanDate(week.startDate)}–${formatGermanDate(week.endDate)}`;
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "ab-week-toggle";
+      toggle.setAttribute("role", "switch");
+      toggle.setAttribute("aria-checked", String(week.variant === "B"));
+      toggle.setAttribute("aria-label", `Kalenderwoche ${week.week}: ${week.variant}-Woche`);
+      ["A", "B"].forEach((variant) => {
+        const option = document.createElement("span");
+        option.textContent = variant;
+        option.classList.toggle("is-active", week.variant === variant);
+        toggle.append(option);
+      });
+      toggle.addEventListener("click", () => {
+        const currentScrollTop = list.scrollTop;
+        const nextVariant = week.variant === "A" ? "B" : "A";
+        if (draft.mode === "alternating") {
+          draft.weeks.forEach((entry, entryIndex) => {
+            const sameParity = Math.abs(entryIndex - index) % 2 === 0;
+            entry.variant = sameParity ? nextVariant : (nextVariant === "A" ? "B" : "A");
+          });
+        } else {
+          week.variant = nextVariant;
+          draft.hasIndividualChanges = true;
+        }
+        render(currentScrollTop);
+      });
+      row.append(calendarWeek, dates, toggle);
+      list.append(row);
+    });
+    panel.append(intro, modeGroup, modeHint, list);
+    list.scrollTop = listScrollTop;
+  };
+  render();
+  return {
+    refresh: render,
+    sync: () => {
+      const { startDate, endDate } = getSchoolYearRange();
+      syncAlternatingWeekDraft(draft, startDate, endDate);
+    }
+  };
+}
+
 function renderProjectSettings(project) {
   detailPanelLabel.textContent = "Projektordner";
   detailPanelTitle.textContent = "Projekteinstellungen";
@@ -1187,6 +2083,147 @@ function renderProjectSettings(project) {
   nameInput.required = true;
   nameInput.value = project.name;
   nameRow.append(nameLabel, nameInput);
+
+  const periodSettings = ensureProjectPeriodSettings(project);
+  const storedHalves = periodSettings.models.halves || {};
+  const normalizeHalf = (value = {}) => ({
+    startDate: value.startDate || "",
+    endDate: value.endDate || "",
+    gradingStops: (Array.isArray(value.gradingStops) ? value.gradingStops : []).map((stop) => ({
+      id: stop.id || globalThis.crypto?.randomUUID?.() || `grading-stop-${Date.now()}`,
+      date: stop.date || "",
+      gradeFrom: Number(stop.gradeFrom) || 1,
+      gradeUntil: Number(stop.gradeUntil ?? stop.gradeTo) || 13
+    }))
+  });
+  const halvesDraft = {
+    first: normalizeHalf(storedHalves.first),
+    second: normalizeHalf(storedHalves.second)
+  };
+  const normalizePeriod = (value = {}) => ({
+    startDate: value.startDate || "",
+    endDate: value.endDate || ""
+  });
+  const storedSemesters = periodSettings.models.semesters || {};
+  const semestersDraft = {
+    first: normalizePeriod(storedSemesters.first),
+    second: normalizePeriod(storedSemesters.second)
+  };
+  const storedTrimesters = periodSettings.models.trimesters || {};
+  const trimestersDraft = {
+    first: normalizePeriod(storedTrimesters.first),
+    second: normalizePeriod(storedTrimesters.second),
+    third: normalizePeriod(storedTrimesters.third)
+  };
+  const storedAlternatingWeeks = periodSettings.models.alternatingWeeks || {};
+  const alternatingWeeksDraft = {
+    mode: storedAlternatingWeeks.mode === "individual" ? "individual" : "alternating",
+    hasIndividualChanges: Boolean(storedAlternatingWeeks.hasIndividualChanges),
+    weeks: (Array.isArray(storedAlternatingWeeks.weeks) ? storedAlternatingWeeks.weeks : []).map((week) => ({
+      key: week.key,
+      isoYear: Number(week.isoYear),
+      week: Number(week.week),
+      startDate: week.startDate,
+      endDate: week.endDate,
+      variant: week.variant === "B" ? "B" : "A"
+    }))
+  };
+  const periodsSection = document.createElement("section");
+  periodsSection.className = "property-section project-period-section";
+  const periodsTitle = document.createElement("h3");
+  periodsTitle.textContent = "Zeiträume";
+  const periodsIntro = document.createElement("p");
+  periodsIntro.className = "project-period-intro";
+  periodsIntro.textContent = "Das Schuljahr bildet den übergeordneten Zeitraum für Stundenpläne und spätere zeitliche Unterteilungen.";
+  const schoolYearRow = document.createElement("div");
+  schoolYearRow.className = "property-row project-school-year-row";
+  const schoolYearLabel = document.createElement("span");
+  schoolYearLabel.textContent = "Schuljahr";
+  const schoolYearFields = document.createElement("div");
+  schoolYearFields.className = "project-school-year-fields";
+  const startLabel = document.createElement("label");
+  startLabel.textContent = "Beginn";
+  const schoolYearStart = document.createElement("input");
+  schoolYearStart.type = "date";
+  schoolYearStart.required = true;
+  schoolYearStart.value = periodSettings.schoolYear.startDate;
+  startLabel.append(schoolYearStart);
+  const endLabel = document.createElement("label");
+  endLabel.textContent = "Ende";
+  const schoolYearEnd = document.createElement("input");
+  schoolYearEnd.type = "date";
+  schoolYearEnd.required = true;
+  schoolYearEnd.value = periodSettings.schoolYear.endDate;
+  endLabel.append(schoolYearEnd);
+  schoolYearFields.append(startLabel, endLabel);
+  schoolYearRow.append(schoolYearLabel, schoolYearFields);
+
+  const periodTabs = document.createElement("div");
+  periodTabs.className = "project-period-tabs";
+  periodTabs.setAttribute("role", "tablist");
+  periodTabs.setAttribute("aria-label", "Unterteilung des Schuljahres");
+  const periodPanels = document.createElement("div");
+  periodPanels.className = "project-period-panels";
+  const tabDefinitions = [
+    ["halves", "Halbjahre", "Die Grenzen der beiden Schulhalbjahre werden hier im nächsten Schritt festgelegt."],
+    ["semesters", "Semester", "Legen Sie Beginn und Ende des ersten und zweiten Semesters fest."],
+    ["trimesters", "Trimester", "Legen Sie Beginn und Ende der drei Trimester fest."],
+    ["alternatingWeeks", "A/B-Woche", "Der Wechsel zwischen A- und B-Wochen wird hier im nächsten Schritt konfiguriert."]
+  ];
+  let alternatingWeeksController = null;
+  const selectPeriodTab = (tabId) => {
+    periodSettings.activeTab = tabId;
+    [...periodTabs.children].forEach((button) => {
+      button.setAttribute("aria-selected", String(button.dataset.periodTab === tabId));
+    });
+    [...periodPanels.children].forEach((panel) => {
+      panel.hidden = panel.dataset.periodPanel !== tabId;
+    });
+  };
+  tabDefinitions.forEach(([id, label, description]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.periodTab = id;
+    button.setAttribute("role", "tab");
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      selectPeriodTab(id);
+      saveProjects();
+    });
+    const panel = document.createElement("section");
+    panel.className = "project-period-panel";
+    panel.dataset.periodPanel = id;
+    panel.setAttribute("role", "tabpanel");
+    if (id === "halves") renderHalfYearConfiguration(panel, halvesDraft);
+    else if (id === "semesters") {
+      renderPeriodRanges(panel, semestersDraft, [
+        ["first", "Erstes Semester"],
+        ["second", "Zweites Semester"]
+      ], description);
+    } else if (id === "trimesters") {
+      renderPeriodRanges(panel, trimestersDraft, [
+        ["first", "Erstes Trimester"],
+        ["second", "Zweites Trimester"],
+        ["third", "Drittes Trimester"]
+      ], description);
+    } else if (id === "alternatingWeeks") {
+      alternatingWeeksController = renderAlternatingWeeksConfiguration(panel, alternatingWeeksDraft, () => ({
+        startDate: schoolYearStart.value,
+        endDate: schoolYearEnd.value
+      }));
+    } else {
+      const panelText = document.createElement("p");
+      panelText.textContent = description;
+      panel.append(panelText);
+    }
+    periodTabs.append(button);
+    periodPanels.append(panel);
+  });
+  schoolYearStart.addEventListener("input", () => alternatingWeeksController?.refresh());
+  schoolYearEnd.addEventListener("input", () => alternatingWeeksController?.refresh());
+  selectPeriodTab(periodSettings.activeTab);
+  periodsSection.append(periodsTitle, periodsIntro, schoolYearRow, periodTabs, periodPanels);
+
   const status = document.createElement("p");
   status.className = "property-status";
   status.setAttribute("role", "status");
@@ -1202,20 +2239,253 @@ function renderProjectSettings(project) {
       nameInput.focus();
       return;
     }
+    if (!schoolYearStart.value || !schoolYearEnd.value || schoolYearEnd.value < schoolYearStart.value) {
+      status.textContent = "Bitte einen gültigen Zeitraum für das Schuljahr festlegen.";
+      schoolYearStart.focus();
+      return;
+    }
+    for (const [label, half] of [["1. Halbjahr", halvesDraft.first], ["2. Halbjahr", halvesDraft.second]]) {
+      const hasPartialRange = Boolean(half.startDate) !== Boolean(half.endDate);
+      if (hasPartialRange || (half.startDate && half.endDate < half.startDate)) {
+        status.textContent = `Bitte für das ${label} einen gültigen Zeitraum von bis eintragen.`;
+        return;
+      }
+      const invalidStop = half.gradingStops.find((stop) => (
+        !stop.date || Number(stop.gradeFrom) > Number(stop.gradeUntil)
+      ));
+      if (invalidStop) {
+        status.textContent = `Bitte die Zensurenstopps im ${label} vollständig und mit aufsteigenden Klassenstufen eintragen.`;
+        return;
+      }
+    }
+    for (const [label, period] of [
+      ["das erste Semester", semestersDraft.first],
+      ["das zweite Semester", semestersDraft.second],
+      ["das erste Trimester", trimestersDraft.first],
+      ["das zweite Trimester", trimestersDraft.second],
+      ["das dritte Trimester", trimestersDraft.third]
+    ]) {
+      const hasPartialRange = Boolean(period.startDate) !== Boolean(period.endDate);
+      if (hasPartialRange || (period.startDate && period.endDate < period.startDate)) {
+        status.textContent = `Bitte für ${label} einen gültigen Zeitraum von bis eintragen.`;
+        return;
+      }
+    }
     project.name = nextName;
+    project.periods.schoolYear = {
+      startDate: schoolYearStart.value,
+      endDate: schoolYearEnd.value,
+      source: "project-settings"
+    };
+    project.periods.models.halves = structuredClone(halvesDraft);
+    project.periods.models.semesters = structuredClone(semestersDraft);
+    project.periods.models.trimesters = structuredClone(trimestersDraft);
+    alternatingWeeksController?.sync();
+    project.periods.models.alternatingWeeks = structuredClone(alternatingWeeksDraft);
+    syncScheduleValidityPeriods(project);
     saveProjects();
     renderProjectBrowser();
     renderProjectDetail();
     renderActiveCalendar();
   });
-  form.append(nameRow, status, saveButton);
+  form.append(nameRow, periodsSection, status, saveButton);
   summary.append(titleLine, note, form);
   projectDetail.replaceChildren(summary);
+  saveProjects();
+}
+
+function openClassProjectDialog(project, classInfo, entry = null) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog class-project-dialog";
+  if (entry?.id) dialog.dataset.classProjectId = entry.id;
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = `Projekttage · ${classInfo.name}`;
+  const title = document.createElement("h2");
+  title.textContent = entry ? "Projekt bearbeiten" : "Projekt hinzufügen";
+  heading.append(label, title);
+
+  const fields = document.createElement("div");
+  fields.className = "class-trip-dialog-grid";
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "dialog-field";
+  nameLabel.innerHTML = "<span>Titel</span>";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.maxLength = 100;
+  nameInput.required = true;
+  nameInput.placeholder = "z. B. Projekttag";
+  nameInput.value = entry?.name || "";
+  nameLabel.append(nameInput);
+
+  const dateFields = document.createElement("div");
+  dateFields.className = "class-trip-date-fields";
+  const startLabel = document.createElement("label");
+  startLabel.className = "dialog-field";
+  startLabel.innerHTML = "<span>Datum von</span>";
+  const startInput = document.createElement("input");
+  startInput.type = "date";
+  startInput.required = true;
+  startInput.value = entry?.startDate || entry?.date || "";
+  startLabel.append(startInput);
+  const endLabel = document.createElement("label");
+  endLabel.className = "dialog-field";
+  endLabel.innerHTML = "<span>bis</span>";
+  const endInput = document.createElement("input");
+  endInput.type = "date";
+  endInput.required = true;
+  endInput.value = entry?.endDate || entry?.date || "";
+  endLabel.append(endInput);
+  dateFields.append(startLabel, endLabel);
+
+  let isAllDay = entry
+    ? (typeof entry.allDay === "boolean" ? entry.allDay : !(entry.startTime && entry.endTime))
+    : true;
+  const durationField = document.createElement("fieldset");
+  durationField.className = "class-project-dialog-duration";
+  const durationLegend = document.createElement("legend");
+  durationLegend.textContent = "Dauer";
+  const durationChoice = document.createElement("div");
+  durationChoice.className = "lesson-form-choice";
+  const timeFields = document.createElement("div");
+  timeFields.className = "event-time-fields";
+  timeFields.hidden = isAllDay;
+  [["true", "Ganztägig"], ["false", "Nicht ganztägig"]].forEach(([value, text]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.setAttribute("aria-pressed", String(isAllDay === (value === "true")));
+    button.addEventListener("click", () => {
+      isAllDay = value === "true";
+      [...durationChoice.querySelectorAll("button")].forEach((choice) => {
+        choice.setAttribute("aria-pressed", String(choice === button));
+      });
+      timeFields.hidden = isAllDay;
+      timeStart.required = !isAllDay;
+      timeEnd.required = !isAllDay;
+    });
+    durationChoice.append(button);
+  });
+  durationField.append(durationLegend, durationChoice);
+
+  const timeStartLabel = document.createElement("label");
+  timeStartLabel.className = "dialog-field";
+  timeStartLabel.innerHTML = "<span>Zeit von</span>";
+  const timeStart = document.createElement("input");
+  timeStart.type = "time";
+  timeStart.step = "60";
+  timeStart.required = !isAllDay;
+  timeStart.value = entry?.startTime || "";
+  timeStartLabel.append(timeStart);
+  const timeEndLabel = document.createElement("label");
+  timeEndLabel.className = "dialog-field";
+  timeEndLabel.innerHTML = "<span>bis</span>";
+  const timeEnd = document.createElement("input");
+  timeEnd.type = "time";
+  timeEnd.step = "60";
+  timeEnd.required = !isAllDay;
+  timeEnd.value = entry?.endTime || "";
+  timeEndLabel.append(timeEnd);
+  timeFields.append(timeStartLabel, timeEndLabel);
+  fields.append(nameLabel, dateFields, durationField, timeFields);
+
+  const status = document.createElement("p");
+  status.className = "property-status";
+  status.setAttribute("role", "status");
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  if (entry) {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "secondary-button lesson-delete-button class-project-dialog-delete";
+    deleteButton.textContent = "Projekt löschen";
+    deleteButton.dataset.projectId = project.id;
+    deleteButton.dataset.classProjectId = entry.id;
+    deleteButton.title = "Zum Löschen gedrückt halten";
+    deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+    deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+    deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+    deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+    actions.append(deleteButton);
+  }
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = entry ? "Änderungen speichern" : "Projekt hinzufügen";
+  actions.append(cancel, submit);
+  form.append(heading, fields, status, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    if (endInput.value < startInput.value) {
+      status.textContent = "Das Enddatum darf nicht vor dem Anfangsdatum liegen.";
+      return;
+    }
+    if (!isAllDay && timeEnd.value <= timeStart.value) {
+      status.textContent = "Das Ende muss nach dem Beginn liegen.";
+      return;
+    }
+    const layer = getProjectLayer(project, "classes");
+    layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+    const values = {
+      type: "class-project",
+      name: nameInput.value.trim(),
+      className: classInfo.name,
+      classIds: [...classInfo.classIds],
+      startDate: startInput.value,
+      endDate: endInput.value,
+      allDay: isAllDay,
+      startTime: isAllDay ? "" : timeStart.value,
+      endTime: isAllDay ? "" : timeEnd.value,
+      color: "#e6d8a8"
+    };
+    if (entry) Object.assign(entry, values);
+    else layer.entries.push({
+      id: globalThis.crypto?.randomUUID?.() ?? `class-project-${Date.now()}`,
+      ...values
+    });
+    saveProjects();
+    dialog.close();
+    renderClassProjectsIntroduction(project);
+    renderActiveCalendar(project);
+  });
+  dialog.showModal();
+  nameInput.focus();
 }
 
 function renderClassProjectsIntroduction(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Projekttage nach Klassen";
+  const layer = getProjectLayer(project, "classes");
+  layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+  const catalog = getProjectLayer(project, "classCatalog");
+  const classesByName = new Map();
+  (Array.isArray(catalog.subjects) ? catalog.subjects : []).forEach((subject) => {
+    (Array.isArray(subject?.grades) ? subject.grades : []).forEach((grade) => {
+      (Array.isArray(grade?.classes) ? grade.classes : []).forEach((classEntry) => {
+        const name = String(classEntry?.name || "").trim();
+        if (!name) return;
+        const key = name.toLocaleLowerCase("de");
+        const item = classesByName.get(key) || { key, name, classIds: [], subjects: [] };
+        if (classEntry.id && !item.classIds.includes(classEntry.id)) item.classIds.push(classEntry.id);
+        if (subject?.name && !item.subjects.includes(subject.name)) item.subjects.push(subject.name);
+        classesByName.set(key, item);
+      });
+    });
+  });
+  const configuredClasses = [...classesByName.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" }));
 
   const sheet = document.createElement("section");
   sheet.className = "property-sheet";
@@ -1232,13 +2502,94 @@ function renderClassProjectsIntroduction(project) {
   const sectionTitle = document.createElement("h3");
   sectionTitle.textContent = "Klassenbezogene Unterrichtsausfälle";
   const explanation = document.createElement("p");
-  explanation.textContent = "Einzelne Klassen haben zeitweise keinen regulären Unterricht, etwa weil sie ohne Ihre Begleitung auf Klassenfahrt sind oder an einem anderen schulischen Projekt teilnehmen. Jeder Eintrag wird deshalb einer Klasse zugeordnet und erhält ein Datum sowie Beginn und Ende.";
+  explanation.textContent = "Einzelne Klassen haben zeitweise keinen regulären Unterricht, etwa weil sie ohne Ihre Begleitung auf Klassenfahrt sind oder an einem anderen schulischen Projekt teilnehmen.";
   const effect = document.createElement("p");
   effect.textContent = "Für den eingetragenen Zeitraum entfernt der Kalender ausschließlich die Unterrichtsstunden der betroffenen Klasse. Der Unterricht aller anderen Klassen bleibt unverändert sichtbar.";
   section.append(sectionTitle, explanation, effect);
 
+  const classList = document.createElement("div");
+  classList.className = "class-project-class-list";
+  if (!configuredClasses.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.append("Es sind noch keine Klassen eingerichtet. Legen Sie diese zunächst unter ");
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "schedule-setup-link";
+    link.textContent = "Klassen";
+    link.addEventListener("click", () => selectLayer(project.id, "classCatalog"));
+    empty.append(link, " an.");
+    classList.append(empty);
+  } else {
+    configuredClasses.forEach((classInfo) => {
+      const classCard = document.createElement("section");
+      classCard.className = "class-project-class-card";
+      const classHead = document.createElement("div");
+      classHead.className = "class-project-class-head";
+      const classHeading = document.createElement("div");
+      const classTitle = document.createElement("h3");
+      classTitle.textContent = classInfo.name;
+      const classMeta = document.createElement("span");
+      classMeta.textContent = classInfo.subjects.join(" · ");
+      classHeading.append(classTitle, classMeta);
+      const addButton = document.createElement("button");
+      addButton.type = "button";
+      addButton.className = "secondary-button";
+      addButton.textContent = "Projekt hinzufügen";
+      addButton.addEventListener("click", () => openClassProjectDialog(project, classInfo));
+      classHead.append(classHeading, addButton);
+
+      const entries = layer.entries.filter((entry) => {
+        if (!entry || typeof entry !== "object") return false;
+        const entryName = String(entry.className || entry.class || "").trim().toLocaleLowerCase("de");
+        return entryName === classInfo.key
+          || (Array.isArray(entry.classIds) && entry.classIds.some((id) => classInfo.classIds.includes(id)));
+      });
+      const projectList = document.createElement("div");
+      projectList.className = "class-project-entry-list";
+      entries.forEach((entry) => {
+        entry.className = classInfo.name;
+        entry.classIds = [...classInfo.classIds];
+        entry.allDay = typeof entry.allDay === "boolean" ? entry.allDay : !(entry.startTime && entry.endTime);
+        const projectRow = document.createElement("button");
+        projectRow.type = "button";
+        projectRow.className = "holiday-entry class-project-summary";
+        projectRow.dataset.classProjectId = entry.id;
+        projectRow.setAttribute("aria-label", `${entry.name || "Projekt"} bearbeiten`);
+        const projectTitle = document.createElement("strong");
+        projectTitle.textContent = entry.name || "Projekt";
+        const projectDates = document.createElement("span");
+        const startDate = entry.startDate || entry.date;
+        const endDate = entry.endDate || entry.date;
+        const dateText = !startDate || !endDate
+          ? "Datum noch nicht vollständig"
+          : startDate === endDate
+            ? formatGermanDate(startDate)
+            : `${formatGermanDate(startDate)}–${formatGermanDate(endDate)}`;
+        const projectTime = document.createElement("span");
+        projectTime.textContent = entry.allDay
+          ? "ganztägig"
+          : `${entry.startTime || "–"}–${entry.endTime || "–"}`;
+        projectDates.textContent = dateText;
+        projectRow.addEventListener("click", () => openClassProjectDialog(project, classInfo, entry));
+        projectRow.append(projectTitle, projectDates, projectTime);
+        projectList.append(projectRow);
+      });
+      if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "class-project-empty";
+        empty.textContent = "Noch keine Projekte eingetragen.";
+        projectList.append(empty);
+      }
+      classCard.append(classHead, projectList);
+      classList.append(classCard);
+    });
+  }
+
+  section.append(classList);
   sheet.append(head, section);
   projectDetail.replaceChildren(sheet);
+  saveProjects();
 }
 
 function setAppointmentGroupColor(value) {
@@ -1746,15 +3097,52 @@ function createSelectShell(select) {
   return shell;
 }
 
-function getDefaultScheduleValidity(project) {
+function getHolidaySchoolYearPeriod(project) {
   const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
   const schoolYear = holidayLayer?.appliedSettings || holidayLayer?.settings;
-  const startYear = Number(schoolYear?.startYear);
-  const endYear = Number(schoolYear?.endYear) || startYear + 1;
-  if (startYear) {
+  const scopeTypes = Array.isArray(schoolYear?.scopeTypes) ? schoolYear.scopeTypes : [schoolYear?.schoolType];
+  const schoolScopeType = scopeTypes.find((type) => type === "general" || type === "vocational" || type === "all");
+  if (!schoolScopeType) return null;
+  const scopeConfig = schoolYear?.scopeConfigs?.[schoolScopeType] || schoolYear;
+  const startYear = Number(scopeConfig?.startYear);
+  const endYear = Number(scopeConfig?.endYear) || startYear + 1;
+  if (!startYear) return null;
+  return {
+    startDate: `${startYear}-08-01`,
+    endDate: `${endYear}-07-31`,
+    source: "holidays"
+  };
+}
+
+function ensureProjectPeriodSettings(project) {
+  project.periods = project.periods && typeof project.periods === "object" ? project.periods : {};
+  const holidayPeriod = getHolidaySchoolYearPeriod(project);
+  if (!project.periods.schoolYear?.startDate || !project.periods.schoolYear?.endDate) {
+    const fallback = holidayPeriod || (() => {
+      const today = new Date();
+      return {
+        startDate: today.toISOString().slice(0, 10),
+        endDate: `${today.getFullYear() + 1}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+        source: "default"
+      };
+    })();
+    project.periods.schoolYear = fallback;
+  }
+  project.periods.models = project.periods.models && typeof project.periods.models === "object"
+    ? project.periods.models
+    : { halves: {}, semesters: {}, trimesters: {}, alternatingWeeks: {} };
+  project.periods.activeTab = ["halves", "semesters", "trimesters", "alternatingWeeks"].includes(project.periods.activeTab)
+    ? project.periods.activeTab
+    : "halves";
+  return project.periods;
+}
+
+function getDefaultScheduleValidity(project) {
+  const periodSettings = ensureProjectPeriodSettings(project);
+  if (periodSettings.schoolYear?.startDate && periodSettings.schoolYear?.endDate) {
     return {
-      validFrom: `${startYear}-08-01`,
-      validUntil: `${endYear}-07-31`
+      validFrom: periodSettings.schoolYear.startDate,
+      validUntil: periodSettings.schoolYear.endDate
     };
   }
   const today = new Date();
@@ -1762,6 +3150,89 @@ function getDefaultScheduleValidity(project) {
     validFrom: today.toISOString().slice(0, 10),
     validUntil: `${today.getFullYear() + 1}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
   };
+}
+
+function getScheduleValidityPeriods(project) {
+  const periods = ensureProjectPeriodSettings(project);
+  const options = [];
+  const addPeriod = (id, label, value, scopeType = null) => {
+    if (!value?.startDate || !value?.endDate || value.endDate < value.startDate) return;
+    options.push({ id, label, startDate: value.startDate, endDate: value.endDate, scopeType });
+  };
+  const holidaySettings = project.layers?.find((layer) => layer.type === "holidays")?.settings;
+  const configuredScopes = Array.isArray(holidaySettings?.scopeTypes)
+    ? holidaySettings.scopeTypes
+    : holidaySettings?.schoolType ? [holidaySettings.schoolType === "all" ? "general" : holidaySettings.schoolType] : [];
+  ["general", "vocational", "university"]
+    .filter((scopeType) => configuredScopes.includes(scopeType))
+    .forEach((scopeType) => {
+      const scopeConfig = holidaySettings?.scopeConfigs?.[scopeType] || holidaySettings;
+      const schoolStartYear = Number(scopeConfig?.startYear);
+      const schoolEndYear = Number(scopeConfig?.endYear) || schoolStartYear + 1;
+      if (scopeType === "general" && schoolStartYear) {
+        addPeriod("schoolYear.general", "Schuljahr (allgemeinbildende Schule)", {
+          startDate: `${schoolStartYear}-08-01`,
+          endDate: `${schoolEndYear}-07-31`
+        }, scopeType);
+      }
+      if (scopeType === "vocational" && schoolStartYear) {
+        addPeriod("schoolYear.vocational", "Schuljahr (Berufsschule)", {
+          startDate: `${schoolStartYear}-08-01`,
+          endDate: `${schoolEndYear}-07-31`
+        }, scopeType);
+      }
+      if (scopeType === "university") {
+        addPeriod("schoolYear.university", "Schuljahr (Hochschule)", periods.schoolYear, scopeType);
+      }
+    });
+  if (!options.length) addPeriod("schoolYear", "Schuljahr", periods.schoolYear);
+  const primarySchoolScope = configuredScopes.find((scopeType) => scopeType === "general" || scopeType === "vocational") || null;
+  const academicScope = configuredScopes.includes("university") ? "university" : null;
+  addPeriod("halves.first", "1. Halbjahr", periods.models.halves?.first, primarySchoolScope);
+  addPeriod("halves.second", "2. Halbjahr", periods.models.halves?.second, primarySchoolScope);
+  addPeriod("semesters.first", "Erstes Semester", periods.models.semesters?.first, academicScope);
+  addPeriod("semesters.second", "Zweites Semester", periods.models.semesters?.second, academicScope);
+  addPeriod("trimesters.first", "Erstes Trimester", periods.models.trimesters?.first, academicScope);
+  addPeriod("trimesters.second", "Zweites Trimester", periods.models.trimesters?.second, academicScope);
+  addPeriod("trimesters.third", "Drittes Trimester", periods.models.trimesters?.third, academicScope);
+  return options;
+}
+
+function resolveScheduleValidityPeriod(schedule, project) {
+  const options = getScheduleValidityPeriods(project);
+  return options.find((option) => option.id === schedule.validityPeriodId)
+    || options.find((option) => option.startDate === schedule.validFrom && option.endDate === schedule.validUntil)
+    || options.find((option) => option.id.startsWith("schoolYear"))
+    || options[0]
+    || null;
+}
+
+function applyScheduleValidityPeriod(schedule, period) {
+  if (!period) return;
+  schedule.validityPeriodId = period.id;
+  schedule.validFrom = period.startDate;
+  schedule.validUntil = period.endDate;
+  schedule.holidayScopeType = period.scopeType || schedule.holidayScopeType || null;
+}
+
+function syncScheduleValidityPeriods(project) {
+  const scheduleLayer = project.layers?.find((layer) => layer.type === "schedules");
+  (scheduleLayer?.schedules || []).forEach((schedule) => {
+    if (!schedule.validityPeriodId) return;
+    const period = getScheduleValidityPeriods(project).find((option) => option.id === schedule.validityPeriodId)
+      || resolveScheduleValidityPeriod(schedule, project);
+    if (period) applyScheduleValidityPeriod(schedule, period);
+  });
+}
+
+function getScheduleActiveDays(schedule) {
+  const configured = Array.isArray(schedule.activeDays)
+    ? schedule.activeDays.map(Number).filter((day) => day >= 1 && day <= 7)
+    : [1, 2, 3, 4, 5];
+  const lessonDays = (Array.isArray(schedule.lessons) ? schedule.lessons : [])
+    .map((lesson) => Number(lesson.day))
+    .filter((day) => day >= 1 && day <= 7);
+  return [...new Set([...configured, ...lessonDays])].sort((a, b) => a - b);
 }
 
 function getDefaultDisplayRows(dayStart = "07:00", dayEndValue = "18:00", lessonMinutes = 45) {
@@ -1838,6 +3309,52 @@ function deleteSchedule(projectId, scheduleId) {
   renderProjectBrowser();
   renderProjectDetail();
   renderActiveCalendar();
+}
+
+function deleteHolidayScope(projectId, scopeType) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "holidays");
+  if (!project || !layer) return;
+  const settings = ensureScopedHolidaySettings(project, layer);
+  if (!settings.scopeTypes.includes(scopeType)) return;
+
+  settings.scopeTypes = settings.scopeTypes.filter((entry) => entry !== scopeType);
+  delete settings.scopeConfigs[scopeType];
+  delete layer.scopeData?.[scopeType];
+  settings.activeScopeType = settings.scopeTypes[0] || null;
+  settings.schoolType = settings.activeScopeType;
+  settings.isAddingScope = !settings.activeScopeType;
+  rebuildScopedHolidayEntries(layer);
+  syncScheduleValidityPeriods(project);
+  saveProjects();
+  renderProjectBrowser();
+  renderHolidayProperties(project);
+  renderActiveCalendar(project);
+}
+
+function deleteClassProject(projectId, classProjectId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "classes");
+  if (!project || !layer || !Array.isArray(layer.entries)) return;
+  layer.entries = layer.entries.filter((entry) => entry.id !== classProjectId);
+  document.querySelector(`dialog.class-project-dialog[data-class-project-id="${classProjectId}"]`)?.close();
+  saveProjects();
+  renderClassProjectsIntroduction(project);
+  renderActiveCalendar(project);
+}
+
+function deleteLesson(projectId, scheduleId, lessonId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const schedule = project?.layers
+    ?.find((entry) => entry.type === "schedules")
+    ?.schedules?.find((entry) => entry.id === scheduleId);
+  if (!project || !schedule || !Array.isArray(schedule.lessons)) return;
+  schedule.lessons = schedule.lessons.filter((entry) => entry.id !== lessonId);
+  lessonDialog.close();
+  saveProjects();
+  renderProjectBrowser();
+  renderSchedulesProperties(project);
+  renderActiveCalendar(project);
 }
 
 function deleteProjectFolder(projectId) {
@@ -1935,6 +3452,7 @@ function beginScheduleDeleteHold(event) {
     projectId: button.dataset.projectId,
     projectFolderId: button.dataset.projectFolderId,
     scheduleId: button.dataset.scheduleId,
+    lessonId: button.dataset.lessonId,
     tripId: button.dataset.tripId,
     appointmentGroupId: button.dataset.appointmentGroupId,
     appointmentId: button.dataset.appointmentId,
@@ -1943,6 +3461,8 @@ function beginScheduleDeleteHold(event) {
     catalogSubjectId: button.dataset.catalogSubjectId,
     catalogGradeId: button.dataset.catalogGradeId,
     catalogClassId: button.dataset.catalogClassId,
+    holidayScopeType: button.dataset.holidayScopeType,
+    classProjectId: button.dataset.classProjectId,
     pointerId: Number.isFinite(event.pointerId) ? event.pointerId : null,
     startedAt: performance.now(),
     armed: false,
@@ -1963,6 +3483,7 @@ function finishScheduleDeleteHold(event) {
     projectId,
     projectFolderId,
     scheduleId,
+    lessonId,
     tripId,
     appointmentGroupId,
     appointmentId,
@@ -1971,6 +3492,8 @@ function finishScheduleDeleteHold(event) {
     catalogSubjectId,
     catalogGradeId,
     catalogClassId,
+    holidayScopeType,
+    classProjectId,
     armed
   } = scheduleDeleteHoldState;
   const releaseTarget = document.elementFromPoint(event.clientX, event.clientY);
@@ -1978,6 +3501,9 @@ function finishScheduleDeleteHold(event) {
   resetScheduleDeleteHold();
   if (!armed || !releasedOnButton) return;
   if (projectFolderId) deleteProjectFolder(projectFolderId);
+  else if (holidayScopeType) deleteHolidayScope(projectId, holidayScopeType);
+  else if (classProjectId) deleteClassProject(projectId, classProjectId);
+  else if (lessonId) deleteLesson(projectId, scheduleId, lessonId);
   else if (catalogType) deleteClassCatalogEntry(projectId, catalogType, catalogSubjectId, catalogGradeId, catalogClassId);
   else if (sicknessId) deleteSickness(projectId, sicknessId);
   else if (appointmentId) deleteAppointment(projectId, appointmentGroupId, appointmentId);
@@ -2016,11 +3542,14 @@ function renderSchedulesProperties(project) {
     addButton.textContent = "Stundenplan hinzufügen";
     addButton.addEventListener("click", () => {
       const defaultValidity = getDefaultScheduleValidity(project);
+      const defaultValidityPeriod = getScheduleValidityPeriods(project)[0];
       const newSchedule = {
         id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}`,
         name: `Stundenplan ${layer.schedules.length + 1}`,
-        validFrom: defaultValidity.validFrom,
-        validUntil: defaultValidity.validUntil,
+        validityPeriodId: defaultValidityPeriod?.id || "schoolYear",
+        validFrom: defaultValidityPeriod?.startDate || defaultValidity.validFrom,
+        validUntil: defaultValidityPeriod?.endDate || defaultValidity.validUntil,
+        activeDays: [1, 2, 3, 4, 5],
         displayDefaults: { dayStart: "07:00", dayEnd: "18:00", lessonMinutes: 45 },
         displayRows: getDefaultDisplayRows(),
         pauseDefaultsInitialized: true,
@@ -2032,6 +3561,7 @@ function renderSchedulesProperties(project) {
       saveProjects();
       renderProjectBrowser();
       renderSchedulesProperties(project);
+      openScheduleDisplayDialog(project, newSchedule);
     });
     const scheduleList = document.createElement("div");
     scheduleList.className = "schedule-overview-list";
@@ -2045,8 +3575,9 @@ function renderSchedulesProperties(project) {
         const name = document.createElement("strong");
         name.textContent = entry.name;
         const validity = document.createElement("span");
+        const validityPeriod = resolveScheduleValidityPeriod(entry, project);
         validity.textContent = entry.validFrom && entry.validUntil
-          ? `${formatGermanDate(entry.validFrom)}–${formatGermanDate(entry.validUntil)}`
+          ? `${validityPeriod?.label ? `${validityPeriod.label} · ` : ""}${formatGermanDate(entry.validFrom)}–${formatGermanDate(entry.validUntil)}`
           : "Gültigkeit noch nicht vollständig festgelegt";
         const lessonCount = document.createElement("small");
         const count = Array.isArray(entry.lessons) ? entry.lessons.length : 0;
@@ -2069,6 +3600,15 @@ function renderSchedulesProperties(project) {
   sheet.className = "schedule-editor";
   const head = document.createElement("div");
   head.className = "property-sheet-head";
+  const setupNotice = document.createElement("p");
+  setupNotice.className = "schedule-setup-notice";
+  setupNotice.append("Bevor Kurse angelegt werden, müssen alle benötigten Klassen unter ");
+  const classCatalogLink = document.createElement("button");
+  classCatalogLink.type = "button";
+  classCatalogLink.className = "schedule-setup-link";
+  classCatalogLink.textContent = "Klassen";
+  classCatalogLink.addEventListener("click", () => selectLayer(project.id, "classCatalog"));
+  setupNotice.append(classCatalogLink, " hinzugefügt sein.");
   const titleLine = document.createElement("div");
   titleLine.className = "schedule-title-line";
   const title = document.createElement("h3");
@@ -2111,37 +3651,86 @@ function renderSchedulesProperties(project) {
   menuShell.append(menuButton, menu);
   titleLine.append(title, menuShell);
   const intro = document.createElement("p");
-  intro.textContent = "Gültigkeit festlegen und für eine neue Stunde in das Wochenraster klicken.";
-  head.append(titleLine, intro);
+  intro.textContent = "Gültigkeitszeitraum auswählen und für eine neue Stunde in das Wochenraster klicken.";
+  head.append(setupNotice, titleLine, intro);
 
   const validity = document.createElement("div");
   validity.className = "schedule-validity";
-  const fromLabel = document.createElement("label");
-  const fromText = document.createElement("span");
-  fromText.textContent = "Gültig von";
-  const fromInput = document.createElement("input");
-  fromInput.type = "date";
-  fromInput.value = schedule.validFrom || "";
-  fromLabel.append(fromText, fromInput);
-  const untilLabel = document.createElement("label");
-  const untilText = document.createElement("span");
-  untilText.textContent = "Gültig bis";
-  const untilInput = document.createElement("input");
-  untilInput.type = "date";
-  untilInput.value = schedule.validUntil || "";
-  untilLabel.append(untilText, untilInput);
-  const saveValidity = () => {
-    schedule.validFrom = fromInput.value;
-    schedule.validUntil = untilInput.value;
+  const validityLabel = document.createElement("label");
+  const validityText = document.createElement("span");
+  validityText.textContent = "Gültigkeitszeitraum";
+  const validitySelect = document.createElement("select");
+  validitySelect.setAttribute("aria-label", "Gültigkeitszeitraum");
+  const validityPeriods = getScheduleValidityPeriods(project);
+  const selectedValidityPeriod = resolveScheduleValidityPeriod(schedule, project);
+  validityPeriods.forEach((period) => {
+    const option = document.createElement("option");
+    option.value = period.id;
+    option.textContent = period.label;
+    option.selected = period.id === selectedValidityPeriod?.id;
+    validitySelect.append(option);
+  });
+  const previousValidity = `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`;
+  applyScheduleValidityPeriod(schedule, selectedValidityPeriod);
+  if (previousValidity !== `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`) {
+    saveProjects();
+  }
+  validityLabel.append(validityText, createSelectShell(validitySelect));
+  validitySelect.addEventListener("change", () => {
+    applyScheduleValidityPeriod(schedule, validityPeriods.find((period) => period.id === validitySelect.value));
     saveProjects();
     renderActiveCalendar(project);
-  };
-  fromInput.addEventListener("change", saveValidity);
-  untilInput.addEventListener("change", saveValidity);
-  validity.append(fromLabel, untilLabel);
+    renderProjectBrowser();
+  });
+  validity.append(validityLabel);
+
+  schedule.activeDays = getScheduleActiveDays(schedule);
+  const activeDaysField = document.createElement("fieldset");
+  activeDaysField.className = "schedule-active-days";
+  const activeDaysLegend = document.createElement("legend");
+  activeDaysLegend.textContent = "Wochentage";
+  const activeDaysButtons = document.createElement("div");
+  activeDaysButtons.className = "lesson-day-buttons";
+  const activeDaysStatus = document.createElement("p");
+  activeDaysStatus.className = "property-status schedule-active-days-status";
+  activeDaysStatus.setAttribute("role", "status");
+  weekdayNames.forEach((name, index) => {
+    const day = index + 1;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = name;
+    button.dataset.scheduleDay = String(day);
+    button.setAttribute("aria-pressed", String(schedule.activeDays.includes(day)));
+    const hasLessons = schedule.lessons.some((lesson) => Number(lesson.day) === day);
+    if (hasLessons) {
+      button.setAttribute("aria-disabled", "true");
+      button.title = `${name} kann nicht ausgeblendet werden, solange dort eine Stunde liegt.`;
+    }
+    button.addEventListener("click", () => {
+      const isActive = schedule.activeDays.includes(day);
+      if (isActive && hasLessons) {
+        activeDaysStatus.textContent = `${name} kann erst ausgeblendet werden, wenn alle Stunden dieses Tages entfernt wurden.`;
+        return;
+      }
+      if (isActive && schedule.activeDays.length === 1) {
+        activeDaysStatus.textContent = "Mindestens ein Wochentag muss sichtbar bleiben.";
+        return;
+      }
+      schedule.activeDays = isActive
+        ? schedule.activeDays.filter((entry) => entry !== day)
+        : [...schedule.activeDays, day].sort((a, b) => a - b);
+      saveProjects();
+      renderSchedulesProperties(project);
+      renderActiveCalendar(project);
+    });
+    activeDaysButtons.append(button);
+  });
+  activeDaysField.append(activeDaysLegend, activeDaysButtons, activeDaysStatus);
 
   const week = document.createElement("div");
   week.className = "schedule-week schedule-editor-timeline";
+  const editorDays = getScheduleActiveDays(schedule);
+  week.style.setProperty("--schedule-editor-days", String(editorDays.length));
   const editorRows = schedule.displayRows.filter((row) => row.start && row.end && row.end > row.start);
   const editorStart = Math.min(...editorRows.map((row) => timeToMinutes(row.start)));
   const editorEnd = Math.max(...editorRows.map((row) => timeToMinutes(row.end)));
@@ -2154,12 +3743,14 @@ function renderSchedulesProperties(project) {
   corner.className = "schedule-week-corner";
   corner.textContent = "Zeit";
   weekHeader.append(corner);
-  ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"].forEach((name) => {
-    const dayHead = document.createElement("div");
-    dayHead.className = "schedule-day-head";
-    dayHead.textContent = name;
-    weekHeader.append(dayHead);
-  });
+  ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+    .filter((_, index) => editorDays.includes(index + 1))
+    .forEach((name) => {
+      const dayHead = document.createElement("div");
+      dayHead.className = "schedule-day-head";
+      dayHead.textContent = name;
+      weekHeader.append(dayHead);
+    });
   week.append(weekHeader);
 
   const weekBody = document.createElement("div");
@@ -2180,7 +3771,7 @@ function renderSchedulesProperties(project) {
   });
   weekBody.append(axis);
 
-  for (let day = 1; day <= 5; day += 1) {
+  editorDays.forEach((day) => {
     const dayColumn = document.createElement("div");
     dayColumn.className = "schedule-editor-day";
     editorRows.forEach((displayRow) => {
@@ -2219,9 +3810,9 @@ function renderSchedulesProperties(project) {
       dayColumn.append(card);
     });
     weekBody.append(dayColumn);
-  }
+  });
   week.append(weekBody);
-  sheet.append(head, validity, week);
+  sheet.append(head, validity, activeDaysField, week);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -2303,6 +3894,10 @@ function addLessonPhase() {
 }
 
 function getLessonStatisticsPeriod(project) {
+  const projectPeriod = project.periods?.schoolYear;
+  if (projectPeriod?.startDate && projectPeriod?.endDate) {
+    return { startDate: projectPeriod.startDate, endDate: projectPeriod.endDate };
+  }
   const holidayLayer = project.layers?.find((entry) => entry.type === "holidays");
   const settings = holidayLayer?.appliedSettings || holidayLayer?.settings;
   if (Number(settings?.startYear)) {
@@ -2354,7 +3949,12 @@ function renderLessonStatistics() {
         || isSchoolHolidayForSchedule(combinedSchedule, cursor)
         || isSicknessForSchedule(combinedSchedule, cursor)) return;
       (Array.isArray(schedule.lessons) ? schedule.lessons : [])
-        .filter((lesson) => lesson.day === weekday && isSameCatalogLesson(lesson, referenceLesson))
+        .filter((lesson) => (
+          lesson.day === weekday
+          && isLessonActiveOnDate(lesson, combinedSchedule, cursor)
+          && !isLessonSuppressedByClassProject(project, lesson, cursor)
+          && isSameCatalogLesson(lesson, referenceLesson)
+        ))
         .forEach((lesson) => {
           const duration = Math.max(0, timeToMinutes(lesson.end) - timeToMinutes(lesson.start));
           const wasGiven = dateKey < todayKey || (dateKey === todayKey && timeToMinutes(lesson.end) <= currentMinutes);
@@ -2442,6 +4042,64 @@ function populateLessonCatalog(project, lesson = null) {
   populateLessonClasses(project, lesson);
 }
 
+function setLessonDays(days) {
+  const selectedDays = new Set(days.map(Number));
+  lessonDayButtons.forEach((button) => {
+    button.setAttribute("aria-pressed", String(selectedDays.has(Number(button.dataset.lessonDay))));
+  });
+  lessonDay.value = [...selectedDays].sort((a, b) => a - b).join(",");
+}
+
+function getSelectedLessonDays() {
+  return lessonDayButtons
+    .filter((button) => button.getAttribute("aria-pressed") === "true")
+    .map((button) => Number(button.dataset.lessonDay))
+    .sort((a, b) => a - b);
+}
+
+function configureLessonDayAvailability(schedule) {
+  const activeDays = new Set(getScheduleActiveDays(schedule));
+  lessonDayButtons.forEach((button) => {
+    button.hidden = !activeDays.has(Number(button.dataset.lessonDay));
+  });
+}
+
+function setLessonFormChoice(buttons, attribute, value) {
+  buttons.forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset[attribute] === value));
+  });
+}
+
+function getLessonFormChoice(buttons, attribute, fallback) {
+  return buttons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset[attribute] || fallback;
+}
+
+function updateLessonTeachingFormFields() {
+  lessonAbWeekChoice.hidden = lessonTeachingForm.value !== "abWeek";
+  lessonEpochHalfChoice.hidden = lessonTeachingForm.value !== "epochal";
+}
+
+function configureLessonTeachingForm(project, schedule, lesson = null) {
+  const options = [
+    ["regular", "Regulär"],
+    ["abWeek", "A/B-Woche"]
+  ];
+  if (resolveScheduleValidityPeriod(schedule, project)?.id.startsWith("schoolYear")) {
+    options.push(["epochal", "Epochal"]);
+  }
+  lessonTeachingForm.replaceChildren(...options.map(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    return option;
+  }));
+  const storedForm = lesson ? getLessonTeachingForm(lesson) : "regular";
+  lessonTeachingForm.value = options.some(([value]) => value === storedForm) ? storedForm : "regular";
+  setLessonFormChoice(lessonAbWeekButtons, "lessonAbWeek", lesson?.abWeek === "B" ? "B" : "A");
+  setLessonFormChoice(lessonEpochHalfButtons, "lessonEpochHalf", lesson?.epochHalf === "second" ? "second" : "first");
+  updateLessonTeachingFormFields();
+}
+
 function openLessonDialog(project, schedule, day, displayRow) {
   lessonForm.reset();
   lessonPhasesDraft = [];
@@ -2450,13 +4108,19 @@ function openLessonDialog(project, schedule, day, displayRow) {
   setLessonDialogTab("properties");
   lessonDialogTitle.textContent = "Stunde hinzufügen";
   lessonSubmitButton.textContent = "Stunde hinzufügen";
+  deleteLessonButton.hidden = true;
+  delete deleteLessonButton.dataset.projectId;
+  delete deleteLessonButton.dataset.scheduleId;
+  delete deleteLessonButton.dataset.lessonId;
   setLessonColor("#bfd2e2");
-  lessonDay.value = String(day);
+  configureLessonDayAvailability(schedule);
+  setLessonDays([day]);
   lessonStart.value = displayRow.start;
   lessonEnd.value = displayRow.end;
   lessonDialogStatus.textContent = "";
   lessonDialog.dataset.projectId = project.id;
   lessonDialog.dataset.scheduleId = schedule.id;
+  configureLessonTeachingForm(project, schedule);
   populateLessonCatalog(project);
   lessonDialog.showModal();
   requestAnimationFrame(() => lessonStart.focus());
@@ -2469,16 +4133,22 @@ function openExistingLessonDialog(project, schedule, lesson) {
   setLessonDialogTab("properties");
   lessonDialogTitle.textContent = "Stunde bearbeiten";
   lessonSubmitButton.textContent = "Änderungen speichern";
-  lessonDay.value = String(lesson.day);
+  deleteLessonButton.hidden = false;
+  deleteLessonButton.dataset.projectId = project.id;
+  deleteLessonButton.dataset.scheduleId = schedule.id;
+  deleteLessonButton.dataset.lessonId = lesson.id;
+  deleteLessonButton.setAttribute("aria-label", `${lesson.subject || "Stunde"} löschen – gedrückt halten`);
+  configureLessonDayAvailability(schedule);
+  setLessonDays([lesson.day]);
   lessonStart.value = lesson.start;
   lessonEnd.value = lesson.end;
   lessonRoom.value = lesson.room || "";
   setLessonColor(lesson.color || "#bfd2e2");
-  lessonEpochal.value = lesson.epochal ? "epochal" : "regular";
   lessonDialogStatus.textContent = "";
   lessonDialog.dataset.projectId = project.id;
   lessonDialog.dataset.scheduleId = schedule.id;
   lessonDialog.dataset.lessonId = lesson.id;
+  configureLessonTeachingForm(project, schedule, lesson);
   populateLessonCatalog(project, lesson);
   lessonDialog.showModal();
   requestAnimationFrame(() => lessonSubject.focus());
@@ -2487,6 +4157,27 @@ function openExistingLessonDialog(project, schedule, lesson) {
 lessonSubject.addEventListener("change", () => {
   const project = projects.find((entry) => entry.id === lessonDialog.dataset.projectId);
   if (project) populateLessonClasses(project);
+});
+lessonDayButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const selectedDays = new Set(getSelectedLessonDays());
+    const day = Number(button.dataset.lessonDay);
+    if (selectedDays.has(day)) selectedDays.delete(day);
+    else selectedDays.add(day);
+    setLessonDays([...selectedDays]);
+    lessonDialogStatus.textContent = "";
+  });
+});
+lessonTeachingForm.addEventListener("change", updateLessonTeachingFormFields);
+lessonAbWeekButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setLessonFormChoice(lessonAbWeekButtons, "lessonAbWeek", button.dataset.lessonAbWeek);
+  });
+});
+lessonEpochHalfButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    setLessonFormChoice(lessonEpochHalfButtons, "lessonEpochHalf", button.dataset.lessonEpochHalf);
+  });
 });
 
 function setLessonColor(value) {
@@ -2995,17 +4686,469 @@ function renderIndividualProjectsProperties(project) {
   saveProjects();
 }
 
+function getConfiguredHigherEducationPeriods(project) {
+  const models = ensureProjectPeriodSettings(project).models;
+  const periods = [
+    ["semesters.first", "Erstes Semester", "Semesterferien", models.semesters?.first],
+    ["semesters.second", "Zweites Semester", "Semesterferien", models.semesters?.second],
+    ["trimesters.first", "Erstes Trimester", "Trimesterferien", models.trimesters?.first],
+    ["trimesters.second", "Zweites Trimester", "Trimesterferien", models.trimesters?.second],
+    ["trimesters.third", "Drittes Trimester", "Trimesterferien", models.trimesters?.third]
+  ];
+  return periods
+    .filter(([, , , period]) => period?.startDate && period?.endDate && period.endDate >= period.startDate)
+    .map(([id, label, holidayLabel, period]) => ({
+      id,
+      label,
+      holidayLabel,
+      startDate: period.startDate,
+      endDate: period.endDate
+    }));
+}
+
+function getHigherEducationHolidayEntries(project, settings) {
+  return getConfiguredHigherEducationPeriods(project).flatMap((period) => {
+    const holiday = settings.higherEducationBreaks?.[period.id];
+    if (!holiday?.startDate || !holiday?.endDate || holiday.endDate < holiday.startDate) return [];
+    return [{
+      id: `higher-education-${period.id}`,
+      name: `${period.holidayLabel} · ${period.label}`,
+      startDate: holiday.startDate,
+      endDate: holiday.endDate,
+      type: "school-holiday",
+      sourceId: `manual:${period.id}`
+    }];
+  });
+}
+
+const HOLIDAY_SCOPE_OPTIONS = [
+  ["general", "Allgemeinbildende Schule"],
+  ["vocational", "Berufliche Schule"],
+  ["university", "Hochschule"]
+];
+
+function getHolidayScopeLabel(scopeType) {
+  return HOLIDAY_SCOPE_OPTIONS.find(([value]) => value === scopeType)?.[1] || scopeType;
+}
+
+function ensureScopedHolidaySettings(project, layer) {
+  const currentYear = new Date().getFullYear();
+  const settings = layer.settings && typeof layer.settings === "object" ? layer.settings : {};
+  const legacyType = settings.schoolType === "vocational"
+    ? "vocational"
+    : settings.schoolType === "university"
+      ? "university"
+      : settings.schoolType === "general" || settings.schoolType === "all" ? "general" : null;
+  const initialScopeTypes = Array.isArray(settings.scopeTypes)
+    ? settings.scopeTypes
+    : legacyType ? [legacyType] : Array.isArray(layer.entries) && layer.entries.length ? ["general"] : [];
+  const scopeTypes = [...new Set(
+    initialScopeTypes
+      .map((type) => type === "all" ? "general" : type)
+      .filter((type) => HOLIDAY_SCOPE_OPTIONS.some(([value]) => value === type))
+  )];
+  settings.scopeTypes = HOLIDAY_SCOPE_OPTIONS
+    .map(([value]) => value)
+    .filter((value) => scopeTypes.includes(value));
+  const isAddingScope = Boolean(settings.isAddingScope || !settings.scopeTypes.length);
+  settings.activeScopeType = isAddingScope
+    ? null
+    : settings.scopeTypes.includes(settings.activeScopeType)
+      ? settings.activeScopeType
+      : settings.scopeTypes[0] || null;
+  settings.isAddingScope = isAddingScope;
+  settings.scopeConfigs = settings.scopeConfigs && typeof settings.scopeConfigs === "object"
+    ? settings.scopeConfigs
+    : {};
+  settings.scopeTypes.forEach((scopeType) => {
+    const existing = settings.scopeConfigs[scopeType] || {};
+    settings.scopeConfigs[scopeType] = {
+      federalState: existing.federalState || settings.federalState || "MV",
+      startYear: Number(existing.startYear ?? settings.startYear) || currentYear,
+      endYear: Number(existing.endYear ?? settings.endYear) || currentYear + 1,
+      higherEducationBreaks: existing.higherEducationBreaks && typeof existing.higherEducationBreaks === "object"
+        ? existing.higherEducationBreaks
+        : settings.higherEducationBreaks && typeof settings.higherEducationBreaks === "object"
+          ? settings.higherEducationBreaks
+          : {}
+    };
+  });
+  settings.schoolType = settings.activeScopeType;
+  layer.settings = settings;
+  layer.scopeData = layer.scopeData && typeof layer.scopeData === "object" ? layer.scopeData : {};
+  settings.scopeTypes.forEach((scopeType) => {
+    layer.scopeData[scopeType] = layer.scopeData[scopeType] && typeof layer.scopeData[scopeType] === "object"
+      ? layer.scopeData[scopeType]
+      : {};
+  });
+  if (!layer.scopedEntriesMigrationVersion && Array.isArray(layer.entries) && layer.entries.length) {
+    settings.scopeTypes.forEach((scopeType) => {
+      layer.scopeData[scopeType].appliedEntries = [];
+    });
+    const defaultSchoolScope = settings.scopeTypes.find((scopeType) => scopeType === "general" || scopeType === "vocational")
+      || settings.scopeTypes[0];
+    layer.entries.forEach((entry) => {
+      const inferredScope = entry.scopeType
+        || (String(entry.sourceId || "").startsWith("manual:") && settings.scopeTypes.includes("university")
+          ? "university"
+          : defaultSchoolScope);
+      const scopeState = layer.scopeData[inferredScope] || layer.scopeData[defaultSchoolScope];
+      scopeState.appliedEntries = Array.isArray(scopeState.appliedEntries) ? scopeState.appliedEntries : [];
+      scopeState.appliedEntries.push({ ...entry, scopeType: inferredScope });
+    });
+    layer.scopedEntriesMigrationVersion = 1;
+  }
+  if (!layer.scopedEntriesMigrationVersion) layer.scopedEntriesMigrationVersion = 1;
+  return settings;
+}
+
+function rebuildScopedHolidayEntries(layer) {
+  const scopeTypes = layer.settings?.scopeTypes || [];
+  layer.entries = scopeTypes.flatMap((scopeType) => (
+    (layer.scopeData?.[scopeType]?.appliedEntries || []).map((entry) => ({ ...entry, scopeType }))
+  ));
+}
+
+async function refreshScopedHolidayPreview(project, layer, scopeType, settingsKey) {
+  const scopeState = layer.scopeData[scopeType];
+  const config = structuredClone(layer.settings.scopeConfigs[scopeType]);
+  scopeState.previewLoadingKey = settingsKey;
+  delete scopeState.previewError;
+  try {
+    const entries = scopeType === "university"
+      ? getHigherEducationHolidayEntries(project, config)
+      : await fetchSchoolHolidays({ ...config, schoolType: scopeType, scopeTypes: [scopeType] });
+    if (getHolidaySettingsKey({ ...layer.settings.scopeConfigs[scopeType], schoolType: scopeType, scopeTypes: [scopeType] }) !== settingsKey) return;
+    scopeState.previewEntries = entries.map((entry) => ({ ...entry, scopeType }));
+    scopeState.previewKey = settingsKey;
+    scopeState.previewProvenance = {
+      provider: scopeType === "university" ? "Manuelle Hochschulferien" : "OpenHolidays API",
+      providerUrl: scopeType === "university" ? "" : "https://openholidaysapi.org/",
+      officialReferenceUrl: scopeType === "university" ? "" : "https://www.kmk.org/service/ferienregelung/ferienkalender.html",
+      retrievedAt: new Date().toISOString(),
+      federalState: scopeType === "university" ? "" : `DE-${config.federalState}`,
+      schoolYear: `${config.startYear}/${String(config.endYear).slice(-2)}`,
+      schoolType: scopeType,
+      groupCode: getHolidayGroupCode({ ...config, schoolType: scopeType }),
+      corrections: getKnownHolidayCorrections({ ...config, schoolType: scopeType })
+    };
+    delete scopeState.previewLoadingKey;
+    delete scopeState.previewErrorKey;
+    saveProjects();
+  } catch (error) {
+    delete scopeState.previewLoadingKey;
+    scopeState.previewError = error instanceof Error ? error.message : "Die Ferientermine konnten nicht geladen werden.";
+    scopeState.previewErrorKey = settingsKey;
+  }
+  if (activeProjectId === project.id && activeLayerType === "holidays") renderHolidayProperties(project);
+}
+
+function renderScopedHolidayProperties(project, layer) {
+  const settings = ensureScopedHolidaySettings(project, layer);
+  const activeScopeType = settings.activeScopeType;
+  const config = activeScopeType ? settings.scopeConfigs[activeScopeType] : null;
+  const scopeState = activeScopeType ? layer.scopeData[activeScopeType] : null;
+  const sheet = document.createElement("section");
+  sheet.className = "property-sheet";
+  const head = document.createElement("div");
+  head.className = "property-sheet-head";
+  const title = document.createElement("h3");
+  title.textContent = project.name;
+  const intro = document.createElement("p");
+  intro.textContent = "Jeder Geltungsbereich verwaltet seine Einstellungen und Ferientermine getrennt.";
+  head.append(title, intro);
+
+  const scopeSection = document.createElement("section");
+  scopeSection.className = "property-section";
+  const scopeTitle = document.createElement("h3");
+  scopeTitle.textContent = "Geltungsbereiche";
+  const tabs = document.createElement("div");
+  tabs.className = "project-period-tabs holiday-scope-tabs";
+  tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", "Geltungsbereiche");
+  settings.scopeTypes.forEach((scopeType) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(scopeType === activeScopeType));
+    tab.textContent = getHolidayScopeLabel(scopeType);
+    tab.addEventListener("click", () => {
+      settings.activeScopeType = scopeType;
+      settings.schoolType = scopeType;
+      settings.isAddingScope = false;
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    tabs.append(tab);
+  });
+  if (settings.isAddingScope) {
+    const emptyTab = document.createElement("button");
+    emptyTab.type = "button";
+    emptyTab.className = "holiday-empty-scope-tab";
+    emptyTab.setAttribute("role", "tab");
+    emptyTab.setAttribute("aria-label", "Neuer Geltungsbereich");
+    emptyTab.setAttribute("aria-selected", "true");
+    emptyTab.innerHTML = "&nbsp;";
+    tabs.append(emptyTab);
+  }
+  const addScopeButton = document.createElement("button");
+  addScopeButton.type = "button";
+  addScopeButton.className = "secondary-button holiday-add-scope";
+  addScopeButton.textContent = "Weiteren Geltungsbereich hinzufügen";
+  addScopeButton.disabled = settings.scopeTypes.length >= HOLIDAY_SCOPE_OPTIONS.length || settings.isAddingScope;
+  addScopeButton.addEventListener("click", () => {
+    if (settings.scopeTypes.length >= HOLIDAY_SCOPE_OPTIONS.length) return;
+    settings.activeScopeType = null;
+    settings.schoolType = null;
+    settings.isAddingScope = true;
+    saveProjects();
+    renderHolidayProperties(project);
+  });
+  scopeSection.append(scopeTitle, tabs, addScopeButton);
+
+  const content = document.createElement("section");
+  content.className = "property-section holiday-scope-content";
+  if (!activeScopeType) {
+    const picker = document.createElement("label");
+    picker.className = "property-row holiday-scope-picker";
+    const label = document.createElement("span");
+    label.textContent = "Geltungsbereich";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Geltungsbereich auswählen");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Bitte auswählen";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.append(placeholder);
+    HOLIDAY_SCOPE_OPTIONS
+      .filter(([value]) => !settings.scopeTypes.includes(value))
+      .forEach(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        select.append(option);
+      });
+    select.addEventListener("change", () => {
+      if (!select.value) return;
+      settings.scopeTypes.push(select.value);
+      settings.activeScopeType = select.value;
+      settings.schoolType = select.value;
+      settings.isAddingScope = false;
+      ensureScopedHolidaySettings(project, layer);
+      syncScheduleValidityPeriods(project);
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    picker.append(label, createSelectShell(select));
+    content.append(picker);
+    sheet.append(head, scopeSection, content);
+    projectDetail.replaceChildren(sheet);
+    saveProjects();
+    return;
+  }
+  const contentTitle = document.createElement("h3");
+  contentTitle.textContent = getHolidayScopeLabel(activeScopeType);
+  const settingsList = document.createElement("div");
+  settingsList.className = "property-list";
+
+  if (activeScopeType !== "university") {
+    const stateRow = document.createElement("label");
+    stateRow.className = "property-row";
+    const stateLabel = document.createElement("span");
+    stateLabel.textContent = "Bundesland";
+    const stateSelect = document.createElement("select");
+    stateSelect.setAttribute("aria-label", "Bundesland");
+    FEDERAL_STATES.forEach(([code, name]) => {
+      const option = document.createElement("option");
+      option.value = code;
+      option.textContent = name;
+      option.selected = code === config.federalState;
+      stateSelect.append(option);
+    });
+    stateSelect.addEventListener("change", () => {
+      config.federalState = stateSelect.value;
+      const otherSchoolType = settings.scopeTypes.find((type) => type !== activeScopeType && type !== "university");
+      if (otherSchoolType) settings.scopeConfigs[otherSchoolType].federalState = stateSelect.value;
+      delete scopeState.previewKey;
+      syncScheduleValidityPeriods(project);
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    stateRow.append(stateLabel, createSelectShell(stateSelect));
+    const yearRow = document.createElement("label");
+    yearRow.className = "property-row";
+    const yearLabel = document.createElement("span");
+    yearLabel.textContent = "Schuljahr";
+    const yearSelect = document.createElement("select");
+    yearSelect.setAttribute("aria-label", "Schuljahr");
+    yearSelect.append(createSchoolYearOptions(config.startYear));
+    yearSelect.addEventListener("change", () => {
+      config.startYear = Number(yearSelect.value);
+      config.endYear = config.startYear + 1;
+      delete scopeState.previewKey;
+      syncScheduleValidityPeriods(project);
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    yearRow.append(yearLabel, createSelectShell(yearSelect));
+    settingsList.append(stateRow, yearRow);
+  } else {
+    const configuredPeriods = getConfiguredHigherEducationPeriods(project);
+    if (!configuredPeriods.length) {
+      const note = document.createElement("p");
+      note.className = "empty-state";
+      note.append("Im ");
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "schedule-setup-link";
+      link.textContent = "Projektordner";
+      link.addEventListener("click", () => selectProject(project.id));
+      note.append(link, " sind noch keine vollständigen Semester- oder Trimestergrenzen eingerichtet.");
+      settingsList.append(note);
+    } else {
+      configuredPeriods.forEach((period) => {
+        const card = document.createElement("section");
+        card.className = "half-year-period higher-education-period";
+        const heading = document.createElement("h4");
+        heading.textContent = period.label;
+        const boundary = document.createElement("p");
+        boundary.className = "higher-education-boundary";
+        boundary.textContent = `${formatGermanDate(period.startDate)}–${formatGermanDate(period.endDate)}`;
+        const holidayTitle = document.createElement("strong");
+        holidayTitle.className = "higher-education-holiday-title";
+        holidayTitle.textContent = period.holidayLabel;
+        const range = document.createElement("div");
+        range.className = "half-year-range";
+        const stored = config.higherEducationBreaks[period.id] || {};
+        const fromLabel = document.createElement("label");
+        fromLabel.textContent = "von";
+        const from = document.createElement("input");
+        from.type = "date";
+        from.value = stored.startDate || "";
+        const untilLabel = document.createElement("label");
+        untilLabel.textContent = "bis";
+        const until = document.createElement("input");
+        until.type = "date";
+        until.value = stored.endDate || "";
+        const update = () => {
+          config.higherEducationBreaks[period.id] = { startDate: from.value, endDate: until.value };
+          delete scopeState.previewKey;
+          saveProjects();
+          renderHolidayProperties(project);
+        };
+        from.addEventListener("change", update);
+        until.addEventListener("change", update);
+        fromLabel.append(from);
+        untilLabel.append(until);
+        range.append(fromLabel, untilLabel);
+        card.append(heading, boundary, holidayTitle, range);
+        settingsList.append(card);
+      });
+    }
+  }
+
+  const settingsKey = getHolidaySettingsKey({ ...config, schoolType: activeScopeType, scopeTypes: [activeScopeType] });
+  const previewIsCurrent = scopeState.previewKey === settingsKey && Array.isArray(scopeState.previewEntries);
+  const previewEntries = previewIsCurrent ? scopeState.previewEntries : [];
+  const result = document.createElement("div");
+  result.className = "holiday-result";
+  if (previewEntries.length) {
+    const resultList = document.createElement("div");
+    resultList.className = "holiday-entry-list";
+    previewEntries.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "holiday-entry";
+      const name = document.createElement("strong");
+      name.textContent = entry.name;
+      const dates = document.createElement("span");
+      dates.textContent = `${formatGermanDate(entry.startDate)}–${formatGermanDate(entry.endDate)}`;
+      row.append(name, dates);
+      resultList.append(row);
+    });
+    result.append(resultList);
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = scopeState.previewError || (activeScopeType === "university"
+      ? "Noch keine Semester- oder Trimesterferien eingetragen."
+      : "Ferientermine werden automatisch abgerufen …");
+    result.append(empty);
+  }
+  const source = document.createElement("div");
+  source.className = "holiday-source";
+  source.textContent = activeScopeType === "university"
+    ? "Manuell eingetragene Hochschulferien auf Grundlage der Projektzeiträume."
+    : "Ferienquelle: OpenHolidays · Prüfreferenz: Kultusministerkonferenz";
+  const status = document.createElement("p");
+  status.className = "property-status";
+  status.setAttribute("role", "status");
+  const applyButton = document.createElement("button");
+  applyButton.type = "button";
+  applyButton.className = "secondary-button primary-action holiday-load-button";
+  applyButton.textContent = "Einstellungen übernehmen";
+  applyButton.disabled = !previewEntries.length;
+  applyButton.addEventListener("click", () => {
+    scopeState.appliedEntries = structuredClone(previewEntries).map((entry) => ({ ...entry, scopeType: activeScopeType }));
+    scopeState.provenance = structuredClone(scopeState.previewProvenance);
+    scopeState.appliedConfig = structuredClone(config);
+    rebuildScopedHolidayEntries(layer);
+    syncScheduleValidityPeriods(project);
+    saveProjects();
+    renderActiveCalendar(project);
+    status.textContent = "Einstellungen übernommen und Kalenderansicht aktualisiert.";
+  });
+  const actions = document.createElement("div");
+  actions.className = "holiday-scope-actions";
+  const deleteScopeButton = document.createElement("button");
+  deleteScopeButton.type = "button";
+  deleteScopeButton.className = "secondary-button lesson-delete-button holiday-scope-delete";
+  deleteScopeButton.textContent = "Geltungsbereich löschen";
+  deleteScopeButton.dataset.projectId = project.id;
+  deleteScopeButton.dataset.holidayScopeType = activeScopeType;
+  deleteScopeButton.title = "Zum Löschen gedrückt halten";
+  deleteScopeButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+  deleteScopeButton.addEventListener("pointerup", finishScheduleDeleteHold);
+  deleteScopeButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+  deleteScopeButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+  actions.append(applyButton, deleteScopeButton);
+  content.append(contentTitle, settingsList, result, source, actions, status);
+  sheet.append(head, scopeSection, content);
+  projectDetail.replaceChildren(sheet);
+  saveProjects();
+  if (!previewIsCurrent && scopeState.previewLoadingKey !== settingsKey && scopeState.previewErrorKey !== settingsKey) {
+    void refreshScopedHolidayPreview(project, layer, activeScopeType, settingsKey);
+  }
+}
+
 function renderHolidayProperties(project) {
+  detailPanelLabel.textContent = "Eigenschaften";
+  detailPanelTitle.textContent = "Ferien";
+  const scopedLayer = getProjectLayer(project, "holidays");
+  renderScopedHolidayProperties(project, scopedLayer);
+  return;
+
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Ferien";
 
   const layer = getProjectLayer(project, "holidays");
   const currentYear = new Date().getFullYear();
+  const previousHolidaySettings = layer.settings || {};
+  const legacyScopeType = previousHolidaySettings.schoolType === "vocational"
+    ? "vocational"
+    : previousHolidaySettings.schoolType === "university" ? "university" : "general";
+  const storedScopeTypes = Array.isArray(previousHolidaySettings.scopeTypes)
+    ? previousHolidaySettings.scopeTypes.filter((type) => ["general", "vocational", "university"].includes(type))
+    : [legacyScopeType];
   layer.settings = {
     federalState: layer.settings?.federalState || "MV",
-    schoolType: layer.settings?.schoolType || (layer.settings?.federalState === "MV" ? "general" : "all"),
+    schoolType: storedScopeTypes[0] || "general",
+    scopeTypes: [...new Set(storedScopeTypes.length ? storedScopeTypes : ["general"])],
     startYear: Number(layer.settings?.startYear) || currentYear,
-    endYear: Number(layer.settings?.endYear) || currentYear + 1
+    endYear: Number(layer.settings?.endYear) || currentYear + 1,
+    higherEducationBreaks: layer.settings?.higherEducationBreaks && typeof layer.settings.higherEducationBreaks === "object"
+      ? layer.settings.higherEducationBreaks
+      : {}
   };
 
   const sheet = document.createElement("section");
@@ -3024,40 +5167,86 @@ function renderHolidayProperties(project) {
   schoolTypeTitle.textContent = "Schulart";
   const schoolTypeList = document.createElement("div");
   schoolTypeList.className = "property-list";
-  const schoolTypeRow = document.createElement("label");
-  schoolTypeRow.className = "property-row";
-  const schoolTypeLabel = document.createElement("span");
-  schoolTypeLabel.textContent = "Geltungsbereich";
-  const schoolTypeSelect = document.createElement("select");
-  schoolTypeSelect.setAttribute("aria-label", "Schulart");
-  const schoolTypeOptions = layer.settings.federalState === "MV"
-    ? [["general", "Allgemeinbildende Schulen"], ["vocational", "Berufliche Schulen"]]
-    : [["all", "Alle Schulen"]];
-  schoolTypeOptions.forEach(([value, text]) => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = text;
-    option.selected = value === layer.settings.schoolType;
-    schoolTypeSelect.append(option);
+  const scopeOptions = [
+    ["general", "Allgemeinbildende Schule"],
+    ["vocational", "Berufliche Schule"],
+    ["university", "Hochschule"]
+  ];
+  layer.settings.scopeTypes.forEach((scopeType, index) => {
+    const row = document.createElement("label");
+    row.className = "property-row";
+    const label = document.createElement("span");
+    label.textContent = layer.settings.scopeTypes.length > 1 ? `Geltungsbereich ${index + 1}` : "Geltungsbereich";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Geltungsbereich ${index + 1}`);
+    const selectedElsewhere = new Set(layer.settings.scopeTypes.filter((_, selectedIndex) => selectedIndex !== index));
+    scopeOptions
+      .filter(([value]) => value === scopeType || !selectedElsewhere.has(value))
+      .forEach(([value, text]) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        option.selected = value === scopeType;
+        select.append(option);
+      });
+    select.addEventListener("change", () => {
+      layer.settings.scopeTypes[index] = select.value;
+      layer.settings.schoolType = layer.settings.scopeTypes[0];
+      clearHolidayPreview(layer);
+      syncScheduleValidityPeriods(project);
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    row.append(label, createSelectShell(select));
+    schoolTypeList.append(row);
   });
-  if (![...schoolTypeSelect.options].some((option) => option.selected)) {
-    schoolTypeSelect.selectedIndex = 0;
-    layer.settings.schoolType = schoolTypeSelect.value;
-  }
-  schoolTypeSelect.addEventListener("change", () => {
-    layer.settings.schoolType = schoolTypeSelect.value;
-    clearHolidayPreview(layer);
-    saveProjects();
-    renderHolidayProperties(project);
+  const addScopeButton = document.createElement("button");
+  addScopeButton.type = "button";
+  addScopeButton.className = "secondary-button holiday-add-scope";
+  addScopeButton.textContent = "Weiteren Geltungsbereich hinzufügen";
+  addScopeButton.disabled = layer.settings.scopeTypes.length >= scopeOptions.length;
+  addScopeButton.addEventListener("click", () => {
+    const availableOptions = scopeOptions.filter(([value]) => !layer.settings.scopeTypes.includes(value));
+    if (!availableOptions.length) return;
+    const row = document.createElement("label");
+    row.className = "property-row";
+    const label = document.createElement("span");
+    label.textContent = `Geltungsbereich ${layer.settings.scopeTypes.length + 1}`;
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Weiteren Geltungsbereich auswählen");
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Bitte auswählen";
+    placeholder.selected = true;
+    placeholder.disabled = true;
+    select.append(placeholder);
+    availableOptions.forEach(([value, text]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = text;
+      select.append(option);
+    });
+    select.addEventListener("change", () => {
+      if (!select.value) return;
+      layer.settings.scopeTypes.push(select.value);
+      layer.settings.schoolType = layer.settings.scopeTypes[0];
+      clearHolidayPreview(layer);
+      syncScheduleValidityPeriods(project);
+      saveProjects();
+      renderHolidayProperties(project);
+    });
+    row.append(label, createSelectShell(select));
+    schoolTypeList.append(row);
+    addScopeButton.disabled = true;
   });
-  schoolTypeRow.append(schoolTypeLabel, createSelectShell(schoolTypeSelect));
-  schoolTypeList.append(schoolTypeRow);
-  schoolTypeSection.append(schoolTypeTitle, schoolTypeList);
+  schoolTypeSection.append(schoolTypeTitle, schoolTypeList, addScopeButton);
+  const hasUniversityScope = layer.settings.scopeTypes.includes("university");
+  const hasSchoolScope = layer.settings.scopeTypes.some((type) => type === "general" || type === "vocational");
 
   const section = document.createElement("section");
   section.className = "property-section";
   const sectionTitle = document.createElement("h3");
-  sectionTitle.textContent = "Schuljahr";
+  sectionTitle.textContent = hasSchoolScope ? "Schuljahr" : "Hochschulferien";
   const list = document.createElement("div");
   list.className = "property-list";
 
@@ -3076,8 +5265,8 @@ function renderHolidayProperties(project) {
   });
   stateSelect.addEventListener("change", () => {
     layer.settings.federalState = stateSelect.value;
-    layer.settings.schoolType = stateSelect.value === "MV" ? "general" : "all";
     clearHolidayPreview(layer);
+    syncScheduleValidityPeriods(project);
     saveProjects();
     renderHolidayProperties(project);
   });
@@ -3102,12 +5291,85 @@ function renderHolidayProperties(project) {
     layer.settings.startYear = startYear;
     layer.settings.endYear = startYear + 1;
     clearHolidayPreview(layer);
+    syncScheduleValidityPeriods(project);
     saveProjects();
     renderHolidayProperties(project);
   });
 
-  list.append(stateRow, schoolYearRow);
+  if (hasSchoolScope) list.append(stateRow, schoolYearRow);
+  const higherEducationPeriods = document.createElement("div");
+  higherEducationPeriods.className = "higher-education-periods";
+  if (hasUniversityScope) {
+    const configuredPeriods = getConfiguredHigherEducationPeriods(project);
+    if (!configuredPeriods.length) {
+      const emptyPeriods = document.createElement("p");
+      emptyPeriods.className = "empty-state";
+      emptyPeriods.append("Im ");
+      const projectSettingsLink = document.createElement("button");
+      projectSettingsLink.type = "button";
+      projectSettingsLink.className = "schedule-setup-link";
+      projectSettingsLink.textContent = "Projektordner";
+      projectSettingsLink.addEventListener("click", () => selectProject(project.id));
+      emptyPeriods.append(projectSettingsLink, " sind noch keine vollständigen Semester- oder Trimestergrenzen eingerichtet.");
+      higherEducationPeriods.append(emptyPeriods);
+    } else {
+      configuredPeriods.forEach((period) => {
+        const card = document.createElement("section");
+        card.className = "half-year-period higher-education-period";
+        const heading = document.createElement("h4");
+        heading.textContent = period.label;
+        const boundary = document.createElement("p");
+        boundary.className = "higher-education-boundary";
+        boundary.textContent = `${formatGermanDate(period.startDate)}–${formatGermanDate(period.endDate)}`;
+        const holidayHeading = document.createElement("strong");
+        holidayHeading.className = "higher-education-holiday-title";
+        holidayHeading.textContent = period.holidayLabel;
+        const range = document.createElement("div");
+        range.className = "half-year-range";
+        const storedHoliday = layer.settings.higherEducationBreaks[period.id] || {};
+        const fromLabel = document.createElement("label");
+        fromLabel.textContent = "von";
+        const from = document.createElement("input");
+        from.type = "date";
+        from.value = storedHoliday.startDate || "";
+        const untilLabel = document.createElement("label");
+        untilLabel.textContent = "bis";
+        const until = document.createElement("input");
+        until.type = "date";
+        until.value = storedHoliday.endDate || "";
+        const updateHoliday = () => {
+          layer.settings.higherEducationBreaks[period.id] = {
+            startDate: from.value,
+            endDate: until.value
+          };
+          clearHolidayPreview(layer);
+          saveProjects();
+          renderHolidayProperties(project);
+        };
+        from.addEventListener("change", updateHoliday);
+        until.addEventListener("change", updateHoliday);
+        fromLabel.append(from);
+        untilLabel.append(until);
+        range.append(fromLabel, untilLabel);
+        card.append(heading, boundary, holidayHeading, range);
+        higherEducationPeriods.append(card);
+      });
+    }
+  }
   const settingsKey = getHolidaySettingsKey(layer.settings);
+  if (!hasSchoolScope && hasUniversityScope && layer.previewKey !== settingsKey) {
+    layer.previewEntries = getHigherEducationHolidayEntries(project, layer.settings);
+    layer.previewKey = settingsKey;
+    layer.previewProvenance = {
+      provider: "Manuelle Hochschulferien",
+      retrievedAt: new Date().toISOString(),
+      schoolYear: `${layer.settings.startYear}/${String(layer.settings.endYear).slice(-2)}`,
+      schoolType: "university"
+    };
+    delete layer.previewError;
+    delete layer.previewErrorKey;
+    delete layer.previewLoadingKey;
+  }
   const previewIsCurrent = layer.previewKey === settingsKey && Array.isArray(layer.previewEntries);
   const previewEntries = previewIsCurrent ? layer.previewEntries : [];
   const applyButton = document.createElement("button");
@@ -3135,19 +5397,32 @@ function renderHolidayProperties(project) {
   } else {
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = layer.previewError || "Ferientermine werden automatisch abgerufen …";
+    empty.textContent = layer.previewError || (!hasSchoolScope && hasUniversityScope
+      ? "Noch keine Semester- oder Trimesterferien eingetragen."
+      : "Ferientermine werden automatisch abgerufen …");
     result.append(empty);
   }
 
   const source = document.createElement("div");
   source.className = "holiday-source";
-  const sourceLink = document.createElement("a");
-  sourceLink.href = "https://www.kmk.org/service/ferienregelung/ferienkalender.html";
-  sourceLink.target = "_blank";
-  sourceLink.rel = "noopener noreferrer";
-  sourceLink.textContent = "Amtliche Prüfreferenz: Kultusministerkonferenz";
-  source.append(sourceLink);
-  if (layer.previewProvenance?.retrievedAt) {
+  if (!hasSchoolScope && hasUniversityScope) {
+    const manualSource = document.createElement("span");
+    manualSource.textContent = "Manuell eingetragene Hochschulferien auf Grundlage der Projektzeiträume.";
+    source.append(manualSource);
+  } else {
+    const sourceLink = document.createElement("a");
+    sourceLink.href = "https://www.kmk.org/service/ferienregelung/ferienkalender.html";
+    sourceLink.target = "_blank";
+    sourceLink.rel = "noopener noreferrer";
+    sourceLink.textContent = "Amtliche Prüfreferenz: Kultusministerkonferenz";
+    source.append(sourceLink);
+  }
+  if (hasUniversityScope && hasSchoolScope) {
+    const manualSource = document.createElement("span");
+    manualSource.textContent = "Hochschulferien: manuell aus den Projektzeiträumen ergänzt.";
+    source.append(manualSource);
+  }
+  if (layer.previewProvenance?.retrievedAt && hasSchoolScope) {
     const retrieved = document.createElement("span");
     retrieved.textContent = `Daten: OpenHolidays · abgerufen ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(layer.previewProvenance.retrievedAt))}`;
     source.append(retrieved);
@@ -3158,12 +5433,17 @@ function renderHolidayProperties(project) {
     layer.entries = structuredClone(previewEntries);
     layer.provenance = structuredClone(layer.previewProvenance);
     layer.appliedSettings = structuredClone(layer.settings);
+    const holidayPeriod = getHolidaySchoolYearPeriod(project);
+    if (holidayPeriod && !layer.settings.scopeTypes.includes("university")) {
+      project.periods = project.periods && typeof project.periods === "object" ? project.periods : {};
+      project.periods.schoolYear = holidayPeriod;
+    }
     saveProjects();
     renderActiveCalendar(project);
     status.textContent = "Einstellungen übernommen und Kalenderansicht aktualisiert.";
   });
 
-  section.append(sectionTitle, list, result, source, applyButton, status);
+  section.append(sectionTitle, list, higherEducationPeriods, result, source, applyButton, status);
   sheet.append(head, schoolTypeSection, section);
   projectDetail.replaceChildren(sheet);
   saveProjects();
@@ -3186,9 +5466,12 @@ function getHolidaySettingsKey(settings) {
   return [
     HOLIDAY_NORMALIZATION_VERSION,
     settings.federalState,
-    settings.schoolType,
+    (settings.scopeTypes || [settings.schoolType]).join(","),
     settings.startYear,
-    settings.endYear
+    settings.endYear,
+    (settings.scopeTypes || [settings.schoolType]).includes("university")
+      ? JSON.stringify(settings.higherEducationBreaks || {})
+      : ""
   ].join(":");
 }
 
@@ -3197,7 +5480,21 @@ async function refreshHolidayPreview(project, layer, settingsKey) {
   delete layer.previewError;
   try {
     const settingsSnapshot = structuredClone(layer.settings);
-    const entries = await fetchSchoolHolidays(settingsSnapshot);
+    const scopeTypes = Array.isArray(settingsSnapshot.scopeTypes)
+      ? settingsSnapshot.scopeTypes
+      : [settingsSnapshot.schoolType];
+    const schoolScopeTypes = scopeTypes.filter((type) => type === "general" || type === "vocational");
+    const schoolEntries = await Promise.all(schoolScopeTypes.map((schoolType) => (
+      fetchSchoolHolidays({ ...settingsSnapshot, schoolType, scopeTypes: [schoolType] })
+    )));
+    const manualEntries = scopeTypes.includes("university")
+      ? getHigherEducationHolidayEntries(project, settingsSnapshot)
+      : [];
+    const uniqueEntries = new Map();
+    [...schoolEntries.flat(), ...manualEntries].forEach((entry) => {
+      uniqueEntries.set(`${entry.name}|${entry.startDate}|${entry.endDate}`, entry);
+    });
+    const entries = [...uniqueEntries.values()].sort((a, b) => a.startDate.localeCompare(b.startDate));
     if (getHolidaySettingsKey(layer.settings) !== settingsKey) return;
     layer.previewEntries = entries;
     layer.previewKey = settingsKey;
@@ -3209,8 +5506,9 @@ async function refreshHolidayPreview(project, layer, settingsKey) {
       federalState: `DE-${settingsSnapshot.federalState}`,
       schoolYear: `${settingsSnapshot.startYear}/${String(settingsSnapshot.endYear).slice(-2)}`,
       schoolType: settingsSnapshot.schoolType,
-      groupCode: getHolidayGroupCode(settingsSnapshot),
-      corrections: getKnownHolidayCorrections(settingsSnapshot)
+      scopeTypes,
+      groupCodes: schoolScopeTypes.map((schoolType) => getHolidayGroupCode({ ...settingsSnapshot, schoolType })).filter(Boolean),
+      corrections: schoolScopeTypes.flatMap((schoolType) => getKnownHolidayCorrections({ ...settingsSnapshot, schoolType }))
     };
     delete layer.previewLoadingKey;
     delete layer.previewErrorKey;
@@ -3266,11 +5564,12 @@ async function fetchSchoolHolidays(settings) {
 }
 
 function getHolidayGroupCode(settings) {
-  if (settings.federalState !== "MV") return null;
+  if (settings.federalState !== "MV" || settings.schoolType === "university") return null;
   return settings.schoolType === "vocational" ? "DE-MV-BBS" : "DE-MV-ABS";
 }
 
 function normalizeHolidayEntries(entries, settings) {
+  if (Array.isArray(settings.scopeTypes) && settings.scopeTypes.includes("vocational")) return entries;
   if (settings.federalState !== "MV" || settings.schoolType !== "general") return entries;
   return entries.filter((entry) => !(
     entry.startDate === entry.endDate
@@ -3279,6 +5578,7 @@ function normalizeHolidayEntries(entries, settings) {
 }
 
 function getKnownHolidayCorrections(settings) {
+  if (Array.isArray(settings.scopeTypes) && settings.scopeTypes.includes("vocational")) return [];
   if (settings.federalState !== "MV" || settings.schoolType !== "general") return [];
   return [{
     id: "mv-2026-11-vocational-only",
@@ -3336,6 +5636,26 @@ newProjectButton.addEventListener("click", () => {
   requestAnimationFrame(() => newProjectName.focus());
 });
 cancelProjectButton.addEventListener("click", () => newProjectDialog.close());
+importProjectButton.addEventListener("click", () => {
+  setBrowserMenuOpen(false);
+  importProjectForm.reset();
+  importProjectStatus.textContent = "";
+  importProjectDialog.showModal();
+  requestAnimationFrame(() => importProjectFile.focus());
+});
+cancelImportProjectButton.addEventListener("click", () => importProjectDialog.close());
+importProjectForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  importProjectStatus.textContent = "Projekt wird geprüft und importiert …";
+  try {
+    await importProjectFromFile(importProjectFile.files?.[0]);
+    importProjectDialog.close();
+  } catch (error) {
+    importProjectStatus.textContent = error instanceof Error
+      ? error.message
+      : "Das Projekt konnte nicht importiert werden.";
+  }
+});
 calendarViewButtons.forEach((button) => {
   button.addEventListener("click", () => {
     mainCalendarView = button.dataset.calendarView;
@@ -3630,6 +5950,10 @@ classTripForm.addEventListener("submit", (event) => {
   renderActiveCalendar(project);
 });
 cancelLessonButton.addEventListener("click", () => lessonDialog.close());
+deleteLessonButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+deleteLessonButton.addEventListener("pointerup", finishScheduleDeleteHold);
+deleteLessonButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+deleteLessonButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
 lessonPropertiesTab.addEventListener("click", () => setLessonDialogTab("properties"));
 lessonStatisticsTab.addEventListener("click", () => setLessonDialogTab("statistics"));
 lessonProgressTab.addEventListener("click", () => setLessonDialogTab("progress"));
@@ -3678,6 +6002,11 @@ scheduleDisplayForm.addEventListener("submit", (event) => {
 });
 lessonForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  const selectedDays = getSelectedLessonDays();
+  if (!selectedDays.length) {
+    lessonDialogStatus.textContent = "Bitte mindestens einen Wochentag auswählen.";
+    return;
+  }
   if (!lessonSubject.value || !lessonGrade.value) {
     lessonDialogStatus.textContent = "Bitte ein angelegtes Fach und eine konkrete Klasse auswählen.";
     return;
@@ -3705,7 +6034,6 @@ lessonForm.addEventListener("submit", (event) => {
   const subjectOption = lessonSubject.selectedOptions[0];
   const classOption = lessonGrade.selectedOptions[0];
   const lessonData = {
-    day: Number(lessonDay.value),
     start: lessonStart.value,
     end: lessonEnd.value,
     grade: classOption?.dataset.name || classOption?.textContent || "",
@@ -3716,14 +6044,31 @@ lessonForm.addEventListener("submit", (event) => {
     phases: structuredClone(lessonPhasesDraft),
     room: lessonRoom.value.trim(),
     color: lessonColor.value || "#bfd2e2",
-    epochal: lessonEpochal.value === "epochal"
+    teachingForm: lessonTeachingForm.value,
+    abWeek: getLessonFormChoice(lessonAbWeekButtons, "lessonAbWeek", "A"),
+    epochHalf: getLessonFormChoice(lessonEpochHalfButtons, "lessonEpochHalf", "first"),
+    epochal: lessonTeachingForm.value === "epochal"
   };
   const existingLesson = schedule.lessons.find((entry) => entry.id === lessonDialog.dataset.lessonId);
-  if (existingLesson) Object.assign(existingLesson, lessonData);
-  else {
-    schedule.lessons.push({
-      id: globalThis.crypto?.randomUUID?.() ?? `lesson-${Date.now()}`,
-      ...lessonData
+  if (existingLesson) {
+    const primaryDay = selectedDays.includes(existingLesson.day) ? existingLesson.day : selectedDays[0];
+    Object.assign(existingLesson, lessonData, { day: primaryDay });
+    selectedDays
+      .filter((day) => day !== primaryDay)
+      .forEach((day) => {
+        schedule.lessons.push({
+          id: globalThis.crypto?.randomUUID?.() ?? `lesson-${Date.now()}-${day}`,
+          ...structuredClone(lessonData),
+          day
+        });
+      });
+  } else {
+    selectedDays.forEach((day) => {
+      schedule.lessons.push({
+        id: globalThis.crypto?.randomUUID?.() ?? `lesson-${Date.now()}-${day}`,
+        ...structuredClone(lessonData),
+        day
+      });
     });
   }
   saveProjects();
@@ -3759,18 +6104,63 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     setMenuOpen(false);
     setBrowserMenuOpen(false);
+    setExportMenuOpen(false);
+    closeCardMenus();
   }
 });
 document.addEventListener("click", (event) => {
   if (!browserActionsMenu.contains(event.target) && !browserActionsButton.contains(event.target)) {
     setBrowserMenuOpen(false);
   }
+  if (!exportMenu.contains(event.target) && !exportButton.contains(event.target)) {
+    setExportMenuOpen(false);
+  }
+  const menuToggle = event.target instanceof Element ? event.target.closest(".schedule-menu-button") : null;
+  if (menuToggle) closeCardMenus(menuToggle.closest(".schedule-menu-shell"));
+  else closeCardMenus();
+});
+exportButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setExportMenuOpen(exportButton.getAttribute("aria-expanded") !== "true");
+});
+exportMenu.addEventListener("click", (event) => {
+  const button = event.target instanceof Element ? event.target.closest("[data-export-format]") : null;
+  if (!button) return;
+  event.stopPropagation();
+  setExportMenuOpen(false);
+  if (button.dataset.exportFormat === "json") exportDisplayedProject();
+  if (button.dataset.exportFormat === "ics") openCalendarExportDialog();
+});
+calendarExportForm.addEventListener("change", (event) => {
+  if (!(event.target instanceof HTMLInputElement) || event.target.name !== "calendarExportPreset") return;
+  calendarExportChoices.hidden = event.target.value !== "custom";
+  calendarExportStatus.textContent = "";
+});
+cancelCalendarExportButton.addEventListener("click", () => calendarExportDialog.close());
+calendarExportForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const project = projects.find((entry) => entry.id === calendarExportDialog.dataset.projectId);
+  if (!project) return;
+  const selection = getCalendarExportSelection(project);
+  const hasSelection = selection.holidays
+    || selection.scheduleIds.size
+    || selection.individualEntryIds.size
+    || selection.appointmentIds.size
+    || selection.sicknessIds.size
+    || selection.classProjectIds.size;
+  if (!hasSelection) {
+    calendarExportStatus.textContent = "Bitte mindestens einen Inhalt für den Export auswählen.";
+    return;
+  }
+  calendarExportDialog.close();
+  downloadDisplayedCalendar(selection);
 });
 renderLessonColorPalette();
 renderAppointmentGroupColorPalette();
 updateLessonSignalsToggle();
 setInterval(checkLessonSignals, 500);
 currentTimeIndicatorTimer = setInterval(updateCurrentTimeIndicator, 15_000);
+window.addEventListener("resize", () => requestAnimationFrame(() => updateCurrentTimeIndicator()));
 renderActiveCalendar();
 renderProjectBrowser();
 renderProjectDetail();
