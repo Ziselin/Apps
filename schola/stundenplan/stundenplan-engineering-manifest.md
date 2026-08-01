@@ -5,7 +5,11 @@ Dieses Manifest hält die fachlichen und technischen Regeln der Schola-App „St
 ## 1. Ein Projektordner bündelt Kalenderschichten
 
 - Ein Projektordner ist die fachliche Einheit eines Stundenplanprojekts.
-- Ferien, individuelle Projekte, klassenbezogene Projekttage und spätere Stundenplandaten bleiben getrennte Kalenderschichten.
+- Schulen bündeln Schulart, Bezeichnung, Bundesland, Schuljahr, Zeitmodelle und die zugehörigen Ferien. Eine separate Ferien-Kategorie gibt es nicht mehr.
+- Individuelle Projekte, klassenbezogene Projekttage und Stundenplandaten bleiben davon getrennte Kalenderschichten.
+- Fächer, Klassen und Stundenpläne referenzieren eine konkrete Schule. Unterrichtsstatistik, Ferienausnahmen und Zeitmodelle werden dadurch eindeutig aus derselben Schule abgeleitet.
+- Identische Ferien desselben Bundeslands und Zeitraums werden in der Kalenderdarstellung nur einmal gezeichnet, intern aber mit allen betroffenen Schulen verknüpft.
+- Die maximale Kalenderspanne eines Projektordners wird aus sämtlichen Schulen ermittelt und darf in den Ordnereinstellungen manuell angepasst werden.
 - Die Kalenderansicht wird aus den aktiven Schichten erzeugt; sie ist nicht selbst die Datenquelle.
 - Export und Stundenbilanz müssen aus denselben normalisierten Projektdaten reproduzierbar erzeugt werden können.
 

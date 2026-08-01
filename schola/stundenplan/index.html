@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260730v">
+    <link rel="stylesheet" href="stundenplan.css?v=20260801w">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -371,14 +371,14 @@
           <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="60" required></label>
           <label class="dialog-field"><span>Fach</span><select id="lessonSubject" required></select></label>
           <label class="dialog-field"><span>Klasse</span><select id="lessonGrade" required></select></label>
-          <label class="dialog-field lesson-dialog-wide"><span>Raum</span><input id="lessonRoom" type="text" maxlength="40" required placeholder="z. B. 204"></label>
+          <label class="dialog-field lesson-dialog-wide"><span>Raum <small>(optional)</small></span><input id="lessonRoom" type="text" maxlength="40" placeholder="z. B. 204"></label>
           <fieldset class="lesson-color-field lesson-dialog-wide">
             <legend>Farbe</legend>
             <input id="lessonColor" type="hidden" value="#bfd2e2">
             <div id="lessonColorPalette" class="lesson-color-palette" aria-label="Kreidefarbe auswählen"></div>
           </fieldset>
           <div class="dialog-field lesson-dialog-wide lesson-teaching-form">
-            <span>Unterrichtsform</span>
+            <span>Zeitliche Organisation</span>
             <select id="lessonTeachingForm" required></select>
             <div id="lessonAbWeekChoice" class="lesson-form-choice" role="group" aria-label="A- oder B-Woche" hidden>
               <button type="button" data-lesson-ab-week="A" aria-pressed="true">A-Woche</button>
@@ -393,15 +393,25 @@
         <p id="lessonDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       </section>
       <section id="lessonStatisticsPanel" class="lesson-tab-panel lesson-statistics" role="tabpanel" aria-labelledby="lessonStatisticsTab" hidden>
-        <article class="lesson-stat-card">
-          <span>Gesamtjahr</span>
+        <p class="lesson-statistics-note">Alle Angaben in USt. à 45 Min. <span>·</span> 90 Min. = 2 USt.</p>
+        <article id="lessonGradingStopStatisticCard" class="lesson-stat-card lesson-stat-hero">
+          <span>Zensurenstopp</span>
+          <strong id="lessonGradingStopStatistic">–</strong>
+          <small id="lessonGradingStopStatisticPeriod"></small>
+        </article>
+        <div class="lesson-stat-year-progress" aria-label="Verlauf des Schuljahres mit Halbjahres- und Zensurenstoppgrenzen">
+          <div id="lessonStatYearTrack" class="lesson-stat-year-track"></div>
+          <div id="lessonStatYearLabels" class="lesson-stat-year-labels"></div>
+        </div>
+        <article id="lessonHalfStatisticCard" class="lesson-stat-card lesson-stat-compact">
+          <span>Aktuelles Halbjahr</span>
+          <strong id="lessonHalfStatistic">–</strong>
+          <small id="lessonHalfStatisticPeriod"></small>
+        </article>
+        <article class="lesson-stat-card lesson-stat-compact">
+          <span>Schuljahr</span>
           <strong id="lessonYearStatistic">–</strong>
           <small id="lessonYearStatisticPeriod"></small>
-        </article>
-        <article class="lesson-stat-card is-unavailable">
-          <span>Aktuelles Halbjahr</span>
-          <strong>–</strong>
-          <small>Die Halbjahresgrenzen sind im Kalender noch nicht festgelegt.</small>
         </article>
       </section>
       <section id="lessonProgressPanel" class="lesson-tab-panel lesson-progress-settings" role="tabpanel" aria-labelledby="lessonProgressTab" hidden>
@@ -454,6 +464,6 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260730x"></script>
+    <script src="stundenplan.js?v=20260801w"></script>
 </body>
 </html>

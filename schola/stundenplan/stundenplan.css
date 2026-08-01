@@ -307,6 +307,10 @@ button, input, select, textarea { font-family: inherit; }
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(87,116,91,.18);
 }
+.day.is-public-holiday {
+  background: #aebfa5;
+  box-shadow: inset 0 0 0 1px rgba(70, 100, 75, .26);
+}
 .day.is-project {
   background: var(--project-blue);
   color: var(--ink);
@@ -850,6 +854,53 @@ button, input, select, textarea { font-family: inherit; }
 .property-section { display: grid; gap: 13px; }
 .property-section h3 { margin: 0; font-size: .88rem; }
 .property-list { display: grid; gap: 8px; }
+.property-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(130px,.72fr) minmax(180px,1.28fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 50px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,255,252,.38);
+  color: var(--ink-soft);
+  font-size: .8rem;
+}
+.property-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 36px 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,252,.7);
+  color: var(--ink);
+  font: inherit;
+  font-size: .86rem;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+.property-field select:focus {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(33,54,51,.075);
+}
+.property-field::after,
+.schedule-validity label:has(select)::after,
+.dialog-field:has(select)::after {
+  content: "";
+  position: absolute;
+  right: 15px;
+  bottom: 17px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.property-field::after { top: 50%; right: 24px; bottom: auto; transform: translateY(-70%) rotate(45deg); }
 .property-row {
   display: grid;
   grid-template-columns: minmax(130px,.72fr) minmax(180px,1.28fr);
@@ -892,6 +943,16 @@ button, input, select, textarea { font-family: inherit; }
 }
 .school-year-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .property-status { min-height: 20px; margin: -4px 0 0; color: var(--muted); font-size: .76rem; }
+.property-status.is-success { color: #486a4f; font-weight: 700; }
+.property-status.is-error { color: #984d46; font-weight: 700; }
+.secondary-button.is-save-success {
+  border-color: rgba(72,106,79,.34);
+  background: rgba(198,215,189,.55);
+}
+.secondary-button.is-save-error {
+  border-color: rgba(152,77,70,.3);
+  background: rgba(223,185,189,.38);
+}
 .holiday-load-button { justify-self: start; }
 .holiday-scope-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .holiday-scope-actions .lesson-delete-button { width: auto; }
@@ -914,6 +975,17 @@ button, input, select, textarea { font-family: inherit; }
 }
 .holiday-entry strong { font-size: .8rem; }
 .holiday-entry span { color: var(--muted); white-space: nowrap; }
+.school-movable-day-row { display: grid; grid-template-columns: minmax(150px, 1fr) auto auto; align-items: end; }
+.school-movable-day-row input {
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,252,.7);
+  color: var(--ink);
+  font: inherit;
+}
 .holiday-source { display: grid; gap: 5px; padding-top: 4px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
 .holiday-source a { color: var(--ink-soft); text-underline-offset: 3px; }
 .higher-education-periods { display: grid; gap: 9px; }
@@ -1140,6 +1212,48 @@ button, input, select, textarea { font-family: inherit; }
   color: var(--muted);
   font-size: .8rem;
 }
+.class-project-class-picker {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,255,252,.38);
+}
+.class-project-class-picker legend { padding: 0 5px; color: var(--ink-soft); font-size: .8rem; }
+.class-project-class-picker-list { display: grid; gap: 7px; }
+.class-project-class-picker-row { position: relative; display: grid; grid-template-columns: minmax(180px,1fr) auto; gap: 8px; align-items: center; }
+.class-project-class-picker-row::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 92px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink-soft);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+.class-project-class-picker-row select {
+  min-height: 40px;
+  padding: 8px 34px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,252,.72);
+  color: var(--ink);
+  font: inherit;
+  appearance: none;
+}
+.class-project-overview-row { grid-template-columns: minmax(120px,1fr) minmax(130px,1fr) auto auto; }
+@media (max-width: 720px) {
+  .class-project-overview-row { grid-template-columns: 1fr auto; }
+  .class-project-overview-row strong,
+  .class-project-overview-row span:nth-child(2) { grid-column: 1 / -1; }
+  .class-project-class-picker-row { grid-template-columns: 1fr; }
+  .class-project-class-picker-row::after { top: 20px; right: 15px; }
+}
 @media (max-width: 720px) {
   .class-project-class-head { align-items: flex-start; flex-direction: column; }
   .class-project-summary { grid-template-columns: minmax(95px,1fr) minmax(120px,auto) auto; }
@@ -1231,7 +1345,7 @@ button, input, select, textarea { font-family: inherit; }
     rgba(33,54,51,.06);
 }
 .schedule-validity { display: grid; grid-template-columns: minmax(220px, 360px); gap: 8px; }
-.schedule-validity label { display: grid; gap: 6px; color: var(--ink-soft); font-size: .76rem; }
+.schedule-validity label { position: relative; display: grid; gap: 6px; color: var(--ink-soft); font-size: .76rem; }
 .schedule-validity select {
   width: 100%;
   min-height: 39px;
@@ -1324,6 +1438,7 @@ button, input, select, textarea { font-family: inherit; }
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
+.timeline-day-holiday.is-public-holiday { color: #506653; }
 .timeline-axis,
 .timeline-day-column {
   position: relative;
@@ -1362,6 +1477,8 @@ button, input, select, textarea { font-family: inherit; }
 .timeline-day-column.is-holiday {
   background: rgba(105, 112, 109, .12);
 }
+.timeline-day-column.is-public-holiday { background: rgba(94, 125, 91, .2); }
+.holiday-entry.is-public-holiday { background: rgba(174,191,165,.42); }
 .timeline-hour-guide {
   position: absolute;
   right: 0;
@@ -1538,6 +1655,7 @@ button, input, select, textarea { font-family: inherit; }
 .lesson-card.is-epochal { border-style: dashed; }
 .lesson-card strong { overflow: hidden; font-size: .84rem; text-overflow: ellipsis; white-space: nowrap; }
 .lesson-card small { font-size: .72rem; line-height: 1.32; }
+.lesson-card-room.is-missing { color: #a84f49; font-weight: 700; }
 .schedule-week.schedule-editor-timeline {
   display: block;
   max-height: calc(100dvh - 300px);
@@ -1758,7 +1876,48 @@ button, input, select, textarea { font-family: inherit; }
   outline-offset: 2px;
 }
 .lesson-color-swatch.is-active { box-shadow: inset 0 0 0 3px rgba(255,255,252,.72); }
-.lesson-statistics { display: grid; gap: 10px; }
+.lesson-statistics { display: grid; gap: 11px; }
+.lesson-statistics-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: .71rem;
+  line-height: 1.35;
+  text-align: center;
+}
+.lesson-statistics-note span { padding: 0 4px; color: var(--line-strong); }
+.lesson-stat-year-progress { display: grid; gap: 7px; padding: 15px 3px 5px; }
+.lesson-stat-year-track {
+  position: relative;
+  height: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(33,54,51,.08);
+  box-shadow: inset 0 1px 2px rgba(33,54,51,.08);
+}
+.lesson-stat-year-elapsed,
+.lesson-stat-half-segment,
+.lesson-stat-stop-range { position: absolute; top: 0; bottom: 0; }
+.lesson-stat-year-elapsed { left: 0; z-index: 1; border-radius: 999px 0 0 999px; background: rgba(74,104,89,.58); }
+.lesson-stat-half-segment { z-index: 2; border-right: 2px solid rgba(255,255,252,.9); border-left: 1px solid rgba(255,255,252,.55); }
+.lesson-stat-stop-range { z-index: 3; background: rgba(177,75,68,.7); }
+.lesson-stat-today-marker,
+.lesson-stat-stop-marker { position: absolute; z-index: 5; top: -4px; bottom: -4px; width: 2px; transform: translateX(-1px); pointer-events: none; }
+.lesson-stat-today-marker { background: var(--ink); }
+.lesson-stat-today-marker::before {
+  content: "Heute";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  color: var(--ink-soft);
+  font-size: .59rem;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+.lesson-stat-today-marker.is-start-edge::before { left: 0; transform: none; }
+.lesson-stat-today-marker.is-end-edge::before { right: 0; left: auto; transform: none; }
+.lesson-stat-stop-marker { background: #93423d; }
+.lesson-stat-year-labels { position: relative; height: 16px; color: var(--ink-soft); font-size: .65rem; font-weight: 700; }
+.lesson-stat-year-labels span { position: absolute; text-align: center; white-space: nowrap; }
 .lesson-stat-card {
   display: grid;
   gap: 6px;
@@ -1771,6 +1930,29 @@ button, input, select, textarea { font-family: inherit; }
 .lesson-stat-card > strong { font-size: 1.22rem; }
 .lesson-stat-card > small { color: var(--ink-soft); font-size: .75rem; line-height: 1.45; }
 .lesson-stat-card.is-unavailable { background: rgba(33,54,51,.025); }
+.lesson-stat-hero {
+  gap: 2px;
+  padding: 17px 18px;
+  border-color: rgba(153,72,65,.2);
+  background: linear-gradient(135deg, rgba(230,216,168,.34), rgba(255,255,252,.62));
+}
+.lesson-stat-hero > span { color: #77524e; font-weight: 700; }
+.lesson-stat-hero > strong { margin-top: 2px; font-size: 2rem; line-height: 1.08; letter-spacing: -.035em; }
+.lesson-stat-hero > small { margin-top: 5px; }
+.lesson-stat-hero > small:empty { display: none; }
+.lesson-stat-hero.is-unavailable { border-color: var(--line); background: rgba(33,54,51,.025); }
+.lesson-stat-compact {
+  grid-template-columns: minmax(105px,.8fr) auto minmax(145px,1.2fr);
+  align-items: baseline;
+  gap: 8px 12px;
+  padding: 11px 13px;
+}
+.lesson-stat-compact > strong { font-size: 1rem; white-space: nowrap; }
+.lesson-stat-compact > small { text-align: right; }
+@media (max-width: 520px) {
+  .lesson-stat-compact { grid-template-columns: 1fr auto; }
+  .lesson-stat-compact > small { grid-column: 1 / -1; text-align: left; }
+}
 .lesson-progress-settings { display: grid; gap: 12px; }
 .lesson-progress-intro { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.45; }
 .lesson-phase-list { display: grid; gap: 7px; }
@@ -1817,13 +1999,20 @@ button, input, select, textarea { font-family: inherit; }
 .dialog-field select {
   width: 100%;
   min-height: 43px;
-  padding: 9px 12px;
+  padding: 9px 36px 9px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(255,255,252,.72);
   color: var(--ink);
   font: inherit;
   font-size: .86rem;
+  appearance: none;
+}
+.dialog-field:has(select) { position: relative; }
+.dialog-field:has(select)::after {
+  top: 38px;
+  bottom: auto;
+  transform: translateY(-70%) rotate(45deg);
 }
 .project-dialog.schedule-display-dialog {
   width: min(860px, calc(100vw - 28px));
@@ -2126,7 +2315,9 @@ button, input, select, textarea { font-family: inherit; }
   .day { min-height: 22px; font-size: .68rem; }
   .settings-stage { padding: 66px 8px 10px; gap: 10px; }
   .settings-panel { min-height: 330px; border-radius: 14px; padding: 16px; }
-  .property-row { grid-template-columns: 1fr; gap: 7px; }
+  .property-row,
+  .property-field { grid-template-columns: 1fr; gap: 7px; }
+  .property-field::after { top: auto; right: 24px; bottom: 21px; transform: rotate(45deg); }
   .project-school-year-fields { grid-template-columns: 1fr; }
   .project-period-tabs { grid-template-columns: 1fr 1fr; }
   .half-year-range,
