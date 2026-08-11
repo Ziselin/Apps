@@ -1,5 +1,5 @@
 ﻿const LOCAL_DB_NAME = "typemap-local-db";
-const LOCAL_DB_VERSION = 1;
+const LOCAL_DB_VERSION = 2;
 const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
@@ -117,8 +117,14 @@ const ui = {
   documentPropertiesSaveButton: document.getElementById("documentPropertiesSaveButton"),
   propertyTabSourceCitation: document.getElementById("propertyTabSourceCitation"),
   propertyTabProvenance: document.getElementById("propertyTabProvenance"),
+  propertyTabDocumentId: document.getElementById("propertyTabDocumentId"),
   propertyPanelSourceCitation: document.getElementById("propertyPanelSourceCitation"),
   propertyPanelProvenance: document.getElementById("propertyPanelProvenance"),
+  propertyPanelDocumentId: document.getElementById("propertyPanelDocumentId"),
+  sharedDocumentIdOutput: document.getElementById("sharedDocumentIdOutput"),
+  copySharedDocumentIdButton: document.getElementById("copySharedDocumentIdButton"),
+  sharedDocumentStatus: document.getElementById("sharedDocumentStatus"),
+  sharedDocumentPublishedAtOutput: document.getElementById("sharedDocumentPublishedAtOutput"),
   provenanceEmptyHint: document.getElementById("provenanceEmptyHint"),
   provenanceContent: document.getElementById("provenanceContent"),
   provenanceTypeSelect: document.getElementById("provenanceTypeSelect"),
@@ -3724,16 +3730,20 @@ function changeActiveFontSize(delta) {
 }
 
 function setDocumentPropertiesTab(tabName = "citation") {
-  const showProvenance = tabName === "provenance";
-  ui.propertyPanelSourceCitation.hidden = showProvenance;
-  ui.propertyPanelProvenance.hidden = !showProvenance;
-  ui.propertyTabSourceCitation.classList.toggle("is-active", !showProvenance);
-  ui.propertyTabProvenance.classList.toggle("is-active", showProvenance);
-  ui.propertyTabSourceCitation.setAttribute("aria-selected", String(!showProvenance));
-  ui.propertyTabProvenance.setAttribute("aria-selected", String(showProvenance));
-  ui.propertyTabSourceCitation.tabIndex = showProvenance ? -1 : 0;
-  ui.propertyTabProvenance.tabIndex = showProvenance ? 0 : -1;
-  if (ui.documentPropertiesTitle) ui.documentPropertiesTitle.textContent = showProvenance ? "Provenienz" : "Quellenangabe";
+  const tabs = [
+    { name: "citation", tab: ui.propertyTabSourceCitation, panel: ui.propertyPanelSourceCitation, title: "Quellenangabe" },
+    { name: "provenance", tab: ui.propertyTabProvenance, panel: ui.propertyPanelProvenance, title: "Provenienz" },
+    { name: "id", tab: ui.propertyTabDocumentId, panel: ui.propertyPanelDocumentId, title: "ID" },
+  ];
+  const selected = tabs.find((entry) => entry.name === tabName) || tabs[0];
+  tabs.forEach((entry) => {
+    const active = entry === selected;
+    entry.panel.hidden = !active;
+    entry.tab.classList.toggle("is-active", active);
+    entry.tab.setAttribute("aria-selected", String(active));
+    entry.tab.tabIndex = active ? 0 : -1;
+  });
+  if (ui.documentPropertiesTitle) ui.documentPropertiesTitle.textContent = selected.title;
 }
 
 function setProvenanceLink(element, url, label = "") {
@@ -3886,6 +3896,11 @@ function openDocumentPropertiesDialog() {
   ui.sourceCitationAccessedDateInput.value = citation.accessed_date;
   ui.sourceCitationStyleInput.value = citation.citation_style;
   renderDocumentProvenance(project);
+  renderSharedDocumentId(project);
+  publishProjectForApps(project).catch((error) => {
+    if (ui.sharedDocumentStatus) ui.sharedDocumentStatus.textContent = "Bereitstellung derzeit nicht möglich";
+    console.warn("TypeMap app presentation publish failed", error);
+  });
   setDocumentPropertiesTab("citation");
   updateSourceCitationForm();
   setDialogOpen(true);
@@ -6024,7 +6039,7 @@ function openLocalDb() {
     }
     const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore(LOCAL_DB_STORE);
+      if (!request.result.objectStoreNames.contains(LOCAL_DB_STORE)) request.result.createObjectStore(LOCAL_DB_STORE);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -6064,12 +6079,72 @@ async function loadLocalSnapshot() {
   }
 }
 
+function openDocumentBridge() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("typemap-document-bridge", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("documents", { keyPath: "sourceId" });
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function buildAppPresentation(project) {
+  const generatedAt = new Date().toISOString();
+  const renderedHtml = buildHtmlExport(project)
+    .replace("<head>", '<head><base href="../../typemap/">')
+    .replace("background: #fff; color: #213633;", "background: transparent; color: #213633;")
+    .replace(/<script>[\s\S]*?<\/script>/gi, "");
+  return {
+    sourceId: project.id,
+    type: "typemap-html",
+    version: 1,
+    title: project.title || "TypeMap-Text",
+    renderedHtml,
+    provenance: {
+      sourceMetadata: project.sourceMetadata || null,
+      citationSource: project.citationSource || null,
+      metadata: project.metadata || null,
+    },
+    generatedAt,
+  };
+}
+
+async function publishProjectForApps(project) {
+  if (!project?.id) return null;
+  const presentation = buildAppPresentation(project);
+  const db = await openDocumentBridge();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("documents", "readwrite");
+    tx.objectStore("documents").put(presentation);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+  if (project.id === getActiveProject()?.id) renderSharedDocumentId(project, presentation.generatedAt);
+  return presentation;
+}
+
+async function publishAllProjectsForApps() {
+  for (const project of state.projects) await publishProjectForApps(project);
+}
+
+function renderSharedDocumentId(project, publishedAt = "") {
+  if (!project) return;
+  if (ui.sharedDocumentIdOutput) ui.sharedDocumentIdOutput.value = `TM1:${project.id}`;
+  if (ui.sharedDocumentStatus) ui.sharedDocumentStatus.textContent = "Für verbundene Apps verfügbar";
+  if (ui.sharedDocumentPublishedAtOutput) ui.sharedDocumentPublishedAtOutput.textContent = publishedAt
+    ? formatProvenanceTimestamp(publishedAt)
+    : "Wird automatisch aktualisiert";
+}
+
 function scheduleAutosave() {
   if (state.autosaveTimer) window.clearTimeout(state.autosaveTimer);
   const delay = (getActiveProject()?.source?.rawText?.length || 0) > 120000 ? 1800 : 500;
   state.autosaveTimer = window.setTimeout(() => {
     state.autosaveTimer = null;
-    saveLocalSnapshot();
+    saveLocalSnapshot().then(() => publishProjectForApps(getActiveProject())).catch((error) => {
+      console.warn("TypeMap app presentation publish failed", error);
+    });
   }, delay);
 }
 
@@ -6079,6 +6154,7 @@ async function flushAutosave() {
     state.autosaveTimer = null;
   }
   await saveLocalSnapshot();
+  await publishProjectForApps(getActiveProject());
 }
 
 function setMenuOpen(isOpen) {
@@ -6557,16 +6633,30 @@ function bindEditor() {
   ui.documentPropertiesSaveButton?.addEventListener("click", saveDocumentPropertiesDialog);
   ui.propertyTabSourceCitation?.addEventListener("click", () => setDocumentPropertiesTab("citation"));
   ui.propertyTabProvenance?.addEventListener("click", () => setDocumentPropertiesTab("provenance"));
+  ui.propertyTabDocumentId?.addEventListener("click", () => setDocumentPropertiesTab("id"));
   ui.provenanceLicenseSelect?.addEventListener("change", updateProvenanceLicenseLink);
   ui.provenanceTypeSelect?.addEventListener("change", updateProvenanceFieldVisibility);
-  [ui.propertyTabSourceCitation, ui.propertyTabProvenance].forEach((tab) => {
+  const documentPropertyTabs = [ui.propertyTabSourceCitation, ui.propertyTabProvenance, ui.propertyTabDocumentId];
+  documentPropertyTabs.forEach((tab, index) => {
     tab?.addEventListener("keydown", (event) => {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
       event.preventDefault();
-      const nextTab = tab === ui.propertyTabSourceCitation ? ui.propertyTabProvenance : ui.propertyTabSourceCitation;
-      setDocumentPropertiesTab(nextTab === ui.propertyTabProvenance ? "provenance" : "citation");
+      const direction = event.key === 'ArrowRight' ? 1 : -1;
+      const nextTab = documentPropertyTabs[(index + direction + documentPropertyTabs.length) % documentPropertyTabs.length];
+      setDocumentPropertiesTab(nextTab === ui.propertyTabProvenance ? "provenance" : nextTab === ui.propertyTabDocumentId ? "id" : "citation");
       nextTab.focus();
     });
+  });
+  ui.copySharedDocumentIdButton?.addEventListener("click", async () => {
+    const value = ui.sharedDocumentIdOutput?.value || "";
+    try {
+      await navigator.clipboard.writeText(value);
+      const previous = ui.copySharedDocumentIdButton.textContent;
+      ui.copySharedDocumentIdButton.textContent = "Kopiert";
+      window.setTimeout(() => { ui.copySharedDocumentIdButton.textContent = previous; }, 1200);
+    } catch (error) {
+      window.alert("Die ID konnte nicht kopiert werden.");
+    }
   });
   document.querySelectorAll("#propertyPanelSourceCitation input, #propertyPanelSourceCitation select, #propertyPanelSourceCitation textarea")
     .forEach((control) => {
@@ -6773,6 +6863,7 @@ async function init() {
     renderApp();
     scheduleAutosave();
   }
+  await publishAllProjectsForApps();
   setWorkspaceSection("preview");
 }
 

@@ -9,7 +9,7 @@
   <title>TypeMap</title>
   <link rel="icon" type="image/svg+xml" href="../assets/typemap-favicon.svg?v=20260613a">
   <link rel="stylesheet" href="../assets/ui/app-render-shell.css?v=20260709i">
-  <link rel="stylesheet" href="typemap.css?v=20260621r">
+  <link rel="stylesheet" href="typemap.css?v=20260811a">
 </head>
 <body>
   <main class="app-frame workspace-mode-preview">
@@ -484,6 +484,7 @@
     <div class="property-tabs" role="tablist" aria-label="Eigenschaftsbereiche">
       <button type="button" class="property-tab is-active" role="tab" aria-selected="true" aria-controls="propertyPanelSourceCitation" id="propertyTabSourceCitation">Quellenangabe</button>
       <button type="button" class="property-tab" role="tab" aria-selected="false" aria-controls="propertyPanelProvenance" id="propertyTabProvenance" tabindex="-1">Provenienz</button>
+      <button type="button" class="property-tab" role="tab" aria-selected="false" aria-controls="propertyPanelDocumentId" id="propertyTabDocumentId" tabindex="-1">ID</button>
     </div>
 
     <div class="property-dialog-body property-tab-body">
@@ -706,6 +707,24 @@
           </section>
         </div>
       </section>
+      <section id="propertyPanelDocumentId" class="property-tab-panel" role="tabpanel" aria-labelledby="propertyTabDocumentId" hidden>
+        <section class="property-section document-id-sharing-section">
+          <h3>In anderen Apps verwenden</h3>
+          <p class="property-hint">Diese unveränderliche Dokument-ID kann in verbundenen Apps eingesetzt werden. TypeMap hält die bereitgestellte HTML-Fassung automatisch aktuell; die jeweilige App entscheidet, wann sie eine neue Fassung übernimmt.</p>
+          <div class="property-list">
+            <div class="property-row property-row-stack">
+              <span>TypeMap-ID</span>
+              <div class="classroom-id-control">
+                <input id="sharedDocumentIdOutput" type="text" readonly spellcheck="false">
+                <button type="button" id="copySharedDocumentIdButton" class="property-copy-button">ID kopieren</button>
+              </div>
+            </div>
+            <div class="property-row"><span>Status</span><output id="sharedDocumentStatus">Wird vorbereitet …</output></div>
+            <div class="property-row"><span>Zuletzt bereitgestellt</span><output id="sharedDocumentPublishedAtOutput">–</output></div>
+            <div class="property-row"><span>Enthalten</span><output>Gerendertes HTML und Provenienzdaten</output></div>
+          </div>
+        </section>
+      </section>
     </div>
 
     <div class="property-dialog-actions">
@@ -926,7 +945,7 @@
     </div>
   </section>
   <script src="styles/document-styles.js?v=20260621b"></script>
-  <script src="typemap.js?v=20260709b"></script>
+  <script src="typemap.js?v=20260811b"></script>
 </body>
 </html>
 

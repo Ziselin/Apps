@@ -3229,6 +3229,27 @@ body.typemap-theme-light .citation-output textarea[readonly] {
   color: var(--accent);
 }
 
+.classroom-id-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.classroom-id-control input {
+  min-width: 0;
+  font-family: "Source Code Pro", Consolas, monospace;
+}
+
+#propertyPanelDocumentId output {
+  color: var(--text-soft);
+  font-size: .84rem;
+}
+
+@media (max-width: 640px) {
+  .classroom-id-control { grid-template-columns: 1fr; }
+}
+
 .citation-author-list {
   display: grid;
   gap: 7px;
