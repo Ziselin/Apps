@@ -1,0 +1,7 @@
+.timer-widget.timer-running .timer-dial{width:min(54vh,520px)}
+.tick:before{top:10%;left:-.5px;width:2px;height:10px;border-radius:2px;background:rgba(33,54,51,.58)}
+.tick.major{top:0;left:50%;width:1px;height:100%;background:transparent;transform-origin:50% 50%}
+.tick.major:before{top:9.5%;left:-1.5px;width:4px;height:24px;border-radius:2px;background:var(--ink)}
+.tick-label{font-family:Arial,Helvetica,sans-serif;font-weight:700}
+.timer-center strong.nta-countdown{color:#b43e39}
+.number-unit input.is-calculated{color:#929995}
