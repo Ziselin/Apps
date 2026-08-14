@@ -7,7 +7,13 @@ const categories=['alkali','alkaline','transition','post-transition','metalloid'
 let elements=[];
 
 function categoryClass(element){return `category-${element.category}`}
-function tileMass(value,atomicNumber){const parsed=Number(value);if(!Number.isFinite(parsed))return value;return atomicNumber>=100?Math.round(parsed).toLocaleString('de-DE'):parsed.toLocaleString('de-DE',{maximumFractionDigits:2})}
+function tileMass(value){const parsed=Number(value);return Number.isFinite(parsed)?parsed.toLocaleString('de-DE',{maximumFractionDigits:2}):value}
+function roundedTileMass(value){const parsed=Number(value);return Number.isFinite(parsed)?Math.ceil(parsed).toLocaleString('de-DE'):value}
+function massCollides(button){const number=button.querySelector('.element-number'),mass=button.querySelector('.element-mass');if(getComputedStyle(number).display==='none'||getComputedStyle(mass).display==='none')return false;return number.getBoundingClientRect().right+2>mass.getBoundingClientRect().left}
+function fitTileMasses(){document.querySelectorAll('.element').forEach(button=>{const mass=button.querySelector('.element-mass'),raw=mass.dataset.mass;mass.style.display='';mass.textContent=tileMass(raw);mass.classList.remove('is-rounded');if(!massCollides(button))return;mass.textContent=roundedTileMass(raw);mass.classList.add('is-rounded');if(massCollides(button))mass.style.display='none'})}
+function hasSymbolNameCollision(){return[...document.querySelectorAll('.element')].some(button=>{const symbol=button.querySelector('.element-symbol'),name=button.querySelector('.element-name');if(getComputedStyle(name).display==='none')return false;return symbol.getBoundingClientRect().bottom+1>name.getBoundingClientRect().top})}
+function hasMetaSymbolCollision(){return[...document.querySelectorAll('.element')].some(button=>{const number=button.querySelector('.element-number'),mass=button.querySelector('.element-mass'),symbol=button.querySelector('.element-symbol');if(getComputedStyle(number).display==='none')return false;const metaBottom=Math.max(number.getBoundingClientRect().bottom,getComputedStyle(mass).display==='none'?0:mass.getBoundingClientRect().bottom);return metaBottom+2>symbol.getBoundingClientRect().top})}
+function fitTileContent(){table.classList.remove('pse-hide-names','pse-hide-meta');fitTileMasses();if(hasSymbolNameCollision())table.classList.add('pse-hide-names');if(hasMetaSymbolCollision())table.classList.add('pse-hide-meta')}
 function showTable(){document.querySelector('.app-head').hidden=false;detailView.hidden=true;tableView.hidden=false;history.replaceState(null,'',location.pathname);document.querySelector(`[data-number="${detail.dataset.number}"]`)?.focus()}
 function showElement(element,updateUrl=true){
   document.querySelector('.app-head').hidden=true;
@@ -20,12 +26,14 @@ function render(){
   for(let group=1;group<=18;group++){const label=document.createElement('span');label.className='group-number';label.style.gridColumn=group;label.style.gridRow=1;label.textContent=group;table.append(label)}
   const labels=[{row:7,text:'57–71',category:'lanthanide'},{row:8,text:'89–103',category:'actinide'}];
   labels.forEach(item=>{const node=document.createElement('span');node.className=`series-label category-${item.category}`;node.style.gridColumn='3';node.style.gridRow=item.row;node.textContent=item.text;table.append(node)});
-  elements.forEach(element=>{const button=document.createElement('button');button.type='button';button.className=`element ${categoryClass(element)}`;button.dataset.number=element.number;button.style.gridColumn=element.gridColumn;button.style.gridRow=element.gridRow;button.setAttribute('aria-label',`${element.name}, Ordnungszahl ${element.number}`);button.innerHTML=`<span class="element-number">${element.number}</span><span class="element-mass">${tileMass(element.mass,element.number)}</span><strong class="element-symbol">${element.symbol}</strong><span class="element-name">${element.name}</span>`;button.onclick=()=>showElement(element);table.append(button)});
+  elements.forEach(element=>{const button=document.createElement('button');button.type='button';button.className=`element ${categoryClass(element)}`;button.dataset.number=element.number;button.style.gridColumn=element.gridColumn;button.style.gridRow=element.gridRow;button.setAttribute('aria-label',`${element.name}, Ordnungszahl ${element.number}`);button.innerHTML=`<span class="element-number">${element.number}</span><span class="element-mass" data-mass="${element.mass}">${tileMass(element.mass)}</span><strong class="element-symbol">${element.symbol}</strong><span class="element-name">${element.name}</span>`;button.onclick=()=>showElement(element);table.append(button)});
   categories.forEach(category=>{const element=elements.find(item=>item.category===category);if(!element)return;const item=document.createElement('span');item.className=`category-${category}`;item.innerHTML=`<i aria-hidden="true"></i>${element.categoryName}`;legend.append(item)});
+  requestAnimationFrame(fitTileContent);
   const requested=new URLSearchParams(location.search).get('element');if(requested){const found=elements.find(item=>item.symbol.toLowerCase()===requested.toLowerCase()||String(item.number)===requested);if(found)showElement(found,false)}
 }
 document.getElementById('backButton').onclick=showTable;
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!detailView.hidden)showTable()});
+let resizeFrame=0;window.addEventListener('resize',()=>{cancelAnimationFrame(resizeFrame);resizeFrame=requestAnimationFrame(fitTileContent)});
 try{
   const data=window.SCHOLA_PSE_DATA;
   if(!data||!Array.isArray(data.elements)||data.elements.length!==118)throw new Error('Elementdaten sind unvollständig.');

@@ -22,7 +22,6 @@
     grid-template-rows: 16px repeat(7, minmax(34px, 1fr)) 10px repeat(2, minmax(34px, 1fr));
     height: calc(100dvh - 150px);
   }
-  .element-name { display: none; }
   .element-symbol { font-size: clamp(0.9rem, 2vw, 1.3rem); }
   .legend { gap: 5px 12px; margin-top: 10px; }
 }
@@ -61,6 +60,120 @@
 }
 
 .element {
+  container-type: size;
+}
+
+.element-symbol {
+  font-size: clamp(0.5rem, 38cqh, 1.45rem);
+  transition: font-size 100ms linear, transform 100ms linear;
+}
+
+@media (max-height: 650px) {
+  .legend {
+    display: none;
+  }
+}
+
+/* Einheitliches, fließendes Raster ohne strukturellen Breiten-Sprung. */
+.pse-app {
+  padding: clamp(7px, 1.4vw, 18px) clamp(5px, 2.8vw, 38px) clamp(10px, 2vw, 30px);
+  overflow: hidden;
+}
+
+.app-head {
+  min-height: clamp(48px, 7vw, 60px);
+  padding-left: 0;
+}
+
+.app-head a,
+.app-head img {
+  width: clamp(36px, 3.3vw, 44px);
+  height: clamp(36px, 3.3vw, 44px);
+}
+
+.table-view {
+  margin-top: clamp(4px, 1.2vh, 14px);
+}
+
+.periodic-table {
+  --fluid-gap: clamp(1px, 0.35vw, 5px);
+  --tile-width: min(calc((100vw - clamp(44px, 9vw, 150px)) / 18), calc((100dvh - 150px) / 12));
+  --tile-height: calc(var(--tile-width) * 1.16);
+  grid-template-columns: repeat(18, var(--tile-width));
+  grid-template-rows: clamp(9px, 1.3vw, 18px) repeat(7, var(--tile-height)) clamp(4px, 0.9vw, 12px) repeat(2, var(--tile-height));
+  gap: var(--fluid-gap);
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+.element {
+  display: block;
+  padding: clamp(0px, 0.3vw, 5px);
+  border-width: 1px;
+  border-radius: clamp(3px, 0.55vw, 8px);
+}
+
+.element-number,
+.element-mass,
+.element-name {
+  display: block;
+}
+
+.element-number {
+  top: clamp(2px, 0.36vw, 5px);
+  left: clamp(2px, 0.36vw, 5px);
+  font-size: clamp(0.48rem, 0.8vw, 0.82rem);
+}
+
+.element-mass {
+  top: clamp(2px, 0.36vw, 5px);
+  right: clamp(2px, 0.36vw, 5px);
+  font-size: clamp(0.4rem, 0.54vw, 0.62rem);
+}
+
+.element-name {
+  right: 2px;
+  bottom: clamp(2px, 0.36vw, 5px);
+  left: 2px;
+  font-size: clamp(0.42rem, 0.56vw, 0.56rem);
+}
+
+.element-symbol {
+  transform: translate(-50%, -42%);
+}
+
+.series-label {
+  display: flex;
+  padding-inline: clamp(1px, 0.4vw, 8px);
+  border-radius: clamp(3px, 0.55vw, 8px);
+  font-size: clamp(0.42rem, 0.68vw, 0.68rem);
+}
+
+.group-number {
+  font-size: clamp(0.42rem, 0.58vw, 0.66rem);
+}
+
+.periodic-table.pse-hide-names .element-name {
+  display: none;
+}
+
+.periodic-table.pse-hide-names .element-symbol {
+  transform: translate(-50%, -10%);
+}
+
+.periodic-table.pse-hide-meta .element-number,
+.periodic-table.pse-hide-meta .element-mass {
+  display: none !important;
+}
+
+@media (max-height: 650px) {
+  .legend { display: none; }
+}
+
+.element {
   position: relative;
   display: block;
   padding: 5px 4px;
@@ -94,7 +207,7 @@
   top: 50%;
   left: 50%;
   width: 100%;
-  transform: translate(-50%, -54%);
+  transform: translate(-50%, -42%);
   text-align: center;
 }
 
@@ -110,6 +223,19 @@
   justify-content: center;
   width: 100%;
   text-align: center;
+}
+
+.periodic-table.pse-hide-names .element-name {
+  display: none;
+}
+
+.periodic-table.pse-hide-names .element-symbol {
+  transform: translate(-50%, -10%);
+}
+
+.periodic-table.pse-hide-meta .element-number,
+.periodic-table.pse-hide-meta .element-mass {
+  display: none !important;
 }
 
 @media (max-width: 700px) {
