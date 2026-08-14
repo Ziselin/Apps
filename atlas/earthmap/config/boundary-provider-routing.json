@@ -1,0 +1,63 @@
+{
+  "schema": "ziselin-boundary-provider-routing-v1",
+  "generated_at": "2026-07-26",
+  "rule": "Use the richest reliable provider first, but normalize every result into Boundary-Set-v1 before rendering.",
+  "default_provider_order": [
+    "osm-europe",
+    "geoboundaries",
+    "natural-earth"
+  ],
+  "routing": [
+    {
+      "scope": "Europe",
+      "levels": ["ADM2", "ADM3", "ADM4"],
+      "preferred_provider": "osm-europe",
+      "fallback_provider": "geoboundaries",
+      "note": "OSM is preferred for European administrative detail. geoBoundaries fills gaps or countries whose OSM extraction is not yet curated."
+    },
+    {
+      "scope": "global",
+      "levels": ["ADM2", "ADM3", "ADM4", "ADM5"],
+      "preferred_provider": "geoboundaries",
+      "fallback_provider": "osm-europe",
+      "note": "Outside Europe, geoBoundaries is the first global coverage provider."
+    }
+  ],
+  "osm_admin_level_mapping": {
+    "default_europe": {
+      "ADM0": ["2"],
+      "ADM1": ["4"],
+      "ADM2": ["6"],
+      "ADM3": ["8"],
+      "ADM4": ["9", "10"],
+      "note": "OSM admin_level is country-specific. These defaults must be overridden when a national hierarchy differs."
+    },
+    "DEU": {
+      "ADM1": ["4"],
+      "ADM2": ["6"],
+      "ADM3": ["8"],
+      "ADM4": ["9", "10"],
+      "note": "ADM2 follows counties/district-free cities for EarthMap statistics. Regierungsbezirke can be modeled as an intermediate national variant when needed."
+    },
+    "FRA": {
+      "ADM1": ["4"],
+      "ADM2": ["6"],
+      "ADM3": ["7", "8"],
+      "ADM4": ["9", "10"]
+    },
+    "GBR": {
+      "ADM1": ["4"],
+      "ADM2": ["6"],
+      "ADM3": ["8"],
+      "ADM4": ["10"],
+      "note": "Home nations and devolved structures must be preserved through Boundary-Set categorization."
+    }
+  },
+  "file_naming": {
+    "folder_pattern": "{ISO3}/{ADM}/",
+    "filename_pattern": "[{valid_from}-{valid_to}] {title}.boundary.json",
+    "open_interval_pattern": "[{valid_from}-] {title}.boundary.json",
+    "unknown_time_pattern": "[undated] {title}.boundary.json",
+    "rule": "The filename is a human-readable label only. valid_from and valid_to in Boundary-Set-v1 are authoritative."
+  }
+}
