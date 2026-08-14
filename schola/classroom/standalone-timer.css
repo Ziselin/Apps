@@ -1,0 +1,27 @@
+.standalone-timer .topbar,
+.standalone-timer .tool-dock,
+.standalone-timer .workspace-corner,
+.standalone-timer .screen-actions,
+.standalone-timer .widget-close,
+.standalone-timer .typemap-text-widget {
+  display: none !important;
+}
+
+.standalone-timer .screen-stage {
+  height: 100dvh;
+  padding: 18px;
+  overflow: auto;
+}
+
+.standalone-timer .timer-widget {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  max-width: calc(100vw - 24px);
+  margin: auto;
+  transform: none !important;
+}
+
+.standalone-timer .timer-widget:not(.timer-running) .widget-head {
+  cursor: default;
+}

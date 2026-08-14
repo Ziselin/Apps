@@ -1,6 +1,14 @@
 # Stundenplan Engineering Manifest
 
+## Präambel
+
+Stundenplan ist eine funktionale und vollständige Schola-App zur Planung und Darstellung schulischer Zeitstrukturen. Sie verbindet Stundenpläne mit Schuljahren, Ferien, Feiertagen und weiteren Kalenderschichten aus nachvollziehbaren Quellen und wird als stabile Version 1.0 geführt.
+
 Dieses Manifest hält die fachlichen und technischen Regeln der Schola-App „Stundenplan“ fest. Es ergänzt die allgemeinen Architekturregeln um Anforderungen an Schuljahre, Kalenderschichten, Stundenpläne und deren Quellen.
+
+## Stellung in der Manifestordnung
+
+Dieses Manifest regelt den spezifischen Kompetenzbereich der App Stundenplan. Es ergänzt das Ziselin-Organisationsmanifest und das Schola-Projektmanifest. Erkannte Widersprüche werden vor einer Implementierungsänderung gemeinsam geklärt und nicht stillschweigend überschrieben.
 
 ## 1. Ein Projektordner bündelt Kalenderschichten
 
