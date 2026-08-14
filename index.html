@@ -569,6 +569,16 @@
       display: block;
     }
 
+    .collection-switch {
+      position: fixed; right: 18px; bottom: 20px; z-index: 20;
+      padding: 11px 14px; border: 1px solid rgba(33, 54, 51, 0.13); border-radius: 12px;
+      background: rgba(249, 249, 244, 0.84); color: var(--muted);
+      font: 700 0.7rem/1 Arial, Helvetica, sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; backdrop-filter: blur(14px);
+    }
+    .collection-switch:hover, .collection-switch:focus-visible { color: var(--ink); background: #fafaf5; outline: none; }
+    body:not(.project-schola) .collection-switch { display: none; }
+
     [data-search-card][hidden] {
       display: none;
     }
@@ -740,21 +750,21 @@
 
     <section class="app-section" aria-label="App-Sammlungen">
       <div class="collection-grid">
-        <a class="app-tile" href="./timemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
+        <a class="app-tile" href="./atlas/timemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="timemap atlas zeitstrahl timeline quellen charts kalender maps">
           <img class="app-icon" src="./assets/timemap-favicon.svg" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">TimeMap</span>
             <span class="app-description">Interaktive Zeitstrahlen und Quellenräume</span>
           </span>
         </a>
-        <a class="app-tile" href="./typemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
+        <a class="app-tile" href="./atlas/typemap/index.html" data-search-card data-app-link data-atlas-app data-search-text="typemap text satz typografie typesetting schreiben layout präsentation">
           <img class="app-icon" src="./assets/typemap-favicon.svg" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">TypeMap</span>
             <span class="app-description">Textsetzung (experimentell)</span>
           </span>
         </a>
-        <a class="app-tile" href="./earthmap/index.html" data-search-card data-app-link data-atlas-app data-search-text="earth map earthmap globus karte grenzen geodaten statistik choropleth daten visualisierung atlas">
+        <a class="app-tile" href="./atlas/earthmap/index.html" data-search-card data-app-link data-atlas-app data-search-text="earth map earthmap globus karte grenzen geodaten statistik choropleth daten visualisierung atlas">
           <img class="app-icon" src="./assets/earthmap-favicon.svg?v=20260628a" alt="" aria-hidden="true">
           <span class="app-copy">
             <span class="app-title">EarthMap</span>
@@ -785,10 +795,20 @@
         <a class="app-tile" href="./schola/classroom/index.html" data-search-card data-app-link data-schola-app data-search-text="classroom schola screen unterricht präsentation browser editor" hidden>
           <img class="app-icon" src="./assets/classroom-icon.svg?v=20260811a" alt="" aria-hidden="true"><span class="app-copy"><span class="app-title">Classroom Screen</span><span class="app-description">(in Vorbereitung)</span></span>
         </a>
+        <a class="app-tile" href="./schola/mini-apps/timer/index.html" data-search-card data-app-link data-schola-mini-app data-search-text="timer mini-app fokuszeit phasen nta countdown" hidden>
+          <img class="app-icon" src="./assets/timer-icon.svg?v=20260814a" alt="" aria-hidden="true">
+          <span class="app-copy"><span class="app-title">Timer</span><span class="app-description">Fokuszeit, Phasen und NTA</span></span>
+        </a>
+        <a class="app-tile" href="./schola/mini-apps/pse/index.html" data-search-card data-app-link data-schola-mini-app data-search-text="pse periodensystem chemie elemente mini-app" hidden>
+          <img class="app-icon" src="./assets/pse-icon.svg?v=20260814a" alt="" aria-hidden="true">
+          <span class="app-copy"><span class="app-title">Periodensystem</span><span class="app-description">Elemente auswählen und darstellen</span></span>
+        </a>
         <p class="empty-state" data-empty-state>Keine passende App gefunden.</p>
       </div>
     </section>
   </main>
+
+  <button id="collectionSwitch" class="collection-switch" type="button" aria-pressed="false">Mini-Apps</button>
 
   <script>
     const homeMenuButton = document.getElementById("homeMenuButton");
@@ -801,6 +821,19 @@
     const homeClaim = document.getElementById("homeClaim");
     const emptyState = document.querySelector("[data-empty-state]");
     let activeHomeProject = "atlas";
+    let scholaCollection = "apps";
+
+    function setScholaCollection(collection) {
+      scholaCollection = collection === "mini-apps" ? "mini-apps" : "apps";
+      const showingMiniApps = scholaCollection === "mini-apps";
+      const switchButton = document.getElementById("collectionSwitch");
+      if (switchButton) {
+        switchButton.textContent = showingMiniApps ? "Apps" : "Mini-Apps";
+        switchButton.setAttribute("aria-pressed", String(showingMiniApps));
+      }
+      if (appSearch && activeHomeProject === "schola") appSearch.placeholder = showingMiniApps ? "Mini-Apps durchsuchen" : "Apps durchsuchen";
+      runSearch();
+    }
 
     function setHomeProject(projectName, options = {}) {
       activeHomeProject = projectName === "schola" ? "schola" : "atlas";
@@ -812,7 +845,7 @@
       if (appSearch) {
         appSearch.value = "";
         appSearch.disabled = false;
-        appSearch.placeholder = "Apps durchsuchen";
+        appSearch.placeholder = isSchola && scholaCollection === "mini-apps" ? "Mini-Apps durchsuchen" : "Apps durchsuchen";
       }
       if (emptyState) {
         emptyState.textContent = "Keine passende App gefunden.";
@@ -889,7 +922,9 @@
 
       collectionCards.forEach((card) => {
         const text = normalizeSearch(card.dataset.searchText ?? card.textContent ?? "");
-        const belongsToProject = activeHomeProject === "schola" ? card.hasAttribute("data-schola-app") : card.hasAttribute("data-atlas-app");
+        const belongsToProject = activeHomeProject === "schola"
+          ? (scholaCollection === "mini-apps" ? card.hasAttribute("data-schola-mini-app") : card.hasAttribute("data-schola-app"))
+          : card.hasAttribute("data-atlas-app");
         const isVisible = belongsToProject && (!query || text.includes(query));
         card.hidden = !isVisible;
         if (isVisible) {
@@ -901,6 +936,10 @@
     }
 
     appSearch?.addEventListener("input", runSearch);
+
+    document.getElementById("collectionSwitch")?.addEventListener("click", () => {
+      setScholaCollection(scholaCollection === "apps" ? "mini-apps" : "apps");
+    });
 
     document.querySelectorAll("[data-project-select]").forEach((button) => {
       button.addEventListener("click", () => {
