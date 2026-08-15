@@ -7,6 +7,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 ### Organisiert
 
 - Die beiden app-spezifischen Werkzeuge zur Aktualisierung und Prüfung der Phasendaten liegen nun manifestkonform unter `schola/mini-apps/pse/tools/`; ihre relativen Datenpfade wurden an den neuen Ort angepasst.
+- Der Einstellungsbutton verwendet nun die zentrale, offline verfügbare Symbolvorlage aus `assets/ui/icons` statt einer app-spezifisch gezeichneten Variante.
 
 ### Korrigiert
 

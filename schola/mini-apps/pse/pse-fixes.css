@@ -144,13 +144,8 @@
   box-shadow: 0 7px 18px rgba(33, 54, 51, 0.12);
 }
 
-.settings-button svg {
-  width: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.6;
+.settings-button .z-button-icon {
+  --z-button-icon-size: 22px;
 }
 
 .app-head a,

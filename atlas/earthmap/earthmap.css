@@ -1362,8 +1362,8 @@ body.earthmap-theme-dark .library-item-card.is-active {
   width: 17px;
   height: 17px;
   background: currentColor;
-  -webkit-mask: url("https://api.iconify.design/mdi/cog-outline.svg") center / contain no-repeat;
-  mask: url("https://api.iconify.design/mdi/cog-outline.svg") center / contain no-repeat;
+  -webkit-mask: url("../../assets/ui/icons/settings.svg") center / contain no-repeat;
+  mask: url("../../assets/ui/icons/settings.svg") center / contain no-repeat;
 }
 body.earthmap-theme-dark .background-map-card {
   border-color: var(--line);

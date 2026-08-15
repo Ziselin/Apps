@@ -52,9 +52,14 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
 14. **Umfangreiche lokale Datensätze werden von gewöhnlichen Veröffentlichungen getrennt.**
     Große Rohdaten, Provider-Spiegelungen und generierte Geometriearchive, die für die vollständige Offline-Installation benötigt werden, werden nicht unbemerkt mit regulären App-Änderungen veröffentlicht. Projektweite Ausschlüsse werden nachvollziehbar in `.gitignore` dokumentiert. Kleine Quell-, Katalog-, Index- und Steuerdateien werden davon getrennt bewertet. Veröffentlichungen werden gezielt zusammengestellt; ein pauschales Hinzufügen aller Dateien ist kein zulässiger Standardablauf.
 
+15. **Gleiche Aktionen verwenden gleiche zentrale Symbole.**
+    Für funktional identische Aktionen wird projektweit dieselbe Symbolvorlage aus `assets/ui/icons` verwendet. App-spezifisch nachgezeichnete Varianten und externe Laufzeitabrufe sind zu vermeiden. Ein abweichendes Symbol wird nur verwendet, wenn die Funktion fachlich abweicht oder die Abweichung ausdrücklich vereinbart wurde.
+
 ## Aktuelle zentrale UI-Vorlagen
 
 - `assets/ui/export-template.css` – gemeinsame Darstellung von Exportbutton, Exportmenü und Dateiformat-Auswahl
+- `assets/ui/buttons.css` – gemeinsame Buttonzustände sowie die Einbindung zentraler UI-Symbole
+- `assets/ui/icons/settings.svg` – gemeinsames Symbol für Einstellungen
 
 ## Manifestordnung und Zuständigkeiten
 

@@ -77,9 +77,8 @@ body[data-theme="dark"] {
   border-radius: var(--z-button-radius);
 }
 
-/* Optionale Button-Icons sind Teil der gemeinsamen Vorlage.
-   Die konkrete Maske kommt aus der jeweiligen App, Größe/Abstand/Verhalten
-   bleiben dadurch aber app-übergreifend konsistent. */
+/* Button-Icons sind Teil der gemeinsamen Vorlage. App-neutrale Standardsymbole
+   liegen unter assets/ui/icons; nur fachlich besondere Symbole kommen aus Apps. */
 .z-button-icon {
   display: inline-block;
   flex: 0 0 auto;
@@ -88,6 +87,10 @@ body[data-theme="dark"] {
   background: currentColor;
   mask: var(--z-button-icon-mask) center / contain no-repeat;
   -webkit-mask: var(--z-button-icon-mask) center / contain no-repeat;
+}
+
+.z-icon-settings {
+  --z-button-icon-mask: url("./icons/settings.svg");
 }
 
 .z-button-label {
