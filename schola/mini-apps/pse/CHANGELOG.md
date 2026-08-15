@@ -21,6 +21,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Hinzugefügt
 
+- Kontextabhängigen Informationsdialog ergänzt. Ein zentrales Info-Symbol öffnet zur aktiven PSE-Darstellung Erläuterungen der physikalischen Grundlage, chemischen Bedeutung, mathematischen Formeln und fachlichen Modellgrenzen.
 - Fachansicht „Ursprung der Elemente“ ergänzt. Jede Kachel zeigt die prozentualen Beiträge kosmischer Nukleosyntheseprozesse als gestapelte Farbflächen; Legende, dynamische Überschrift und exakte Anteile im Tooltip sind enthalten.
 - Herkunftsdatensatz für alle 118 Elemente offline hinterlegt. Grundlage sind die Daten von Jennifer A. Johnson und die CC-BY-SA-3.0-Visualisierung von Cmglee; für Elemente oberhalb Lawrencium wird künstliche Synthese ausgewiesen.
 - Orbitalformen zu einem interaktiven Orbital-Labor erweitert: drehbare dreidimensionale Punktwolke, stufenlose Überblendung zur Wahrscheinlichkeitsgrenzfläche, einstellbares Wahrscheinlichkeitsniveau, einblendbare Knoten, verschiebbare Schnittansicht und start-/stoppbare Rotation.

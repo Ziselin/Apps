@@ -60,6 +60,7 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
 - `assets/ui/export-template.css` – gemeinsame Darstellung von Exportbutton, Exportmenü und Dateiformat-Auswahl
 - `assets/ui/buttons.css` – gemeinsame Buttonzustände sowie die Einbindung zentraler UI-Symbole
 - `assets/ui/icons/settings.svg` – gemeinsames Symbol für Einstellungen
+- `assets/ui/icons/information.svg` – gemeinsames Symbol für kontextbezogene Informationen
 
 ## Manifestordnung und Zuständigkeiten
 

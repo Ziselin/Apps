@@ -93,6 +93,10 @@ body[data-theme="dark"] {
   --z-button-icon-mask: url("./icons/settings.svg");
 }
 
+.z-icon-information {
+  --z-button-icon-mask: url("./icons/information.svg");
+}
+
 .z-button-label {
   min-width: 0;
 }

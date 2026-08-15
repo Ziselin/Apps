@@ -7,17 +7,22 @@
   <title>Periodensystem · Schola</title>
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
-  <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815a">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260815f">
+  <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815b">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260815g">
 </head>
 <body>
   <main class="pse-app">
     <header class="app-head">
       <a href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
       <div><span class="eyebrow">Periodensystem</span><h1 id="periodicTableTitle">Herkömmliche Darstellung</h1></div>
-      <button id="settingsButton" class="settings-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
-        <span class="z-button-icon z-icon-settings" aria-hidden="true"></span>
-      </button>
+      <div class="app-head-actions">
+        <button id="infoButton" class="settings-button" type="button" aria-label="Informationen zur aktiven Darstellung öffnen" title="Informationen">
+          <span class="z-button-icon z-icon-information" aria-hidden="true"></span>
+        </button>
+        <button id="settingsButton" class="settings-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
+          <span class="z-button-icon z-icon-settings" aria-hidden="true"></span>
+        </button>
+      </div>
     </header>
     <section id="tableView" class="table-view" aria-label="Periodensystem der Elemente">
       <div class="table-scroll">
@@ -79,6 +84,16 @@
       <footer><button class="primary-button" value="close">Fertig</button></footer>
     </form>
   </dialog>
+  <dialog id="infoDialog" class="settings-dialog info-dialog" aria-labelledby="infoTitle">
+    <form method="dialog">
+      <header class="settings-dialog-head">
+        <div><span class="eyebrow">Periodensystem</span><h2 id="infoTitle">Informationen</h2></div>
+        <button class="dialog-close" value="close" aria-label="Dialog schließen">×</button>
+      </header>
+      <div id="infoDialogBody" class="settings-dialog-body info-dialog-body"></div>
+      <footer><button class="primary-button" value="close">Schließen</button></footer>
+    </form>
+  </dialog>
   <script src="elements-data.js?v=20260814b"></script>
   <script src="phase-data.js?v=20260814a"></script>
   <script src="abundance-data.js?v=20260814a"></script>
@@ -87,6 +102,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260815d"></script>
+  <script src="pse.js?v=20260815e"></script>
 </body>
 </html>
