@@ -101,6 +101,32 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
 - Änderungen dürfen keine stillen Datenverluste erzeugen. Nicht mehr sichtbare, aber weiterhin relevante Informationen bleiben rekonstruierbar.
 - Performance, Diagnosefähigkeit und verständliche Kommentare zu Architekturentscheidungen sind Bestandteile der Implementierung und keine nachträglichen Ergänzungen.
 
+## Verbindlicher Veröffentlichungsablauf
+
+1. **Remote-Stand zuerst prüfen.**
+   Vor einer Veröffentlichung werden Branch, Upstream und möglicher Rückstand gegenüber `origin/main` geprüft. Fremde Remote-Änderungen werden kontrolliert und konfliktfrei übernommen, bevor ein neuer Commit entsteht.
+
+2. **Arbeitsstand vollständig sichten.**
+   Geänderte, neue, gelöschte und ignorierte Dateien werden getrennt betrachtet. Große Dateien, generierte Daten und fachfremde Änderungen dürfen nicht durch pauschales Hinzufügen in ein Veröffentlichungspaket geraten.
+
+3. **Fachlich geschlossene Pakete bilden.**
+   Vorgemerkt werden nur Dateien, die zum ausdrücklich benannten Änderungsumfang gehören. Gleichzeitig vorhandene Arbeiten an anderen Apps oder Datensätzen bleiben außerhalb des Commits.
+
+4. **Vor dem Commit prüfen.**
+   In angemessenem Umfang werden Syntax, Datenvollständigkeit, lokale Abhängigkeiten, Dateigrößen, Diff-Qualität, mögliche Zugangsdaten und die sichtbare App-Funktion kontrolliert. Bekannte fachliche Datenlücken werden von technischen Fehlern unterschieden und transparent benannt.
+
+5. **Änderung nachvollziehbar protokollieren.**
+   App-Änderungen werden im zuständigen `CHANGELOG.md` dokumentiert. Der Commit erhält einen knappen, inhaltlich beschreibenden Titel und eine datenschutzfreundliche Autorenidentität.
+
+6. **Push benötigt ausdrückliche Freigabe.**
+   Ein lokaler Commit berechtigt nicht automatisch zum Hochladen. Jeder Push nach GitHub und jeder dadurch ausgelöste Online-Deploy erfolgt erst nach einer ausdrücklichen Freigabe des Users.
+
+7. **Deploy vollständig verifizieren.**
+   Nach dem Push werden der Remote-Commit, der GitHub-Pages-Build, Custom Domain und HTTPS sowie die öffentlich bereitgestellte App geprüft. Eine Veröffentlichung gilt erst dann als abgeschlossen, wenn der vorgesehene Commit online fehlerfrei ausgeliefert wird.
+
+8. **Offline-Daten bleiben geschützt.**
+   Umfangreiche EarthMap-Geometrien und andere ausdrücklich lokale Datenbestände werden niemals pauschal veröffentlicht. Änderungen an Online-Indizes dürfen keine Dateien voraussetzen, die durch die Veröffentlichungsregeln ausgeschlossen sind.
+
 ## Manifestbestand
 
 - `atlas/atlas-engineering-manifest.md` – Projekt Atlas
