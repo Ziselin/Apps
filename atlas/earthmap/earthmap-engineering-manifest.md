@@ -167,3 +167,11 @@ Keine spätere Phase darf eine frühere Phase verdecken oder deren Füllung zers
 - Ist der Gültigkeitszeitraum angegeben?
 - Funktionieren Suche, Statistikmatching und Browserklick auf dieselbe Boundary?
 - Wird die Boundary auf allen relevanten Zoomstufen ohne UI-Freeze geladen?
+
+## 18. Offline-Daten und Veröffentlichung
+
+- Die vollständige Offline-Installation darf umfangreiche Boundary-Sets, Provider-Spiegelungen und generierte Geometriearchive enthalten, die nicht Bestandteil gewöhnlicher GitHub-Pages-Veröffentlichungen sind.
+- Große lokale Geometriedaten werden über die projektweite `.gitignore` ausdrücklich vom normalen Git-Workflow getrennt; sie werden dadurch weder gelöscht noch für die Offline-App unzugänglich.
+- Kataloge, Provider-Registries, Quellcode und kleine Indexdateien werden getrennt von den Geometriearchiven bewertet und dürfen veröffentlicht werden, wenn die Online-App nicht auf ausgeschlossene Dateien verweist.
+- Änderungen an bereits versionierten EarthMap-Indizes werden nie allein veröffentlicht, wenn sie neue, online nicht vorhandene Geometriedateien voraussetzen.
+- Ein späterer Online-Datenkanal für EarthMap benötigt eine eigene, dokumentierte Hosting-, Versions- und Cache-Strategie und wird nicht durch einen unbeabsichtigten Repository-Upload ersetzt.

@@ -1,0 +1,13 @@
+# Lokale EarthMap-Geodaten
+#
+# Diese umfangreichen, generierten oder gespiegelt vorliegenden Geometrien
+# bleiben Bestandteil der vollständigen Offline-Installation. Sie werden nicht
+# zusammen mit gewöhnlichen App-Änderungen über GitHub Pages veröffentlicht.
+/assets/earthmap-engine/boundary-sets/geoboundaries/
+/assets/earthmap-engine/boundary-sets/natural-earth/10m/admin2/
+/assets/earthmap-engine/boundary-sets/natural-earth/10m/admin0/lines.geojson
+/assets/earthmap-engine/boundary-sets/natural-earth/10m/admin0/lines.js
+/assets/geojson/natural-earth/10m/ne_10m_admin_2_counties.geojson
+/assets/geojson/natural-earth/10m/ne_10m_land.js
+/assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_hierarchy_global_start.js
+/assets/geojson/natural-earth/10m/tiles-vector-hierarchy/ne_10m_land_hierarchy_global_start_surface.js

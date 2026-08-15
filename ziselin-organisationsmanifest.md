@@ -49,6 +49,9 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
 13. **Manifeste beginnen mit einer Präambel.**
     Direkt nach dem Titel enthält jedes Projekt- und App-Manifest eine kurze Präambel. Sie beschreibt Zweck, Charakter und Ausrichtung des zugehörigen Projekts beziehungsweise Produkts, wird bei der Anlage eines neuen Manifests automatisch ergänzt und im weiteren Entwicklungsverlauf angepasst, sobald sich Zweck, Zielgruppe oder wesentlicher Funktionsumfang verändern.
 
+14. **Umfangreiche lokale Datensätze werden von gewöhnlichen Veröffentlichungen getrennt.**
+    Große Rohdaten, Provider-Spiegelungen und generierte Geometriearchive, die für die vollständige Offline-Installation benötigt werden, werden nicht unbemerkt mit regulären App-Änderungen veröffentlicht. Projektweite Ausschlüsse werden nachvollziehbar in `.gitignore` dokumentiert. Kleine Quell-, Katalog-, Index- und Steuerdateien werden davon getrennt bewertet. Veröffentlichungen werden gezielt zusammengestellt; ein pauschales Hinzufügen aller Dateien ist kein zulässiger Standardablauf.
+
 ## Aktuelle zentrale UI-Vorlagen
 
 - `assets/ui/export-template.css` – gemeinsame Darstellung von Exportbutton, Exportmenü und Dateiformat-Auswahl

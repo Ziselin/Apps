@@ -7,27 +7,85 @@
   <title>Periodensystem · Schola</title>
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260814d">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260815e">
 </head>
 <body>
   <main class="pse-app">
     <header class="app-head">
       <a href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
-      <div><span class="eyebrow">Mini-App</span><h1>Periodensystem</h1></div>
+      <div><span class="eyebrow">Periodensystem</span><h1 id="periodicTableTitle">Herkömmliche Darstellung</h1></div>
+      <button id="settingsButton" class="settings-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Zm8.1 4.9v-2.6l-2.1-.7a7 7 0 0 0-.7-1.7l1-2-1.8-1.8-2 1a7 7 0 0 0-1.7-.7L12.1 2H9.5l-.7 2.1a7 7 0 0 0-1.7.7l-2-1-1.8 1.8 1 2a7 7 0 0 0-.7 1.7l-2.1.7v2.6l2.1.7a7 7 0 0 0 .7 1.7l-1 2 1.8 1.8 2-1a7 7 0 0 0 1.7.7l.7 2.1h2.6l.7-2.1a7 7 0 0 0 1.7-.7l2 1 1.8-1.8-1-2a7 7 0 0 0 .7-1.7l2.1-.7Z"/></svg>
+      </button>
     </header>
     <section id="tableView" class="table-view" aria-label="Periodensystem der Elemente">
       <div class="table-scroll">
         <div id="periodicTable" class="periodic-table" aria-label="Periodensystem"></div>
       </div>
       <div id="legend" class="legend" aria-label="Legende der Elementgruppen"></div>
+      <div id="discoveryControls" class="discovery-controls" hidden>
+        <label for="discoverySlider">Entdeckungszeit</label>
+        <input id="discoverySlider" type="range" min="0" step="1" value="0">
+        <strong id="discoveryValue">Antike</strong>
+        <p id="discoveryStatus" aria-live="polite"></p>
+      </div>
+      <div id="phaseControls" class="phase-controls" hidden>
+        <label>Temperatur <span><input id="temperatureInput" type="number" min="-273.15" step="1" value="15"> °C</span></label>
+        <label>Druck <span><input id="pressureInput" type="number" min="0" step="0.01" value="1013.25"> hPa</span></label>
+        <button id="earthSurfaceButton" type="button">Durchschnitt Erdoberfläche</button>
+        <p id="phaseStatus">Berechnung aus PubChem-Schmelz- und Siedepunkten; Druckkorrektur als Näherung nahe Oberflächenbedingungen.</p>
+      </div>
     </section>
-    <section id="detailView" class="detail-view" aria-live="polite" hidden>
-      <button id="backButton" class="back-button" type="button"><span aria-hidden="true">←</span> Periodensystem</button>
+    <section id="detailView" class="detail-view" hidden>
+      <button id="backButton" class="back-button" type="button" aria-label="Zurück zum Periodensystem"><span aria-hidden="true">←</span> Periodensystem</button>
       <article id="elementDetail" class="element-detail"></article>
     </section>
     <p id="loadError" class="load-error" hidden>Die Elementdaten konnten nicht geladen werden.</p>
   </main>
+  <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
+    <form method="dialog">
+      <header class="settings-dialog-head">
+        <div><span class="eyebrow">Periodensystem</span><h2 id="settingsTitle">Einstellungen</h2></div>
+        <button class="dialog-close" value="close" aria-label="Dialog schließen">×</button>
+      </header>
+      <div class="settings-dialog-body">
+      <section class="settings-section" aria-labelledby="layoutTitle">
+        <h3 id="layoutTitle">Form</h3>
+        <div class="segmented-control">
+          <label><input type="radio" name="layout" value="short" checked><span>Kurzform</span></label>
+          <label><input type="radio" name="layout" value="long"><span>Langbahn</span></label>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="tileMetaTitle">
+        <h3 id="tileMetaTitle">Kachel</h3>
+        <p class="tile-setting-label">Angabe oben rechts</p>
+        <div class="segmented-control">
+          <label><input type="radio" name="tileMeta" value="mass" checked><span>Atommasse</span></label>
+          <label><input type="radio" name="tileMeta" value="radioactivity"><span>Radioaktivität</span></label>
+        </div>
+        <p class="tile-setting-label">Name</p>
+        <div class="segmented-control">
+          <label><input type="radio" name="nameMode" value="german" checked><span>Deutsch</span></label>
+          <label><input type="radio" name="nameMode" value="origin"><span>Originalname</span></label>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="viewTitle">
+        <h3 id="viewTitle">Darstellung</h3>
+        <div id="viewOptions" class="view-options"></div>
+        <p class="settings-note">Noch nicht aktive Ansichten benötigen zusätzliche, fachlich dokumentierte Datensätze.</p>
+      </section>
+      </div>
+      <footer><button class="primary-button" value="close">Fertig</button></footer>
+    </form>
+  </dialog>
   <script src="elements-data.js?v=20260814b"></script>
-  <script src="pse.js?v=20260814c"></script>
+  <script src="phase-data.js?v=20260814a"></script>
+  <script src="abundance-data.js?v=20260814a"></script>
+  <script src="substance-data.js?v=20260814a"></script>
+  <script src="electronic-data.js?v=20260814a"></script>
+  <script src="name-data.js?v=20260814c"></script>
+  <script src="detail-data.js?v=20260814b"></script>
+  <script src="origin-data.js?v=20260815a"></script>
+  <script src="pse.js?v=20260815d"></script>
 </body>
 </html>
