@@ -11,6 +11,14 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Korrigiert
 
+- Die Orbitalanimation wird nicht mehr an den Kanten des Modellcontainers abgeschnitten. Eine transparente fenstergroße Zeichenfläche lässt die Punktwolke im Hintergrund weiterlaufen, während Kern, Achsen, Maßstab und Interaktionsbereich fest am bisherigen Modellcontainer verankert bleiben.
+- Die manuelle Rotation der Orbitalformen folgt nun horizontal und vertikal der Greifbewegung der Maus beziehungsweise des Fingers; die zuvor vertauschten Bewegungsrichtungen wurden korrigiert.
+- Die Titeltypografie der normalen und der modellbasierten Elementansicht ist nun vollständig vereinheitlicht: identische responsive Schriftgröße, Zeilenhöhe und Einzeiligkeit. Auf Desktop erhält die Infospalte zusätzlichen Raum ausschließlich nach rechts, sodass auch „Element 118“ regulär vollständig passt, ohne den korrigierten linken Titelanker zu verschieben oder auf eine Ellipse zurückzugreifen.
+- Den verbleibenden horizontalen Titelsprung beim Umschalten beseitigt: Die normale Faktenansicht übernimmt nun exakt das bereits richtige Spaltenraster der Modellansicht. Modellüberschriften bleiben durch eine spaltengebundene responsive Schriftgröße und eine sichere Einzeilenbegrenzung vollständig in einer Zeile.
+- Die Überschrift „Element …“ liegt nun außerhalb des Scrollbereichs der Infospalte und bleibt beim Scrollen der Orbitalsteuerungen dauerhaft sichtbar. Normale Einzelansicht und Modellansicht teilen sich denselben Bühnen- und Titelanker, sodass die Überschrift auch beim Umschalten zwischen Elementkachel und Modell nicht mehr springt.
+- Die Infospalte der Atommodelle klebt nicht mehr am Fensterrand. Modell und Information liegen nun in einer gemeinsam zentrierten Bühne mit stabilem Außenabstand; „Element …“ behält beim Wechsel zwischen Bohrmodell, Orbitalbesetzung und Orbitalformen exakt denselben oberen Anker. Mittlere Breiten nutzen eine kontrollierte Überlagerung innerhalb der Bühne, kleine Ansichten eine klare Stapelung.
+- Überlaufende Orbitalmodelle in mittleren Desktopfenstern behoben: Die Modellgröße bleibt erhalten, während Darstellung und rechte Steuerung dieselbe auf das Fenster begrenzte Fläche nutzen und sich bei Bedarf kontrolliert überlagern.
+- Leere Info- und Einstellungsbuttons beim direkten lokalen Öffnen behoben: Die zentralen Symbolmasken sind nun ohne blockierbaren SVG-Unterabruf vollständig in der gemeinsamen UI-Vorlage verfügbar.
 - Die Herkunftsansicht bewahrt wieder die vertraute Position von Kürzel, Ordnungszahl und Elementname innerhalb jeder Kachel.
 - Fremde Kachelmetadaten wie Atommasse oder Radioaktivitätssymbol werden in der Herkunftsansicht ausgeblendet, damit die Farbanteile eindeutig lesbar bleiben.
 - Das Radioaktivitätssymbol ist nun so hoch wie die Ordnungszahl, liegt mit ihr auf einer gemeinsamen horizontalen Mittelachse und besitzt nach oben und rechts denselben Randabstand.
@@ -21,6 +29,8 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Hinzugefügt
 
+- Bohrsches Atommodell um eine Schalenübersicht im Infobereich ergänzt: tatsächliche Besetzung, theoretische Maximalkapazität `2n²` und dezente Füllanzeige stehen nun direkt unter dem Elementtitel; die redundante Besetzungszeile unter der Modellgrafik entfällt.
+- Modellauswahl in ein kompaktes Dropdown hinter dem Button „Modelle“ oben rechts in der übergeordneten Kopfzeile verschoben; sie ist damit strukturell von der Infospalte getrennt. Bestehende Modell-Icons und aktive Kennzeichnung bleiben erhalten.
 - Kontextabhängigen Informationsdialog ergänzt. Ein zentrales Info-Symbol öffnet zur aktiven PSE-Darstellung Erläuterungen der physikalischen Grundlage, chemischen Bedeutung, mathematischen Formeln und fachlichen Modellgrenzen.
 - Fachansicht „Ursprung der Elemente“ ergänzt. Jede Kachel zeigt die prozentualen Beiträge kosmischer Nukleosyntheseprozesse als gestapelte Farbflächen; Legende, dynamische Überschrift und exakte Anteile im Tooltip sind enthalten.
 - Herkunftsdatensatz für alle 118 Elemente offline hinterlegt. Grundlage sind die Daten von Jennifer A. Johnson und die CC-BY-SA-3.0-Visualisierung von Cmglee; für Elemente oberhalb Lawrencium wird künstliche Synthese ausgewiesen.
@@ -82,6 +92,17 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 - Originalnamensansicht auf alle 118 Elemente vervollständigt: Internationale Symbolnamen wie Hydrogen, Carbon, Nitrogen und Oxygen ergänzen die historischen Sonderformen; nur identische Schreibweisen verwenden weiterhin den bereits vorhandenen Namen.
 
 ### Geändert
+
+- Das redundante Textelement „Lernidee:“ vor den Reglererklärungen wurde entfernt; die didaktischen Hinweise beginnen nun unmittelbar mit ihrem Inhalt.
+- Die Regler des Orbital-Labors wurden didaktisch beschriftet: Darstellungsform, eingeschlossener Anteil und Schnittebene erklären jeweils ihre Lernidee und Modellgrenze. Der Anteilsregler hebt nun tatsächlich 50 bis 99 Prozent einer aus der wasserstoffähnlichen `|ψ|²`-Verteilung erzeugten Modellstichprobe hervor; außerhalb liegende Messorte bleiben blass sichtbar.
+- Die bisherigen frei geformten Orbitalpunktwolken wurden durch deterministisch erzeugte wasserstoffähnliche Verteilungen ersetzt. Radialfunktionen, Laguerre-Polynome, reelle s-/p-/d-Winkelgestalten, Phasenwechsel und radiale Knoten bestimmen nun die Darstellung; die Oberfläche grenzt das Modell ausdrücklich von exakten Mehrelektronenrechnungen ab.
+- Orbitalformen und Bohrsches Modell teilen nun dieselbe zentrierte Modellbühne sowie einen grafisch identischen, schematischen Atomkern mit Elementsymbol. Die Orbitaldarstellung bleibt fachlich korrekt als Wahrscheinlichkeitsverteilung vom Bohrschen Bahnmodell getrennt; es werden keine falschen Schalenradien auf Orbitale übertragen.
+- Die Diagrammachsen der Orbitalformen übernehmen nun exakt die dunkelgrüne Linienfarbe und Strichstärke der Kernkontur.
+- Koordinatenachsen, Kernkontur und sämtliche radialen Knotenkreise beziehen ihre Strichstärke nun ausdrücklich aus demselben Linienwert des Bohrschen Modells.
+- Die Strichstärke wird dabei wie im vergrößerten Bohr-SVG mit dem Modellmaßstab skaliert. Dadurch entsprechen nun auch Kernkontur und Linien des Canvas-Modells optisch – nicht nur numerisch – der Bohr-Darstellung.
+- Die Orbitalpunktwolke wird anhand ihrer projizierten Tiefe vor und hinter dem Kern gestaffelt. Vordergrundpunkte überlagern den Kern nun sichtbar und verankern ihn räumlich innerhalb des Orbitals.
+- Die Kernfläche der Orbitalformen verwendet nun neutral die Hintergrundfarbe statt der jeweiligen PSE-Kategoriefarbe; das Bohrsche Modell behält seine farbliche Zuordnung.
+- Die Modellauswahl in der Elementkopfzeile folgt nun der Schola-Formsprache als kompakter Toolbar-Select: Icon und Kurzname zeigen das aktive Modell, ein gezeichnetes Chevron ersetzt das uneinheitliche Textzeichen und das zusammenhängende Dropdown kennzeichnet die Auswahl mit einem Haken. Fokuszustände, Fokusführung nach der Auswahl und mobile Touch-Ziele wurden zugleich verbessert.
 
 - Kopfzeile der Gesamtansicht neu hierarchisiert: „Periodensystem“ steht als feste Dachbezeichnung, darunter erscheint dynamisch der Titel der jeweils gewählten fachlichen Darstellung.
 - Orbitalformen visuell an die Qualität des Bohrschen Modells angeglichen: größere Volumenkörper, räumliche Farbverläufe, kräftigere Konturen, dezente Tiefenwirkung, ruhigere Achsen und klar ausgesparte radiale Knotenzonen.

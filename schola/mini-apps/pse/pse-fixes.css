@@ -847,7 +847,8 @@
     transform: translate(-50%, -50%);
   }
 }
-.detail-info h2{margin-bottom:clamp(16px,2.5vw,24px);font-size:clamp(2rem,4.5vw,3.8rem);outline:none}
+.detail-info h2{max-width:100%;margin-bottom:clamp(16px,2.5vw,24px);font-size:clamp(2rem,3.5vw,3rem);line-height:1.05;white-space:nowrap;outline:none}
+.detail-info-scroll{min-width:0}
 .detail-facts{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:rgba(250,250,245,.82)}
 .detail-facts section{padding:14px}
 .detail-facts section+section{border-top:1px solid var(--line)}
@@ -870,16 +871,45 @@
 .detail-visual-toggle.shows-atom:hover{transform:none;box-shadow:none}
 .element-detail.shows-atom{grid-template-columns:minmax(390px,520px) minmax(230px,360px);gap:clamp(30px,6vw,84px)}
 .element-detail.shows-atom .detail-visual-toggle{width:min(46vw,520px);max-width:none}
-.atom-model{display:block;width:100%;height:100%;overflow:visible}
+.atom-model,.orbital-lab{display:block;width:100%;height:100%;transform-origin:50% 50%}
+.atom-model{overflow:visible}
 .atom-shell{fill:none;stroke:rgba(33,54,51,.34);stroke-width:1.35}
 .atom-electron{fill:var(--ink);stroke:var(--paper);stroke-width:1}
 .atom-nucleus{fill:var(--element-color);stroke:var(--ink);stroke-width:1.5}
 .atom-model text{fill:var(--ink);font-size:16px;font-weight:700;text-anchor:middle}
 .atom-caption{position:absolute;right:0;bottom:2px;left:0;color:var(--soft);font-size:.8rem;text-align:center}
-.model-options{display:grid;gap:10px}
-.model-options-label{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.model-option{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:13px;background:rgba(250,250,245,.82);font-weight:700;text-align:left}
-.model-option.is-active{border-color:rgba(33,54,51,.34);background:rgba(33,54,51,.09)}
+.bohr-shell-info{display:grid;gap:14px;padding:2px 0 8px}
+.bohr-shell-info-head{display:flex;align-items:end;justify-content:space-between;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.bohr-shell-info-head h3{margin:0;font-size:.78rem;letter-spacing:.09em;text-transform:uppercase}
+.bohr-shell-info-head span{color:var(--muted);font-size:.68rem;text-align:right}
+.bohr-shell-grid{display:grid;gap:8px}
+.bohr-shell-row{display:grid;grid-template-columns:42px minmax(72px,1fr) 62px;gap:10px;align-items:center;min-width:0}
+.bohr-shell-row>strong{display:grid;font-size:1rem;line-height:1}
+.bohr-shell-row>strong small{margin-top:4px;color:var(--muted);font-size:.58rem;font-weight:400}
+.bohr-shell-meter{height:8px;overflow:hidden;border-radius:999px;background:rgba(33,54,51,.09)}
+.bohr-shell-meter i{display:block;width:var(--shell-fill);height:100%;border-radius:inherit;background:var(--ink)}
+.bohr-shell-count{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;white-space:nowrap}
+.bohr-shell-count b{font-size:1rem}
+.bohr-shell-count small{color:var(--muted);font-size:.67rem}
+.bohr-shell-info>p{margin:0;padding-top:2px;color:var(--soft);font-size:.72rem;line-height:1.45}
+.model-menu-host{position:fixed;z-index:8;top:max(20px,env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right))}
+.model-menu{position:relative}
+.model-menu summary{display:flex;align-items:center;height:42px;min-width:148px;padding:0 13px 0 11px;gap:10px;border:1px solid rgba(33,54,51,.2);border-radius:12px;background:rgba(250,250,245,.86);box-shadow:0 3px 12px rgba(33,54,51,.055);font-size:.92rem;font-weight:700;list-style:none;cursor:pointer;backdrop-filter:blur(12px);transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}
+.model-menu summary::-webkit-details-marker{display:none}
+.model-menu summary:hover{border-color:rgba(33,54,51,.3);background:rgba(250,250,245,.98);box-shadow:0 5px 16px rgba(33,54,51,.09)}
+.model-menu summary:focus-visible{outline:3px solid rgba(33,54,51,.42);outline-offset:3px}
+.model-menu[open] summary{border-color:rgba(33,54,51,.38);background:var(--paper);box-shadow:0 5px 16px rgba(33,54,51,.1)}
+.model-trigger-label{flex:1;text-align:left}
+.model-menu-chevron{width:8px;height:8px;margin:-4px 1px 0 4px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(45deg);transition:margin .16s ease,transform .16s ease}
+.model-menu[open] .model-menu-chevron{margin:4px 1px 0 4px;transform:rotate(225deg)}
+.model-menu-popover{position:absolute;top:calc(100% + 7px);right:0;display:grid;width:280px;gap:2px;padding:7px;border:1px solid rgba(33,54,51,.18);border-radius:14px;background:rgba(250,250,245,.98);box-shadow:0 16px 38px rgba(33,54,51,.16);backdrop-filter:blur(16px)}
+.model-option{display:flex;align-items:center;min-height:48px;gap:12px;width:100%;padding:8px 11px;border:0;border-radius:9px;background:transparent;color:var(--ink);font:inherit;font-weight:700;text-align:left;cursor:pointer;transition:background .14s ease}
+.model-option:hover{background:rgba(33,54,51,.055)}
+.model-option:focus-visible{outline:2px solid rgba(33,54,51,.42);outline-offset:-2px;background:rgba(33,54,51,.045)}
+.model-option.is-active{background:rgba(33,54,51,.09)}
+.model-option-label{flex:1}
+.model-option-check{width:10px;height:6px;margin:0 5px 3px 4px;border-bottom:2px solid transparent;border-left:2px solid transparent;transform:rotate(-45deg)}
+.model-option.is-active .model-option-check{border-color:var(--ink)}
 .model-option-icon{position:relative;width:28px;height:28px;flex:0 0 28px;border:1px solid var(--ink);border-radius:50%}
 .model-option-icon::before,.model-option-icon::after{position:absolute;content:"";border:1px solid var(--ink);border-radius:50%;inset:5px}
 .model-option-icon::after{inset:11px;background:var(--ink)}
@@ -889,6 +919,12 @@
 .forms-icon{border:0}
 .forms-icon::before,.forms-icon::after{inset:4px 13px;border:0;border-radius:50%;background:#d88b53;transform:rotate(35deg) scale(1.7,.72)}
 .forms-icon::after{background:#668fb1;transform:rotate(-35deg) scale(1.7,.72)}
+.model-trigger-icon{width:22px;height:22px;flex-basis:22px}
+.model-trigger-icon.bohr-icon::before{inset:4px}
+.model-trigger-icon.bohr-icon::after{inset:8px}
+.model-trigger-icon.orbital-icon::before{inset:4px 2px}
+.model-trigger-icon.orbital-icon::after{inset:9px 4px}
+.model-trigger-icon.forms-icon::before,.model-trigger-icon.forms-icon::after{inset:4px 10px}
 .orbital-model{display:grid;width:100%;height:100%;padding:34px 34px 46px;gap:22px;align-content:center;color:var(--ink);text-align:left}
 .orbital-spin-legend{display:flex;justify-content:center;gap:28px;color:var(--soft);font-size:.78rem}
 .orbital-spin-legend span{display:flex;align-items:center;gap:5px}
@@ -907,8 +943,9 @@
 .orbital-box i{width:13px;font-size:1.45rem;font-style:normal;font-weight:700;line-height:1;text-align:center}
 .alpha-spin{color:#d93939}.beta-spin{color:#2878c8}
 .orbital-shape{display:block;width:100%;height:100%;overflow:visible}
-.orbital-lab{display:block;width:100%;height:100%;border-radius:24px;cursor:grab;touch-action:none}
-.orbital-lab:active{cursor:grabbing}
+.detail-visual-toggle:has(.orbital-lab){cursor:grab;touch-action:none}
+.detail-visual-toggle:has(.orbital-lab):active{cursor:grabbing}
+.orbital-lab{position:fixed;z-index:0;inset:0;width:100vw;height:100dvh;border-radius:0;pointer-events:none}
 .orbital-axes path{fill:none;stroke:rgba(33,54,51,.25);stroke-width:1.5;stroke-linecap:round}
 .orbital-axes text{fill:var(--muted);font-size:12px;font-weight:700}
 .orbital-volume{filter:url(#orbitalShadow)}
@@ -930,17 +967,53 @@
 .orbital-form-controls p,.orbital-form-controls small{margin:0;color:var(--soft);font-size:.7rem;line-height:1.4}
 .orbital-lab-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:3px;padding:12px;border:1px solid var(--line);border-radius:13px;background:rgba(250,250,245,.62)}
 .orbital-lab-controls>label{display:grid;gap:4px;color:var(--soft);font-size:.7rem}
+.orbital-lab-controls .lab-slider{grid-column:1/-1;grid-template-columns:1fr auto;gap:5px 10px;padding-bottom:10px;border-bottom:1px solid rgba(33,54,51,.1)}
+.orbital-lab-controls .lab-slider .lab-control-title{color:var(--ink);font-size:.72rem;font-weight:700}
+.orbital-lab-controls .lab-slider input{grid-column:1/-1}
+.orbital-lab-controls .lab-slider output{grid-column:2;grid-row:1;color:var(--soft);font-size:.66rem;font-weight:700;text-align:right}
+.orbital-lab-controls .lab-learning{grid-column:1/-1;color:var(--muted);font-size:.65rem;line-height:1.42}
 .orbital-lab-controls input[type="range"]{width:100%;accent-color:var(--ink)}
 .orbital-lab-controls label>span{color:var(--muted);font-size:.64rem}
 .orbital-lab-controls .lab-check{display:flex;align-items:center;gap:7px}
 .orbital-lab-controls .lab-section-position{grid-column:1/-1}
 .orbital-lab-controls .lab-actions{display:grid;grid-column:1/-1;grid-template-columns:1fr 1fr;gap:7px}
 .orbital-lab-controls button{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:rgba(250,250,245,.88);cursor:pointer}
-.orbital-lab-controls small{grid-column:1/-1}
+.orbital-lab-controls>small{grid-column:1/-1}
+.orbital-lab-controls .lab-model-note{padding-top:2px;color:var(--muted);font-size:.65rem;line-height:1.42}
 .phase-key{display:inline-block;width:9px;height:9px;margin-right:3px;border-radius:50%}
 .phase-key.positive{background:#d88b53}.phase-key.negative{background:#668fb1}
+@media(min-width:721px){
+  .detail-view{width:100%;max-width:100%;padding-right:clamp(32px,5vw,72px);padding-left:clamp(32px,5vw,72px);overflow-x:clip}
+  .element-detail{width:min(100%,826px);grid-template-rows:min(640px,calc(100dvh - 112px));align-items:start}
+  .element-detail:not(.shows-atom){grid-template-columns:minmax(390px,520px) minmax(230px,360px);gap:clamp(30px,6vw,84px)}
+  .element-detail .detail-tile{align-self:center}
+  .element-detail .detail-info{display:grid;height:100%;min-height:0;grid-template-rows:auto minmax(0,1fr);padding:4px 0 0;overflow:hidden}
+  .element-detail .detail-info-scroll{min-height:0;padding:0 8px 8px 0;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin}
+  .element-detail.shows-atom{position:relative}
+  .element-detail.shows-atom .detail-visual-toggle{z-index:1;grid-column:1;grid-row:1;width:520px;max-width:none;align-self:center;justify-self:center}
+  .element-detail.shows-atom .detail-info{z-index:2;grid-column:2;grid-row:1}
+  .element-detail.shows-atom .detail-info h2{margin-top:0}
+  .element-detail.shows-atom .model-options,
+  .element-detail.shows-atom .orbital-form-controls,
+  .element-detail.shows-atom .orbital-lab-controls,
+  .element-detail.shows-atom .orbital-lab-controls>label{
+    min-width:0;
+  }
+  .element-detail.shows-atom .orbital-lab-controls{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  }
+  .element-detail.shows-atom .orbital-lab-controls input[type="range"]{
+    min-width:0;
+  }
+}
+@media(min-width:1041px){.element-detail .detail-info{width:calc(100% + 48px)}}
+@media(min-width:721px) and (max-width:1040px){
+  .element-detail.shows-atom .detail-visual-toggle{justify-self:start}
+  .element-detail.shows-atom .detail-info{padding-left:24px;background:linear-gradient(90deg,transparent 0,rgba(250,250,245,.9) 22%,rgba(250,250,245,.98) 46%)}
+}
 @media(max-width:430px){.orbital-model{padding-right:10px;padding-left:10px;gap:14px}.orbital-levels{gap:11px}.orbital-row{grid-template-columns:34px auto;gap:8px}.orbital-row strong{padding-top:7px;font-size:.82rem}.orbital-boxes{gap:3px}.orbital-box{width:27px;height:34px}.orbital-box i{width:10px;font-size:1.12rem}.orbital-column small{font-size:.56rem}.orbital-spin-legend{gap:16px}.orbital-core{padding:8px 13px}}
-@media(max-width:720px){.element-detail.shows-atom{grid-template-columns:1fr}.element-detail.shows-atom .detail-visual-toggle{width:min(90vw,430px);place-self:center}}
+@media(max-width:720px){.element-detail.shows-atom{grid-template-columns:1fr;width:min(430px,100%);gap:24px}.element-detail.shows-atom .detail-visual-toggle{width:min(90vw,430px);place-self:center}.element-detail.shows-atom .detail-info{display:grid;width:100%;max-height:min(520px,calc(100dvh - 112px));grid-template-rows:auto minmax(0,1fr);text-align:left;overflow:hidden}.element-detail.shows-atom .detail-info-scroll{min-height:0;overflow-y:auto;scrollbar-width:thin}}
+@media(max-width:430px){.model-menu-host{top:max(14px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right))}.model-menu summary{height:44px;min-width:138px;padding:0 11px}.model-menu-popover{width:min(280px,calc(100vw - 24px))}.model-option{min-height:48px}}
 @media(max-width:430px){.orbital-lab-controls{grid-template-columns:1fr}.orbital-lab-controls .lab-section-position,.orbital-lab-controls .lab-actions,.orbital-lab-controls small{grid-column:auto}}
 .periodic-table[data-view="origin"] .element{background:var(--origin-background,#c9c9c3)}
 .periodic-table[data-view="origin"] .element::after{position:absolute;inset:0;border-radius:inherit;background:linear-gradient(145deg,rgba(255,255,255,.24),transparent 48%,rgba(33,54,51,.08));content:"";pointer-events:none}
