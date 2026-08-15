@@ -16,6 +16,9 @@ Classroom Screen verantwortet die Unterrichtsfläche, ihre Mini-Apps, deren Anor
 - Der Timer muss im Classroom Screen und im eigenständigen Zugang dieselbe Implementierung verwenden.
 
 - Mini-Apps liegen direkt auf der Unterrichtsfläche und können eigene gespeicherte Zustände besitzen.
+- Das Menü „Mehr“ ist eine reine Verwaltung der Schnellleiste. Es zeigt die im Classroom Screen verfügbaren Mini-Apps als Checkbox-Liste; ausgewählte Einträge erscheinen als Schnellzugriff in der unteren Leiste. Das Abwählen eines Schnellzugriffs entfernt keine bereits auf der Unterrichtsfläche liegende Mini-App. Diese Auswahl wird lokal gespeichert. Dazu gehören Timer, Periodensystem und „Text einfügen“.
+- Namen und Icons richten sich nach der Mini-Apps-Sammlung der Schola-Hauptseite. Die Schnellleiste und ihre Auswahlliste binden exakt dieselben zentralen SVG-Dateien ein.
+- Das eigenständige Periodensystem kann als Mini-App in einem begrenzten Classroom-Container geöffnet und geschlossen werden. Seine fachliche Implementierung bleibt vollständig im Mini-App-Verzeichnis; der Classroom Screen bindet sie nur ein.
 - Der Besen leert die Unterrichtsfläche und setzt die Zustände der entfernten Mini-Apps zurück.
 - Der JSON-Export enthält die Einstellungen aller vorhandenen Mini-Apps und bleibt für weitere Mini-Apps erweiterbar.
 - TypeMap-Texte werden mit HTML und Provenienzinformationen übernommen; ihre ID bleibt eine allgemeine TypeMap-ID.

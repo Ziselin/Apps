@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260815x">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260815zg">
 </head>
 <body>
   <main class="pse-app">
@@ -43,7 +43,14 @@
       </div>
     </section>
     <section id="detailView" class="detail-view" hidden>
-      <button id="backButton" class="back-button" type="button" aria-label="Zurück zum Periodensystem"><span aria-hidden="true">←</span> Periodensystem</button>
+      <nav class="detail-navigation" aria-label="Navigation der Elementansicht">
+        <button id="detailContextBackButton" class="detail-navigation-button" type="button" hidden>
+          <span class="detail-navigation-icon detail-navigation-back-icon" aria-hidden="true"></span><span>Zurück</span>
+        </button>
+        <button id="detailOverviewButton" class="detail-navigation-button" type="button" aria-label="Zum Periodensystem">
+          <span class="detail-navigation-icon detail-navigation-overview-icon" aria-hidden="true"></span><span>Periodensystem</span>
+        </button>
+      </nav>
       <div id="modelMenuHost" class="model-menu-host" hidden></div>
       <article id="elementDetail" class="element-detail"></article>
     </section>
@@ -103,6 +110,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260815u"></script>
+  <script src="pse.js?v=20260815za"></script>
 </body>
 </html>

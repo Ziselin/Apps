@@ -6,11 +6,13 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Organisiert
 
+- Das zentrale App-Icon bildet nun eine vollständige Helium-Elementkachel mit Ordnungszahl, Atommasse, Symbol und Namen ab und bleibt die gemeinsame Referenz für Schola-Hauptseite und Classroom Screen.
 - Die beiden app-spezifischen Werkzeuge zur Aktualisierung und Prüfung der Phasendaten liegen nun manifestkonform unter `schola/mini-apps/pse/tools/`; ihre relativen Datenpfade wurden an den neuen Ort angepasst.
 - Der Einstellungsbutton verwendet nun die zentrale, offline verfügbare Symbolvorlage aus `assets/ui/icons` statt einer app-spezifisch gezeichneten Variante.
 
 ### Korrigiert
 
+- Die vier Konturen des neuen Orbitalformen-Icons bleiben nun auch in der kompakten Kopfzeilenfassung vollständig geschlossen; zusätzlicher Innenabstand und eine leicht kräftigere, gerundete SVG-Kontur verhindern offene Enden durch Rasterung.
 - Die Orbitalanimation wird nicht mehr an den Kanten des Modellcontainers abgeschnitten. Eine transparente fenstergroße Zeichenfläche lässt die Punktwolke im Hintergrund weiterlaufen, während Kern, Achsen, Maßstab und Interaktionsbereich fest am bisherigen Modellcontainer verankert bleiben.
 - Die manuelle Rotation der Orbitalformen folgt nun horizontal und vertikal der Greifbewegung der Maus beziehungsweise des Fingers; die zuvor vertauschten Bewegungsrichtungen wurden korrigiert.
 - Die Titeltypografie der normalen und der modellbasierten Elementansicht ist nun vollständig vereinheitlicht: identische responsive Schriftgröße, Zeilenhöhe und Einzeiligkeit. Auf Desktop erhält die Infospalte zusätzlichen Raum ausschließlich nach rechts, sodass auch „Element 118“ regulär vollständig passt, ohne den korrigierten linken Titelanker zu verschieben oder auf eine Ellipse zurückzugreifen.
@@ -28,6 +30,13 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 - Die Schriftgröße der Elementnamen richtet sich nun nach der tatsächlichen Kachelhöhe statt nach der Fensterbreite. Ein breiteres Fenster kann den Namen daher nicht mehr innerhalb einer höhenbegrenzten Kachel künstlich vergrößern und ausblenden.
 
 ### Hinzugefügt
+
+- Die Elementansicht besitzt oben links nun eine zusammengehörige Navigations-Toolbar mit zwei getrennten Zielen: „Zurück“ erscheint ausschließlich innerhalb einer verfolgten Edelgaskern-Kette und führt zum vorherigen Element; „Periodensystem“ bleibt dauerhaft sichtbar und öffnet direkt die Übersicht. Beide Aktionen erhalten eigene Linienicons, klare Fokus-/Hoverzustände und eine kollisionsfreie mobile Anordnung.
+- Die fachlich uneindeutige horizontale Einrückung von s-, p-, d- und f-Unterniveaus wurde entfernt. Sämtliche Reihen besitzen nun denselben Ausgangspunkt; allein die Vertikale bildet die Energieordnung ab.
+- Abgekürzte Edelgaskerne in der Orbitalbesetzung sind nun navigierbare Buttons. Sie öffnen die Orbitalbesetzung des genannten Edelgases; ein kontextbezogener Rückweg führt zum zuvor betrachteten Element. Direkte Links unterstützen dafür `model=orbital`.
+- Die Phasenlegende der Orbitalformen steht nun direkt unter der Visualisierung. Deren Beschreibung nennt Orbital und Element; der bisherige Hinweis „ziehen zum Drehen“ wurde entfernt.
+- Die Orbitalbesetzung wurde zu einem großformatigen Orbital-Energiediagramm ausgebaut: Energieachse, gestaffelte Unterniveaus, Besetzungsquoten, hervorgehobene Außenzone, Grundzustandskonfiguration, kompakte Regelkarten und eine schrittweise Auffüllanimation nutzen nun die gesamte Modell- und Infobühne.
+- Eine didaktische Notiz unter Orbitalform und Schalenwahl erklärt die Besetzungspunkte: Sie beziehen sich auf die Grundzustandskonfiguration des neutralen Atoms; eine fehlende Markierung bedeutet „unbesetzt“, nicht „nicht existent“.
 
 - Bohrsches Atommodell um eine Schalenübersicht im Infobereich ergänzt: tatsächliche Besetzung, theoretische Maximalkapazität `2n²` und dezente Füllanzeige stehen nun direkt unter dem Elementtitel; die redundante Besetzungszeile unter der Modellgrafik entfällt.
 - Modellauswahl in ein kompaktes Dropdown hinter dem Button „Modelle“ oben rechts in der übergeordneten Kopfzeile verschoben; sie ist damit strukturell von der Infospalte getrennt. Bestehende Modell-Icons und aktive Kennzeichnung bleiben erhalten.
@@ -93,6 +102,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Geändert
 
+- Das bisher stilistisch abweichende, farbige Icon der Orbitalformen wurde durch ein monochromes schematisches 3d-Orbital mit vier Lappen und Kernpunkt ersetzt. Es folgt nun derselben Linien- und Größenlogik wie die Icons für Bohrmodell und Orbitalbesetzung.
 - Das redundante Textelement „Lernidee:“ vor den Reglererklärungen wurde entfernt; die didaktischen Hinweise beginnen nun unmittelbar mit ihrem Inhalt.
 - Die Regler des Orbital-Labors wurden didaktisch beschriftet: Darstellungsform, eingeschlossener Anteil und Schnittebene erklären jeweils ihre Lernidee und Modellgrenze. Der Anteilsregler hebt nun tatsächlich 50 bis 99 Prozent einer aus der wasserstoffähnlichen `|ψ|²`-Verteilung erzeugten Modellstichprobe hervor; außerhalb liegende Messorte bleiben blass sichtbar.
 - Die bisherigen frei geformten Orbitalpunktwolken wurden durch deterministisch erzeugte wasserstoffähnliche Verteilungen ersetzt. Radialfunktionen, Laguerre-Polynome, reelle s-/p-/d-Winkelgestalten, Phasenwechsel und radiale Knoten bestimmen nun die Darstellung; die Oberfläche grenzt das Modell ausdrücklich von exakten Mehrelektronenrechnungen ab.

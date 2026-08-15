@@ -31,6 +31,7 @@ Dieses Manifest konkretisiert die projektweiten Regeln für den Kompetenzbereich
 - Mini-Apps sind eigenständige fachliche Einheiten mit eigenem Manifest und Changelog. Sie können allein oder eingebettet in Schola- und später gegebenenfalls Atlas-Apps ausgeführt werden.
 - Eine Mini-App besitzt genau eine fachliche Implementierung. Einbettungen dürfen Host-spezifische Oberflächen ergänzen, aber keine unabhängigen Kopien der Mini-App-Logik führen.
 - Eigenständige Mini-App-Ansichten zeigen nur die für Steuerung und Funktion erforderliche Oberfläche und keinen Browser-/Editor-Arbeitsbereich einer einbettenden App.
+- Die Mini-Apps-Sammlung der Schola-Hauptseite ist der verbindliche Katalog und die visuelle Referenz für Mini-App-Namen und -Icons. Einbettende Apps verwenden dieselben zentral unter `assets` geführten Icondateien; sie bilden diese Symbole nicht lokal oder per CSS nach.
 
 ## Icon-Gestaltung
 
