@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>DNA · Schola</title>
+  <link rel="icon" href="../../../assets/dna-icon.svg">
+  <link rel="stylesheet" href="dna.css?v=20260816a">
+  <link rel="stylesheet" href="dna-fixes.css?v=20260816c">
+</head>
+<body>
+  <main class="dna-app">
+    <header class="app-head">
+      <a href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
+      <div><span class="eyebrow">DNA</span><h1 id="activeViewTitle">Doppelhelix</h1></div>
+      <label class="view-picker"><span>Darstellung</span><select id="viewMode"><option value="schematic">1 · Doppelhelix</option><option value="bonds">2 · Basen &amp; Brücken</option><option value="molecular">3 · Kugel-Stab-Modell</option><option value="spacefill">4 · Raumerfüllend</option></select></label>
+    </header>
+
+    <section class="stage" aria-label="DNA-Modell">
+      <canvas id="dnaCanvas" aria-label="Drehbares Modell einer DNA-Doppelhelix mit Basenpaaren"></canvas>
+      <button id="rotationButton" class="rotation-button" type="button" aria-pressed="true"><span aria-hidden="true">↻</span> Rotation</button>
+      <div class="orientation" aria-hidden="true"><span>5′</span><i></i><span>3′</span></div>
+    </section>
+
+    <aside class="info-panel">
+      <div><span class="eyebrow">Legende</span><h2>Dargestellte Bestandteile</h2></div>
+      <div id="viewLegend" class="view-legend"></div>
+      <p id="modeNote" class="mode-note">Die reduzierte Darstellung zeigt die Gesamtform. Die ungleichen Abstände der Rückgräte bilden große und kleine Furche.</p>
+      <details><summary>Was zeigt das Modell?</summary><p>Die beiden Zucker-Phosphat-Rückgrate verlaufen gegenläufig. Im Inneren verbinden sich A mit T und G mit C. Abstände, Atomgrößen und Bindungswinkel sind für die Übersicht didaktisch vereinfacht.</p></details>
+    </aside>
+  </main>
+  <script src="dna.js?v=20260816c"></script>
+</body>
+</html>
