@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Klassensprecher-Wahl · Schola</title>
+  <link rel="icon" href="../../../assets/klassensprecher-wahl-icon.svg">
+  <link rel="stylesheet" href="wahl.css?v=20260820a">
+  <link rel="stylesheet" href="wahl-board.css?v=20260820a">
+  <link rel="stylesheet" href="wahl-adjustments.css?v=20260820b">
+  <link rel="stylesheet" href="wahl-print-fixes.css?v=20260820b">
+  <link rel="stylesheet" href="wahl-print-density.css?v=20260820e">
+  <link rel="stylesheet" href="wahl-protocol.css?v=20260820f">
+  <link rel="stylesheet" href="wahl-majority.css?v=20260820g">
+  <link rel="stylesheet" href="wahl-legal.css?v=20260820h">
+  <link rel="stylesheet" href="wahl-form-layout.css?v=20260820i">
+  <link rel="stylesheet" href="wahl-counting-state.css?v=20260820j">
+  <link rel="stylesheet" href="wahl-protocol-breaks.css?v=20260820k">
+  <link rel="stylesheet" href="wahl-protocol-pages.css?v=20260820l">
+  <link rel="stylesheet" href="wahl-quorum.css?v=20260820c">
+  <link rel="stylesheet" href="wahl-ux-polish.css?v=20260820d">
+  <link rel="stylesheet" href="wahl-ux-status.css?v=20260820d">
+</head>
+<body>
+  <main class="election-app">
+    <header class="app-head">
+      <a class="brand" href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
+      <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Klassensprecher-Wahl</h1></div>
+      <div class="head-actions"><button id="boardModeButton" class="quiet" type="button" aria-pressed="false">Tafelmodus</button><button id="resetButton" class="quiet" type="button">Neu beginnen</button><span id="saveState" class="save-state" aria-live="polite">Automatisch gespeichert</span></div>
+    </header>
+
+    <nav id="stepNav" class="step-nav" aria-label="Wahlschritte"></nav>
+
+    <section class="workspace">
+      <article id="stepPanel" class="step-panel" aria-live="polite"></article>
+      <aside class="election-summary" aria-label="Wahlübersicht">
+        <span class="eyebrow">Wahlstand</span>
+        <h2 id="summaryTitle">Noch nicht begonnen</h2>
+        <dl>
+          <div><dt>Klasse</dt><dd id="summaryClass">–</dd></div>
+          <div><dt>Wahlleitung</dt><dd id="summaryLeader">–</dd></div>
+          <div><dt>Schriftführung</dt><dd id="summarySecretary">–</dd></div>
+          <div><dt>Beschlussfähigkeit</dt><dd id="summaryQuorum">–</dd></div>
+          <div><dt>Kandidierende</dt><dd id="summaryCandidates">0</dd></div>
+          <div><dt>Klassensprecher</dt><dd id="summarySpeaker">–</dd></div>
+          <div><dt>Stellvertretung</dt><dd id="summaryDeputy">–</dd></div>
+        </dl>
+        <p class="privacy-note"><strong>Nur auf diesem Gerät.</strong> Namen und Ergebnisse werden lokal im Browser gespeichert und nicht übertragen.</p>
+      </aside>
+    </section>
+
+    <footer class="flow-actions">
+      <button id="backButton" class="secondary" type="button">Zurück</button>
+      <span id="flowHint"></span>
+      <button id="nextButton" class="primary" type="button">Weiter</button>
+    </footer>
+  </main>
+
+  <section id="printArea" class="print-area" aria-hidden="true"></section>
+  <script src="wahl.js?v=20260820a"></script>
+</body>
+</html>
