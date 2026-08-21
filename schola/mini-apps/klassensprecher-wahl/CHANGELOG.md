@@ -1,5 +1,7 @@
 # Changelog
 
+- Schritt 1 benennt die Rechtsgrundlage nun konkret als § 81 Abs. 2 SchulG M-V. Schritt 3 wurde auf die reguläre Wahlversammlung reduziert; die Namensliste erscheint als Hinweis beim Abschluss statt als Pflichtbestätigung.
+
 ## 2026-08-20
 
 - Erste Fassung der geführten Klassensprecher-Wahl.
