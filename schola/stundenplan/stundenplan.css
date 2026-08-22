@@ -492,8 +492,16 @@ button, input, select, textarea { font-family: inherit; }
   overflow: auto;
   scrollbar-gutter: stable;
 }
+.browser-panel { overflow: hidden; }
+.browser-panel > .panel-head { flex: 0 0 auto; }
+.browser-panel .project-browser-list {
+  min-height: 0;
+  max-height: 100%;
+  overscroll-behavior: contain;
+}
 .project-browser-empty { margin: 0; padding: 18px 4px; color: var(--muted); font-size: .84rem; line-height: 1.5; }
 .project-card {
+  flex: 0 0 auto;
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 11px;
@@ -574,12 +582,34 @@ button, input, select, textarea { font-family: inherit; }
 .project-main strong, .project-main span { display: block; }
 .project-main strong { overflow: hidden; font-size: .9rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
 .project-main span { margin-top: 3px; color: var(--muted); font-size: .73rem; }
-.layer-list { display: grid; gap: 2px; padding: 0 10px 9px 66px; }
+.layer-list { display: grid; gap: 2px; padding: 0 10px 9px 58px; }
+.layer-tree-item { display: grid; min-width: 0; }
+.layer-tree-head { display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 0; }
+.layer-tree-toggle,
+.layer-tree-spacer {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+}
+.layer-tree-toggle {
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.layer-tree-toggle:hover,
+.layer-tree-toggle:focus-visible { outline: none; background: rgba(255,255,252,.62); color: var(--ink); }
+.layer-tree-spacer::before { width: 9px; height: 1px; background: var(--line-strong); content: ""; }
 .layer-row {
   position: relative;
   width: 100%;
   min-height: 31px;
-  padding: 7px 8px 7px 22px;
+  padding: 7px 8px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -588,15 +618,6 @@ button, input, select, textarea { font-family: inherit; }
   font-size: .8rem;
   text-align: left;
   cursor: pointer;
-}
-.layer-row::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 6px;
-  width: 9px;
-  height: 1px;
-  background: var(--line-strong);
 }
 .layer-row:hover, .layer-row:focus-visible { outline: none; background: rgba(255,255,252,.55); color: var(--ink); }
 .layer-row.is-active { border-color: var(--line); background: rgba(255,255,252,.72); color: var(--ink); font-weight: 700; }
@@ -618,6 +639,34 @@ button, input, select, textarea { font-family: inherit; }
 .schedule-tree-row::before { content: "▦"; position: absolute; left: 6px; color: var(--ink-soft); }
 .schedule-tree-row:hover, .schedule-tree-row:focus-visible { outline: none; background: rgba(255,255,252,.55); color: var(--ink); }
 .schedule-tree-row.is-active { border-color: var(--line); background: rgba(255,255,252,.72); color: var(--ink); font-weight: 700; }
+.browser-group-row {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 30px;
+  align-items: center;
+  width: calc(100% - 16px);
+  margin-left: 16px;
+}
+.browser-group-select { width: 100%; margin-left: 0; }
+.browser-group-select::before { content: "▤"; }
+.group-visibility-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.group-visibility-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.group-visibility-button .eye-slash { display: none; }
+.group-visibility-button:hover,
+.group-visibility-button:focus-visible { outline: none; background: rgba(255,255,252,.68); color: var(--ink); }
+.group-visibility-button.is-hidden { color: var(--muted); opacity: .48; }
+.group-visibility-button.is-hidden svg { filter: grayscale(1); }
+.group-visibility-button.is-hidden .eye-slash { display: block; }
 .project-detail {
   flex: 1 1 auto;
   min-height: 0;
@@ -887,7 +936,6 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: 0 0 0 3px rgba(33,54,51,.075);
 }
 .property-field::after,
-.schedule-validity label:has(select)::after,
 .dialog-field:has(select)::after {
   content: "";
   position: absolute;
@@ -2018,12 +2066,103 @@ button, input, select, textarea { font-family: inherit; }
   width: min(860px, calc(100vw - 28px));
   max-width: none;
 }
+.project-dialog.schedule-preset-dialog {
+  width: min(760px, calc(100vw - 28px));
+  max-width: none;
+}
 .dialog-intro { margin: 7px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
 .display-default-fields {
   display: grid;
   grid-template-columns: minmax(480px, 1.4fr) minmax(230px, .6fr);
   gap: 10px;
 }
+.display-default-fields[hidden], .display-default-note[hidden] { display: none; }
+.five-minute-time-control { position: relative; display: block; min-width: 0; }
+.five-minute-time-manual {
+  display: grid;
+  grid-template-columns: 24px 8px 24px;
+  align-items: center;
+  justify-content: start;
+  width: 100%;
+  min-height: 39px;
+  padding: 6px 38px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,252,.72);
+  color: var(--ink);
+}
+.five-minute-time-manual:focus-within { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33,54,51,.075); }
+.five-minute-time-manual input {
+  width: 24px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+.five-minute-time-manual > span {
+  display: grid;
+  place-items: center;
+  width: 8px;
+  padding: 0;
+  color: var(--muted);
+  line-height: 1;
+  text-align: center;
+}
+.five-minute-time-button {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.five-minute-time-button:hover, .five-minute-time-button:focus-visible { outline: none; background: rgba(33,54,51,.07); }
+.five-minute-time-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.five-minute-time-picker {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 5px);
+  right: 0;
+  grid-template-columns: 1fr 1fr;
+  width: 126px;
+  height: 230px;
+  padding: 4px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--milk-light);
+  box-shadow: 0 14px 35px rgba(33,54,51,.18);
+}
+.five-minute-time-picker:not([hidden]) { display: grid; }
+.five-minute-time-column { display: grid; align-content: start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.five-minute-time-column button {
+  min-height: 34px;
+  padding: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.five-minute-time-column button:hover, .five-minute-time-column button:focus-visible { outline: none; background: rgba(191,210,226,.45); }
+.five-minute-time-column button.is-selected { background: var(--ink-soft); color: white; font-weight: 700; }
 .display-default-fields > label,
 .display-default-fields > .display-default-group {
   display: grid;
@@ -2174,6 +2313,19 @@ button, input, select, textarea { font-family: inherit; }
 }
 .calendar-export-choice input { margin: 0; accent-color: var(--ink); }
 .dialog-field { display: grid; gap: 7px; color: var(--muted); font-size: .8rem; }
+.dialog-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: .84rem;
+  line-height: 1.35;
+  background: rgba(255,255,252,.42);
+}
+.dialog-checkbox input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); flex: 0 0 auto; }
 .dialog-field[hidden] { display: none; }
 .dialog-field input {
   width: 100%;
@@ -2298,6 +2450,10 @@ button, input, select, textarea { font-family: inherit; }
   .year-calendar { grid-template-columns: repeat(3, minmax(180px, 1fr)); }
   .settings-stage { overflow: auto; grid-template-columns: 1fr; }
   .settings-panel { min-height: 380px; }
+  .settings-panel.browser-panel {
+    height: calc(100dvh - 94px);
+    max-height: 720px;
+  }
 }
 @media (max-width: 680px) {
   .topbar { padding-right: 10px; padding-left: 12px; }
@@ -2315,6 +2471,11 @@ button, input, select, textarea { font-family: inherit; }
   .day { min-height: 22px; font-size: .68rem; }
   .settings-stage { padding: 66px 8px 10px; gap: 10px; }
   .settings-panel { min-height: 330px; border-radius: 14px; padding: 16px; }
+  .settings-panel.browser-panel {
+    height: calc(100dvh - 82px);
+    min-height: 330px;
+    max-height: none;
+  }
   .property-row,
   .property-field { grid-template-columns: 1fr; gap: 7px; }
   .property-field::after { top: auto; right: 24px; bottom: 21px; transform: rotate(45deg); }

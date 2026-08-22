@@ -41,6 +41,7 @@ const appointmentName = document.getElementById("appointmentName");
 const appointmentDate = document.getElementById("appointmentDate");
 const appointmentStartTime = document.getElementById("appointmentStartTime");
 const appointmentEndTime = document.getElementById("appointmentEndTime");
+const appointmentOverridesLessons = document.getElementById("appointmentOverridesLessons");
 const appointmentDialogStatus = document.getElementById("appointmentDialogStatus");
 const appointmentSubmitButton = document.getElementById("appointmentSubmitButton");
 const cancelAppointmentButton = document.getElementById("cancelAppointmentButton");
@@ -57,9 +58,11 @@ const classTripDialogTitle = document.getElementById("classTripDialogTitle");
 const classTripForm = document.getElementById("classTripForm");
 const classTripName = document.getElementById("classTripName");
 const classTripClass = document.getElementById("classTripClass");
-const classTripDate = document.getElementById("classTripDate");
+const classTripStartDate = document.getElementById("classTripStartDate");
+const classTripEndDate = document.getElementById("classTripEndDate");
 const classTripStartTime = document.getElementById("classTripStartTime");
 const classTripEndTime = document.getElementById("classTripEndTime");
+const classTripOverridesLessons = document.getElementById("classTripOverridesLessons");
 const classTripDialogStatus = document.getElementById("classTripDialogStatus");
 const cancelClassTripButton = document.getElementById("cancelClassTripButton");
 const classTripSubmitButton = document.getElementById("classTripSubmitButton");
@@ -71,6 +74,7 @@ const schoolProjectDate = document.getElementById("schoolProjectDate");
 const schoolProjectEndDate = document.getElementById("schoolProjectEndDate");
 const schoolProjectStartTime = document.getElementById("schoolProjectStartTime");
 const schoolProjectEndTime = document.getElementById("schoolProjectEndTime");
+const schoolProjectOverridesLessons = document.getElementById("schoolProjectOverridesLessons");
 const schoolProjectDialogStatus = document.getElementById("schoolProjectDialogStatus");
 const cancelSchoolProjectButton = document.getElementById("cancelSchoolProjectButton");
 const schoolProjectSubmitButton = document.getElementById("schoolProjectSubmitButton");
@@ -136,6 +140,10 @@ const cancelScheduleDisplayButton = document.getElementById("cancelScheduleDispl
 const schoolDayStart = document.getElementById("schoolDayStart");
 const schoolDayEnd = document.getElementById("schoolDayEnd");
 const defaultLessonDuration = document.getElementById("defaultLessonDuration");
+const schedulePresetDialog = document.getElementById("schedulePresetDialog");
+const schedulePresetForm = document.getElementById("schedulePresetForm");
+const schedulePresetStatus = document.getElementById("schedulePresetStatus");
+const cancelSchedulePresetButton = document.getElementById("cancelSchedulePresetButton");
 const scheduleDisplayName = document.getElementById("scheduleDisplayName");
 const calendarViewButtons = [...document.querySelectorAll("[data-calendar-view]")];
 const calendarDateNavigation = document.getElementById("calendarDateNavigation");
@@ -154,6 +162,7 @@ const cancelCalendarExportButton = document.getElementById("cancelCalendarExport
 const PROJECT_STORAGE_KEY = "schola-stundenplan-projects-v1";
 const DISPLAY_PROJECT_STORAGE_KEY = "schola-stundenplan-display-project-v1";
 const LESSON_SIGNALS_STORAGE_KEY = "schola-stundenplan-signals-enabled-v1";
+const EXPANDED_LAYERS_STORAGE_KEY = "schola-stundenplan-expanded-layers-v1";
 const SCHEDULE_DELETE_HOLD_MS = 820;
 const HOLIDAY_NORMALIZATION_VERSION = "mv-school-types-2026-07-27-1";
 const MV_VOCATIONAL_ONLY_DATES = new Set(["2026-11-26", "2026-11-27"]);
@@ -170,9 +179,9 @@ const LESSON_COLORS = [
 const LAYER_TYPES = [
   { id: "holidays", title: "Schulen", description: "Schulen, Zeitmodelle und zugehörige Ferien" },
   { id: "classCatalog", title: "Klassen", description: "Fächer, Klassenstufen und semantisch eindeutige Einzelklassen" },
-  { id: "schedules", title: "Stundenpläne", description: "Wochenpläne mit Gültigkeitszeitraum und Unterrichtsstunden" },
-  { id: "individual", title: "Individuelle Projekte", description: "Klassenfahrten, Projekttage und persönliche Beteiligungen" },
-  { id: "appointments", title: "Termine", description: "Gruppen für unregelmäßig wiederkehrende Termine" },
+  { id: "schedules", title: "Stundenplanlogiken", description: "Mögliche Zeitraster einer Schule, etwa Einzel- und Blockstunden oder unterschiedliche Pausenfolgen" },
+  { id: "individual", title: "Persönliche Termine", description: "Urlaub und weitere persönliche Termine" },
+  { id: "appointments", title: "Schulische Termine", description: "Termingruppen, Klassenfahrten und Schulprojekte" },
   { id: "classes", title: "Projekttage nach Klassen", description: "Klassenbezogene Projektschichten" },
   { id: "sickness", title: "Krankschreibungen", description: "Zeiträume persönlicher Verhinderung ohne Unterricht" }
 ];
@@ -219,6 +228,14 @@ const lessonEndAudio = new Audio("../../assets/stundenplan-ende.mp3");
 lessonStartAudio.preload = "auto";
 lessonEndAudio.preload = "auto";
 const expandedProjectIds = new Set(projects.map((project) => project.id));
+const expandableLayerIds = new Set(["holidays", "schedules", "individual", "appointments"]);
+const storedExpandedLayerKeys = (() => {
+  try { return JSON.parse(localStorage.getItem(EXPANDED_LAYERS_STORAGE_KEY) || "null"); }
+  catch { return null; }
+})();
+const expandedLayerKeys = new Set(Array.isArray(storedExpandedLayerKeys)
+  ? storedExpandedLayerKeys
+  : projects.flatMap((project) => [...expandableLayerIds].map((layerId) => `${project.id}:${layerId}`)));
 
 const monthNames = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -362,7 +379,8 @@ function renderActiveCalendar() {
   const sicknessLayer = project?.layers?.find((entry) => entry.type === "sickness");
   const appliedSettings = holidayLayer?.appliedSettings || holidayLayer?.settings;
   const semanticSchoolYearStart = Number((project ? getProjectCalendarRange(project).startDate : "")?.slice(0, 4));
-  const appointmentEntries = (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
+  const appointmentEntries = [appointmentLayer, individualLayer]
+    .flatMap((entryLayer) => (Array.isArray(entryLayer?.groups) ? entryLayer.groups : []).filter((group) => group.calendarVisible !== false))
     .flatMap((group) => (Array.isArray(group.appointments) ? group.appointments : []).map((appointment) => ({
       id: appointment.id,
       name: `${group.name}: ${appointment.name}`,
@@ -396,24 +414,27 @@ function getCombinedSchoolProjects() {
   return projects.filter((project) => project.id === displayedProjectId).flatMap((project) => {
     const layer = project.layers?.find((entry) => entry.type === "individual");
     return (Array.isArray(layer?.appliedEntries) ? layer.appliedEntries : [])
-      .filter((entry) => entry.type === "school-project" || entry.type === "class-trip")
+      .filter((entry) => ["school-project", "class-trip", "vacation", "personal-appointment"].includes(entry.type))
       .map((entry) => ({ ...entry, projectId: project.id, projectName: project.name }));
   });
 }
 
 function getCombinedAppointments() {
   return projects.filter((project) => project.id === displayedProjectId).flatMap((project) => {
-    const layer = project.layers?.find((entry) => entry.type === "appointments");
-    return (Array.isArray(layer?.groups) ? layer.groups : []).flatMap((group) => (
-      Array.isArray(group.appointments) ? group.appointments.map((appointment) => ({
+    return ["appointments", "individual"].flatMap((layerType) => {
+      const layer = project.layers?.find((entry) => entry.type === layerType);
+      return (Array.isArray(layer?.groups) ? layer.groups : []).filter((group) => group.calendarVisible !== false).flatMap((group) => (
+        Array.isArray(group.appointments) ? group.appointments.map((appointment) => ({
         ...appointment,
         groupId: group.id,
         groupName: group.name,
         color: group.color || "#c9c1dd",
+        layerType,
         projectId: project.id,
         projectName: project.name
-      })) : []
-    ));
+        })) : []
+      ));
+    });
   });
 }
 
@@ -743,7 +764,13 @@ function renderSchoolProjectCard(schoolProject, start, end) {
   card.type = "button";
   card.className = "lesson-card timeline-lesson-card timeline-project-card";
   card.style.setProperty("--lesson-color", "#bfd2e2");
-  card.title = `${schoolProject.projectName} / ${schoolProject.type === "class-trip" ? "Klassenfahrten" : "Schulprojekte"}`;
+  const categoryNames = {
+    "class-trip": "Klassenfahrten",
+    "school-project": "Schulprojekte",
+    vacation: "Urlaub",
+    "personal-appointment": "Weitere Termine"
+  };
+  card.title = `${schoolProject.projectName} / ${categoryNames[schoolProject.type] || "Termine"}`;
   const name = document.createElement("strong");
   name.textContent = schoolProject.name;
   if (schoolProject.type === "class-trip" && schoolProject.className) {
@@ -762,7 +789,7 @@ function renderSchoolProjectCard(schoolProject, start, end) {
       ?.entries?.find((entry) => entry.id === schoolProject.id);
     if (!project || !originalEntry) return;
     if (originalEntry.type === "class-trip") openClassTripDialog(project, originalEntry);
-    else openSchoolProjectDialog(project, originalEntry);
+    else openSchoolProjectDialog(project, originalEntry, originalEntry.type);
   });
   return card;
 }
@@ -787,11 +814,11 @@ function renderAppointmentTimelineCard(appointment, date = null) {
   }, date, appointment.name || "Termin");
   card.addEventListener("click", () => {
     const project = projects.find((entry) => entry.id === appointment.projectId);
-    const originalGroup = project?.layers?.find((entry) => entry.type === "appointments")
+    const originalGroup = project?.layers?.find((entry) => entry.type === (appointment.layerType || "appointments"))
       ?.groups?.find((entry) => entry.id === appointment.groupId);
     const originalAppointment = originalGroup?.appointments?.find((entry) => entry.id === appointment.id);
     if (project && originalGroup && originalAppointment) {
-      openAppointmentDialog(project, originalGroup, originalAppointment);
+      openAppointmentDialog(project, originalGroup, originalAppointment, appointment.layerType || "appointments");
     }
   });
   return card;
@@ -1192,6 +1219,7 @@ async function importProjectFromFile(file) {
   activeLayerType = null;
   activeScheduleId = null;
   expandedProjectIds.add(project.id);
+  expandDefaultProjectLayers(project.id);
   localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
   saveProjects();
   renderProjectBrowser();
@@ -1292,7 +1320,7 @@ function createIcalendarEvent({
 function isLessonSuppressedByClassProject(project, lesson, date) {
   const layer = project?.layers?.find((entry) => entry.type === "classes");
   const dateKey = getLocalDateKey(date);
-  return (Array.isArray(layer?.entries) ? layer.entries : []).some((entry) => {
+  const suppressedByClassProject = (Array.isArray(layer?.entries) ? layer.entries : []).some((entry) => {
     if (Array.isArray(entry.schoolIds) && entry.schoolIds.length && lesson.schoolId && !entry.schoolIds.includes(lesson.schoolId)) return false;
     if ((!Array.isArray(entry.schoolIds) || !entry.schoolIds.length) && entry.schoolId && lesson.schoolId && entry.schoolId !== lesson.schoolId) return false;
     const startDate = entry.startDate || entry.date;
@@ -1313,6 +1341,25 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     if (!entry.startTime || !entry.endTime) return false;
     return lesson.start < entry.endTime && lesson.end > entry.startTime;
   });
+  if (suppressedByClassProject) return true;
+  const overlapsLesson = (entry) => {
+    if (!entry?.overridesLessons) return false;
+    const startDate = entry.startDate || entry.date;
+    const endDate = entry.endDate || entry.date;
+    if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
+    if (!entry.startTime || !entry.endTime) return true;
+    return lesson.start < entry.endTime && lesson.end > entry.startTime;
+  };
+  const individualLayer = project?.layers?.find((entry) => entry.type === "individual");
+  const schoolAppointmentLayer = project?.layers?.find((entry) => entry.type === "appointments");
+  const individualEntries = Array.isArray(individualLayer?.appliedEntries)
+    ? individualLayer.appliedEntries
+    : (Array.isArray(individualLayer?.entries) ? individualLayer.entries : []);
+  const groupedAppointments = [schoolAppointmentLayer, individualLayer].flatMap((appointmentLayer) => (
+    (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : []).filter((group) => group.calendarVisible !== false)
+      .flatMap((group) => Array.isArray(group.appointments) ? group.appointments : [])
+  ));
+  return individualEntries.some(overlapsLesson) || groupedAppointments.some(overlapsLesson);
 }
 
 function getCompleteIcalendarSelection(project) {
@@ -1325,8 +1372,8 @@ function getCompleteIcalendarSelection(project) {
     scheduleIds: new Set((schedulesLayer?.schedules || []).map((entry) => entry.id)),
     holidays: true,
     individualEntryIds: new Set((individualLayer?.appliedEntries || []).map((entry) => entry.id)),
-    appointmentIds: new Set((appointmentLayer?.groups || []).flatMap((group) => (
-      (group.appointments || []).map((entry) => entry.id)
+    appointmentIds: new Set([appointmentLayer, individualLayer].flatMap((layer) => (
+      (layer?.groups || []).flatMap((group) => (group.appointments || []).map((entry) => entry.id))
     ))),
     sicknessIds: new Set((sicknessLayer?.entries || []).map((entry) => entry.id)),
     classProjectIds: new Set((classProjectsLayer?.entries || []).map((entry) => entry.id))
@@ -1401,24 +1448,24 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
   (Array.isArray(individualLayer?.appliedEntries) ? individualLayer.appliedEntries : [])
     .filter((entry) => (
       selection.individualEntryIds.has(entry.id)
-      && (entry.type === "school-project" || entry.type === "class-trip")
+      && ["school-project", "class-trip", "vacation", "personal-appointment"].includes(entry.type)
     ))
     .forEach((entry) => {
       forEachDateKey(entry.startDate, entry.endDate || entry.startDate, (dateKey) => {
         events.push(...createIcalendarEvent({
           uid: `${entry.type}-${entry.id}-${dateKey}`,
-          title: entry.name || (entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt"),
+          title: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type]),
           description: entry.className || entry.class || "",
           startDate: dateKey,
           startTime: entry.startTime,
           endTime: entry.endTime,
-          category: entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt",
+          category: ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Persönlicher Termin" }[entry.type]),
           color: entry.color || "#bfd2e2"
         }));
       });
     });
 
-  (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
+  [appointmentLayer, individualLayer].flatMap((layer) => (Array.isArray(layer?.groups) ? layer.groups : []))
     .forEach((group) => {
     (Array.isArray(group.appointments) ? group.appointments : [])
       .filter((appointment) => selection.appointmentIds.has(appointment.id))
@@ -1522,19 +1569,19 @@ function renderCalendarExportChoices(project) {
       label: "Alle Ferien, Feiertage und schulfreien Tage"
     }]);
   }
-  appendCalendarExportChoiceGroup("Individuelle Projekte", (individualLayer?.appliedEntries || [])
-    .filter((entry) => entry.type === "school-project" || entry.type === "class-trip")
+  appendCalendarExportChoiceGroup("Persönliche Termine, Klassenfahrten und Schulprojekte", (individualLayer?.appliedEntries || [])
+    .filter((entry) => ["school-project", "class-trip", "vacation", "personal-appointment"].includes(entry.type))
     .map((entry) => ({
       kind: "individual",
       id: entry.id,
-      label: entry.name || (entry.type === "class-trip" ? "Klassenfahrt" : "Schulprojekt")
+      label: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type])
     })));
-  appendCalendarExportChoiceGroup("Termine", (appointmentLayer?.groups || []).flatMap((group) => (
-    (group.appointments || []).map((appointment) => ({
+  appendCalendarExportChoiceGroup("Schulische und persönliche Termingruppen", [appointmentLayer, individualLayer].flatMap((layer) => (
+    (layer?.groups || []).flatMap((group) => (group.appointments || []).map((appointment) => ({
       kind: "appointment",
       id: appointment.id,
       label: `${group.name}: ${appointment.name}`
-    }))
+    })))
   )));
   appendCalendarExportChoiceGroup("Projekttage nach Klassen", (classProjectsLayer?.entries || []).map((entry) => ({
     kind: "classProject",
@@ -1674,6 +1721,49 @@ function selectSchedule(projectId, scheduleId) {
   renderActiveCalendar();
 }
 
+function toggleLayerExpanded(projectId, layerId) {
+  const key = `${projectId}:${layerId}`;
+  if (expandedLayerKeys.has(key)) expandedLayerKeys.delete(key);
+  else expandedLayerKeys.add(key);
+  localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
+  renderProjectBrowser();
+}
+
+function expandDefaultProjectLayers(projectId) {
+  expandableLayerIds.forEach((layerId) => expandedLayerKeys.add(`${projectId}:${layerId}`));
+  localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
+}
+
+function setAppointmentGroupCalendarVisibility(project, layerType, groupId, visible) {
+  const layer = getProjectLayer(project, layerType);
+  const group = (Array.isArray(layer.groups) ? layer.groups : []).find((entry) => entry.id === groupId);
+  if (!group) return;
+  group.calendarVisible = visible;
+  saveProjects();
+  renderProjectBrowser();
+  renderActiveCalendar(project);
+}
+
+function createBrowserGroupRow(project, layerType, group) {
+  const row = document.createElement("div");
+  row.className = "browser-group-row";
+  const select = document.createElement("button");
+  select.type = "button";
+  select.className = "schedule-tree-row browser-group-select";
+  select.textContent = group.name;
+  select.addEventListener("click", () => selectLayer(project.id, layerType));
+  const visibility = document.createElement("button");
+  visibility.type = "button";
+  visibility.className = `group-visibility-button${group.calendarVisible === false ? " is-hidden" : ""}`;
+  visibility.setAttribute("aria-pressed", String(group.calendarVisible !== false));
+  visibility.setAttribute("aria-label", `${group.name} im Kalender ${group.calendarVisible === false ? "einblenden" : "ausblenden"}`);
+  visibility.title = group.calendarVisible === false ? "Im Kalender einblenden" : "Im Kalender ausblenden";
+  visibility.innerHTML = "<svg aria-hidden=\"true\" viewBox=\"0 0 24 24\"><path d=\"M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z\"/><circle cx=\"12\" cy=\"12\" r=\"2.8\"/><path class=\"eye-slash\" d=\"M4 4l16 16\"/></svg>";
+  visibility.addEventListener("click", () => setAppointmentGroupCalendarVisibility(project, layerType, group.id, group.calendarVisible === false));
+  row.append(select, visibility);
+  return row;
+}
+
 function renderProjectBrowser() {
   if (!projects.length) {
     const empty = document.createElement("p");
@@ -1711,9 +1801,7 @@ function renderProjectBrowser() {
     main.className = "project-main";
     const title = document.createElement("strong");
     title.textContent = project.name;
-    const meta = document.createElement("span");
-    meta.textContent = `${LAYER_TYPES.length} Kalenderschichten`;
-    main.append(title, meta);
+    main.append(title);
     main.addEventListener("click", () => selectProject(project.id));
 
     const displayToggle = document.createElement("input");
@@ -1738,23 +1826,46 @@ function renderProjectBrowser() {
       const layers = document.createElement("div");
       layers.className = "layer-list";
       LAYER_TYPES.forEach((layer) => {
+        const layerKey = `${project.id}:${layer.id}`;
+        const isExpandable = expandableLayerIds.has(layer.id);
+        const isLayerExpanded = isExpandable && expandedLayerKeys.has(layerKey);
+        const layerShell = document.createElement("div");
+        layerShell.className = "layer-tree-item";
+        const layerHead = document.createElement("div");
+        layerHead.className = "layer-tree-head";
+        if (isExpandable) {
+          const layerToggle = document.createElement("button");
+          layerToggle.type = "button";
+          layerToggle.className = "layer-tree-toggle";
+          layerToggle.textContent = isLayerExpanded ? "−" : "+";
+          layerToggle.setAttribute("aria-expanded", String(isLayerExpanded));
+          layerToggle.setAttribute("aria-label", `${layer.title} ${isLayerExpanded ? "zuklappen" : "aufklappen"}`);
+          layerToggle.addEventListener("click", () => toggleLayerExpanded(project.id, layer.id));
+          layerHead.append(layerToggle);
+        } else {
+          const spacer = document.createElement("span");
+          spacer.className = "layer-tree-spacer";
+          spacer.setAttribute("aria-hidden", "true");
+          layerHead.append(spacer);
+        }
         const layerRow = document.createElement("button");
         layerRow.type = "button";
         layerRow.className = `layer-row${project.id === activeProjectId && layer.id === activeLayerType ? " is-active" : ""}`;
         layerRow.textContent = layer.title;
         layerRow.addEventListener("click", () => selectLayer(project.id, layer.id));
-        layers.append(layerRow);
-        if (layer.id === "holidays") {
+        layerHead.append(layerRow);
+        layerShell.append(layerHead);
+        if (isLayerExpanded && layer.id === "holidays") {
           ensureSchools(project).forEach((school) => {
             const schoolRow = document.createElement("button");
             schoolRow.type = "button";
             schoolRow.className = `schedule-tree-row${project.id === activeProjectId && school.id === activeSchoolId ? " is-active" : ""}`;
             schoolRow.textContent = school.name;
             schoolRow.addEventListener("click", () => selectSchool(project.id, school.id));
-            layers.append(schoolRow);
+            layerShell.append(schoolRow);
           });
         }
-        if (layer.id === "schedules") {
+        if (isLayerExpanded && layer.id === "schedules") {
           const scheduleLayer = getProjectLayer(project, "schedules");
           scheduleLayer.schedules = Array.isArray(scheduleLayer.schedules) ? scheduleLayer.schedules : [];
           scheduleLayer.schedules.forEach((schedule) => {
@@ -1763,9 +1874,15 @@ function renderProjectBrowser() {
             scheduleRow.className = `schedule-tree-row${project.id === activeProjectId && schedule.id === activeScheduleId ? " is-active" : ""}`;
             scheduleRow.textContent = schedule.name;
             scheduleRow.addEventListener("click", () => selectSchedule(project.id, schedule.id));
-            layers.append(scheduleRow);
+            layerShell.append(scheduleRow);
           });
         }
+        if (isLayerExpanded && (layer.id === "appointments" || layer.id === "individual")) {
+          const appointmentLayer = getProjectLayer(project, layer.id);
+          appointmentLayer.groups = Array.isArray(appointmentLayer.groups) ? appointmentLayer.groups : [];
+          appointmentLayer.groups.forEach((group) => layerShell.append(createBrowserGroupRow(project, layer.id, group)));
+        }
+        layers.append(layerShell);
       });
       card.append(layers);
     }
@@ -3020,10 +3137,11 @@ function renderAppointmentGroupColorPalette() {
   setAppointmentGroupColor(appointmentGroupColor.value || "#c9c1dd");
 }
 
-function openAppointmentGroupDialog(project, group = null) {
+function openAppointmentGroupDialog(project, group = null, layerType = "appointments") {
   appointmentGroupForm.reset();
   appointmentGroupDialogStatus.textContent = "";
   appointmentGroupDialog.dataset.projectId = project.id;
+  appointmentGroupDialog.dataset.layerType = layerType;
   if (group) {
     appointmentGroupDialog.dataset.groupId = group.id;
     appointmentGroupDialogTitle.textContent = "Gruppe bearbeiten";
@@ -3040,11 +3158,12 @@ function openAppointmentGroupDialog(project, group = null) {
   appointmentGroupName.focus();
 }
 
-function openAppointmentDialog(project, group, appointment = null) {
+function openAppointmentDialog(project, group, appointment = null, layerType = "appointments") {
   appointmentForm.reset();
   appointmentDialogStatus.textContent = "";
   appointmentDialog.dataset.projectId = project.id;
   appointmentDialog.dataset.groupId = group.id;
+  appointmentDialog.dataset.layerType = layerType;
   if (appointment) {
     appointmentDialog.dataset.appointmentId = appointment.id;
     appointmentDialogTitle.textContent = "Termin bearbeiten";
@@ -3053,6 +3172,7 @@ function openAppointmentDialog(project, group, appointment = null) {
     appointmentDate.value = appointment.date || "";
     appointmentStartTime.value = appointment.startTime || "";
     appointmentEndTime.value = appointment.endTime || "";
+    appointmentOverridesLessons.checked = Boolean(appointment.overridesLessons);
   } else {
     delete appointmentDialog.dataset.appointmentId;
     appointmentDialogTitle.textContent = "Termin hinzufügen";
@@ -3062,7 +3182,7 @@ function openAppointmentDialog(project, group, appointment = null) {
   appointmentName.focus();
 }
 
-function createAppointmentMenu(project, group, appointment = null) {
+function createAppointmentMenu(project, group, appointment = null, layerType = "appointments") {
   const menuShell = document.createElement("div");
   menuShell.className = "schedule-menu-shell";
   const menuButton = document.createElement("button");
@@ -3080,8 +3200,8 @@ function createAppointmentMenu(project, group, appointment = null) {
   editButton.addEventListener("click", () => {
     menu.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
-    if (appointment) openAppointmentDialog(project, group, appointment);
-    else openAppointmentGroupDialog(project, group);
+    if (appointment) openAppointmentDialog(project, group, appointment, layerType);
+    else openAppointmentGroupDialog(project, group, layerType);
   });
   const deleteButton = document.createElement("button");
   deleteButton.type = "button";
@@ -3089,6 +3209,7 @@ function createAppointmentMenu(project, group, appointment = null) {
   deleteButton.textContent = "Löschen";
   deleteButton.dataset.projectId = project.id;
   deleteButton.dataset.appointmentGroupId = group.id;
+  deleteButton.dataset.appointmentLayerType = layerType;
   if (appointment) deleteButton.dataset.appointmentId = appointment.id;
   deleteButton.setAttribute("aria-label", `${appointment?.name || group.name} löschen – gedrückt halten`);
   deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
@@ -3104,9 +3225,93 @@ function createAppointmentMenu(project, group, appointment = null) {
   return menuShell;
 }
 
+function createMovedProjectSection(project, type, titleText, buttonText, emptyText) {
+  const individualLayer = getProjectLayer(project, "individual");
+  individualLayer.entries = Array.isArray(individualLayer.entries) ? individualLayer.entries : [];
+  const entries = individualLayer.entries.filter((entry) => entry.type === type);
+  const section = document.createElement("section");
+  section.className = "property-section";
+  const title = document.createElement("h3");
+  title.textContent = titleText;
+  const addButton = document.createElement("button");
+  addButton.type = "button";
+  addButton.className = "secondary-button primary-action trip-add-button";
+  addButton.textContent = buttonText;
+  addButton.addEventListener("click", () => {
+    if (type === "class-trip") openClassTripDialog(project);
+    else openSchoolProjectDialog(project, null, type);
+  });
+  const list = document.createElement("div");
+  list.className = "trip-entry-list";
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = emptyText;
+    list.append(empty);
+  } else {
+    entries.slice().sort((a, b) => a.startDate.localeCompare(b.startDate)).forEach((entry) => {
+      const row = document.createElement("article");
+      row.className = "trip-entry";
+      const copy = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = entry.name;
+      const schedule = document.createElement("span");
+      schedule.textContent = formatIndividualEventSchedule(entry);
+      copy.append(name);
+      if (entry.className) {
+        const classLabel = document.createElement("span");
+        classLabel.textContent = `Klasse ${entry.className}`;
+        copy.append(classLabel);
+      }
+      copy.append(schedule);
+      const menuShell = document.createElement("div");
+      menuShell.className = "schedule-menu-shell";
+      const menuButton = document.createElement("button");
+      menuButton.type = "button";
+      menuButton.className = "schedule-menu-button";
+      menuButton.setAttribute("aria-label", `Menü für ${entry.name}`);
+      menuButton.setAttribute("aria-expanded", "false");
+      menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+      const menu = document.createElement("div");
+      menu.className = "schedule-menu trip-entry-menu";
+      menu.hidden = true;
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.textContent = "Bearbeiten";
+      editButton.addEventListener("click", () => {
+        menu.hidden = true;
+        menuButton.setAttribute("aria-expanded", "false");
+        if (type === "class-trip") openClassTripDialog(project, entry);
+        else openSchoolProjectDialog(project, entry, type);
+      });
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "schedule-menu-delete";
+      deleteButton.textContent = "Löschen";
+      deleteButton.dataset.projectId = project.id;
+      deleteButton.dataset.tripId = entry.id;
+      deleteButton.setAttribute("aria-label", `${entry.name} löschen – gedrückt halten`);
+      deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+      deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+      deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+      deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+      menuButton.addEventListener("click", () => {
+        menu.hidden = !menu.hidden;
+        menuButton.setAttribute("aria-expanded", String(!menu.hidden));
+      });
+      menu.append(editButton, deleteButton);
+      menuShell.append(menuButton, menu);
+      row.append(copy, menuShell);
+      list.append(row);
+    });
+  }
+  section.append(title, addButton, list);
+  return section;
+}
+
 function renderAppointmentsProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
-  detailPanelTitle.textContent = "Termine";
+  detailPanelTitle.textContent = "Schulische Termine";
   const layer = getProjectLayer(project, "appointments");
   layer.groups = Array.isArray(layer.groups) ? layer.groups : [];
 
@@ -3115,9 +3320,9 @@ function renderAppointmentsProperties(project) {
   const head = document.createElement("div");
   head.className = "property-sheet-head";
   const title = document.createElement("h3");
-  title.textContent = project.name;
+  title.textContent = "Termine organisieren";
   const intro = document.createElement("p");
-  intro.textContent = "Bündeln Sie unregelmäßig wiederkehrende Termine in eigenen Gruppen, zum Beispiel „Fachschaft Deutsch“.";
+  intro.textContent = "Bündeln Sie unregelmäßig wiederkehrende Termine in Gruppen und verwalten Sie hier auch Klassenfahrten und Schulprojekte.";
   head.append(title, intro);
   const addGroupButton = document.createElement("button");
   addGroupButton.type = "button";
@@ -3176,7 +3381,9 @@ function renderAppointmentsProperties(project) {
       groupList.append(groupCard);
     });
   }
-  sheet.append(head, addGroupButton, groupList);
+  const classTrips = createMovedProjectSection(project, "class-trip", "Klassenfahrten", "Klassenfahrt hinzufügen", "Noch keine Klassenfahrt eingetragen.");
+  const schoolProjects = createMovedProjectSection(project, "school-project", "Schulprojekte", "Schulprojekt hinzufügen", "Noch kein Schulprojekt eingetragen.");
+  sheet.append(head, addGroupButton, groupList, classTrips, schoolProjects);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -3911,6 +4118,8 @@ function deleteProjectFolder(projectId) {
   if (!projects.some((project) => project.id === projectId)) return;
   projects = projects.filter((project) => project.id !== projectId);
   expandedProjectIds.delete(projectId);
+  [...expandedLayerKeys].filter((key) => key.startsWith(`${projectId}:`)).forEach((key) => expandedLayerKeys.delete(key));
+  localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
 
   if (displayedProjectId === projectId) {
     displayedProjectId = projects[0]?.id ?? null;
@@ -3937,28 +4146,31 @@ function deleteClassTrip(projectId, tripId) {
     layer.appliedEntries = layer.appliedEntries.filter((entry) => entry.id !== tripId);
   }
   saveProjects();
-  renderIndividualProjectsProperties(project);
+  if (activeLayerType === "appointments") renderAppointmentsProperties(project);
+  else renderIndividualProjectsProperties(project);
   renderActiveCalendar(project);
 }
 
-function deleteAppointmentGroup(projectId, groupId) {
+function deleteAppointmentGroup(projectId, groupId, layerType = "appointments") {
   const project = projects.find((entry) => entry.id === projectId);
-  const layer = project?.layers?.find((entry) => entry.type === "appointments");
+  const layer = project?.layers?.find((entry) => entry.type === layerType);
   if (!project || !layer || !Array.isArray(layer.groups)) return;
   layer.groups = layer.groups.filter((entry) => entry.id !== groupId);
   saveProjects();
-  renderAppointmentsProperties(project);
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
   renderActiveCalendar(project);
 }
 
-function deleteAppointment(projectId, groupId, appointmentId) {
+function deleteAppointment(projectId, groupId, appointmentId, layerType = "appointments") {
   const project = projects.find((entry) => entry.id === projectId);
-  const layer = project?.layers?.find((entry) => entry.type === "appointments");
+  const layer = project?.layers?.find((entry) => entry.type === layerType);
   const group = layer?.groups?.find((entry) => entry.id === groupId);
   if (!project || !group || !Array.isArray(group.appointments)) return;
   group.appointments = group.appointments.filter((entry) => entry.id !== appointmentId);
   saveProjects();
-  renderAppointmentsProperties(project);
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
   renderActiveCalendar(project);
 }
 
@@ -4006,6 +4218,7 @@ function beginScheduleDeleteHold(event) {
     tripId: button.dataset.tripId,
     appointmentGroupId: button.dataset.appointmentGroupId,
     appointmentId: button.dataset.appointmentId,
+    appointmentLayerType: button.dataset.appointmentLayerType,
     sicknessId: button.dataset.sicknessId,
     catalogType: button.dataset.catalogType,
     catalogSubjectId: button.dataset.catalogSubjectId,
@@ -4038,6 +4251,7 @@ function finishScheduleDeleteHold(event) {
     tripId,
     appointmentGroupId,
     appointmentId,
+    appointmentLayerType,
     sicknessId,
     catalogType,
     catalogSubjectId,
@@ -4059,8 +4273,8 @@ function finishScheduleDeleteHold(event) {
   else if (lessonId) deleteLesson(projectId, scheduleId, lessonId);
   else if (catalogType) deleteClassCatalogEntry(projectId, catalogType, catalogSubjectId, catalogGradeId, catalogClassId);
   else if (sicknessId) deleteSickness(projectId, sicknessId);
-  else if (appointmentId) deleteAppointment(projectId, appointmentGroupId, appointmentId);
-  else if (appointmentGroupId) deleteAppointmentGroup(projectId, appointmentGroupId);
+  else if (appointmentId) deleteAppointment(projectId, appointmentGroupId, appointmentId, appointmentLayerType);
+  else if (appointmentGroupId) deleteAppointmentGroup(projectId, appointmentGroupId, appointmentLayerType);
   else if (tripId) deleteClassTrip(projectId, tripId);
   else deleteSchedule(projectId, scheduleId);
 }
@@ -4072,9 +4286,20 @@ function cancelScheduleDeleteHold(event) {
   resetScheduleDeleteHold();
 }
 
+function openSchedulePresetDialog(project) {
+  schedulePresetForm.reset();
+  schoolDayStart.value = "07:00";
+  schoolDayEnd.value = "18:00";
+  defaultLessonDuration.value = "45";
+  schedulePresetStatus.textContent = "";
+  schedulePresetDialog.dataset.projectId = project.id;
+  schedulePresetDialog.showModal();
+  requestAnimationFrame(() => schoolDayStart.focus());
+}
+
 function renderSchedulesProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
-  detailPanelTitle.textContent = "Stundenpläne";
+  detailPanelTitle.textContent = "Stundenplanlogiken";
   const layer = getProjectLayer(project, "schedules");
   const schools = ensureSchools(project);
   layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
@@ -4085,42 +4310,17 @@ function renderSchedulesProperties(project) {
     sheet.className = "property-sheet";
     const head = document.createElement("div");
     head.className = "property-sheet-head";
-    const title = document.createElement("h3");
-    title.textContent = project.name;
     const intro = document.createElement("p");
-    intro.textContent = "Legen Sie einen Wochenplan an. Er erscheint anschließend unter „Stundenpläne“ im Browser.";
-    head.append(title, intro);
+    intro.textContent = "Legen Sie die möglichen Zeitlogiken Ihrer Schule an – beispielsweise ein Raster aus Einzelstunden, Blockstunden oder abweichenden Stunden- und Pausenfolgen. Die konkreten Unterrichtsstunden werden anschließend innerhalb der gewählten Logik eingetragen.";
+    head.append(intro);
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button primary-action schedule-add-button";
-    addButton.textContent = "Stundenplan hinzufügen";
+    addButton.textContent = "Stundenplanlogik hinzufügen";
     addButton.disabled = !schools.length;
     if (!schools.length) addButton.title = "Bitte zuerst eine Schule anlegen.";
     addButton.addEventListener("click", () => {
-      const school = schools[0];
-      if (!school) return;
-      const defaultValidity = getDefaultScheduleValidity(project, school.id);
-      const defaultValidityPeriod = getScheduleValidityPeriods(project, school.id)[0];
-      const newSchedule = {
-        id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}`,
-        name: `Stundenplan ${layer.schedules.length + 1}`,
-        schoolId: school.id,
-        validityPeriodId: defaultValidityPeriod?.id || "schoolYear",
-        validFrom: defaultValidityPeriod?.startDate || defaultValidity.validFrom,
-        validUntil: defaultValidityPeriod?.endDate || defaultValidity.validUntil,
-        activeDays: [1, 2, 3, 4, 5],
-        displayDefaults: { dayStart: "07:00", dayEnd: "18:00", lessonMinutes: 45 },
-        displayRows: getDefaultDisplayRows(),
-        pauseDefaultsInitialized: true,
-        lessons: [],
-        createdAt: new Date().toISOString()
-      };
-      layer.schedules.push(newSchedule);
-      activeScheduleId = newSchedule.id;
-      saveProjects();
-      renderProjectBrowser();
-      renderSchedulesProperties(project);
-      openScheduleDisplayDialog(project, newSchedule);
+      openSchedulePresetDialog(project);
     });
     const scheduleList = document.createElement("div");
     scheduleList.className = "schedule-overview-list";
@@ -4135,10 +4335,7 @@ function renderSchedulesProperties(project) {
         name.textContent = entry.name;
         const schoolName = getSchool(project, entry.schoolId)?.name;
         const validity = document.createElement("span");
-        const validityPeriod = resolveScheduleValidityPeriod(entry, project);
-        validity.textContent = entry.validFrom && entry.validUntil
-          ? `${schoolName ? `${schoolName} · ` : ""}${validityPeriod?.label ? `${validityPeriod.label} · ` : ""}${formatGermanDate(entry.validFrom)}–${formatGermanDate(entry.validUntil)}`
-          : "Gültigkeit noch nicht vollständig festgelegt";
+        validity.textContent = schoolName || "Schule noch nicht zugeordnet";
         const lessonCount = document.createElement("small");
         const count = Array.isArray(entry.lessons) ? entry.lessons.length : 0;
         lessonCount.textContent = `${count} ${count === 1 ? "Unterrichtsstunde" : "Unterrichtsstunden"}`;
@@ -4211,7 +4408,7 @@ function renderSchedulesProperties(project) {
   menuShell.append(menuButton, menu);
   titleLine.append(title, menuShell);
   const intro = document.createElement("p");
-  intro.textContent = "Gültigkeitszeitraum auswählen und für eine neue Stunde in das Wochenraster klicken.";
+  intro.textContent = "Für eine neue Stunde in das Wochenraster klicken.";
   head.append(setupNotice, titleLine, intro);
 
   const validity = document.createElement("div");
@@ -4230,41 +4427,18 @@ function renderSchedulesProperties(project) {
   });
   if (!schedule.schoolId && schools[0]) schedule.schoolId = schools[0].id;
   schoolLabel.append(schoolText, createSelectShell(schoolSelect));
-  const validityLabel = document.createElement("label");
-  const validityText = document.createElement("span");
-  validityText.textContent = "Gültigkeitszeitraum";
-  const validitySelect = document.createElement("select");
-  validitySelect.setAttribute("aria-label", "Gültigkeitszeitraum");
-  let validityPeriods = getScheduleValidityPeriods(project, schedule.schoolId);
-  const selectedValidityPeriod = resolveScheduleValidityPeriod(schedule, project);
-  validityPeriods.forEach((period) => {
-    const option = document.createElement("option");
-    option.value = period.id;
-    option.textContent = period.label;
-    option.selected = period.id === selectedValidityPeriod?.id;
-    validitySelect.append(option);
-  });
+  const selectedValidityPeriod = getScheduleValidityPeriods(project, schedule.schoolId)[0];
   const previousValidity = `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`;
   applyScheduleValidityPeriod(schedule, selectedValidityPeriod);
-  if (previousValidity !== `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`) {
-    saveProjects();
-  }
-  validityLabel.append(validityText, createSelectShell(validitySelect));
-  validitySelect.addEventListener("change", () => {
-    applyScheduleValidityPeriod(schedule, validityPeriods.find((period) => period.id === validitySelect.value));
-    saveProjects();
-    renderActiveCalendar(project);
-    renderProjectBrowser();
-  });
+  if (previousValidity !== `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`) saveProjects();
   schoolSelect.addEventListener("change", () => {
     schedule.schoolId = schoolSelect.value;
-    validityPeriods = getScheduleValidityPeriods(project, schedule.schoolId);
-    applyScheduleValidityPeriod(schedule, validityPeriods[0]);
+    applyScheduleValidityPeriod(schedule, getScheduleValidityPeriods(project, schedule.schoolId)[0]);
     saveProjects();
     renderSchedulesProperties(project);
     renderActiveCalendar(project);
   });
-  validity.append(schoolLabel, validityLabel);
+  validity.append(schoolLabel);
 
   schedule.activeDays = getScheduleActiveDays(schedule);
   const activeDaysField = document.createElement("fieldset");
@@ -4961,17 +5135,7 @@ function renderLessonColorPalette() {
 function openScheduleDisplayDialog(project, schedule) {
   displayRowsDraft = structuredClone(schedule.displayRows);
   if (!schedule.pauseDefaultsInitialized) insertMissingPauseRows();
-  const firstStart = displayRowsDraft[0]?.start || "07:00";
-  const lastEnd = displayRowsDraft.at(-1)?.end || "18:00";
-  const firstLesson = displayRowsDraft.find((row) => row.type === "lesson");
-  const inferredLessonMinutes = firstLesson
-    ? Math.max(15, timeToMinutes(firstLesson.end) - timeToMinutes(firstLesson.start))
-    : 45;
-  const defaults = schedule.displayDefaults || {};
   scheduleDisplayName.value = schedule.name;
-  schoolDayStart.value = defaults.dayStart || firstStart;
-  schoolDayEnd.value = defaults.dayEnd || lastEnd;
-  defaultLessonDuration.value = String(defaults.lessonMinutes || inferredLessonMinutes);
   scheduleDisplayDialog.dataset.projectId = project.id;
   scheduleDisplayDialog.dataset.scheduleId = schedule.id;
   scheduleDisplayStatus.textContent = "";
@@ -4996,26 +5160,159 @@ function insertMissingPauseRows() {
   }
 }
 
-function applyDisplayDefaults() {
-  const lessonMinutes = Math.max(15, Number(defaultLessonDuration.value) || 45);
-  if (!schoolDayStart.value || !schoolDayEnd.value || schoolDayEnd.value <= schoolDayStart.value) {
-    scheduleDisplayStatus.textContent = "Das Ende des Schultages muss nach seinem Beginn liegen.";
-    return;
-  }
-  displayRowsDraft = getDefaultDisplayRows(schoolDayStart.value, schoolDayEnd.value, lessonMinutes);
-  scheduleDisplayStatus.textContent = "Voreinstellung aktualisiert. Einzelne Zeiten und Pausen können weiterhin verändert werden.";
-  renderScheduleDisplayRows();
-}
-
 function timeToMinutes(value) {
   const [hours, minutes] = String(value).split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+function isValidTimeValue(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value));
 }
 
 function minutesToTime(value) {
   const safeMinutes = Math.max(0, Math.min(value, 23 * 60 + 45));
   return `${String(Math.floor(safeMinutes / 60)).padStart(2, "0")}:${String(safeMinutes % 60).padStart(2, "0")}`;
 }
+
+function createFiveMinuteTimeControl(input) {
+  const initialParts = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.value) || ["", "00", "00"];
+  input.type = "hidden";
+  input.removeAttribute("step");
+  const shell = document.createElement("span");
+  shell.className = "five-minute-time-control";
+  const manual = document.createElement("span");
+  manual.className = "five-minute-time-manual";
+  const hourInput = document.createElement("input");
+  hourInput.type = "text";
+  hourInput.inputMode = "numeric";
+  hourInput.maxLength = 2;
+  hourInput.value = initialParts[1];
+  hourInput.setAttribute("aria-label", "Stunde");
+  hourInput.autocomplete = "off";
+  const separator = document.createElement("span");
+  separator.textContent = ":";
+  separator.setAttribute("aria-hidden", "true");
+  const minuteInput = document.createElement("input");
+  minuteInput.type = "text";
+  minuteInput.inputMode = "numeric";
+  minuteInput.maxLength = 2;
+  minuteInput.value = initialParts[2];
+  minuteInput.setAttribute("aria-label", "Minute");
+  minuteInput.autocomplete = "off";
+  [hourInput, minuteInput].forEach((segment) => segment.addEventListener("focus", () => segment.select()));
+  const syncManualValue = () => {
+    let hour = hourInput.value.replace(/\D/g, "").slice(0, 2);
+    let minute = minuteInput.value.replace(/\D/g, "").slice(0, 2);
+    if (hour.length === 2 && Number(hour) > 23) hour = "23";
+    if (minute.length === 2 && Number(minute) > 59) minute = "59";
+    hourInput.value = hour;
+    minuteInput.value = minute;
+    input.value = hour.length === 2 && minute.length === 2 ? `${hour}:${minute}` : "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  hourInput.addEventListener("input", () => {
+    syncManualValue();
+    if (hourInput.value.length === 2) minuteInput.select();
+  });
+  minuteInput.addEventListener("input", syncManualValue);
+  [hourInput, minuteInput].forEach((segment) => segment.addEventListener("blur", () => {
+    if (segment.value.length === 1) segment.value = segment.value.padStart(2, "0");
+    syncManualValue();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }));
+  manual.append(hourInput, separator, minuteInput);
+  const pickerButton = document.createElement("button");
+  pickerButton.type = "button";
+  pickerButton.className = "five-minute-time-button";
+  pickerButton.setAttribute("aria-label", "Uhrzeit auswählen");
+  pickerButton.setAttribute("aria-expanded", "false");
+  pickerButton.innerHTML = "<svg aria-hidden=\"true\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 7v5l3 2\"/></svg>";
+  const picker = document.createElement("span");
+  picker.className = "five-minute-time-picker";
+  picker.hidden = true;
+  const hourList = document.createElement("span");
+  hourList.className = "five-minute-time-column";
+  hourList.setAttribute("role", "listbox");
+  hourList.setAttribute("aria-label", "Stunde");
+  const minuteList = document.createElement("span");
+  minuteList.className = "five-minute-time-column";
+  minuteList.setAttribute("role", "listbox");
+  minuteList.setAttribute("aria-label", "Minute");
+  const currentParts = () => /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.value) || ["", "00", "00"];
+  const selectValue = (kind, value) => {
+    const parts = currentParts();
+    const hour = kind === "hour" ? value : parts[1];
+    const minute = kind === "minute" ? value : parts[2];
+    input.value = `${hour}:${minute}`;
+    hourInput.value = hour;
+    minuteInput.value = minute;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    [...picker.querySelectorAll("button")].forEach((button) => {
+      const selected = button.dataset[kind] === value;
+      if (button.dataset[kind]) button.classList.toggle("is-selected", selected);
+    });
+    if (kind === "minute") {
+      picker.hidden = true;
+      pickerButton.setAttribute("aria-expanded", "false");
+      minuteInput.focus();
+    }
+  };
+  for (let hour = 0; hour < 24; hour += 1) {
+    const value = String(hour).padStart(2, "0");
+    const option = document.createElement("button");
+    option.type = "button";
+    option.dataset.hour = value;
+    option.textContent = value;
+    option.setAttribute("role", "option");
+    option.addEventListener("click", () => selectValue("hour", value));
+    hourList.append(option);
+  }
+  for (let minute = 0; minute < 60; minute += 5) {
+    const value = String(minute).padStart(2, "0");
+    const option = document.createElement("button");
+    option.type = "button";
+    option.dataset.minute = value;
+    option.textContent = value;
+    option.setAttribute("role", "option");
+    option.addEventListener("click", () => selectValue("minute", value));
+    minuteList.append(option);
+  }
+  picker.append(hourList, minuteList);
+  pickerButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    document.querySelectorAll(".five-minute-time-picker").forEach((other) => { if (other !== picker) other.hidden = true; });
+    picker.hidden = !picker.hidden;
+    pickerButton.setAttribute("aria-expanded", String(!picker.hidden));
+    if (!picker.hidden) {
+      picker.querySelectorAll(".is-selected").forEach((option) => option.classList.remove("is-selected"));
+      const [, hour, minute] = currentParts();
+      const roundedMinute = String(Math.min(55, Math.round(Number(minute) / 5) * 5)).padStart(2, "0");
+      const hourOption = hourList.querySelector(`[data-hour="${hour}"]`);
+      const minuteOption = minuteList.querySelector(`[data-minute="${roundedMinute}"]`);
+      hourOption?.classList.add("is-selected");
+      minuteOption?.classList.add("is-selected");
+      requestAnimationFrame(() => hourOption?.scrollIntoView({ block: "center" }));
+      requestAnimationFrame(() => minuteOption?.scrollIntoView({ block: "center" }));
+    }
+  });
+  picker.addEventListener("click", (event) => event.stopPropagation());
+  shell.append(input, manual, pickerButton, picker);
+  return shell;
+}
+
+document.addEventListener("click", () => {
+  document.querySelectorAll(".five-minute-time-picker").forEach((picker) => { picker.hidden = true; });
+  document.querySelectorAll(".five-minute-time-button").forEach((button) => button.setAttribute("aria-expanded", "false"));
+});
+
+[schoolDayStart, schoolDayEnd].forEach((input) => {
+  const parent = input?.parentNode;
+  if (!parent || input.closest(".five-minute-time-control")) return;
+  const nextSibling = input.nextSibling;
+  const control = createFiveMinuteTimeControl(input);
+  parent.insertBefore(control, nextSibling);
+});
 
 function renderScheduleDisplayRows() {
   const rows = displayRowsDraft.map((row, index) => {
@@ -5045,9 +5342,9 @@ function renderScheduleDisplayRows() {
     start.value = row.start;
     start.required = true;
     start.setAttribute("aria-label", `${kind.textContent} Beginn`);
-    start.addEventListener("change", () => {
+    start.addEventListener("input", () => {
       row.start = start.value;
-      renderScheduleDisplayRows();
+      updateScheduleDisplayConflicts();
     });
     const end = document.createElement("input");
     end.type = "time";
@@ -5055,9 +5352,9 @@ function renderScheduleDisplayRows() {
     end.value = row.end;
     end.required = true;
     end.setAttribute("aria-label", `${kind.textContent} Ende`);
-    end.addEventListener("change", () => {
+    end.addEventListener("input", () => {
       row.end = end.value;
-      renderScheduleDisplayRows();
+      updateScheduleDisplayConflicts();
     });
     const remove = document.createElement("button");
     remove.type = "button";
@@ -5068,10 +5365,25 @@ function renderScheduleDisplayRows() {
       displayRowsDraft.splice(index, 1);
       renderScheduleDisplayRows();
     });
-    item.append(kind, label, start, end, remove);
+    item.append(kind, label, createFiveMinuteTimeControl(start), createFiveMinuteTimeControl(end), remove);
     return item;
   });
   scheduleDisplayRows.replaceChildren(...rows);
+}
+
+function updateScheduleDisplayConflicts() {
+  [...scheduleDisplayRows.querySelectorAll(".display-row-item")].forEach((item, index) => {
+    const row = displayRowsDraft[index];
+    const previous = displayRowsDraft[index - 1];
+    const hasConflict = Boolean(previous && row?.start && row.start !== previous.end);
+    item.classList.toggle("has-time-conflict", hasConflict);
+    if (!hasConflict) {
+      item.removeAttribute("title");
+      return;
+    }
+    const relation = row.start < previous.end ? "Überschneidung" : "Zeitlücke";
+    item.title = `${relation}: Der Beginn stimmt nicht mit dem Ende des vorherigen Feldes überein.`;
+  });
 }
 
 function addScheduleDisplayRow(type) {
@@ -5121,6 +5433,7 @@ function getIndividualEventTimeDefaults(project) {
 
 function openClassTripDialog(project, trip = null) {
   classTripForm.reset();
+  classTripEndDate.min = "";
   classTripDialogStatus.textContent = "";
   classTripDialog.dataset.projectId = project.id;
   const timeDefaults = getIndividualEventTimeDefaults(project);
@@ -5130,41 +5443,67 @@ function openClassTripDialog(project, trip = null) {
     classTripSubmitButton.textContent = "Änderungen speichern";
     classTripName.value = trip.name || "";
     classTripClass.value = trip.className || "";
-    classTripDate.value = trip.startDate || "";
+    classTripStartDate.value = trip.startDate || trip.date || "";
+    classTripEndDate.value = trip.endDate || trip.startDate || trip.date || "";
+    classTripEndDate.min = classTripStartDate.value;
     classTripStartTime.value = trip.startTime || timeDefaults.start;
     classTripEndTime.value = trip.endTime || timeDefaults.end;
+    classTripOverridesLessons.checked = Boolean(trip.overridesLessons);
   } else {
     delete classTripDialog.dataset.tripId;
     classTripDialogTitle.textContent = "Klassenfahrt hinzufügen";
     classTripSubmitButton.textContent = "Klassenfahrt hinzufügen";
     classTripStartTime.value = timeDefaults.start;
     classTripEndTime.value = timeDefaults.end;
+    classTripOverridesLessons.checked = false;
   }
+  classTripStartDate.onchange = () => {
+    classTripEndDate.min = classTripStartDate.value;
+    if (!classTripEndDate.value || classTripEndDate.value < classTripStartDate.value) {
+      classTripEndDate.value = classTripStartDate.value;
+    }
+  };
   classTripDialog.showModal();
   classTripName.focus();
 }
 
-function openSchoolProjectDialog(project, schoolProject = null) {
+function openSchoolProjectDialog(project, schoolProject = null, entryType = "school-project") {
   schoolProjectForm.reset();
   schoolProjectEndDate.min = "";
   schoolProjectDialogStatus.textContent = "";
   schoolProjectDialog.dataset.projectId = project.id;
+  schoolProjectDialog.dataset.entryType = schoolProject?.type || entryType;
+  const dialogLabels = {
+    "school-project": ["Schulprojekt", "Schulprojekt"],
+    vacation: ["Urlaub", "Urlaub"],
+    "personal-appointment": ["Weiteren Termin", "Termin"]
+  };
+  const [noun, buttonNoun] = dialogLabels[schoolProjectDialog.dataset.entryType] || dialogLabels["school-project"];
+  const dialogLabel = schoolProjectDialog.querySelector(".label");
+  if (dialogLabel) dialogLabel.textContent = schoolProjectDialog.dataset.entryType === "school-project" ? "Termine" : "Persönliche Termine";
+  schoolProjectName.placeholder = schoolProjectDialog.dataset.entryType === "vacation"
+    ? "z. B. Sommerurlaub"
+    : schoolProjectDialog.dataset.entryType === "personal-appointment"
+      ? "z. B. Arzttermin"
+      : "z. B. Theaterprojekt";
   const timeDefaults = getIndividualEventTimeDefaults(project);
   if (schoolProject) {
     schoolProjectDialog.dataset.entryId = schoolProject.id;
-    schoolProjectDialogTitle.textContent = "Schulprojekt bearbeiten";
+    schoolProjectDialogTitle.textContent = `${noun} bearbeiten`;
     schoolProjectSubmitButton.textContent = "Änderungen speichern";
     schoolProjectName.value = schoolProject.name || "";
     schoolProjectDate.value = schoolProject.startDate || "";
     schoolProjectEndDate.value = schoolProject.endDate || schoolProject.startDate || "";
     schoolProjectStartTime.value = schoolProject.startTime || timeDefaults.start;
     schoolProjectEndTime.value = schoolProject.endTime || timeDefaults.end;
+    schoolProjectOverridesLessons.checked = Boolean(schoolProject.overridesLessons);
   } else {
     delete schoolProjectDialog.dataset.entryId;
-    schoolProjectDialogTitle.textContent = "Schulprojekt hinzufügen";
-    schoolProjectSubmitButton.textContent = "Schulprojekt hinzufügen";
+    schoolProjectDialogTitle.textContent = `${noun} hinzufügen`;
+    schoolProjectSubmitButton.textContent = `${buttonNoun} hinzufügen`;
     schoolProjectStartTime.value = timeDefaults.start;
     schoolProjectEndTime.value = timeDefaults.end;
+    schoolProjectOverridesLessons.checked = false;
   }
   schoolProjectEndDate.min = schoolProjectDate.value;
   schoolProjectDialog.showModal();
@@ -5180,14 +5519,78 @@ function formatIndividualEventSchedule(entry) {
     : dateText;
 }
 
+function createPersonalAppointmentGroupsSection(project, layer) {
+  layer.groups = Array.isArray(layer.groups) ? layer.groups : [];
+  const section = document.createElement("section");
+  section.className = "property-section";
+  const title = document.createElement("h3");
+  title.textContent = "Weitere Termine";
+  const intro = document.createElement("p");
+  intro.textContent = "Organisieren Sie persönliche Termine in eigenen Gruppen.";
+  const addGroupButton = document.createElement("button");
+  addGroupButton.type = "button";
+  addGroupButton.className = "secondary-button primary-action appointment-add-group";
+  addGroupButton.textContent = "Gruppe hinzufügen";
+  addGroupButton.addEventListener("click", () => openAppointmentGroupDialog(project, null, "individual"));
+  const list = document.createElement("div");
+  list.className = "appointment-group-list";
+  if (!layer.groups.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Noch keine persönliche Termingruppe angelegt.";
+    list.append(empty);
+  } else {
+    layer.groups.forEach((group) => {
+      group.appointments = Array.isArray(group.appointments) ? group.appointments : [];
+      const card = document.createElement("section");
+      card.className = "appointment-group-card";
+      card.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
+      const head = document.createElement("div");
+      head.className = "appointment-group-head";
+      const name = document.createElement("h3");
+      name.textContent = group.name;
+      head.append(name, createAppointmentMenu(project, group, null, "individual"));
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "secondary-button appointment-add-button";
+      add.textContent = "Termin hinzufügen";
+      add.addEventListener("click", () => openAppointmentDialog(project, group, null, "individual"));
+      const entries = document.createElement("div");
+      entries.className = "appointment-entry-list";
+      if (!group.appointments.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = "In dieser Gruppe sind noch keine Termine eingetragen.";
+        entries.append(empty);
+      } else {
+        group.appointments.slice().sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)).forEach((appointment) => {
+          const row = document.createElement("article");
+          row.className = "appointment-entry";
+          const copy = document.createElement("div");
+          const entryName = document.createElement("strong");
+          entryName.textContent = appointment.name;
+          const date = document.createElement("span");
+          date.textContent = `${formatGermanDate(appointment.date)} · ${appointment.startTime}–${appointment.endTime}`;
+          copy.append(entryName, date);
+          row.append(copy, createAppointmentMenu(project, group, appointment, "individual"));
+          entries.append(row);
+        });
+      }
+      card.append(head, add, entries);
+      list.append(card);
+    });
+  }
+  section.append(title, intro, addGroupButton, list);
+  return section;
+}
+
 function renderIndividualProjectsProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
-  detailPanelTitle.textContent = "Individuelle Projekte";
+  detailPanelTitle.textContent = "Persönliche Termine";
 
   const layer = getProjectLayer(project, "individual");
   layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
-  const trips = layer.entries.filter((entry) => entry.type === "class-trip");
-  const schoolProjects = layer.entries.filter((entry) => entry.type === "school-project");
+  const trips = layer.entries.filter((entry) => entry.type === "vacation");
 
   const sheet = document.createElement("section");
   sheet.className = "property-sheet";
@@ -5196,13 +5599,13 @@ function renderIndividualProjectsProperties(project) {
   const title = document.createElement("h3");
   title.textContent = project.name;
   const intro = document.createElement("p");
-  intro.textContent = "Persönlich betreute oder begleitete Vorhaben werden als eigene Kalendereinträge im Projekt gespeichert.";
+  intro.textContent = "Erfassen Sie Urlaub und weitere persönliche Termine als eigene Kalendereinträge.";
   head.append(title, intro);
 
   const section = document.createElement("section");
   section.className = "property-section";
   const sectionTitle = document.createElement("h3");
-  sectionTitle.textContent = "Klassenfahrten";
+  sectionTitle.textContent = "Urlaub";
 
   const form = document.createElement("form");
   form.className = "trip-form";
@@ -5277,15 +5680,15 @@ function renderIndividualProjectsProperties(project) {
   const launcherButton = document.createElement("button");
   launcherButton.type = "button";
   launcherButton.className = "secondary-button primary-action trip-add-button";
-  launcherButton.textContent = "Klassenfahrt hinzufügen";
-  launcherButton.addEventListener("click", () => openClassTripDialog(project));
+  launcherButton.textContent = "Urlaub hinzufügen";
+  launcherButton.addEventListener("click", () => openSchoolProjectDialog(project, null, "vacation"));
 
   const list = document.createElement("div");
   list.className = "trip-entry-list";
   if (!trips.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = "Noch keine Klassenfahrt eingetragen.";
+    empty.textContent = "Noch kein Urlaub eingetragen.";
     list.append(empty);
   } else {
     trips
@@ -5323,7 +5726,7 @@ function renderIndividualProjectsProperties(project) {
         editButton.addEventListener("click", () => {
           menu.hidden = true;
           menuButton.setAttribute("aria-expanded", "false");
-          openClassTripDialog(project, trip);
+          openSchoolProjectDialog(project, trip, "vacation");
         });
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
@@ -5347,82 +5750,12 @@ function renderIndividualProjectsProperties(project) {
       });
   }
 
-  const schoolProjectSection = document.createElement("section");
-  schoolProjectSection.className = "property-section";
-  const schoolProjectSectionTitle = document.createElement("h3");
-  schoolProjectSectionTitle.textContent = "Schulprojekte";
-  const schoolProjectLauncher = document.createElement("button");
-  schoolProjectLauncher.type = "button";
-  schoolProjectLauncher.className = "secondary-button primary-action trip-add-button";
-  schoolProjectLauncher.textContent = "Schulprojekt hinzufügen";
-  schoolProjectLauncher.addEventListener("click", () => openSchoolProjectDialog(project));
-  const schoolProjectList = document.createElement("div");
-  schoolProjectList.className = "trip-entry-list";
-  if (!schoolProjects.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty-state";
-    empty.textContent = "Noch kein Schulprojekt eingetragen.";
-    schoolProjectList.append(empty);
-  } else {
-    schoolProjects
-      .slice()
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))
-      .forEach((schoolProject) => {
-        const row = document.createElement("article");
-        row.className = "trip-entry";
-        const copy = document.createElement("div");
-        const name = document.createElement("strong");
-        name.textContent = schoolProject.name;
-        const dates = document.createElement("span");
-        dates.textContent = formatIndividualEventSchedule(schoolProject);
-        copy.append(name, dates);
-        const menuShell = document.createElement("div");
-        menuShell.className = "schedule-menu-shell";
-        const menuButton = document.createElement("button");
-        menuButton.type = "button";
-        menuButton.className = "schedule-menu-button";
-        menuButton.setAttribute("aria-label", `Menü für ${schoolProject.name}`);
-        menuButton.setAttribute("aria-expanded", "false");
-        menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
-        const menu = document.createElement("div");
-        menu.className = "schedule-menu trip-entry-menu";
-        menu.hidden = true;
-        const editButton = document.createElement("button");
-        editButton.type = "button";
-        editButton.textContent = "Bearbeiten";
-        editButton.addEventListener("click", () => {
-          menu.hidden = true;
-          menuButton.setAttribute("aria-expanded", "false");
-          openSchoolProjectDialog(project, schoolProject);
-        });
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.className = "schedule-menu-delete";
-        deleteButton.textContent = "Löschen";
-        deleteButton.dataset.projectId = project.id;
-        deleteButton.dataset.tripId = schoolProject.id;
-        deleteButton.setAttribute("aria-label", `${schoolProject.name} löschen – gedrückt halten`);
-        deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
-        deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
-        deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
-        deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
-        menuButton.addEventListener("click", () => {
-          menu.hidden = !menu.hidden;
-          menuButton.setAttribute("aria-expanded", String(!menu.hidden));
-        });
-        menu.append(editButton, deleteButton);
-        menuShell.append(menuButton, menu);
-        row.append(copy, menuShell);
-        schoolProjectList.append(row);
-      });
-  }
-  schoolProjectSection.append(schoolProjectSectionTitle, schoolProjectLauncher, schoolProjectList);
-
   layer.appliedEntries = structuredClone(layer.entries);
   layer.appliedAt = new Date().toISOString();
 
   section.append(sectionTitle, launcherButton, list);
-  sheet.append(head, section, schoolProjectSection);
+  const appointmentGroups = createPersonalAppointmentGroupsSection(project, layer);
+  sheet.append(head, section, appointmentGroups);
   projectDetail.replaceChildren(sheet);
   saveProjects();
   renderActiveCalendar(project);
@@ -6964,7 +7297,8 @@ cancelAppointmentGroupButton.addEventListener("click", () => appointmentGroupDia
 appointmentGroupForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const project = projects.find((entry) => entry.id === appointmentGroupDialog.dataset.projectId);
-  const layer = project && getProjectLayer(project, "appointments");
+  const layerType = appointmentGroupDialog.dataset.layerType || "appointments";
+  const layer = project && getProjectLayer(project, layerType);
   const name = appointmentGroupName.value.trim();
   if (!project || !layer) return;
   if (!name) {
@@ -6989,14 +7323,16 @@ appointmentGroupForm.addEventListener("submit", (event) => {
   }
   saveProjects();
   appointmentGroupDialog.close();
-  renderAppointmentsProperties(project);
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
   renderActiveCalendar(project);
 });
 cancelAppointmentButton.addEventListener("click", () => appointmentDialog.close());
 appointmentForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const project = projects.find((entry) => entry.id === appointmentDialog.dataset.projectId);
-  const layer = project && getProjectLayer(project, "appointments");
+  const layerType = appointmentDialog.dataset.layerType || "appointments";
+  const layer = project && getProjectLayer(project, layerType);
   const group = layer?.groups?.find((entry) => entry.id === appointmentDialog.dataset.groupId);
   const name = appointmentName.value.trim();
   if (!project || !group) return;
@@ -7014,7 +7350,8 @@ appointmentForm.addEventListener("submit", (event) => {
     name,
     date: appointmentDate.value,
     startTime: appointmentStartTime.value,
-    endTime: appointmentEndTime.value
+    endTime: appointmentEndTime.value,
+    overridesLessons: appointmentOverridesLessons.checked
   };
   const existingAppointment = group.appointments.find((entry) => entry.id === appointmentDialog.dataset.appointmentId);
   if (existingAppointment) Object.assign(existingAppointment, appointmentData);
@@ -7027,7 +7364,8 @@ appointmentForm.addEventListener("submit", (event) => {
   }
   saveProjects();
   appointmentDialog.close();
-  renderAppointmentsProperties(project);
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
   renderActiveCalendar(project);
 });
 cancelSicknessButton.addEventListener("click", () => sicknessDialog.close());
@@ -7161,14 +7499,15 @@ schoolProjectForm.addEventListener("submit", (event) => {
     startDate: schoolProjectDate.value,
     endDate: schoolProjectEndDate.value,
     startTime: schoolProjectStartTime.value,
-    endTime: schoolProjectEndTime.value
+    endTime: schoolProjectEndTime.value,
+    overridesLessons: schoolProjectOverridesLessons.checked
   };
   const existingEntry = layer.entries.find((entry) => entry.id === schoolProjectDialog.dataset.entryId);
   if (existingEntry) Object.assign(existingEntry, entryData);
   else {
     layer.entries.push({
       id: globalThis.crypto?.randomUUID?.() ?? `school-project-${Date.now()}`,
-      type: "school-project",
+      type: schoolProjectDialog.dataset.entryType || "school-project",
       ...entryData,
       createdAt: new Date().toISOString()
     });
@@ -7177,7 +7516,8 @@ schoolProjectForm.addEventListener("submit", (event) => {
   layer.appliedAt = new Date().toISOString();
   saveProjects();
   schoolProjectDialog.close();
-  renderIndividualProjectsProperties(project);
+  if (activeLayerType === "appointments") renderAppointmentsProperties(project);
+  else renderIndividualProjectsProperties(project);
   renderActiveCalendar(project);
 });
 cancelClassTripButton.addEventListener("click", () => classTripDialog.close());
@@ -7188,8 +7528,13 @@ classTripForm.addEventListener("submit", (event) => {
   const name = classTripName.value.trim();
   const className = classTripClass.value.trim();
   if (!project || !layer) return;
-  if (!name || !className || !classTripDate.value || !classTripStartTime.value || !classTripEndTime.value) {
-    classTripDialogStatus.textContent = "Bitte Bezeichnung, Klasse, Datum sowie Beginn und Ende eintragen.";
+  if (!name || !className || !classTripStartDate.value || !classTripEndDate.value || !classTripStartTime.value || !classTripEndTime.value) {
+    classTripDialogStatus.textContent = "Bitte Bezeichnung, Klasse, Start- und Enddatum sowie Beginn und Ende eintragen.";
+    return;
+  }
+  if (classTripEndDate.value < classTripStartDate.value) {
+    classTripDialogStatus.textContent = "Das Enddatum darf nicht vor dem Startdatum liegen.";
+    classTripEndDate.focus();
     return;
   }
   if (classTripEndTime.value <= classTripStartTime.value) {
@@ -7201,10 +7546,11 @@ classTripForm.addEventListener("submit", (event) => {
   const tripData = {
     name,
     className,
-    startDate: classTripDate.value,
-    endDate: classTripDate.value,
+    startDate: classTripStartDate.value,
+    endDate: classTripEndDate.value,
     startTime: classTripStartTime.value,
-    endTime: classTripEndTime.value
+    endTime: classTripEndTime.value,
+    overridesLessons: classTripOverridesLessons.checked
   };
   const existingTrip = layer.entries.find((entry) => entry.id === classTripDialog.dataset.tripId);
   if (existingTrip) Object.assign(existingTrip, tripData);
@@ -7220,7 +7566,8 @@ classTripForm.addEventListener("submit", (event) => {
   layer.appliedAt = new Date().toISOString();
   saveProjects();
   classTripDialog.close();
-  renderIndividualProjectsProperties(project);
+  if (activeLayerType === "appointments") renderAppointmentsProperties(project);
+  else renderIndividualProjectsProperties(project);
   renderActiveCalendar(project);
 });
 cancelLessonButton.addEventListener("click", () => lessonDialog.close());
@@ -7235,16 +7582,50 @@ addLessonPhaseButton.addEventListener("click", addLessonPhase);
 cancelScheduleDisplayButton.addEventListener("click", () => scheduleDisplayDialog.close());
 addLessonRowButton.addEventListener("click", () => addScheduleDisplayRow("lesson"));
 addBreakRowButton.addEventListener("click", () => addScheduleDisplayRow("break"));
-schoolDayStart.addEventListener("change", applyDisplayDefaults);
-schoolDayEnd.addEventListener("change", applyDisplayDefaults);
-defaultLessonDuration.addEventListener("change", applyDisplayDefaults);
+cancelSchedulePresetButton.addEventListener("click", () => schedulePresetDialog.close());
+schedulePresetForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const lessonMinutes = Math.max(1, Number(defaultLessonDuration.value) || 45);
+  if (!isValidTimeValue(schoolDayStart.value) || !isValidTimeValue(schoolDayEnd.value) || schoolDayEnd.value <= schoolDayStart.value) {
+    schedulePresetStatus.textContent = "Das Ende des Schultages muss nach seinem Beginn liegen.";
+    return;
+  }
+  const project = projects.find((entry) => entry.id === schedulePresetDialog.dataset.projectId);
+  const layer = project && getProjectLayer(project, "schedules");
+  const school = project && ensureSchools(project)[0];
+  if (!project || !layer || !school) return;
+  layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
+  const defaultValidity = getDefaultScheduleValidity(project, school.id);
+  const defaultValidityPeriod = getScheduleValidityPeriods(project, school.id)[0];
+  const newSchedule = {
+    id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}`,
+    name: `Planlogik ${layer.schedules.length + 1}`,
+    schoolId: school.id,
+    validityPeriodId: defaultValidityPeriod?.id || "schoolYear",
+    validFrom: defaultValidityPeriod?.startDate || defaultValidity.validFrom,
+    validUntil: defaultValidityPeriod?.endDate || defaultValidity.validUntil,
+    activeDays: [1, 2, 3, 4, 5],
+    displayDefaults: { dayStart: schoolDayStart.value, dayEnd: schoolDayEnd.value, lessonMinutes },
+    displayRows: getDefaultDisplayRows(schoolDayStart.value, schoolDayEnd.value, lessonMinutes),
+    pauseDefaultsInitialized: true,
+    lessons: [],
+    createdAt: new Date().toISOString()
+  };
+  layer.schedules.push(newSchedule);
+  activeScheduleId = newSchedule.id;
+  saveProjects();
+  schedulePresetDialog.close();
+  renderProjectBrowser();
+  renderSchedulesProperties(project);
+  openScheduleDisplayDialog(project, newSchedule);
+});
 scheduleDisplayForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const scheduleName = scheduleDisplayName.value.trim();
   const invalidIndex = displayRowsDraft.findIndex((row, index) => (
     !row.label.trim()
-    || !row.start
-    || !row.end
+    || !isValidTimeValue(row.start)
+    || !isValidTimeValue(row.end)
     || row.end <= row.start
   ));
   if (!scheduleName) {
@@ -7261,11 +7642,6 @@ scheduleDisplayForm.addEventListener("submit", (event) => {
   const schedule = layer?.schedules?.find((entry) => entry.id === scheduleDisplayDialog.dataset.scheduleId);
   if (!schedule) return;
   schedule.name = scheduleName;
-  schedule.displayDefaults = {
-    dayStart: schoolDayStart.value,
-    dayEnd: schoolDayEnd.value,
-    lessonMinutes: Number(defaultLessonDuration.value),
-  };
   schedule.displayRows = structuredClone(displayRowsDraft);
   schedule.pauseDefaultsInitialized = true;
   saveProjects();
@@ -7370,6 +7746,7 @@ newProjectForm.addEventListener("submit", (event) => {
   localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
   activeLayerType = null;
   expandedProjectIds.add(project.id);
+  expandDefaultProjectLayers(project.id);
   saveProjects();
   renderProjectBrowser();
   renderProjectDetail();

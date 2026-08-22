@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260801w">
+    <link rel="stylesheet" href="stundenplan.css?v=20260822m">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -237,6 +237,7 @@
           <label class="dialog-field"><span>Beginn</span><input id="appointmentStartTime" type="time" step="900" required></label>
           <label class="dialog-field"><span>Ende</span><input id="appointmentEndTime" type="time" step="900" required></label>
         </div>
+        <label class="dialog-checkbox"><input id="appointmentOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
       </div>
       <p id="appointmentDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
@@ -279,14 +280,15 @@
           <span>Klasse</span>
           <input id="classTripClass" type="text" maxlength="40" autocomplete="off" required placeholder="z. B. 8a">
         </label>
-        <label class="dialog-field">
-          <span>Datum</span>
-          <input id="classTripDate" type="date" required>
-        </label>
+        <div class="class-trip-date-fields">
+          <label class="dialog-field"><span>Startdatum</span><input id="classTripStartDate" type="date" required></label>
+          <label class="dialog-field"><span>Enddatum</span><input id="classTripEndDate" type="date" required></label>
+        </div>
         <div class="event-time-fields">
           <label class="dialog-field"><span>Beginn</span><input id="classTripStartTime" type="time" step="900" required></label>
           <label class="dialog-field"><span>Ende</span><input id="classTripEndTime" type="time" step="900" required></label>
         </div>
+        <label class="dialog-checkbox"><input id="classTripOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
       </div>
       <p id="classTripDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
@@ -310,6 +312,7 @@
           <label class="dialog-field"><span>Startdatum</span><input id="schoolProjectDate" type="date" required></label>
           <label class="dialog-field"><span>Enddatum</span><input id="schoolProjectEndDate" type="date" required></label>
         </div>
+        <label class="dialog-checkbox"><input id="schoolProjectOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
         <div class="event-time-fields">
           <label class="dialog-field"><span>Beginn</span><input id="schoolProjectStartTime" type="time" step="900" required></label>
           <label class="dialog-field"><span>Ende</span><input id="schoolProjectEndTime" type="time" step="900" required></label>
@@ -427,17 +430,13 @@
       <button type="button" id="deleteLessonButton" class="secondary-button lesson-delete-button" hidden>Stunde löschen</button>
     </form>
   </dialog>
-  <dialog id="scheduleDisplayDialog" class="project-dialog schedule-display-dialog" aria-labelledby="scheduleDisplayTitle">
-    <form id="scheduleDisplayForm" method="dialog">
+  <dialog id="schedulePresetDialog" class="project-dialog schedule-preset-dialog" aria-labelledby="schedulePresetTitle">
+    <form id="schedulePresetForm" method="dialog" novalidate>
       <div>
-        <span class="label">Wochenkalender</span>
-        <h2 id="scheduleDisplayTitle">Darstellung anpassen</h2>
-        <p class="dialog-intro">Diese Reihenfolge gilt für alle fünf Wochentage. Unterrichtszeiten und Pausen bestimmen das Raster.</p>
+        <span class="label">Neue Stundenplanlogik</span>
+        <h2 id="schedulePresetTitle">Voreinstellung festlegen</h2>
+        <p class="dialog-intro">Diese Angaben erzeugen lediglich das erste Raster. Alle Stunden und Pausen können anschließend frei verändert werden.</p>
       </div>
-      <label class="dialog-field display-name-field">
-        <span>Name des Kalenders</span>
-        <input id="scheduleDisplayName" type="text" maxlength="80" autocomplete="off" required>
-      </label>
       <div class="display-default-fields" aria-label="Voreinstellungen">
         <div class="display-default-group">
           <span>Dauer des Schultages</span>
@@ -448,10 +447,27 @@
         </div>
         <label>
           <span>Stundenlänge</span>
-          <span class="display-number-field"><input id="defaultLessonDuration" type="number" min="15" max="180" step="15" value="45"><span>Min.</span></span>
+          <span class="display-number-field"><input id="defaultLessonDuration" type="number" min="1" max="1440" step="1" value="45"><span>Min.</span></span>
         </label>
       </div>
-      <p class="display-default-note">Diese Werte erzeugen die Voreinstellung. Alle Zeilen können anschließend individuell geändert werden.</p>
+      <p id="schedulePresetStatus" class="property-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="cancelSchedulePresetButton" class="secondary-button">Abbrechen</button>
+        <button type="submit" class="secondary-button primary-action">Raster erstellen</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="scheduleDisplayDialog" class="project-dialog schedule-display-dialog" aria-labelledby="scheduleDisplayTitle">
+    <form id="scheduleDisplayForm" method="dialog" novalidate>
+      <div>
+        <span class="label">Wochenkalender</span>
+        <h2 id="scheduleDisplayTitle">Darstellung anpassen</h2>
+        <p class="dialog-intro">Diese Reihenfolge gilt für alle fünf Wochentage. Unterrichtszeiten und Pausen bestimmen das Raster.</p>
+      </div>
+      <label class="dialog-field display-name-field">
+        <span>Name des Kalenders</span>
+        <input id="scheduleDisplayName" type="text" maxlength="80" autocomplete="off" required>
+      </label>
       <div id="scheduleDisplayRows" class="display-row-list"></div>
       <div class="display-add-actions">
         <button type="button" id="addLessonRowButton" class="secondary-button">Unterrichtszeit hinzufügen</button>
@@ -464,6 +480,6 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260801w"></script>
+    <script src="stundenplan.js?v=20260822m"></script>
 </body>
 </html>
