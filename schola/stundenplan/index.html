@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260822m">
+    <link rel="stylesheet" href="stundenplan.css?v=20260822za">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -234,10 +234,11 @@
         </label>
         <label class="dialog-field"><span>Datum</span><input id="appointmentDate" type="date" required></label>
         <div class="event-time-fields">
-          <label class="dialog-field"><span>Beginn</span><input id="appointmentStartTime" type="time" step="900" required></label>
-          <label class="dialog-field"><span>Ende</span><input id="appointmentEndTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Beginn (optional)</span><input id="appointmentStartTime" type="time" step="900"></label>
+          <label class="dialog-field"><span>Ende (optional)</span><input id="appointmentEndTime" type="time" step="900"></label>
         </div>
-        <label class="dialog-checkbox"><input id="appointmentOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
+        <label class="dialog-checkbox"><input id="appointmentIsDeadline" type="checkbox"><span>Bei diesem Termin handelt es sich um eine Frist.</span></label>
+        <label class="dialog-checkbox"><input id="appointmentOverridesLessons" type="checkbox"><span>Mein regulärer Unterricht fällt für diesen Zeitraum aus.</span></label>
       </div>
       <p id="appointmentDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
@@ -277,18 +278,18 @@
           <input id="classTripName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Berlinfahrt">
         </label>
         <label class="dialog-field">
-          <span>Klasse</span>
-          <input id="classTripClass" type="text" maxlength="40" autocomplete="off" required placeholder="z. B. 8a">
+          <span>Klasse (optional)</span>
+          <input id="classTripClass" type="text" maxlength="40" autocomplete="off" placeholder="z. B. 8a">
         </label>
         <div class="class-trip-date-fields">
           <label class="dialog-field"><span>Startdatum</span><input id="classTripStartDate" type="date" required></label>
           <label class="dialog-field"><span>Enddatum</span><input id="classTripEndDate" type="date" required></label>
         </div>
         <div class="event-time-fields">
-          <label class="dialog-field"><span>Beginn</span><input id="classTripStartTime" type="time" step="900" required></label>
-          <label class="dialog-field"><span>Ende</span><input id="classTripEndTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Beginn (optional)</span><input id="classTripStartTime" type="time" step="900"></label>
+          <label class="dialog-field"><span>Ende (optional)</span><input id="classTripEndTime" type="time" step="900"></label>
         </div>
-        <label class="dialog-checkbox"><input id="classTripOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
+        <label class="dialog-checkbox"><input id="classTripOverridesLessons" type="checkbox"><span>Mein regulärer Unterricht fällt für diesen Zeitraum aus.</span></label>
       </div>
       <p id="classTripDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
@@ -312,10 +313,10 @@
           <label class="dialog-field"><span>Startdatum</span><input id="schoolProjectDate" type="date" required></label>
           <label class="dialog-field"><span>Enddatum</span><input id="schoolProjectEndDate" type="date" required></label>
         </div>
-        <label class="dialog-checkbox"><input id="schoolProjectOverridesLessons" type="checkbox"><span>Regulärer Unterricht fällt für diesen Zeitraum aus</span></label>
+        <label class="dialog-checkbox"><input id="schoolProjectOverridesLessons" type="checkbox"><span>Mein regulärer Unterricht fällt für diesen Zeitraum aus.</span></label>
         <div class="event-time-fields">
-          <label class="dialog-field"><span>Beginn</span><input id="schoolProjectStartTime" type="time" step="900" required></label>
-          <label class="dialog-field"><span>Ende</span><input id="schoolProjectEndTime" type="time" step="900" required></label>
+          <label class="dialog-field"><span>Beginn (optional)</span><input id="schoolProjectStartTime" type="time" step="900"></label>
+          <label class="dialog-field"><span>Ende (optional)</span><input id="schoolProjectEndTime" type="time" step="900"></label>
         </div>
       </div>
       <p id="schoolProjectDialogStatus" class="property-status" role="status" aria-live="polite"></p>
@@ -340,6 +341,16 @@
         <span>Klassenstufe</span>
         <select id="classCatalogGrade"></select>
       </label>
+      <section id="classCatalogClassOptions" class="class-catalog-class-options" hidden>
+        <p>Klassenstufe <strong id="classCatalogFixedGrade"></strong></p>
+        <div class="class-catalog-display-modes" role="group" aria-label="Darstellung der Klasse">
+          <button type="button" data-class-display-mode="normal" aria-pressed="true"></button>
+          <button type="button" data-class-display-mode="subscript" aria-pressed="false"></button>
+          <button type="button" data-class-display-mode="superscript" aria-pressed="false"></button>
+          <button type="button" data-class-display-mode="hyphen" aria-pressed="false"></button>
+          <button type="button" data-class-display-mode="smallcaps" aria-pressed="false"></button>
+        </div>
+      </section>
       <p id="classCatalogDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
         <button type="button" id="cancelClassCatalogButton" class="secondary-button">Abbrechen</button>
@@ -373,7 +384,7 @@
           <label class="dialog-field"><span>Beginn</span><input id="lessonStart" type="time" step="60" required></label>
           <label class="dialog-field"><span>Ende</span><input id="lessonEnd" type="time" step="60" required></label>
           <label class="dialog-field"><span>Fach</span><select id="lessonSubject" required></select></label>
-          <label class="dialog-field"><span>Klasse</span><select id="lessonGrade" required></select></label>
+          <label class="dialog-field lesson-class-select-field"><span>Klasse</span><select id="lessonGrade" required></select><span id="lessonGradePreview" class="lesson-class-selection-preview" aria-hidden="true"></span></label>
           <label class="dialog-field lesson-dialog-wide"><span>Raum <small>(optional)</small></span><input id="lessonRoom" type="text" maxlength="40" placeholder="z. B. 204"></label>
           <fieldset class="lesson-color-field lesson-dialog-wide">
             <legend>Farbe</legend>
@@ -480,6 +491,6 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260822m"></script>
+    <script src="stundenplan.js?v=20260822za"></script>
 </body>
 </html>
