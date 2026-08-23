@@ -5662,123 +5662,99 @@ function openSchedulePresetDialog(project) {
   requestAnimationFrame(() => schoolDayStart.focus());
 }
 
-function exportScheduleLogic(project, schedule) {
-  const payload = {
-    type: "schola-stundenplan-logic",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    logic: {
-      name: schedule.name,
-      activeDays: structuredClone(getScheduleActiveDays(schedule)),
-      displayDefaults: structuredClone(schedule.displayDefaults || {}),
-      displayRows: structuredClone(schedule.displayRows || []),
-      pauseDefaultsInitialized: Boolean(schedule.pauseDefaultsInitialized)
-    }
+function serializeScheduleLogic(project, schedule) {
+  const school = getSchool(project, schedule.schoolId);
+  return {
+    name: schedule.name,
+    schoolId: schedule.schoolId || null,
+    schoolName: school?.name || "",
+    activeDays: structuredClone(getScheduleActiveDays(schedule)),
+    displayDefaults: structuredClone(schedule.displayDefaults || {}),
+    displayRows: structuredClone(schedule.displayRows || []),
+    pauseDefaultsInitialized: Boolean(schedule.pauseDefaultsInitialized)
   };
-  downloadExportFile(
-    JSON.stringify(payload, null, 2),
-    `${makeExportFilename(schedule.name)}.stundenplanlogik.json`,
-    "application/json;charset=utf-8"
-  );
 }
 
-function openScheduleLogicExport(project, preferredSchedule = null) {
+function exportScheduleLogics(project) {
   const schedules = getProjectLayer(project, "schedules").schedules || [];
-  if (preferredSchedule) {
-    exportScheduleLogic(project, preferredSchedule);
-    return;
-  }
   if (!schedules.length) {
     window.alert("Es ist noch keine Stundenplanlogik vorhanden.");
     return;
   }
-  if (schedules.length === 1) {
-    exportScheduleLogic(project, schedules[0]);
-    return;
-  }
-  const dialog = document.createElement("dialog");
-  dialog.className = "project-dialog schedule-logic-transfer-dialog";
-  const form = document.createElement("form");
-  form.method = "dialog";
-  const heading = document.createElement("div");
-  heading.innerHTML = "<span class=\"label\">Stundenplanlogiken</span><h2>Logik exportieren</h2>";
-  const field = document.createElement("label");
-  field.className = "dialog-field";
-  const fieldLabel = document.createElement("span");
-  fieldLabel.textContent = "Stundenplanlogik";
-  const select = document.createElement("select");
-  schedules.forEach((schedule) => select.add(new Option(schedule.name, schedule.id)));
-  field.append(fieldLabel, select);
-  const actions = document.createElement("div");
-  actions.className = "dialog-actions";
-  const cancel = document.createElement("button");
-  cancel.type = "button";
-  cancel.className = "secondary-button";
-  cancel.textContent = "Abbrechen";
-  const submit = document.createElement("button");
-  submit.type = "submit";
-  submit.className = "secondary-button primary-action";
-  submit.textContent = "Exportieren";
-  cancel.addEventListener("click", () => dialog.close());
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const schedule = schedules.find((entry) => entry.id === select.value);
-    if (schedule) exportScheduleLogic(project, schedule);
-    dialog.close();
-  });
-  dialog.addEventListener("close", () => dialog.remove());
-  actions.append(cancel, submit);
-  form.append(heading, field, actions);
-  dialog.append(form);
-  document.body.append(dialog);
-  dialog.showModal();
+  const payload = {
+    type: "schola-stundenplan-logics",
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    projectName: project.name,
+    logics: schedules.map((schedule) => serializeScheduleLogic(project, schedule))
+  };
+  downloadExportFile(
+    JSON.stringify(payload, null, 2),
+    `${makeExportFilename(project.name)}.stundenplanlogiken.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+function openScheduleLogicExport(project) {
+  exportScheduleLogics(project);
 }
 
 async function importScheduleLogicFile(project, file) {
   let payload;
   try { payload = JSON.parse(await file.text()); }
   catch { throw new Error("Die ausgewählte Datei enthält kein gültiges JSON."); }
-  if (payload?.type !== "schola-stundenplan-logic" || Number(payload.version) !== 1 || !payload.logic) {
+  const isLegacyExport = payload?.type === "schola-stundenplan-logic" && Number(payload.version) === 1 && payload.logic;
+  const isCombinedExport = payload?.type === "schola-stundenplan-logics" && Number(payload.version) === 2 && Array.isArray(payload.logics);
+  if (!isLegacyExport && !isCombinedExport) {
     throw new Error("Die Datei ist keine gültige exportierte Stundenplanlogik.");
   }
-  const source = payload.logic;
-  const rows = Array.isArray(source.displayRows) ? source.displayRows : [];
-  if (!rows.length || rows.some((row) => (
-    !["lesson", "break"].includes(row.type)
-    || !String(row.label || "").trim()
-    || !isValidTimeValue(row.start)
-    || !isValidTimeValue(row.end)
-    || row.end <= row.start
-  ))) throw new Error("Die Datei enthält kein gültiges Stunden- und Pausenraster.");
-  const school = ensureSchools(project)[0];
-  if (!school) throw new Error("Bitte legen Sie vor dem Import mindestens eine Schule an.");
+  const sources = isLegacyExport ? [payload.logic] : payload.logics;
+  if (!sources.length) throw new Error("Die Datei enthält keine Stundenplanlogik.");
+  const schools = ensureSchools(project);
+  if (!schools.length) throw new Error("Bitte legen Sie vor dem Import mindestens eine Schule an.");
+  const normalizedSources = sources.map((source) => {
+    const rows = Array.isArray(source.displayRows) ? source.displayRows : [];
+    if (!rows.length || rows.some((row) => (
+      !["lesson", "break"].includes(row.type)
+      || !String(row.label || "").trim()
+      || !isValidTimeValue(row.start)
+      || !isValidTimeValue(row.end)
+      || row.end <= row.start
+    ))) throw new Error(`Die Logik „${source.name || "Unbenannt"}“ enthält kein gültiges Stunden- und Pausenraster.`);
+    return { source, rows };
+  });
   const layer = getProjectLayer(project, "schedules");
   layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
-  const period = getScheduleValidityPeriods(project, school.id)[0];
-  const defaults = getDefaultScheduleValidity(project, school.id);
-  const schedule = {
-    id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}`,
-    name: String(source.name || "Importierte Planlogik").slice(0, 80),
-    schoolId: school.id,
-    validityPeriodId: period?.id || "schoolYear",
-    validFrom: period?.startDate || defaults.validFrom,
-    validUntil: period?.endDate || defaults.validUntil,
-    activeDays: Array.isArray(source.activeDays) ? source.activeDays.filter((day) => Number(day) >= 1 && Number(day) <= 7) : [1, 2, 3, 4, 5],
-    displayDefaults: structuredClone(source.displayDefaults || {}),
-    displayRows: rows.map((row, index) => ({
-      id: globalThis.crypto?.randomUUID?.() ?? `display-${Date.now()}-${index}`,
-      type: row.type,
-      label: String(row.label).slice(0, 50),
-      start: row.start,
-      end: row.end
-    })),
-    pauseDefaultsInitialized: source.pauseDefaultsInitialized !== false,
-    lessons: [],
-    importedAt: new Date().toISOString(),
-    createdAt: new Date().toISOString()
-  };
-  layer.schedules.push(schedule);
-  activeScheduleId = schedule.id;
+  const importedSchedules = normalizedSources.map(({ source, rows }, sourceIndex) => {
+    const school = schools.find((entry) => entry.id === source.schoolId)
+      || schools.find((entry) => source.schoolName && entry.name === source.schoolName)
+      || schools[0];
+    const period = getScheduleValidityPeriods(project, school.id)[0];
+    const defaults = getDefaultScheduleValidity(project, school.id);
+    return {
+      id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}-${sourceIndex}`,
+      name: String(source.name || "Importierte Planlogik").slice(0, 80),
+      schoolId: school.id,
+      validityPeriodId: period?.id || "schoolYear",
+      validFrom: period?.startDate || defaults.validFrom,
+      validUntil: period?.endDate || defaults.validUntil,
+      activeDays: Array.isArray(source.activeDays) ? source.activeDays.map(Number).filter((day) => day >= 1 && day <= 7) : [1, 2, 3, 4, 5],
+      displayDefaults: structuredClone(source.displayDefaults || {}),
+      displayRows: rows.map((row, index) => ({
+        id: globalThis.crypto?.randomUUID?.() ?? `display-${Date.now()}-${sourceIndex}-${index}`,
+        type: row.type,
+        label: String(row.label).slice(0, 50),
+        start: row.start,
+        end: row.end
+      })),
+      pauseDefaultsInitialized: source.pauseDefaultsInitialized !== false,
+      lessons: [],
+      importedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+  });
+  layer.schedules.push(...importedSchedules);
+  activeScheduleId = importedSchedules.at(-1)?.id || null;
   saveProjects();
   renderProjectBrowser();
   renderSchedulesProperties(project);
@@ -5798,7 +5774,7 @@ function openScheduleLogicImport(project) {
   input.click();
 }
 
-function createScheduleLogicTransferMenu(project, preferredSchedule = null) {
+function createScheduleLogicTransferMenu(project) {
   const shell = document.createElement("div");
   shell.className = "schedule-menu-shell schedule-transfer-menu";
   const button = document.createElement("button");
@@ -5813,7 +5789,7 @@ function createScheduleLogicTransferMenu(project, preferredSchedule = null) {
   const exportButton = document.createElement("button");
   exportButton.type = "button";
   exportButton.textContent = "Exportieren";
-  exportButton.addEventListener("click", () => { menu.hidden = true; openScheduleLogicExport(project, preferredSchedule); });
+  exportButton.addEventListener("click", () => { menu.hidden = true; openScheduleLogicExport(project); });
   const importButton = document.createElement("button");
   importButton.type = "button";
   importButton.textContent = "Importieren";
@@ -5928,7 +5904,7 @@ function renderSchedulesProperties(project) {
   exportLogicButton.addEventListener("click", () => {
     menu.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
-    openScheduleLogicExport(project, schedule);
+    openScheduleLogicExport(project);
   });
   const importLogicButton = document.createElement("button");
   importLogicButton.type = "button";
