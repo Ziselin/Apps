@@ -954,6 +954,7 @@ button, input, select, textarea { font-family: inherit; }
   font-size: .75rem;
 }
 .class-project-target-chip.is-grade { background: rgba(198,215,189,.42); color: var(--ink); }
+.class-project-target-chip.is-course { border-color: rgba(70,105,132,.3); background: color-mix(in srgb, var(--project-blue) 68%, white); color: var(--ink); }
 .class-target-checkbox-list { display: grid; gap: 7px; max-height: min(52vh, 430px); overflow-y: auto; padding-right: 3px; }
 .class-target-checkbox {
   display: grid;
@@ -969,6 +970,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .class-target-checkbox:hover { background: rgba(255,255,252,.72); }
 .class-target-checkbox.is-grade { background: rgba(198,215,189,.25); }
+.class-target-checkbox.is-course { border-color: rgba(70,105,132,.26); background: color-mix(in srgb, var(--project-blue) 42%, white); }
 .class-target-checkbox input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink-soft); }
 .class-target-checkbox span, .class-target-checkbox strong, .class-target-checkbox small { display: block; }
 .class-target-checkbox strong { color: var(--ink); font-size: .82rem; }
@@ -1238,13 +1240,85 @@ button, input, select, textarea { font-family: inherit; }
 .class-catalog-grade-list { display: grid; gap: 10px; }
 .class-catalog-subject {
   display: grid;
-  gap: 11px;
-  padding: 13px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid rgba(70,105,132,.22);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--project-blue) 58%, white);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.36);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--project-blue) 52%, white);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.48), 0 2px 8px rgba(45,68,76,.035);
 }
+.class-subject-subtitle { color: var(--ink-soft); font-size: .72rem; }
+.class-subject-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.class-subject-actions .secondary-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-color: rgba(70,105,132,.2);
+  background: rgba(255,255,252,.55);
+  font-size: .73rem;
+}
+.class-course-list { display: grid; gap: 6px; }
+.class-course-row {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,252,.58);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.class-course-row:hover, .class-course-row:focus-visible { border-color: var(--line-strong); outline: none; }
+.class-course-row strong, .class-course-row small { display: block; }
+.class-course-row small { margin-top: 3px; color: var(--muted); }
+.class-subject-class-row { cursor: default; }
+.class-subject-class-row:hover { border-color: var(--line); }
+.class-subject-assignment-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 7px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(70,105,132,.16);
+}
+.class-subject-assignment-pill {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 50px;
+  padding: 7px 10px;
+  border: 1px solid rgba(70,105,132,.18);
+  border-radius: 999px;
+  background: rgba(255,255,252,.68);
+  color: var(--ink);
+  font: inherit;
+  font-size: .8rem;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+}
+button.class-subject-assignment-pill { cursor: pointer; }
+button.class-subject-assignment-pill:hover,
+button.class-subject-assignment-pill:focus-visible {
+  border-color: rgba(61,91,87,.48);
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 2px rgba(61,91,87,.12);
+}
+button.class-subject-assignment-pill:hover { transform: translateY(-1px); border-color: rgba(61,91,87,.38); }
+.class-subject-assignment-pill.is-course {
+  border-color: rgba(70,105,132,.3);
+  background: color-mix(in srgb, var(--project-blue) 72%, white);
+}
+.class-subject-assignment-pill.is-course { gap: 2px; }
+.class-subject-assignment-pill.is-course small {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .68rem;
+  white-space: nowrap;
+}
+.class-subject-assignment-pill.is-class { color: var(--ink-soft); }
+.class-subject-assignment-pill strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .class-catalog-grade {
   display: grid;
   gap: 8px;
@@ -1272,6 +1346,19 @@ button, input, select, textarea { font-family: inherit; }
 }
 .class-catalog-add-class { justify-self: start; }
 .class-catalog-master-section { display: grid; gap: 12px; }
+.class-catalog-name-control { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.class-catalog-name-control > input { min-width: 0; width: 100%; }
+.dialog-field.is-class-suffix-field > #classCatalogNameLabel { margin-left: 52px; }
+.class-catalog-grade-prefix {
+  min-width: 42px;
+  color: var(--ink);
+  font-size: 1.55rem;
+  line-height: 1;
+  text-align: left;
+}
+.class-catalog-grade-prefix[hidden] { display: none; }
+.class-catalog-school-tabs { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.class-catalog-school-tabs .empty-state { grid-column: 1 / -1; margin: 7px 9px; }
 .class-catalog-class-options {
   display: grid;
   gap: 9px;
@@ -1296,6 +1383,9 @@ button, input, select, textarea { font-family: inherit; }
 .class-catalog-display-modes button:hover,
 .class-catalog-display-modes button:focus-visible { outline: none; border-color: var(--line-strong); }
 .class-catalog-display-modes button[aria-pressed="true"] { border-color: var(--ink-soft); background: var(--ink-soft); color: white; }
+.class-global-display-modes button { display: grid; gap: 5px; place-items: center; min-height: 68px; }
+.class-global-display-modes button small { color: inherit; font-size: .64rem; font-weight: 500; }
+.class-global-display-modes button[aria-checked="true"] { border-color: var(--ink-soft); background: var(--ink-soft); color: white; }
 .class-catalog-display-modes sub { font-size: .7em; }
 .class-catalog-display-modes sup { font-size: .7em; }
 .class-label-smallcaps { font-variant-caps: all-small-caps; letter-spacing: .04em; }

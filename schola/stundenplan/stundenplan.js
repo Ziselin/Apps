@@ -58,7 +58,8 @@ const classTripDialog = document.getElementById("classTripDialog");
 const classTripDialogTitle = document.getElementById("classTripDialogTitle");
 const classTripForm = document.getElementById("classTripForm");
 const classTripName = document.getElementById("classTripName");
-const classTripClass = document.getElementById("classTripClass");
+const classTripClassSummary = document.getElementById("classTripClassSummary");
+const classTripClassButton = document.getElementById("classTripClassButton");
 const classTripStartDate = document.getElementById("classTripStartDate");
 const classTripEndDate = document.getElementById("classTripEndDate");
 const classTripStartTime = document.getElementById("classTripStartTime");
@@ -86,6 +87,7 @@ const classCatalogMode = document.getElementById("classCatalogMode");
 const classCatalogNameField = document.getElementById("classCatalogNameField");
 const classCatalogNameLabel = document.getElementById("classCatalogNameLabel");
 const classCatalogName = document.getElementById("classCatalogName");
+const classCatalogGradePrefix = document.getElementById("classCatalogGradePrefix");
 const classCatalogGradeField = document.getElementById("classCatalogGradeField");
 const classCatalogGrade = document.getElementById("classCatalogGrade");
 const classCatalogClassOptions = document.getElementById("classCatalogClassOptions");
@@ -171,6 +173,8 @@ const EXPANDED_LAYERS_STORAGE_KEY = "schola-stundenplan-expanded-layers-v1";
 const SCHEDULE_DELETE_HOLD_MS = 820;
 const HOLIDAY_NORMALIZATION_VERSION = "mv-school-types-2026-07-27-1";
 const MV_VOCATIONAL_ONLY_DATES = new Set(["2026-11-26", "2026-11-27"]);
+const VACATION_COLOR = "#9faf93";
+let classTripSelectedClassKeys = [];
 const LESSON_COLORS = [
   ["#bfd2e2", "Kreideblau"],
   ["#b8d6d1", "Kreidetürkis"],
@@ -311,6 +315,7 @@ function renderYear(startYear, calendarEntries = [], schoolYearMode = false) {
       const entryColors = [...new Set(matchingEntries.map((entry) => {
         if (entry.type === "public-holiday") return "#aebfa5";
         if (nonTeachingTypes.includes(entry.type)) return "#c6d7bd";
+        if (entry.type === "vacation") return VACATION_COLOR;
         if (entry.type === "appointment") return entry.color || "#c9c1dd";
         if (entry.type === "sickness") return "#d8ccca";
         return "#bfd2e2";
@@ -771,7 +776,7 @@ function renderSchoolProjectCard(schoolProject, start, end) {
   const card = document.createElement("button");
   card.type = "button";
   card.className = "lesson-card timeline-lesson-card timeline-project-card";
-  card.style.setProperty("--lesson-color", "#bfd2e2");
+  card.style.setProperty("--lesson-color", schoolProject.type === "vacation" ? VACATION_COLOR : "#bfd2e2");
   const categoryNames = {
     "class-trip": "Klassenfahrten",
     "school-project": "Schulprojekte",
@@ -781,9 +786,10 @@ function renderSchoolProjectCard(schoolProject, start, end) {
   card.title = `${schoolProject.projectName} / ${categoryNames[schoolProject.type] || "Termine"}`;
   const name = document.createElement("strong");
   name.textContent = schoolProject.name;
-  if (schoolProject.type === "class-trip" && schoolProject.className) {
+  const assignedClasses = (schoolProject.classNames || []).join(", ") || schoolProject.className;
+  if (schoolProject.type === "class-trip" && assignedClasses) {
     const classLabel = document.createElement("small");
-    classLabel.textContent = `Klasse ${schoolProject.className}`;
+    classLabel.textContent = `Klasse ${assignedClasses}`;
     card.append(name, classLabel);
   } else {
     card.append(name);
@@ -1344,6 +1350,7 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
     const normalizedEntryClass = String(entry.className || entry.class || "").trim().toLowerCase();
     const normalizedLessonClass = String(lesson.grade || "").trim().toLowerCase();
+    const lessonClassIds = [...new Set([lesson.classId, ...(lesson.classIds || [])].filter(Boolean))];
     const lessonGradeName = normalizedLessonClass.match(/^\d+/)?.[0] || "";
     if (layer?.gradeVisibility?.[lessonGradeName || "unassigned"] === false) return false;
     const matchesSelectedGrade = (entry.classGroups || []).some((group) => {
@@ -1359,7 +1366,8 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     });
     const sameClass = Boolean(
       (entry.classId && lesson.classId && entry.classId === lesson.classId)
-      || (Array.isArray(entry.classIds) && lesson.classId && entry.classIds.includes(lesson.classId))
+      || (Array.isArray(entry.classIds) && lessonClassIds.some((classId) => entry.classIds.includes(classId)))
+      || (entry.classGroups || []).some((group) => lessonClassIds.some((classId) => (group.classIds || []).includes(classId)))
       || (normalizedEntryClass && normalizedEntryClass === normalizedLessonClass)
       || matchesSelectedGrade
     );
@@ -1377,11 +1385,22 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     const startDate = entry.startDate || entry.date;
     const endDate = entry.endDate || entry.date;
     if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
-    if (!entry.startTime || !entry.endTime) return false;
+    if (!entry.startTime || !entry.endTime) return entry.type === "vacation";
     if (entry.type === "class-trip") {
-      const assignedClass = String(entry.className || entry.class || "").trim().toLocaleLowerCase("de");
       const lessonClass = String(lesson.grade || "").trim().toLocaleLowerCase("de");
-      if (!assignedClass || assignedClass !== lessonClass) return false;
+      const lessonGradeName = lessonClass.match(/^\d+/)?.[0] || "";
+      const lessonClassIds = [...new Set([lesson.classId, ...(lesson.classIds || [])].filter(Boolean))];
+      const hasTargets = (entry.classGroups || []).length || (entry.classIds || []).length || entry.className || entry.class;
+      const matchesTarget = (entry.classGroups || []).some((group) => (
+        (group.targetType === "grade" && String(group.gradeName || "").trim().toLocaleLowerCase("de") === lessonGradeName)
+        || (group.targetType === "course" && lessonClassIds.some((classId) => (group.classIds || []).includes(classId)))
+        || (group.targetType === "class" && (
+          lessonClassIds.some((classId) => (group.classIds || []).includes(classId))
+          || String(group.className || "").trim().toLocaleLowerCase("de") === lessonClass
+        ))
+      )) || lessonClassIds.some((classId) => (entry.classIds || []).includes(classId))
+        || String(entry.className || entry.class || "").trim().toLocaleLowerCase("de") === lessonClass;
+      if (hasTargets && !matchesTarget) return false;
     }
     return lesson.start < entry.endTime && lesson.end > entry.startTime;
   };
@@ -1490,12 +1509,12 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
         events.push(...createIcalendarEvent({
           uid: `${entry.type}-${entry.id}-${dateKey}`,
           title: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type]),
-          description: entry.className || entry.class || "",
+          description: (entry.classNames || []).join(", ") || entry.className || entry.class || "",
           startDate: dateKey,
           startTime: entry.startTime,
           endTime: entry.endTime,
           category: ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Persönlicher Termin" }[entry.type]),
-          color: entry.color || "#bfd2e2"
+          color: entry.type === "vacation" ? VACATION_COLOR : (entry.color || "#bfd2e2")
         }));
       });
     });
@@ -3118,17 +3137,116 @@ function getConfiguredClassGroups(project) {
       });
       if (gradeName && gradeGroup.classIds.length) gradeGroups.set(gradeKey, gradeGroup);
   });
-  return [...gradeGroups.values(), ...groups.values()].sort((a, b) => (
+  const courseGroups = (catalog.subjects || []).flatMap((subject) => (subject.courses || []).map((course) => ({
+    key: `${subject.schoolId || ""}|course|${course.id}`,
+    name: course.name,
+    targetType: "course",
+    courseId: course.id,
+    subjectId: subject.id,
+    subjectName: subject.name,
+    schoolId: subject.schoolId || "",
+    schoolName: getSchool(project, subject.schoolId)?.name || "Schule",
+    classIds: [...new Set(course.classIds || [])],
+    gradeNames: (catalog.grades || [])
+      .filter((grade) => (grade.classes || []).some((classEntry) => (course.classIds || []).includes(classEntry.id)))
+      .map((grade) => String(grade.name)),
+    subjects: [subject.name]
+  })));
+  return [...gradeGroups.values(), ...groups.values(), ...courseGroups].sort((a, b) => (
     a.schoolName.localeCompare(b.schoolName, "de", { sensitivity: "base" })
-    || (a.targetType === b.targetType ? 0 : a.targetType === "grade" ? -1 : 1)
+    || ({ grade: 0, class: 1, course: 2 }[a.targetType] - { grade: 0, class: 1, course: 2 }[b.targetType])
     || a.name.localeCompare(b.name, "de", { numeric: true, sensitivity: "base" })
   ));
+}
+
+function renderClassTargetSummary(container, classGroups, selectedKeys) {
+  const selected = selectedKeys.map((key) => classGroups.find((group) => group.key === key)).filter(Boolean);
+  if (!selected.length) {
+    const empty = document.createElement("span");
+    empty.className = "empty-state";
+    empty.textContent = "Noch keine Klasse, Klassenstufe oder Kurs ausgewählt.";
+    container.replaceChildren(empty);
+    return;
+  }
+  container.replaceChildren(...selected.map((group) => {
+    const chip = document.createElement("span");
+    chip.className = `class-project-target-chip is-${group.targetType}`;
+    chip.append(document.createTextNode(group.targetType === "course"
+      ? `${group.schoolName} · ${group.subjectName} · `
+      : `${group.schoolName} · `));
+    const classLabel = document.createElement("span");
+    if (group.targetType === "class" && group.gradeName) renderClassDisplay(classLabel, group.gradeName, group.suffix, group.displayMode);
+    else classLabel.textContent = group.name;
+    chip.append(classLabel);
+    return chip;
+  }));
+}
+
+function openClassTargetPicker(project, selectedKeys, onApply, contextLabel = "Termine") {
+  const classGroups = getConfiguredClassGroups(project);
+  const pickerDialog = document.createElement("dialog");
+  pickerDialog.className = "project-dialog class-target-picker-dialog";
+  const pickerForm = document.createElement("form");
+  pickerForm.method = "dialog";
+  const pickerHeading = document.createElement("div");
+  pickerHeading.innerHTML = `<span class="label">${contextLabel}</span><h2>Klassen auswählen</h2>`;
+  const pickerIntro = document.createElement("p");
+  pickerIntro.className = "dialog-intro";
+  pickerIntro.textContent = "Wählen Sie beliebig viele Klassenstufen, Einzelklassen und Kurse aus.";
+  const choices = document.createElement("div");
+  choices.className = "class-target-checkbox-list";
+  classGroups.forEach((group) => {
+    const choice = document.createElement("label");
+    choice.className = `class-target-checkbox is-${group.targetType}`;
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = group.key;
+    checkbox.checked = selectedKeys.includes(group.key);
+    const copy = document.createElement("span");
+    const name = document.createElement("strong");
+    if (group.targetType === "class" && group.gradeName) renderClassDisplay(name, group.gradeName, group.suffix, group.displayMode);
+    else name.textContent = group.name;
+    const school = document.createElement("small");
+    school.textContent = group.targetType === "course" ? `${group.subjectName} · ${group.schoolName}` : group.schoolName;
+    copy.append(name, school);
+    choice.append(checkbox, copy);
+    choices.append(choice);
+  });
+  if (!classGroups.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Es sind noch keine Klassen eingerichtet.";
+    choices.append(empty);
+  }
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => pickerDialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = "Auswahl übernehmen";
+  pickerForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onApply([...choices.querySelectorAll("input:checked")].map((checkbox) => checkbox.value), classGroups);
+    pickerDialog.close();
+  });
+  pickerDialog.addEventListener("close", () => pickerDialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  pickerForm.append(pickerHeading, pickerIntro, choices, actions);
+  pickerDialog.append(pickerForm);
+  document.body.append(pickerDialog);
+  pickerDialog.showModal();
 }
 
 function getClassProjectGradeNames(entry) {
   const grades = new Set();
   (entry.classGroups || []).forEach((group) => {
     if (group.targetType === "grade" && group.gradeName) grades.add(String(group.gradeName));
+    else if (group.targetType === "course") (group.gradeNames || []).forEach((gradeName) => grades.add(String(gradeName)));
     else {
       const match = String(group.className || "").trim().match(/^\d+/);
       if (match) grades.add(match[0]);
@@ -3195,7 +3313,7 @@ function openClassProjectDialog(project, entry = null) {
     }).filter(Boolean)
     : classGroups.filter((group) => group.targetType === "class" && (entry?.classIds || []).some((id) => group.classIds.includes(id))).map((group) => group.key);
   const classSection = document.createElement("fieldset"); classSection.className = "class-project-class-picker";
-  const classLegend = document.createElement("legend"); classLegend.textContent = "Beteiligte Klassen oder Klassenstufen";
+  const classLegend = document.createElement("legend"); classLegend.textContent = "Beteiligte Klassen, Klassenstufen oder Kurse";
   const selectedSummary = document.createElement("div"); selectedSummary.className = "class-project-selected-targets";
   const renderSelectedSummary = () => {
     const selected = selectedKeys.map((key) => classGroups.find((group) => group.key === key)).filter(Boolean);
@@ -3226,7 +3344,7 @@ function openClassProjectDialog(project, entry = null) {
     pickerHeading.innerHTML = "<span class=\"label\">Projekttage nach Klassen</span><h2>Klassen auswählen</h2>";
     const pickerIntro = document.createElement("p");
     pickerIntro.className = "dialog-intro";
-    pickerIntro.textContent = "Wählen Sie beliebig viele Klassenstufen und Einzelklassen aus.";
+    pickerIntro.textContent = "Wählen Sie beliebig viele Klassenstufen, Einzelklassen und Kurse aus.";
     const choices = document.createElement("div");
     choices.className = "class-target-checkbox-list";
     classGroups.forEach((group) => {
@@ -3241,7 +3359,7 @@ function openClassProjectDialog(project, entry = null) {
       if (group.targetType === "class" && group.gradeName) renderClassDisplay(name, group.gradeName, group.suffix, group.displayMode);
       else name.textContent = group.name;
       const school = document.createElement("small");
-      school.textContent = group.schoolName;
+      school.textContent = group.targetType === "course" ? `${group.subjectName} · ${group.schoolName}` : group.schoolName;
       copy.append(name, school);
       choice.append(checkbox, copy);
       choices.append(choice);
@@ -3335,7 +3453,7 @@ function openClassProjectDialog(project, entry = null) {
     const chosenGroups = selectedKeys.map((key) => classGroups.find((group) => group.key === key)).filter(Boolean);
     const values = {
       type: "class-project", name: name.value.trim(),
-      classGroups: chosenGroups.map((group) => ({ key: group.key, targetType: group.targetType, schoolId: group.schoolId, schoolName: group.schoolName, className: group.name, gradeName: group.gradeName || "", suffix: group.suffix || "", displayMode: group.displayMode || "normal", classIds: [...group.classIds] })),
+      classGroups: chosenGroups.map((group) => ({ key: group.key, targetType: group.targetType, schoolId: group.schoolId, schoolName: group.schoolName, className: group.name, gradeName: group.gradeName || "", gradeNames: [...(group.gradeNames || [])], suffix: group.suffix || "", displayMode: group.displayMode || "normal", classIds: [...group.classIds], courseId: group.courseId || "", subjectId: group.subjectId || "", subjectName: group.subjectName || "" })),
       classIds: [...new Set(chosenGroups.flatMap((group) => group.classIds))],
       classNames: chosenGroups.map((group) => group.name),
       schoolIds: [...new Set(chosenGroups.map((group) => group.schoolId).filter(Boolean))],
@@ -3375,9 +3493,13 @@ function renderClassProjectsIntroduction(project) {
       schoolName: group.schoolName || getSchool(project, group.schoolId)?.name || "Schule",
       className: group.className || group.name,
       gradeName: group.gradeName || "",
+      gradeNames: [...(group.gradeNames || [])],
       suffix: group.suffix || "",
       displayMode: group.displayMode || "normal",
-      classIds: [...group.classIds]
+      classIds: [...group.classIds],
+      courseId: group.courseId || "",
+      subjectId: group.subjectId || "",
+      subjectName: group.subjectName || ""
     }));
     entry.classIds = [...new Set(entry.classGroups.flatMap((group) => group.classIds))];
     entry.schoolIds = [...new Set(entry.classGroups.map((group) => group.schoolId).filter(Boolean))];
@@ -3569,9 +3691,10 @@ function createMovedProjectSection(project, type, titleText, buttonText, emptyTe
       const schedule = document.createElement("span");
       schedule.textContent = formatIndividualEventSchedule(entry);
       copy.append(name);
-      if (entry.className) {
+      const assignedClasses = (entry.classNames || []).join(", ") || entry.className;
+      if (assignedClasses) {
         const classLabel = document.createElement("span");
-        classLabel.textContent = `Klasse ${entry.className}`;
+        classLabel.textContent = `Klasse ${assignedClasses}`;
         copy.append(classLabel);
       }
       copy.append(schedule);
@@ -3912,6 +4035,19 @@ function getClassCatalogData(project) {
     layer.independentClassesMigrationVersion = 2;
   }
   layer.grades.forEach((grade) => { grade.classes = Array.isArray(grade.classes) ? grade.classes : []; });
+  layer.subjects.forEach((subject) => {
+    subject.classIds = Array.isArray(subject.classIds) ? subject.classIds : [];
+    subject.courses = Array.isArray(subject.courses) ? subject.courses : [];
+    subject.courses.forEach((course) => { course.classIds = Array.isArray(course.classIds) ? course.classIds : []; });
+  });
+  const validDisplayModes = new Set(["normal", "subscript", "superscript", "hyphen", "smallcaps"]);
+  if (!validDisplayModes.has(layer.classDisplayMode)) {
+    layer.classDisplayMode = layer.grades.flatMap((grade) => grade.classes || []).find((entry) => validDisplayModes.has(entry.displayMode))?.displayMode || "normal";
+  }
+  layer.grades.forEach((grade) => (grade.classes || []).forEach((classEntry) => {
+    classEntry.displayMode = layer.classDisplayMode;
+    classEntry.name = getClassDisplayText(grade.name, classEntry.suffix, layer.classDisplayMode);
+  }));
   return layer;
 }
 
@@ -3923,7 +4059,7 @@ function getClassDisplayText(gradeName, suffix, mode = "normal") {
 function renderClassDisplay(element, gradeName, suffix, mode = "normal") {
   element.replaceChildren(document.createTextNode(String(gradeName || "")));
   const mark = document.createElement(mode === "subscript" ? "sub" : mode === "superscript" ? "sup" : "span");
-  mark.textContent = mode === "subscript" ? String(suffix || "").toUpperCase() : String(suffix || "");
+  mark.textContent = String(suffix || "");
   if (mode === "hyphen") mark.textContent = `-${suffix || ""}`;
   if (mode === "smallcaps") mark.className = "class-label-smallcaps";
   element.append(mark);
@@ -3973,8 +4109,10 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
     return option;
   }));
   classCatalogNameField.hidden = mode === "catalog-grade";
+  classCatalogNameField.classList.toggle("is-class-suffix-field", mode === "catalog-class");
   classCatalogGradeField.hidden = mode !== "catalog-grade";
-  classCatalogClassOptions.hidden = mode !== "catalog-class";
+  classCatalogClassOptions.hidden = true;
+  classCatalogGradePrefix.hidden = mode !== "catalog-class";
   if (mode === "subject") {
     classCatalogDialogTitle.textContent = subject ? "Fach bearbeiten" : "Fach hinzufügen";
     classCatalogNameLabel.textContent = "Fach";
@@ -3988,10 +4126,8 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
     classCatalogNameLabel.textContent = "Klassenkürzel";
     classCatalogName.placeholder = "z. B. b, 2 oder II";
     classCatalogName.value = classEntry?.suffix || String(classEntry?.name || "").replace(new RegExp(`^${grade?.name || ""}-?`, "i"), "");
+    classCatalogGradePrefix.textContent = grade?.name || "";
     classCatalogFixedGrade.textContent = grade?.name || "";
-    const selectedMode = classEntry?.displayMode || "normal";
-    classCatalogDisplayModeButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.classDisplayMode === selectedMode)));
-    updateClassDisplayPreviews();
   }
   const isEditing = (mode === "subject" && Boolean(subject))
     || (mode === "catalog-grade" && Boolean(grade))
@@ -4043,6 +4179,265 @@ function createClassCatalogMenu(project, type, subject, grade = null, classEntry
   return shell;
 }
 
+function openGlobalClassDisplayDialog(project) {
+  const layer = getClassCatalogData(project);
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog class-display-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = "<span class=\"label\">Klassen</span><h2>Darstellung</h2>";
+  const intro = document.createElement("p");
+  intro.className = "dialog-intro";
+  intro.textContent = "Wählen Sie eine einheitliche Darstellung für alle vorhandenen und zukünftigen Klassen.";
+  const choices = document.createElement("div");
+  choices.className = "class-catalog-display-modes class-global-display-modes";
+  choices.setAttribute("role", "radiogroup");
+  const labels = {
+    normal: "Normal",
+    subscript: "Kürzel tiefgestellt",
+    superscript: "Kürzel hochgestellt",
+    hyphen: "Mit Bindestrich",
+    smallcaps: "Kürzel als Kapitälchen"
+  };
+  let selectedMode = layer.classDisplayMode || "normal";
+  Object.entries(labels).forEach(([mode, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.classDisplayMode = mode;
+    button.setAttribute("role", "radio");
+    button.setAttribute("aria-checked", String(mode === selectedMode));
+    button.setAttribute("aria-label", label);
+    const preview = document.createElement("strong");
+    renderClassDisplay(preview, "7", "b", mode);
+    const caption = document.createElement("small");
+    caption.textContent = label;
+    button.append(preview, caption);
+    button.addEventListener("click", () => {
+      selectedMode = mode;
+      choices.querySelectorAll("button").forEach((entry) => entry.setAttribute("aria-checked", String(entry === button)));
+    });
+    choices.append(button);
+  });
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = "Darstellung speichern";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    layer.classDisplayMode = selectedMode;
+    layer.grades.forEach((grade) => (grade.classes || []).forEach((classEntry) => {
+      classEntry.displayMode = selectedMode;
+      classEntry.name = getClassDisplayText(grade.name, classEntry.suffix, selectedMode);
+    }));
+    syncLessonCatalogLabels(project);
+    saveProjects();
+    dialog.close();
+    renderClassCatalogProperties(project);
+    renderActiveCalendar(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, intro, choices, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function createClassCatalogSettingsMenu(project) {
+  const shell = document.createElement("div");
+  shell.className = "schedule-menu-shell";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "schedule-menu-button";
+  button.setAttribute("aria-label", "Menü für Klassen");
+  button.setAttribute("aria-expanded", "false");
+  button.innerHTML = "<span aria-hidden=\"true\"></span>";
+  const menu = document.createElement("div");
+  menu.className = "schedule-menu";
+  menu.hidden = true;
+  const display = document.createElement("button");
+  display.type = "button";
+  display.textContent = "Darstellung";
+  display.addEventListener("click", () => {
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    openGlobalClassDisplayDialog(project);
+  });
+  button.addEventListener("click", () => {
+    menu.hidden = !menu.hidden;
+    button.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  menu.append(display);
+  shell.append(button, menu);
+  return shell;
+}
+
+function getSchoolCatalogClasses(project, schoolId) {
+  return getClassCatalogData(project).grades
+    .filter((grade) => grade.schoolId === schoolId)
+    .flatMap((grade) => (grade.classes || []).map((classEntry) => ({ grade, classEntry })));
+}
+
+function openSubjectClassSelectionDialog(project, subject, initialClassIds, onApply, title = "Klassen zuweisen") {
+  const classes = getSchoolCatalogClasses(project, subject.schoolId);
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog class-target-picker-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const headingLabel = document.createElement("span");
+  headingLabel.className = "label";
+  headingLabel.textContent = subject.name;
+  const headingTitle = document.createElement("h2");
+  headingTitle.textContent = title;
+  heading.append(headingLabel, headingTitle);
+  const intro = document.createElement("p");
+  intro.className = "dialog-intro";
+  intro.textContent = "Wählen Sie beliebig viele Einzelklassen aus.";
+  const choices = document.createElement("div");
+  choices.className = "class-target-checkbox-list";
+  classes.forEach(({ grade, classEntry }) => {
+    const choice = document.createElement("label");
+    choice.className = "class-target-checkbox is-class";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = classEntry.id;
+    checkbox.checked = initialClassIds.includes(classEntry.id);
+    const copy = document.createElement("span");
+    const name = document.createElement("strong");
+    renderClassDisplay(name, grade.name, classEntry.suffix, classEntry.displayMode);
+    const gradeCopy = document.createElement("small");
+    gradeCopy.textContent = `${grade.name}. Klassenstufe`;
+    copy.append(name, gradeCopy);
+    choice.append(checkbox, copy);
+    choices.append(choice);
+  });
+  if (!classes.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Für diese Schule sind noch keine Klassen eingerichtet.";
+    choices.append(empty);
+  }
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = "Auswahl übernehmen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onApply([...choices.querySelectorAll("input:checked")].map((checkbox) => checkbox.value));
+    dialog.close();
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, intro, choices, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function openCourseDialog(project, subject, course = null) {
+  let selectedClassIds = [...(course?.classIds || [])];
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog class-course-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const headingLabel = document.createElement("span");
+  headingLabel.className = "label";
+  headingLabel.textContent = subject.name;
+  const headingTitle = document.createElement("h2");
+  headingTitle.textContent = course ? "Kurs bearbeiten" : "Kurs erstellen";
+  heading.append(headingLabel, headingTitle);
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "dialog-field";
+  const label = document.createElement("span");
+  label.textContent = "Kursbezeichnung";
+  const name = document.createElement("input");
+  name.type = "text";
+  name.required = true;
+  name.maxLength = 80;
+  name.placeholder = "z. B. Grundkurs Deutsch";
+  name.value = course?.name || "";
+  nameLabel.append(label, name);
+  const selectedSummary = document.createElement("div");
+  selectedSummary.className = "class-project-selected-targets";
+  const renderSummary = () => {
+    const classes = getSchoolCatalogClasses(project, subject.schoolId).filter(({ classEntry }) => selectedClassIds.includes(classEntry.id));
+    if (!classes.length) {
+      const empty = document.createElement("span");
+      empty.className = "empty-state";
+      empty.textContent = "Noch keine Herkunftsklasse ausgewählt.";
+      selectedSummary.replaceChildren(empty);
+      return;
+    }
+    selectedSummary.replaceChildren(...classes.map(({ grade, classEntry }) => {
+      const chip = document.createElement("span");
+      chip.className = "class-project-target-chip is-class";
+      renderClassDisplay(chip, grade.name, classEntry.suffix, classEntry.displayMode);
+      return chip;
+    }));
+  };
+  const choose = document.createElement("button");
+  choose.type = "button";
+  choose.className = "secondary-button";
+  choose.textContent = "Klassen auswählen";
+  choose.addEventListener("click", () => openSubjectClassSelectionDialog(project, subject, selectedClassIds, (ids) => {
+    selectedClassIds = ids;
+    renderSummary();
+  }, "Herkunftsklassen auswählen"));
+  renderSummary();
+  const status = document.createElement("p");
+  status.className = "property-status";
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = course ? "Änderungen speichern" : "Kurs erstellen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const courseName = name.value.trim();
+    if (!courseName || !selectedClassIds.length) {
+      status.textContent = !courseName ? "Bitte den Kurs benennen." : "Bitte mindestens eine Herkunftsklasse auswählen.";
+      return;
+    }
+    subject.courses = Array.isArray(subject.courses) ? subject.courses : [];
+    const values = { name: courseName, classIds: [...selectedClassIds] };
+    if (course) Object.assign(course, values);
+    else subject.courses.push({ id: globalThis.crypto?.randomUUID?.() ?? `course-${Date.now()}`, ...values });
+    saveProjects();
+    dialog.close();
+    renderClassCatalogProperties(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, nameLabel, selectedSummary, choose, status, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  name.focus();
+}
+
 function renderClassCatalogProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Klassen";
@@ -4057,19 +4452,33 @@ function renderClassCatalogProperties(project) {
   title.textContent = project.name;
   const intro = document.createElement("p");
   intro.textContent = "Legen Sie Klassen unabhängig von Fächern an. Dadurch können dieselben Klassen später verschiedenen Fächern und zusammengesetzten Kursen zugeordnet werden.";
-  head.append(title, intro);
-  const schoolField = document.createElement("label");
-  schoolField.className = "property-field";
-  const schoolLabel = document.createElement("span");
-  schoolLabel.textContent = "Schule";
-  const schoolSelect = document.createElement("select");
-  schools.forEach((school) => schoolSelect.add(new Option(school.name, school.id, false, school.id === activeClassSchoolId)));
-  schoolSelect.disabled = !schools.length;
-  schoolSelect.addEventListener("change", () => {
-    activeClassSchoolId = schoolSelect.value;
-    renderClassCatalogProperties(project);
+  const titleLine = document.createElement("div");
+  titleLine.className = "schedule-title-line";
+  titleLine.append(title, createClassCatalogSettingsMenu(project));
+  head.append(titleLine, intro);
+  const schoolTabs = document.createElement("div");
+  schoolTabs.className = "project-period-tabs class-catalog-school-tabs";
+  schoolTabs.setAttribute("role", "tablist");
+  schoolTabs.setAttribute("aria-label", "Schule auswählen");
+  schools.forEach((school) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(school.id === activeClassSchoolId));
+    tab.textContent = school.name;
+    tab.addEventListener("click", () => {
+      if (school.id === activeClassSchoolId) return;
+      activeClassSchoolId = school.id;
+      renderClassCatalogProperties(project);
+    });
+    schoolTabs.append(tab);
   });
-  schoolField.append(schoolLabel, schoolSelect);
+  if (!schools.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Legen Sie zuerst eine Schule an.";
+    schoolTabs.append(empty);
+  }
   const classSection = document.createElement("section");
   classSection.className = "property-section class-catalog-master-section";
   const classSectionTitle = document.createElement("h3");
@@ -4149,12 +4558,67 @@ function renderClassCatalogProperties(project) {
       const subjectTitle = document.createElement("h3");
       subjectTitle.textContent = subject.name;
       subjectHead.append(subjectTitle, createClassCatalogMenu(project, "subject", subject));
-      subjectCard.append(subjectHead);
+      const assignedClasses = document.createElement("div");
+      assignedClasses.className = "class-subject-assignment-pills";
+      const catalogClasses = getSchoolCatalogClasses(project, subject.schoolId);
+      const courseClassIds = new Set((subject.courses || []).flatMap((course) => course.classIds || []));
+      const visibleClassIds = new Set((subject.classIds || []).filter((classId) => !courseClassIds.has(classId)));
+      const selectedClasses = catalogClasses.filter(({ classEntry }) => visibleClassIds.has(classEntry.id));
+      if (selectedClasses.length) {
+        selectedClasses.forEach(({ grade, classEntry }) => {
+          const row = document.createElement("div");
+          row.className = "class-subject-assignment-pill is-class";
+          const name = document.createElement("strong");
+          renderClassDisplay(name, grade.name, classEntry.suffix, classEntry.displayMode);
+          row.append(name);
+          assignedClasses.append(row);
+        });
+      }
+      const subjectActions = document.createElement("div");
+      subjectActions.className = "class-subject-actions";
+      const assignClasses = document.createElement("button");
+      assignClasses.type = "button";
+      assignClasses.className = "secondary-button";
+      assignClasses.textContent = "Klassen zuweisen";
+      assignClasses.addEventListener("click", () => openSubjectClassSelectionDialog(project, subject, subject.classIds, (ids) => {
+        subject.classIds = ids;
+        saveProjects();
+        renderClassCatalogProperties(project);
+      }));
+      const addCourse = document.createElement("button");
+      addCourse.type = "button";
+      addCourse.className = "secondary-button";
+      addCourse.textContent = "Kurs erstellen";
+      addCourse.addEventListener("click", () => openCourseDialog(project, subject));
+      subjectActions.append(assignClasses, addCourse);
+      const courseRows = [];
+      (subject.courses || []).forEach((course) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "class-subject-assignment-pill is-course";
+        row.title = `${course.name} bearbeiten`;
+        row.setAttribute("aria-label", `${course.name} bearbeiten`);
+        const courseName = document.createElement("strong");
+        courseName.textContent = course.name;
+        const courseClasses = document.createElement("small");
+        const assignedCourseClasses = catalogClasses.filter(({ classEntry }) => course.classIds.includes(classEntry.id));
+        assignedCourseClasses.forEach(({ grade, classEntry }, index) => {
+          if (index) courseClasses.append(document.createTextNode(", "));
+          const className = document.createElement("span");
+          renderClassDisplay(className, grade.name, classEntry.suffix, classEntry.displayMode);
+          courseClasses.append(className);
+        });
+        row.append(courseName, courseClasses);
+        row.addEventListener("click", () => openCourseDialog(project, subject, course));
+        courseRows.push(row);
+      });
+      assignedClasses.prepend(...courseRows);
+      subjectCard.append(subjectHead, subjectActions, assignedClasses);
       subjectList.append(subjectCard);
     });
   }
   subjectSection.append(subjectSectionTitle, subjectSectionIntro, addSubject, subjectList);
-  sheet.append(head, schoolField, classSection, subjectSection);
+  sheet.append(head, schoolTabs, classSection, subjectSection);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -4688,6 +5152,10 @@ function deleteClassCatalogEntry(projectId, type, subjectId, gradeId, classId) {
   } else if (type === "catalog-class") {
     const grade = (layer.grades || []).find((entry) => entry.id === gradeId);
     if (grade) grade.classes = (grade.classes || []).filter((entry) => entry.id !== classId);
+    layer.subjects.forEach((subject) => {
+      subject.classIds = (subject.classIds || []).filter((id) => id !== classId);
+      (subject.courses || []).forEach((course) => { course.classIds = (course.classIds || []).filter((id) => id !== classId); });
+    });
   } else if (type === "subject") layer.subjects = layer.subjects.filter((entry) => entry.id !== subjectId);
   else {
     const subject = layer.subjects.find((entry) => entry.id === subjectId);
@@ -5357,6 +5825,9 @@ function getLessonStatisticsPeriod(project, schoolId = null) {
 }
 
 function isSameCatalogLesson(candidate, reference) {
+  if (reference.subjectId && reference.courseId) {
+    return candidate.subjectId === reference.subjectId && candidate.courseId === reference.courseId;
+  }
   if (reference.subjectId && reference.classId) {
     return candidate.subjectId === reference.subjectId && candidate.classId === reference.classId;
   }
@@ -5473,8 +5944,10 @@ function formatRemainingLessonStatistic(result, referenceLesson) {
 
 function getLessonGradeLevel(project, lesson) {
   const catalog = getClassCatalogData(project);
+  const subject = catalog.subjects?.find((entry) => entry.id === lesson.subjectId);
+  const course = subject?.courses?.find((entry) => entry.id === lesson.courseId);
   const grade = catalog.grades?.find((entry) => entry.id === lesson.gradeLevelId
-    || (entry.classes || []).some((classEntry) => classEntry.id === lesson.classId));
+    || (entry.classes || []).some((classEntry) => classEntry.id === lesson.classId || course?.classIds?.includes(classEntry.id)));
   return Number(grade?.name) || Number(String(lesson.grade || "").match(/\d+/)?.[0]) || null;
 }
 
@@ -5596,7 +6069,7 @@ function populateLessonClasses(project, lesson = null, schoolId = null) {
   const options = [];
   if (subject) {
     (Array.isArray(layer.grades) ? layer.grades : []).filter((grade) => !schoolId || grade.schoolId === schoolId).forEach((grade) => {
-      (Array.isArray(grade.classes) ? grade.classes : []).forEach((classEntry) => {
+      (Array.isArray(grade.classes) ? grade.classes : []).filter((classEntry) => subject.classIds.includes(classEntry.id)).forEach((classEntry) => {
         const option = document.createElement("option");
         option.value = classEntry.id;
         option.textContent = `${classEntry.name} · ${grade.name}. Klassenstufe`;
@@ -5604,13 +6077,25 @@ function populateLessonClasses(project, lesson = null, schoolId = null) {
         option.dataset.gradeId = grade.id;
         option.dataset.displayMode = classEntry.displayMode || "normal";
         option.dataset.suffix = classEntry.suffix || "";
+        option.dataset.targetType = "class";
         options.push(option);
       });
     });
+    (subject.courses || []).forEach((course) => {
+      const option = document.createElement("option");
+      option.value = `course:${course.id}`;
+      option.textContent = `${course.name} · Kurs`;
+      option.dataset.name = course.name;
+      option.dataset.courseId = course.id;
+      option.dataset.classIds = (course.classIds || []).join(",");
+      option.dataset.targetType = "course";
+      options.push(option);
+    });
   }
-  if (lesson?.grade && !options.some((option) => option.value === lesson.classId)) {
+  const lessonTargetValue = lesson?.courseId ? `course:${lesson.courseId}` : lesson?.classId;
+  if (lesson?.grade && !options.some((option) => option.value === lessonTargetValue)) {
     const legacy = document.createElement("option");
-    legacy.value = lesson.classId || `legacy-class:${lesson.grade}`;
+    legacy.value = lessonTargetValue || `legacy-class:${lesson.grade}`;
     legacy.textContent = `${lesson.grade} · bisheriger Eintrag`;
     legacy.dataset.name = lesson.grade;
     legacy.dataset.gradeId = lesson.gradeLevelId || "";
@@ -5623,7 +6108,7 @@ function populateLessonClasses(project, lesson = null, schoolId = null) {
     options.push(empty);
   }
   lessonGrade.replaceChildren(...options);
-  lessonGrade.value = lesson?.classId || options[0].value;
+  lessonGrade.value = lessonTargetValue || options[0].value;
   updateLessonClassSelectionPreview(project);
 }
 
@@ -5865,7 +6350,8 @@ function minutesToTime(value) {
 }
 
 function createFiveMinuteTimeControl(input) {
-  const initialParts = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.value) || ["", "00", "00"];
+  const initialParts = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.value) || ["", "", ""];
+  const isRequired = input.required;
   input.type = "hidden";
   input.removeAttribute("step");
   const shell = document.createElement("span");
@@ -5879,6 +6365,7 @@ function createFiveMinuteTimeControl(input) {
   hourInput.value = initialParts[1];
   hourInput.setAttribute("aria-label", "Stunde");
   hourInput.autocomplete = "off";
+  hourInput.required = isRequired;
   const separator = document.createElement("span");
   separator.textContent = ":";
   separator.setAttribute("aria-hidden", "true");
@@ -5889,6 +6376,22 @@ function createFiveMinuteTimeControl(input) {
   minuteInput.value = initialParts[2];
   minuteInput.setAttribute("aria-label", "Minute");
   minuteInput.autocomplete = "off";
+  minuteInput.required = isRequired;
+  const nativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  const syncSegmentsFromValue = () => {
+    const parts = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(nativeValue.get.call(input));
+    hourInput.value = parts?.[1] || "";
+    minuteInput.value = parts?.[2] || "";
+  };
+  Object.defineProperty(input, "value", {
+    configurable: true,
+    get: () => nativeValue.get.call(input),
+    set: (value) => {
+      nativeValue.set.call(input, value);
+      syncSegmentsFromValue();
+    }
+  });
+  input.form?.addEventListener("reset", () => requestAnimationFrame(syncSegmentsFromValue));
   [hourInput, minuteInput].forEach((segment) => segment.addEventListener("focus", () => segment.select()));
   const syncManualValue = () => {
     let hour = hourInput.value.replace(/\D/g, "").slice(0, 2);
@@ -5897,7 +6400,7 @@ function createFiveMinuteTimeControl(input) {
     if (minute.length === 2 && Number(minute) > 59) minute = "59";
     hourInput.value = hour;
     minuteInput.value = minute;
-    input.value = hour.length === 2 && minute.length === 2 ? `${hour}:${minute}` : "";
+    nativeValue.set.call(input, hour.length === 2 && minute.length === 2 ? `${hour}:${minute}` : "");
     input.dispatchEvent(new Event("input", { bubbles: true }));
   };
   hourInput.addEventListener("input", () => {
@@ -5996,13 +6499,26 @@ document.addEventListener("click", () => {
   document.querySelectorAll(".five-minute-time-button").forEach((button) => button.setAttribute("aria-expanded", "false"));
 });
 
-[schoolDayStart, schoolDayEnd].forEach((input) => {
-  const parent = input?.parentNode;
-  if (!parent || input.closest(".five-minute-time-control")) return;
+function enhanceFiveMinuteTimeInput(input) {
+  if (!(input instanceof HTMLInputElement) || input.type !== "time" || input.closest(".five-minute-time-control")) return;
+  const parent = input.parentNode;
+  if (!parent) return;
   const nextSibling = input.nextSibling;
   const control = createFiveMinuteTimeControl(input);
   parent.insertBefore(control, nextSibling);
-});
+}
+
+function enhanceFiveMinuteTimeInputs(root = document) {
+  if (root instanceof HTMLInputElement) enhanceFiveMinuteTimeInput(root);
+  root.querySelectorAll?.('input[type="time"]').forEach(enhanceFiveMinuteTimeInput);
+}
+
+enhanceFiveMinuteTimeInputs();
+new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+    if (node instanceof Element) enhanceFiveMinuteTimeInputs(node);
+  }));
+}).observe(document.body, { childList: true, subtree: true });
 
 function renderScheduleDisplayRows() {
   const rows = displayRowsDraft.map((row, index) => {
@@ -6028,7 +6544,7 @@ function renderScheduleDisplayRows() {
     label.addEventListener("input", () => { row.label = label.value; });
     const start = document.createElement("input");
     start.type = "time";
-    start.step = "300";
+    start.step = "60";
     start.value = row.start;
     start.required = true;
     start.setAttribute("aria-label", `${kind.textContent} Beginn`);
@@ -6038,7 +6554,7 @@ function renderScheduleDisplayRows() {
     });
     const end = document.createElement("input");
     end.type = "time";
-    end.step = "300";
+    end.step = "60";
     end.value = row.end;
     end.required = true;
     end.setAttribute("aria-label", `${kind.textContent} Ende`);
@@ -6126,13 +6642,22 @@ function openClassTripDialog(project, trip = null) {
   classTripEndDate.min = "";
   classTripDialogStatus.textContent = "";
   classTripDialog.dataset.projectId = project.id;
+  const classGroups = getConfiguredClassGroups(project);
+  const storedTargets = trip?.classGroups || [];
+  classTripSelectedClassKeys = storedTargets.length
+    ? storedTargets.map((stored) => classGroups.find((group) => group.key === stored.key
+      || ((stored.classIds || []).some((id) => group.classIds.includes(id)) && group.targetType === (stored.targetType || "class")))?.key).filter(Boolean)
+    : classGroups.filter((group) => group.targetType === "class" && (
+      (trip?.classIds || []).some((id) => group.classIds.includes(id))
+      || group.name === trip?.className
+    )).map((group) => group.key);
+  renderClassTargetSummary(classTripClassSummary, classGroups, classTripSelectedClassKeys);
   const timeDefaults = getIndividualEventTimeDefaults(project);
   if (trip) {
     classTripDialog.dataset.tripId = trip.id;
     classTripDialogTitle.textContent = "Klassenfahrt bearbeiten";
     classTripSubmitButton.textContent = "Änderungen speichern";
     classTripName.value = trip.name || "";
-    classTripClass.value = trip.className || "";
     classTripStartDate.value = trip.startDate || trip.date || "";
     classTripEndDate.value = trip.endDate || trip.startDate || trip.date || "";
     classTripEndDate.min = classTripStartDate.value;
@@ -6157,12 +6682,28 @@ function openClassTripDialog(project, trip = null) {
   classTripName.focus();
 }
 
+classTripClassButton.addEventListener("click", () => {
+  const project = projects.find((entry) => entry.id === classTripDialog.dataset.projectId);
+  if (!project) return;
+  openClassTargetPicker(project, classTripSelectedClassKeys, (selectedKeys, classGroups) => {
+    classTripSelectedClassKeys = selectedKeys;
+    renderClassTargetSummary(classTripClassSummary, classGroups, classTripSelectedClassKeys);
+  }, "Klassenfahrt");
+});
+
 function openSchoolProjectDialog(project, schoolProject = null, entryType = "school-project") {
   schoolProjectForm.reset();
   schoolProjectEndDate.min = "";
   schoolProjectDialogStatus.textContent = "";
   schoolProjectDialog.dataset.projectId = project.id;
   schoolProjectDialog.dataset.entryType = schoolProject?.type || entryType;
+  const isVacation = schoolProjectDialog.dataset.entryType === "vacation";
+  const nameField = schoolProjectName.closest(".dialog-field");
+  const timeFields = schoolProjectStartTime.closest(".event-time-fields");
+  const overridesField = schoolProjectOverridesLessons.closest(".dialog-checkbox");
+  nameField.hidden = isVacation;
+  timeFields.hidden = isVacation;
+  overridesField.hidden = isVacation;
   const dialogLabels = {
     "school-project": ["Schulprojekt", "Schulprojekt"],
     vacation: ["Urlaub", "Urlaub"],
@@ -6181,23 +6722,24 @@ function openSchoolProjectDialog(project, schoolProject = null, entryType = "sch
     schoolProjectDialog.dataset.entryId = schoolProject.id;
     schoolProjectDialogTitle.textContent = `${noun} bearbeiten`;
     schoolProjectSubmitButton.textContent = "Änderungen speichern";
-    schoolProjectName.value = schoolProject.name || "";
+    schoolProjectName.value = isVacation ? "Urlaub" : (schoolProject.name || "");
     schoolProjectDate.value = schoolProject.startDate || "";
     schoolProjectEndDate.value = schoolProject.endDate || schoolProject.startDate || "";
-    schoolProjectStartTime.value = schoolProject.startTime || timeDefaults.start;
-    schoolProjectEndTime.value = schoolProject.endTime || timeDefaults.end;
-    schoolProjectOverridesLessons.checked = Boolean(schoolProject.overridesLessons);
+    schoolProjectStartTime.value = isVacation ? "" : (schoolProject.startTime || timeDefaults.start);
+    schoolProjectEndTime.value = isVacation ? "" : (schoolProject.endTime || timeDefaults.end);
+    schoolProjectOverridesLessons.checked = isVacation || Boolean(schoolProject.overridesLessons);
   } else {
     delete schoolProjectDialog.dataset.entryId;
     schoolProjectDialogTitle.textContent = `${noun} hinzufügen`;
     schoolProjectSubmitButton.textContent = `${buttonNoun} hinzufügen`;
-    schoolProjectStartTime.value = timeDefaults.start;
-    schoolProjectEndTime.value = timeDefaults.end;
-    schoolProjectOverridesLessons.checked = false;
+    schoolProjectName.value = isVacation ? "Urlaub" : "";
+    schoolProjectStartTime.value = isVacation ? "" : timeDefaults.start;
+    schoolProjectEndTime.value = isVacation ? "" : timeDefaults.end;
+    schoolProjectOverridesLessons.checked = isVacation;
   }
   schoolProjectEndDate.min = schoolProjectDate.value;
   schoolProjectDialog.showModal();
-  schoolProjectName.focus();
+  (isVacation ? schoolProjectDate : schoolProjectName).focus();
 }
 
 function formatIndividualEventSchedule(entry) {
@@ -6395,9 +6937,10 @@ function renderIndividualProjectsProperties(project) {
         const dates = document.createElement("span");
         dates.textContent = formatIndividualEventSchedule(trip);
         copy.append(tripName);
-        if (trip.className) {
+        const assignedClasses = (trip.classNames || []).join(", ") || trip.className;
+        if (assignedClasses) {
           const classLabel = document.createElement("span");
-          classLabel.textContent = `Klasse ${trip.className}`;
+          classLabel.textContent = `Klasse ${assignedClasses}`;
           copy.append(classLabel);
         }
         copy.append(dates);
@@ -8159,7 +8702,7 @@ classCatalogForm.addEventListener("submit", (event) => {
     });
   } else if (mode === "catalog-class" && grade) {
     grade.classes = Array.isArray(grade.classes) ? grade.classes : [];
-    const displayMode = classCatalogDisplayModeButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.dataset.classDisplayMode || "normal";
+    const displayMode = layer.classDisplayMode || "normal";
     const fullName = getClassDisplayText(grade.name, name, displayMode);
     const duplicate = grade.classes.some((entry) => String(entry.suffix || entry.name).toLocaleLowerCase("de") === name.toLocaleLowerCase("de") && entry.id !== classCatalogDialog.dataset.classId);
     if (duplicate) {
@@ -8191,10 +8734,14 @@ schoolProjectForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const project = projects.find((entry) => entry.id === schoolProjectDialog.dataset.projectId);
   const layer = project && getProjectLayer(project, "individual");
-  const name = schoolProjectName.value.trim();
+  const entryType = schoolProjectDialog.dataset.entryType || "school-project";
+  const isVacation = entryType === "vacation";
+  const name = isVacation ? "Urlaub" : schoolProjectName.value.trim();
   if (!project || !layer) return;
   if (!name || !schoolProjectDate.value || !schoolProjectEndDate.value) {
-    schoolProjectDialogStatus.textContent = "Bitte Bezeichnung sowie Start- und Enddatum eintragen.";
+    schoolProjectDialogStatus.textContent = isVacation
+      ? "Bitte Start- und Enddatum eintragen."
+      : "Bitte Bezeichnung sowie Start- und Enddatum eintragen.";
     return;
   }
   if (schoolProjectEndDate.value < schoolProjectDate.value) {
@@ -8202,11 +8749,11 @@ schoolProjectForm.addEventListener("submit", (event) => {
     schoolProjectEndDate.focus();
     return;
   }
-  if (Boolean(schoolProjectStartTime.value) !== Boolean(schoolProjectEndTime.value)) {
+  if (!isVacation && Boolean(schoolProjectStartTime.value) !== Boolean(schoolProjectEndTime.value)) {
     schoolProjectDialogStatus.textContent = "Beginn und Ende bitte entweder gemeinsam eintragen oder beide offenlassen.";
     return;
   }
-  if (schoolProjectStartTime.value && schoolProjectEndTime.value <= schoolProjectStartTime.value) {
+  if (!isVacation && schoolProjectStartTime.value && schoolProjectEndTime.value <= schoolProjectStartTime.value) {
     schoolProjectDialogStatus.textContent = "Das Ende muss nach dem Beginn liegen.";
     schoolProjectEndTime.focus();
     return;
@@ -8216,16 +8763,16 @@ schoolProjectForm.addEventListener("submit", (event) => {
     name,
     startDate: schoolProjectDate.value,
     endDate: schoolProjectEndDate.value,
-    startTime: schoolProjectStartTime.value,
-    endTime: schoolProjectEndTime.value,
-    overridesLessons: schoolProjectOverridesLessons.checked
+    startTime: isVacation ? "" : schoolProjectStartTime.value,
+    endTime: isVacation ? "" : schoolProjectEndTime.value,
+    overridesLessons: isVacation || schoolProjectOverridesLessons.checked
   };
   const existingEntry = layer.entries.find((entry) => entry.id === schoolProjectDialog.dataset.entryId);
   if (existingEntry) Object.assign(existingEntry, entryData);
   else {
     layer.entries.push({
       id: globalThis.crypto?.randomUUID?.() ?? `school-project-${Date.now()}`,
-      type: schoolProjectDialog.dataset.entryType || "school-project",
+      type: entryType,
       ...entryData,
       createdAt: new Date().toISOString()
     });
@@ -8244,7 +8791,6 @@ classTripForm.addEventListener("submit", (event) => {
   const project = projects.find((entry) => entry.id === classTripDialog.dataset.projectId);
   const layer = project && getProjectLayer(project, "individual");
   const name = classTripName.value.trim();
-  const className = classTripClass.value.trim();
   if (!project || !layer) return;
   if (!name || !classTripStartDate.value || !classTripEndDate.value) {
     classTripDialogStatus.textContent = "Bitte Bezeichnung sowie Start- und Enddatum eintragen.";
@@ -8265,9 +8811,25 @@ classTripForm.addEventListener("submit", (event) => {
     return;
   }
   layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+  const classGroups = getConfiguredClassGroups(project);
+  const chosenGroups = classTripSelectedClassKeys.map((key) => classGroups.find((group) => group.key === key)).filter(Boolean);
   const tripData = {
     name,
-    className,
+    className: chosenGroups.length === 1 ? chosenGroups[0].name : "",
+    classGroups: chosenGroups.map((group) => ({
+      key: group.key,
+      targetType: group.targetType,
+      schoolId: group.schoolId,
+      schoolName: group.schoolName,
+      className: group.name,
+      gradeName: group.gradeName || "",
+      suffix: group.suffix || "",
+      displayMode: group.displayMode || "normal",
+      classIds: [...group.classIds]
+    })),
+    classIds: [...new Set(chosenGroups.flatMap((group) => group.classIds))],
+    classNames: chosenGroups.map((group) => group.name),
+    schoolIds: [...new Set(chosenGroups.map((group) => group.schoolId).filter(Boolean))],
     startDate: classTripStartDate.value,
     endDate: classTripEndDate.value,
     startTime: classTripStartTime.value,
@@ -8380,7 +8942,7 @@ lessonForm.addEventListener("submit", (event) => {
     return;
   }
   if (!lessonSubject.value || !lessonGrade.value) {
-    lessonDialogStatus.textContent = "Bitte ein angelegtes Fach und eine konkrete Klasse auswählen.";
+    lessonDialogStatus.textContent = "Bitte ein angelegtes Fach und eine Klasse oder einen Kurs auswählen.";
     return;
   }
   if (lessonEnd.value <= lessonStart.value) {
@@ -8413,7 +8975,9 @@ lessonForm.addEventListener("submit", (event) => {
     subject: subjectOption?.dataset.name || subjectOption?.textContent || "",
     subjectId: lessonSubject.value,
     gradeLevelId: classOption?.dataset.gradeId || "",
-    classId: lessonGrade.value,
+    classId: classOption?.dataset.targetType === "course" ? "" : lessonGrade.value,
+    courseId: classOption?.dataset.courseId || "",
+    classIds: classOption?.dataset.targetType === "course" ? (classOption.dataset.classIds || "").split(",").filter(Boolean) : [lessonGrade.value],
     phases: structuredClone(lessonPhasesDraft),
     room: lessonRoom.value.trim(),
     color: lessonColor.value || "#bfd2e2",
