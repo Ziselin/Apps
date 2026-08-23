@@ -246,6 +246,7 @@ const storedExpandedLayerKeys = (() => {
 const expandedLayerKeys = new Set(Array.isArray(storedExpandedLayerKeys)
   ? storedExpandedLayerKeys
   : projects.flatMap((project) => [...expandableLayerIds].map((layerId) => `${project.id}:${layerId}`)));
+const expandedAppointmentGroupKeys = new Set();
 
 const monthNames = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -4061,6 +4062,34 @@ function createAppointmentProjectCard(project, group, appointmentProject, layerT
   return card;
 }
 
+function createAppointmentGroupHeader(project, group, layerType) {
+  const groupKey = `${project.id}:${layerType}:${group.id}`;
+  const isExpanded = expandedAppointmentGroupKeys.has(groupKey);
+  const head = document.createElement("div");
+  head.className = "appointment-group-head";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "appointment-group-toggle";
+  toggle.textContent = isExpanded ? "−" : "+";
+  toggle.setAttribute("aria-expanded", String(isExpanded));
+  toggle.setAttribute("aria-label", `${group.name} ${isExpanded ? "einklappen" : "ausklappen"}`);
+  const title = document.createElement("button");
+  title.type = "button";
+  title.className = "appointment-group-title";
+  title.textContent = group.name;
+  title.setAttribute("aria-expanded", String(isExpanded));
+  const toggleGroup = () => {
+    if (isExpanded) expandedAppointmentGroupKeys.delete(groupKey);
+    else expandedAppointmentGroupKeys.add(groupKey);
+    if (layerType === "individual") renderIndividualProjectsProperties(project);
+    else renderAppointmentsProperties(project);
+  };
+  toggle.addEventListener("click", toggleGroup);
+  title.addEventListener("click", toggleGroup);
+  head.append(toggle, title, createAppointmentMenu(project, group, null, layerType));
+  return { head, isExpanded };
+}
+
 function renderAppointmentsProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Schulische Termine";
@@ -4104,11 +4133,7 @@ function renderAppointmentsProperties(project) {
       const groupCard = document.createElement("section");
       groupCard.className = "appointment-group-card";
       groupCard.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
-      const groupHead = document.createElement("div");
-      groupHead.className = "appointment-group-head";
-      const groupTitle = document.createElement("h3");
-      groupTitle.textContent = group.name;
-      groupHead.append(groupTitle, createAppointmentMenu(project, group));
+      const { head: groupHead, isExpanded } = createAppointmentGroupHeader(project, group, "appointments");
       const addAppointmentButton = document.createElement("button");
       addAppointmentButton.type = "button";
       addAppointmentButton.className = "secondary-button appointment-add-button";
@@ -4141,7 +4166,11 @@ function renderAppointmentsProperties(project) {
       const projectList = document.createElement("div");
       projectList.className = "appointment-project-list";
       group.projects.forEach((appointmentProject) => projectList.append(createAppointmentProjectCard(project, group, appointmentProject, "appointments")));
-      groupCard.append(groupHead, groupActions, appointmentList, projectList);
+      const groupBody = document.createElement("div");
+      groupBody.className = "appointment-group-body";
+      groupBody.hidden = !isExpanded;
+      groupBody.append(groupActions, appointmentList, projectList);
+      groupCard.append(groupHead, groupBody);
       groupList.append(groupCard);
     });
   }
@@ -7146,11 +7175,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       const card = document.createElement("section");
       card.className = "appointment-group-card";
       card.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
-      const head = document.createElement("div");
-      head.className = "appointment-group-head";
-      const name = document.createElement("h3");
-      name.textContent = group.name;
-      head.append(name, createAppointmentMenu(project, group, null, "individual"));
+      const { head, isExpanded } = createAppointmentGroupHeader(project, group, "individual");
       const add = document.createElement("button");
       add.type = "button";
       add.className = "secondary-button appointment-add-button";
@@ -7180,7 +7205,11 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       const projectList = document.createElement("div");
       projectList.className = "appointment-project-list";
       group.projects.forEach((appointmentProject) => projectList.append(createAppointmentProjectCard(project, group, appointmentProject, "individual")));
-      card.append(head, actions, entries, projectList);
+      const body = document.createElement("div");
+      body.className = "appointment-group-body";
+      body.hidden = !isExpanded;
+      body.append(actions, entries, projectList);
+      card.append(head, body);
       list.append(card);
     });
   }

@@ -1206,12 +1206,36 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: inset 0 1px 0 rgba(255,255,255,.36);
 }
 .appointment-group-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 .appointment-group-head h3 { margin: 0; font-size: .9rem; }
+.appointment-group-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(78, 68, 96, .2);
+  border-radius: 8px;
+  background: rgba(255, 255, 252, .48);
+  color: var(--ink);
+  font: 600 1rem/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.appointment-group-toggle:hover { background: rgba(255, 255, 252, .72); }
+.appointment-group-title {
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 650 .9rem/1.3 system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.appointment-group-body { display: grid; gap: 11px; }
+.appointment-group-body[hidden] { display: none; }
 .appointment-project-list { display: grid; gap: 8px; }
 .appointment-project-card {
   display: grid;
@@ -1222,7 +1246,7 @@ button, input, select, textarea { font-family: inherit; }
   background: rgba(255,255,252,.38);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.42);
 }
-.appointment-project-head { padding-bottom: 7px; border-bottom: 1px solid rgba(78,68,96,.12); }
+.appointment-project-head { grid-template-columns: minmax(0, 1fr) auto; padding-bottom: 7px; border-bottom: 1px solid rgba(78,68,96,.12); }
 .appointment-project-head h4 { margin: 0; font-size: .82rem; }
 .appointment-project-card .appointment-entry { background: color-mix(in srgb, var(--appointment-group-color, #c9c1dd) 78%, white); }
 .appointment-todo-entry { min-height: 50px; }
