@@ -974,7 +974,9 @@ button, input, select, textarea { font-family: inherit; }
 .class-target-checkbox.is-grade { background: rgba(198,215,189,.25); }
 .class-target-checkbox.is-course { border-color: rgba(70,105,132,.26); background: color-mix(in srgb, var(--project-blue) 42%, white); }
 .class-target-checkbox input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink-soft); }
-.class-target-checkbox span, .class-target-checkbox strong, .class-target-checkbox small { display: block; }
+.class-target-checkbox > span,
+.class-target-checkbox > span > strong,
+.class-target-checkbox > span > small { display: block; }
 .class-target-checkbox strong { color: var(--ink); font-size: .82rem; }
 .class-target-checkbox small { margin-top: 2px; color: var(--muted); font-size: .7rem; }
 .property-section { display: grid; gap: 13px; }
