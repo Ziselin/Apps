@@ -702,7 +702,9 @@ button, input, select, textarea { font-family: inherit; }
 .class-project-browser-entry { width: calc(100% - 28px); margin-left: 28px; }
 .class-project-browser-entry::before { content: "◆"; font-size: .52rem; }
 .class-project-grade-section { display: grid; gap: 8px; padding: 11px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,252,.3); }
-.class-project-grade-section > h3 { margin: 0; color: var(--ink); font-size: .82rem; }
+.class-project-grade-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.class-project-grade-heading h3 { margin: 0; color: var(--ink); font-size: .82rem; }
+.class-project-grade-heading span { overflow: hidden; color: var(--muted); font-size: .72rem; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .class-project-grade-entries { display: grid; gap: 7px; }
 .project-detail {
   flex: 1 1 auto;
@@ -1188,6 +1190,9 @@ button, input, select, textarea { font-family: inherit; }
 .schedule-overview-card small { color: var(--ink-soft); font-size: .76rem; }
 .appointment-add-group,
 .appointment-add-button { justify-self: start; }
+.appointment-root-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.appointment-group-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.appointment-group-actions .appointment-add-button { min-height: 34px; padding: 7px 11px; font-size: .73rem; }
 .appointment-group-list { display: grid; gap: 12px; }
 .appointment-group-card {
   display: grid;
@@ -1205,6 +1210,39 @@ button, input, select, textarea { font-family: inherit; }
   gap: 12px;
 }
 .appointment-group-head h3 { margin: 0; font-size: .9rem; }
+.appointment-project-list { display: grid; gap: 8px; }
+.appointment-project-card {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--appointment-group-color, #c9c1dd) 66%, rgba(78,68,96,.34));
+  border-radius: 11px;
+  background: rgba(255,255,252,.38);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.42);
+}
+.appointment-project-head { padding-bottom: 7px; border-bottom: 1px solid rgba(78,68,96,.12); }
+.appointment-project-head h4 { margin: 0; font-size: .82rem; }
+.appointment-project-card .appointment-entry { background: color-mix(in srgb, var(--appointment-group-color, #c9c1dd) 78%, white); }
+.appointment-todo-entry { min-height: 50px; }
+.appointment-todo-check {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  cursor: pointer;
+}
+.appointment-todo-check input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--ink-soft);
+  cursor: pointer;
+}
+.appointment-todo-copy { display: block; min-width: 0; }
+.appointment-todo-check strong { min-width: 0; font-size: .82rem; line-height: 1.35; }
+.appointment-todo-copy small { display: block; margin-top: 3px; color: var(--muted); font-size: .7rem; }
+.appointment-todo-entry.is-completed .appointment-todo-check strong { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .appointment-entry-list { display: grid; gap: 7px; }
 .appointment-entry {
   display: grid;
@@ -1508,13 +1546,17 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
   font: inherit;
   appearance: none;
 }
-.class-project-overview-row { grid-template-columns: minmax(120px,1fr) minmax(130px,1fr) auto auto; }
+.class-project-overview-row { grid-template-columns: minmax(120px,1fr) minmax(62px,.55fr) minmax(86px,auto) minmax(68px,auto); gap: 10px; }
+.class-project-overview-row > span:nth-child(3),
+.class-project-overview-row > span:nth-child(4) { white-space: nowrap; }
 @media (max-width: 720px) {
   .class-project-overview-row { grid-template-columns: 1fr auto; }
   .class-project-overview-row strong,
   .class-project-overview-row span:nth-child(2) { grid-column: 1 / -1; }
   .class-project-class-picker-row { grid-template-columns: 1fr; }
   .class-project-class-picker-row::after { top: 20px; right: 15px; }
+  .class-project-grade-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .class-project-grade-heading span { text-align: left; }
 }
 @media (max-width: 720px) {
   .class-project-class-head { align-items: flex-start; flex-direction: column; }

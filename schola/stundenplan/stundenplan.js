@@ -38,7 +38,8 @@ const appointmentDialog = document.getElementById("appointmentDialog");
 const appointmentDialogTitle = document.getElementById("appointmentDialogTitle");
 const appointmentForm = document.getElementById("appointmentForm");
 const appointmentName = document.getElementById("appointmentName");
-const appointmentDate = document.getElementById("appointmentDate");
+const appointmentStartDate = document.getElementById("appointmentStartDate");
+const appointmentEndDate = document.getElementById("appointmentEndDate");
 const appointmentStartTime = document.getElementById("appointmentStartTime");
 const appointmentEndTime = document.getElementById("appointmentEndTime");
 const appointmentIsDeadline = document.getElementById("appointmentIsDeadline");
@@ -190,7 +191,7 @@ const LAYER_TYPES = [
   { id: "classCatalog", title: "Klassen", description: "Fachunabhängige Klassenstufen und semantisch eindeutige Einzelklassen" },
   { id: "schedules", title: "Stundenplanlogiken", description: "Mögliche Zeitraster einer Schule, etwa Einzel- und Blockstunden oder unterschiedliche Pausenfolgen" },
   { id: "individual", title: "Persönliche Termine", description: "Urlaub, weitere persönliche Termine und Krankschreibungen" },
-  { id: "appointments", title: "Schulische Termine", description: "Termingruppen, Klassenfahrten und Schulprojekte" },
+  { id: "appointments", title: "Schulische Termine", description: "Einzelveranstaltungen, Termingruppen und Klassenfahrten" },
   { id: "classes", title: "Projekttage nach Klassen", description: "Klassenbezogene Projektschichten" },
   { id: "sickness", title: "Krankschreibungen", description: "Zeiträume persönlicher Verhinderung ohne Unterricht", hiddenInBrowser: true }
 ];
@@ -391,11 +392,11 @@ function renderActiveCalendar() {
   const semanticSchoolYearStart = Number((project ? getProjectCalendarRange(project).startDate : "")?.slice(0, 4));
   const appointmentEntries = [appointmentLayer, individualLayer]
     .flatMap((entryLayer) => (Array.isArray(entryLayer?.groups) ? entryLayer.groups : []).filter((group) => group.calendarVisible !== false))
-    .flatMap((group) => (Array.isArray(group.appointments) ? group.appointments : []).map((appointment) => ({
+    .flatMap((group) => getAppointmentGroupEntries(group).map((appointment) => ({
       id: appointment.id,
-      name: `${group.name}: ${appointment.name}`,
-      startDate: appointment.date,
-      endDate: appointment.date,
+      name: `${group.name}${appointment.appointmentProjectName ? ` · ${appointment.appointmentProjectName}` : ""}: ${appointment.name}`,
+      startDate: getAppointmentStartDate(appointment),
+      endDate: getAppointmentEndDate(appointment),
       type: "appointment",
       color: group.color || "#c9c1dd"
     })));
@@ -410,6 +411,37 @@ function renderActiveCalendar() {
     return;
   }
   renderYear(semanticSchoolYearStart || Number(appliedSettings.startYear), calendarEntries, true);
+}
+
+function getAppointmentGroupEntries(group) {
+  const direct = (Array.isArray(group?.appointments) ? group.appointments : []).map((appointment) => ({
+    ...appointment,
+    appointmentProjectId: "",
+    appointmentProjectName: ""
+  }));
+  const projectEntries = (Array.isArray(group?.projects) ? group.projects : []).flatMap((appointmentProject) => (
+    (Array.isArray(appointmentProject.appointments) ? appointmentProject.appointments : []).map((appointment) => ({
+      ...appointment,
+      appointmentProjectId: appointmentProject.id,
+      appointmentProjectName: appointmentProject.name
+    }))
+  ));
+  return [...direct, ...projectEntries];
+}
+
+function getAppointmentStartDate(appointment) {
+  return appointment?.startDate || appointment?.date || "";
+}
+
+function getAppointmentEndDate(appointment) {
+  return appointment?.endDate || appointment?.startDate || appointment?.date || "";
+}
+
+function formatAppointmentDateRange(appointment) {
+  const startDate = getAppointmentStartDate(appointment);
+  const endDate = getAppointmentEndDate(appointment);
+  if (!startDate) return "Datum noch offen";
+  return startDate === endDate ? formatGermanDate(startDate) : `${formatGermanDate(startDate)}–${formatGermanDate(endDate)}`;
 }
 
 function getCombinedSchedules() {
@@ -434,7 +466,7 @@ function getCombinedAppointments() {
     return ["appointments", "individual"].flatMap((layerType) => {
       const layer = project.layers?.find((entry) => entry.type === layerType);
       return (Array.isArray(layer?.groups) ? layer.groups : []).filter((group) => group.calendarVisible !== false).flatMap((group) => (
-        Array.isArray(group.appointments) ? group.appointments.map((appointment) => ({
+        getAppointmentGroupEntries(group).map((appointment) => ({
         ...appointment,
         groupId: group.id,
         groupName: group.name,
@@ -442,7 +474,7 @@ function getCombinedAppointments() {
         layerType,
         projectId: project.id,
         projectName: project.name
-        })) : []
+        }))
       ));
     });
   });
@@ -779,7 +811,7 @@ function renderSchoolProjectCard(schoolProject, start, end) {
   card.style.setProperty("--lesson-color", schoolProject.type === "vacation" ? VACATION_COLOR : "#bfd2e2");
   const categoryNames = {
     "class-trip": "Klassenfahrten",
-    "school-project": "Schulprojekte",
+    "school-project": "Einzelveranstaltungen",
     vacation: "Urlaub",
     "personal-appointment": "Weitere Termine"
   };
@@ -817,7 +849,9 @@ function renderAppointmentTimelineCard(appointment, date = null) {
   const name = document.createElement("strong");
   name.textContent = appointment.name;
   const group = document.createElement("small");
-  group.textContent = appointment.groupName;
+  group.textContent = appointment.appointmentProjectName
+    ? `${appointment.groupName} · ${appointment.appointmentProjectName}`
+    : appointment.groupName;
   const time = document.createElement("small");
   time.textContent = appointment.startTime && appointment.endTime
     ? `${appointment.startTime}–${appointment.endTime}`
@@ -834,9 +868,10 @@ function renderAppointmentTimelineCard(appointment, date = null) {
     const project = projects.find((entry) => entry.id === appointment.projectId);
     const originalGroup = project?.layers?.find((entry) => entry.type === (appointment.layerType || "appointments"))
       ?.groups?.find((entry) => entry.id === appointment.groupId);
-    const originalAppointment = originalGroup?.appointments?.find((entry) => entry.id === appointment.id);
+    const originalProjectGroup = originalGroup?.projects?.find((entry) => entry.id === appointment.appointmentProjectId);
+    const originalAppointment = (originalProjectGroup?.appointments || originalGroup?.appointments)?.find((entry) => entry.id === appointment.id);
     if (project && originalGroup && originalAppointment) {
-      openAppointmentDialog(project, originalGroup, originalAppointment, appointment.layerType || "appointments");
+      openAppointmentDialog(project, originalGroup, originalAppointment, appointment.layerType || "appointments", originalProjectGroup || null);
     }
   });
   return card;
@@ -914,7 +949,10 @@ function renderCombinedScheduleView(view) {
     return dateKey >= schoolProject.startDate && dateKey <= schoolProject.endDate;
   }));
   const visibleAppointments = appointments.filter((appointment) => (
-    dates.some((date) => getLocalDateKey(date) === appointment.date)
+    dates.some((date) => {
+      const dateKey = getLocalDateKey(date);
+      return dateKey >= getAppointmentStartDate(appointment) && dateKey <= getAppointmentEndDate(appointment);
+    })
   ));
   calendar.replaceChildren();
   calendar.className = `combined-timeline is-${view}-timeline`;
@@ -1042,7 +1080,10 @@ function renderCombinedScheduleView(view) {
         };
       });
     const appointmentEntries = visibleAppointments
-      .filter((appointment) => appointment.date === getLocalDateKey(date))
+      .filter((appointment) => {
+        const dateKey = getLocalDateKey(date);
+        return dateKey >= getAppointmentStartDate(appointment) && dateKey <= getAppointmentEndDate(appointment);
+      })
       .map((appointment) => ({
         lesson: {
           start: appointment.startTime || minutesToTime(schoolDayStart),
@@ -1411,7 +1452,7 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     : (Array.isArray(individualLayer?.entries) ? individualLayer.entries : []);
   const groupedAppointments = [schoolAppointmentLayer, individualLayer].flatMap((appointmentLayer) => (
     (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : []).filter((group) => group.calendarVisible !== false)
-      .flatMap((group) => Array.isArray(group.appointments) ? group.appointments : [])
+      .flatMap((group) => getAppointmentGroupEntries(group))
   ));
   return individualEntries.some(overlapsLesson) || groupedAppointments.some(overlapsLesson);
 }
@@ -1427,7 +1468,7 @@ function getCompleteIcalendarSelection(project) {
     holidays: true,
     individualEntryIds: new Set((individualLayer?.appliedEntries || []).map((entry) => entry.id)),
     appointmentIds: new Set([appointmentLayer, individualLayer].flatMap((layer) => (
-      (layer?.groups || []).flatMap((group) => (group.appointments || []).map((entry) => entry.id))
+      (layer?.groups || []).flatMap((group) => getAppointmentGroupEntries(group).map((entry) => entry.id))
     ))),
     sicknessIds: new Set((sicknessLayer?.entries || []).map((entry) => entry.id)),
     classProjectIds: new Set((classProjectsLayer?.entries || []).map((entry) => entry.id))
@@ -1508,12 +1549,12 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
       forEachDateKey(entry.startDate, entry.endDate || entry.startDate, (dateKey) => {
         events.push(...createIcalendarEvent({
           uid: `${entry.type}-${entry.id}-${dateKey}`,
-          title: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type]),
+          title: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Einzelveranstaltung", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type]),
           description: (entry.classNames || []).join(", ") || entry.className || entry.class || "",
           startDate: dateKey,
           startTime: entry.startTime,
           endTime: entry.endTime,
-          category: ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Persönlicher Termin" }[entry.type]),
+          category: ({ "class-trip": "Klassenfahrt", "school-project": "Einzelveranstaltung", vacation: "Urlaub", "personal-appointment": "Persönlicher Termin" }[entry.type]),
           color: entry.type === "vacation" ? VACATION_COLOR : (entry.color || "#bfd2e2")
         }));
       });
@@ -1521,14 +1562,15 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
 
   [appointmentLayer, individualLayer].flatMap((layer) => (Array.isArray(layer?.groups) ? layer.groups : []))
     .forEach((group) => {
-    (Array.isArray(group.appointments) ? group.appointments : [])
+    getAppointmentGroupEntries(group)
       .filter((appointment) => selection.appointmentIds.has(appointment.id))
       .forEach((appointment) => {
       events.push(...createIcalendarEvent({
-        uid: `appointment-${group.id}-${appointment.id}`,
+        uid: `appointment-${group.id}-${appointment.appointmentProjectId || "direct"}-${appointment.id}`,
         title: appointment.name || group.name || "Termin",
-        description: group.name || "",
-        startDate: appointment.date,
+        description: [group.name, appointment.appointmentProjectName].filter(Boolean).join(" · "),
+        startDate: getAppointmentStartDate(appointment),
+        endDate: getAppointmentEndDate(appointment),
         startTime: appointment.startTime,
         endTime: appointment.endTime,
         category: "Termin",
@@ -1623,18 +1665,18 @@ function renderCalendarExportChoices(project) {
       label: "Alle Ferien, Feiertage und schulfreien Tage"
     }]);
   }
-  appendCalendarExportChoiceGroup("Persönliche Termine, Klassenfahrten und Schulprojekte", (individualLayer?.appliedEntries || [])
+  appendCalendarExportChoiceGroup("Persönliche Termine, Klassenfahrten und Einzelveranstaltungen", (individualLayer?.appliedEntries || [])
     .filter((entry) => ["school-project", "class-trip", "vacation", "personal-appointment"].includes(entry.type))
     .map((entry) => ({
       kind: "individual",
       id: entry.id,
-      label: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Schulprojekt", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type])
+      label: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Einzelveranstaltung", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type])
     })));
   appendCalendarExportChoiceGroup("Schulische und persönliche Termingruppen", [appointmentLayer, individualLayer].flatMap((layer) => (
-    (layer?.groups || []).flatMap((group) => (group.appointments || []).map((appointment) => ({
+    (layer?.groups || []).flatMap((group) => getAppointmentGroupEntries(group).map((appointment) => ({
       kind: "appointment",
       id: appointment.id,
-      label: `${group.name}: ${appointment.name}`
+      label: `${group.name}${appointment.appointmentProjectName ? ` · ${appointment.appointmentProjectName}` : ""}: ${appointment.name}`
     })))
   )));
   appendCalendarExportChoiceGroup("Projekttage nach Klassen", (classProjectsLayer?.entries || []).map((entry) => ({
@@ -3507,18 +3549,31 @@ function renderClassProjectsIntroduction(project) {
   getClassProjectGradeFolders(project).forEach((folder) => {
     const folderSection = document.createElement("section");
     folderSection.className = "class-project-grade-section";
+    const folderHeading = document.createElement("div");
+    folderHeading.className = "class-project-grade-heading";
     const folderTitle = document.createElement("h3");
     folderTitle.textContent = folder.gradeName ? `${folder.gradeName}. Klassenstufe` : "Ohne Klassenstufe";
+    const folderSchools = document.createElement("span");
+    const schoolNames = [...new Set(folder.entries.flatMap((entry) => (entry.classGroups || [])
+      .filter((group) => !folder.gradeName
+        || group.gradeName === folder.gradeName
+        || (group.gradeNames || []).includes(folder.gradeName))
+      .map((group) => group.schoolName)
+      .filter(Boolean)))];
+    folderSchools.textContent = schoolNames.join(", ");
+    folderHeading.append(folderTitle, folderSchools);
     const folderEntries = document.createElement("div");
     folderEntries.className = "class-project-grade-entries";
     folder.entries.forEach((entry) => {
       const row = document.createElement("button"); row.type = "button"; row.className = "holiday-entry class-project-summary class-project-overview-row";
       const name = document.createElement("strong"); name.textContent = entry.name || "Projekt";
       const classes = document.createElement("span");
-      if (!entry.classGroups.length) classes.textContent = "Keine Klasse";
-      else entry.classGroups.forEach((group, index) => {
+      const visibleGroups = (entry.classGroups || []).filter((group) => !folder.gradeName
+        || group.gradeName === folder.gradeName
+        || (group.gradeNames || []).includes(folder.gradeName));
+      if (!visibleGroups.length) classes.textContent = "Keine Klasse";
+      else visibleGroups.forEach((group, index) => {
         if (index) classes.append(document.createTextNode(", "));
-        classes.append(document.createTextNode(`${group.schoolName} · `));
         const label = document.createElement("span");
         if (group.targetType === "class" && group.gradeName) renderClassDisplay(label, group.gradeName, group.suffix, group.displayMode);
         else label.textContent = group.className;
@@ -3531,7 +3586,7 @@ function renderClassProjectsIntroduction(project) {
       const time = document.createElement("span"); time.textContent = entry.allDay !== false ? "ganztägig" : `${entry.startTime || "–"}–${entry.endTime || "–"}`;
       row.append(name, classes, dates, time); row.addEventListener("click", () => openClassProjectDialog(project, entry)); folderEntries.append(row);
     });
-    folderSection.append(folderTitle, folderEntries);
+    folderSection.append(folderHeading, folderEntries);
     list.append(folderSection);
   });
   if (!classGroups.length) {
@@ -3590,18 +3645,20 @@ function openAppointmentGroupDialog(project, group = null, layerType = "appointm
   appointmentGroupName.focus();
 }
 
-function openAppointmentDialog(project, group, appointment = null, layerType = "appointments") {
+function openAppointmentDialog(project, group, appointment = null, layerType = "appointments", appointmentProject = null) {
   appointmentForm.reset();
   appointmentDialogStatus.textContent = "";
   appointmentDialog.dataset.projectId = project.id;
   appointmentDialog.dataset.groupId = group.id;
   appointmentDialog.dataset.layerType = layerType;
+  appointmentDialog.dataset.appointmentProjectId = appointmentProject?.id || "";
   if (appointment) {
     appointmentDialog.dataset.appointmentId = appointment.id;
     appointmentDialogTitle.textContent = "Termin bearbeiten";
     appointmentSubmitButton.textContent = "Änderungen speichern";
     appointmentName.value = appointment.name || "";
-    appointmentDate.value = appointment.date || "";
+    appointmentStartDate.value = getAppointmentStartDate(appointment);
+    appointmentEndDate.value = getAppointmentEndDate(appointment);
     appointmentStartTime.value = appointment.startTime || "";
     appointmentEndTime.value = appointment.endTime || "";
     appointmentIsDeadline.checked = Boolean(appointment.isDeadline);
@@ -3611,17 +3668,74 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
     appointmentDialogTitle.textContent = "Termin hinzufügen";
     appointmentSubmitButton.textContent = "Termin hinzufügen";
   }
+  linkDateRangePicker(appointmentStartDate, appointmentEndDate);
+  appointmentEndDate.min = appointmentStartDate.value;
   appointmentDialog.showModal();
   appointmentName.focus();
 }
 
-function createAppointmentMenu(project, group, appointment = null, layerType = "appointments") {
+function openAppointmentProjectDialog(project, group, appointmentProject = null, layerType = "appointments") {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog appointment-project-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = group.name;
+  const title = document.createElement("h2");
+  title.textContent = appointmentProject ? "Projektgruppe bearbeiten" : "Projektgruppe hinzufügen";
+  heading.append(label, title);
+  const field = document.createElement("label");
+  field.className = "dialog-field";
+  const fieldLabel = document.createElement("span");
+  fieldLabel.textContent = "Bezeichnung";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.required = true;
+  input.maxLength = 100;
+  input.placeholder = "z. B. Projekt Abi";
+  input.value = appointmentProject?.name || "";
+  field.append(fieldLabel, input);
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = appointmentProject ? "Änderungen speichern" : "Projektgruppe hinzufügen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) return;
+    group.projects = Array.isArray(group.projects) ? group.projects : [];
+    if (appointmentProject) appointmentProject.name = name;
+    else group.projects.push({ id: globalThis.crypto?.randomUUID?.() ?? `appointment-project-${Date.now()}`, name, appointments: [], todos: [] });
+    saveProjects();
+    dialog.close();
+    if (layerType === "individual") renderIndividualProjectsProperties(project);
+    else renderAppointmentsProperties(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, field, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  input.focus();
+}
+
+function createAppointmentMenu(project, group, appointment = null, layerType = "appointments", appointmentProject = null) {
   const menuShell = document.createElement("div");
   menuShell.className = "schedule-menu-shell";
   const menuButton = document.createElement("button");
   menuButton.type = "button";
   menuButton.className = "schedule-menu-button";
-  menuButton.setAttribute("aria-label", `Menü für ${appointment?.name || group.name}`);
+  menuButton.setAttribute("aria-label", `Menü für ${appointment?.name || appointmentProject?.name || group.name}`);
   menuButton.setAttribute("aria-expanded", "false");
   menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
   const menu = document.createElement("div");
@@ -3633,7 +3747,8 @@ function createAppointmentMenu(project, group, appointment = null, layerType = "
   editButton.addEventListener("click", () => {
     menu.hidden = true;
     menuButton.setAttribute("aria-expanded", "false");
-    if (appointment) openAppointmentDialog(project, group, appointment, layerType);
+    if (appointment) openAppointmentDialog(project, group, appointment, layerType, appointmentProject);
+    else if (appointmentProject) openAppointmentProjectDialog(project, group, appointmentProject, layerType);
     else openAppointmentGroupDialog(project, group, layerType);
   });
   const deleteButton = document.createElement("button");
@@ -3643,8 +3758,9 @@ function createAppointmentMenu(project, group, appointment = null, layerType = "
   deleteButton.dataset.projectId = project.id;
   deleteButton.dataset.appointmentGroupId = group.id;
   deleteButton.dataset.appointmentLayerType = layerType;
+  if (appointmentProject) deleteButton.dataset.appointmentProjectId = appointmentProject.id;
   if (appointment) deleteButton.dataset.appointmentId = appointment.id;
-  deleteButton.setAttribute("aria-label", `${appointment?.name || group.name} löschen – gedrückt halten`);
+  deleteButton.setAttribute("aria-label", `${appointment?.name || appointmentProject?.name || group.name} löschen – gedrückt halten`);
   deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
   deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
   deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
@@ -3658,7 +3774,7 @@ function createAppointmentMenu(project, group, appointment = null, layerType = "
   return menuShell;
 }
 
-function createMovedProjectSection(project, type, titleText, buttonText, emptyText) {
+function createMovedProjectSection(project, type, titleText, buttonText, emptyText, options = {}) {
   const individualLayer = getProjectLayer(project, "individual");
   individualLayer.entries = Array.isArray(individualLayer.entries) ? individualLayer.entries : [];
   const entries = individualLayer.entries.filter((entry) => entry.type === type);
@@ -3739,8 +3855,210 @@ function createMovedProjectSection(project, type, titleText, buttonText, emptyTe
       list.append(row);
     });
   }
-  section.append(title, addButton, list);
+  if (options.hideWhenEmpty && !entries.length) section.hidden = true;
+  if (!options.hideTitle) section.append(title);
+  if (!options.hideAddButton) section.append(addButton);
+  section.append(list);
   return section;
+}
+
+function createAppointmentEntryRow(project, group, appointment, layerType, appointmentProject = null) {
+  const row = document.createElement("article");
+  row.className = "appointment-entry";
+  const copy = document.createElement("div");
+  const name = document.createElement("strong");
+  name.textContent = appointment.name;
+  const date = document.createElement("span");
+  date.textContent = appointment.startTime && appointment.endTime
+    ? `${formatAppointmentDateRange(appointment)} · ${appointment.startTime}–${appointment.endTime}`
+    : `${formatAppointmentDateRange(appointment)} · Zeit noch offen`;
+  copy.append(name, date);
+  row.append(copy, createAppointmentMenu(project, group, appointment, layerType, appointmentProject));
+  return row;
+}
+
+function openAppointmentTodoDialog(project, group, appointmentProject, todo = null, layerType = "appointments") {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog appointment-todo-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = appointmentProject.name;
+  const title = document.createElement("h2");
+  title.textContent = todo ? "To-do bearbeiten" : "To-do hinzufügen";
+  heading.append(label, title);
+  const field = document.createElement("label");
+  field.className = "dialog-field";
+  const fieldLabel = document.createElement("span");
+  fieldLabel.textContent = "Aufgabe";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.required = true;
+  input.maxLength = 140;
+  input.placeholder = "z. B. Elternbrief vorbereiten";
+  input.value = todo?.name || "";
+  field.append(fieldLabel, input);
+  const deadlineField = document.createElement("label");
+  deadlineField.className = "dialog-field";
+  const deadlineLabel = document.createElement("span");
+  deadlineLabel.textContent = "Frist";
+  const deadline = document.createElement("input");
+  deadline.type = "date";
+  deadline.required = true;
+  deadline.value = todo?.dueDate || "";
+  deadlineField.append(deadlineLabel, deadline);
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = todo ? "Änderungen speichern" : "To-do hinzufügen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name || !deadline.value) return;
+    appointmentProject.todos = Array.isArray(appointmentProject.todos) ? appointmentProject.todos : [];
+    if (todo) Object.assign(todo, { name, dueDate: deadline.value });
+    else appointmentProject.todos.push({ id: globalThis.crypto?.randomUUID?.() ?? `appointment-todo-${Date.now()}`, name, dueDate: deadline.value, completed: false });
+    saveProjects();
+    dialog.close();
+    if (layerType === "individual") renderIndividualProjectsProperties(project);
+    else renderAppointmentsProperties(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, field, deadlineField, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  input.focus();
+}
+
+function createAppointmentTodoMenu(project, group, appointmentProject, todo, layerType) {
+  const shell = document.createElement("div");
+  shell.className = "schedule-menu-shell";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "schedule-menu-button";
+  button.setAttribute("aria-label", `Menü für ${todo.name}`);
+  button.setAttribute("aria-expanded", "false");
+  button.innerHTML = "<span aria-hidden=\"true\"></span>";
+  const menu = document.createElement("div");
+  menu.className = "schedule-menu";
+  menu.hidden = true;
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.textContent = "Bearbeiten";
+  edit.addEventListener("click", () => openAppointmentTodoDialog(project, group, appointmentProject, todo, layerType));
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "schedule-menu-delete";
+  remove.textContent = "Löschen";
+  remove.dataset.projectId = project.id;
+  remove.dataset.appointmentGroupId = group.id;
+  remove.dataset.appointmentProjectId = appointmentProject.id;
+  remove.dataset.appointmentTodoId = todo.id;
+  remove.dataset.appointmentLayerType = layerType;
+  remove.setAttribute("aria-label", `${todo.name} löschen – gedrückt halten`);
+  remove.addEventListener("pointerdown", beginScheduleDeleteHold);
+  remove.addEventListener("pointerup", finishScheduleDeleteHold);
+  remove.addEventListener("pointercancel", cancelScheduleDeleteHold);
+  remove.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+  button.addEventListener("click", () => {
+    menu.hidden = !menu.hidden;
+    button.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  menu.append(edit, remove);
+  shell.append(button, menu);
+  return shell;
+}
+
+function createAppointmentTodoRow(project, group, appointmentProject, todo, layerType) {
+  const row = document.createElement("article");
+  row.className = `appointment-entry appointment-todo-entry${todo.completed ? " is-completed" : ""}`;
+  const checkLabel = document.createElement("label");
+  checkLabel.className = "appointment-todo-check";
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(todo.completed);
+  checkbox.setAttribute("aria-label", `${todo.name} als erledigt markieren`);
+  checkbox.addEventListener("change", () => {
+    todo.completed = checkbox.checked;
+    row.classList.toggle("is-completed", todo.completed);
+    saveProjects();
+  });
+  const copy = document.createElement("span");
+  copy.className = "appointment-todo-copy";
+  const name = document.createElement("strong");
+  name.textContent = todo.name;
+  const deadline = document.createElement("small");
+  deadline.textContent = todo.dueDate ? `Frist: ${formatGermanDate(todo.dueDate)}` : "Frist noch offen";
+  copy.append(name, deadline);
+  checkLabel.append(checkbox, copy);
+  row.append(checkLabel, createAppointmentTodoMenu(project, group, appointmentProject, todo, layerType));
+  return row;
+}
+
+function createAppointmentProjectCard(project, group, appointmentProject, layerType) {
+  appointmentProject.appointments = Array.isArray(appointmentProject.appointments) ? appointmentProject.appointments : [];
+  appointmentProject.todos = Array.isArray(appointmentProject.todos) ? appointmentProject.todos : [];
+  const card = document.createElement("section");
+  card.className = "appointment-project-card";
+  const head = document.createElement("div");
+  head.className = "appointment-group-head appointment-project-head";
+  const name = document.createElement("h4");
+  name.textContent = appointmentProject.name;
+  head.append(name, createAppointmentMenu(project, group, null, layerType, appointmentProject));
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "secondary-button appointment-add-button";
+  add.textContent = "Termin hinzufügen";
+  add.addEventListener("click", () => openAppointmentDialog(project, group, null, layerType, appointmentProject));
+  const addTodo = document.createElement("button");
+  addTodo.type = "button";
+  addTodo.className = "secondary-button appointment-add-button";
+  addTodo.textContent = "To-do hinzufügen";
+  addTodo.addEventListener("click", () => openAppointmentTodoDialog(project, group, appointmentProject, null, layerType));
+  const actions = document.createElement("div");
+  actions.className = "appointment-group-actions appointment-project-actions";
+  actions.append(add, addTodo);
+  const entries = document.createElement("div");
+  entries.className = "appointment-entry-list";
+  if (!appointmentProject.appointments.length && !appointmentProject.todos.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Noch kein Termin in dieser Projektgruppe.";
+    entries.append(empty);
+  } else {
+    const chronologicalEntries = [
+      ...appointmentProject.appointments.map((appointment) => ({
+        type: "appointment",
+        date: getAppointmentStartDate(appointment) || "9999-12-31",
+        time: appointment.startTime || "00:00",
+        value: appointment
+      })),
+      ...appointmentProject.todos.map((todo) => ({
+        type: "todo",
+        date: todo.dueDate || "9999-12-31",
+        time: "23:59",
+        value: todo
+      }))
+    ].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+    chronologicalEntries.forEach((entry) => {
+      entries.append(entry.type === "appointment"
+        ? createAppointmentEntryRow(project, group, entry.value, layerType, appointmentProject)
+        : createAppointmentTodoRow(project, group, appointmentProject, entry.value, layerType));
+    });
+  }
+  card.append(head, actions, entries);
+  return card;
 }
 
 function renderAppointmentsProperties(project) {
@@ -3756,13 +4074,21 @@ function renderAppointmentsProperties(project) {
   const title = document.createElement("h3");
   title.textContent = "Termine organisieren";
   const intro = document.createElement("p");
-  intro.textContent = "Bündeln Sie unregelmäßig wiederkehrende Termine in Gruppen und verwalten Sie hier auch Klassenfahrten und Schulprojekte.";
+  intro.textContent = "Erfassen Sie einzelne schulische Veranstaltungen direkt oder bündeln Sie zusammengehörige Termine in Gruppen und Projektgruppen.";
   head.append(title, intro);
   const addGroupButton = document.createElement("button");
   addGroupButton.type = "button";
   addGroupButton.className = "secondary-button primary-action appointment-add-group";
   addGroupButton.textContent = "Gruppe hinzufügen";
   addGroupButton.addEventListener("click", () => openAppointmentGroupDialog(project));
+  const addSingleEventButton = document.createElement("button");
+  addSingleEventButton.type = "button";
+  addSingleEventButton.className = "secondary-button primary-action appointment-add-group";
+  addSingleEventButton.textContent = "Einzelveranstaltung hinzufügen";
+  addSingleEventButton.addEventListener("click", () => openSchoolProjectDialog(project, null, "school-project"));
+  const rootActions = document.createElement("div");
+  rootActions.className = "appointment-root-actions";
+  rootActions.append(addGroupButton, addSingleEventButton);
 
   const groupList = document.createElement("div");
   groupList.className = "appointment-group-list";
@@ -3774,6 +4100,7 @@ function renderAppointmentsProperties(project) {
   } else {
     layer.groups.forEach((group) => {
       group.appointments = Array.isArray(group.appointments) ? group.appointments : [];
+      group.projects = Array.isArray(group.projects) ? group.projects : [];
       const groupCard = document.createElement("section");
       groupCard.className = "appointment-group-card";
       groupCard.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
@@ -3787,9 +4114,17 @@ function renderAppointmentsProperties(project) {
       addAppointmentButton.className = "secondary-button appointment-add-button";
       addAppointmentButton.textContent = "Termin hinzufügen";
       addAppointmentButton.addEventListener("click", () => openAppointmentDialog(project, group));
+      const addProjectButton = document.createElement("button");
+      addProjectButton.type = "button";
+      addProjectButton.className = "secondary-button appointment-add-button";
+      addProjectButton.textContent = "Projektgruppe hinzufügen";
+      addProjectButton.addEventListener("click", () => openAppointmentProjectDialog(project, group));
+      const groupActions = document.createElement("div");
+      groupActions.className = "appointment-group-actions";
+      groupActions.append(addAppointmentButton, addProjectButton);
       const appointmentList = document.createElement("div");
       appointmentList.className = "appointment-entry-list";
-      if (!group.appointments.length) {
+      if (!group.appointments.length && !group.projects.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
         empty.textContent = "In dieser Gruppe sind noch keine Termine eingetragen.";
@@ -3797,29 +4132,29 @@ function renderAppointmentsProperties(project) {
       } else {
         group.appointments
           .slice()
-          .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`))
+          .sort((a, b) => `${getAppointmentStartDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentStartDate(b)} ${b.startTime}`))
           .forEach((appointment) => {
-            const row = document.createElement("article");
-            row.className = "appointment-entry";
-            const copy = document.createElement("div");
-            const name = document.createElement("strong");
-            name.textContent = appointment.name;
-            const date = document.createElement("span");
-            date.textContent = appointment.startTime && appointment.endTime
-              ? `${formatGermanDate(appointment.date)} · ${appointment.startTime}–${appointment.endTime}`
-              : `${formatGermanDate(appointment.date)} · Zeit noch offen`;
-            copy.append(name, date);
-            row.append(copy, createAppointmentMenu(project, group, appointment));
-            appointmentList.append(row);
+            appointmentList.append(createAppointmentEntryRow(project, group, appointment, "appointments"));
           });
       }
-      groupCard.append(groupHead, addAppointmentButton, appointmentList);
+      appointmentList.hidden = !group.appointments.length && group.projects.length > 0;
+      const projectList = document.createElement("div");
+      projectList.className = "appointment-project-list";
+      group.projects.forEach((appointmentProject) => projectList.append(createAppointmentProjectCard(project, group, appointmentProject, "appointments")));
+      groupCard.append(groupHead, groupActions, appointmentList, projectList);
       groupList.append(groupCard);
     });
   }
   const classTrips = createMovedProjectSection(project, "class-trip", "Klassenfahrten", "Klassenfahrt hinzufügen", "Noch keine Klassenfahrt eingetragen.");
-  const schoolProjects = createMovedProjectSection(project, "school-project", "Schulprojekte", "Schulprojekt hinzufügen", "Noch kein Schulprojekt eingetragen.");
-  sheet.append(head, addGroupButton, groupList, classTrips, schoolProjects);
+  const singleEvents = createMovedProjectSection(
+    project,
+    "school-project",
+    "Einzelveranstaltungen",
+    "Einzelveranstaltung hinzufügen",
+    "Noch keine Einzelveranstaltung eingetragen.",
+    { hideTitle: true, hideAddButton: true, hideWhenEmpty: true }
+  );
+  sheet.append(head, rootActions, singleEvents, groupList, classTrips);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -5120,12 +5455,39 @@ function deleteAppointmentGroup(projectId, groupId, layerType = "appointments") 
   renderActiveCalendar(project);
 }
 
-function deleteAppointment(projectId, groupId, appointmentId, layerType = "appointments") {
+function deleteAppointmentProject(projectId, groupId, appointmentProjectId, layerType = "appointments") {
   const project = projects.find((entry) => entry.id === projectId);
   const layer = project?.layers?.find((entry) => entry.type === layerType);
   const group = layer?.groups?.find((entry) => entry.id === groupId);
-  if (!project || !group || !Array.isArray(group.appointments)) return;
-  group.appointments = group.appointments.filter((entry) => entry.id !== appointmentId);
+  if (!project || !group || !Array.isArray(group.projects)) return;
+  group.projects = group.projects.filter((entry) => entry.id !== appointmentProjectId);
+  saveProjects();
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
+  renderActiveCalendar(project);
+}
+
+function deleteAppointmentTodo(projectId, groupId, appointmentProjectId, appointmentTodoId, layerType = "appointments") {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === layerType);
+  const group = layer?.groups?.find((entry) => entry.id === groupId);
+  const appointmentProject = group?.projects?.find((entry) => entry.id === appointmentProjectId);
+  if (!project || !appointmentProject || !Array.isArray(appointmentProject.todos)) return;
+  appointmentProject.todos = appointmentProject.todos.filter((entry) => entry.id !== appointmentTodoId);
+  saveProjects();
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
+}
+
+function deleteAppointment(projectId, groupId, appointmentId, layerType = "appointments", appointmentProjectId = "") {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === layerType);
+  const group = layer?.groups?.find((entry) => entry.id === groupId);
+  const appointmentContainer = appointmentProjectId
+    ? group?.projects?.find((entry) => entry.id === appointmentProjectId)
+    : group;
+  if (!project || !appointmentContainer || !Array.isArray(appointmentContainer.appointments)) return;
+  appointmentContainer.appointments = appointmentContainer.appointments.filter((entry) => entry.id !== appointmentId);
   saveProjects();
   if (layerType === "individual") renderIndividualProjectsProperties(project);
   else renderAppointmentsProperties(project);
@@ -5185,6 +5547,8 @@ function beginScheduleDeleteHold(event) {
     lessonId: button.dataset.lessonId,
     tripId: button.dataset.tripId,
     appointmentGroupId: button.dataset.appointmentGroupId,
+    appointmentProjectId: button.dataset.appointmentProjectId,
+    appointmentTodoId: button.dataset.appointmentTodoId,
     appointmentId: button.dataset.appointmentId,
     appointmentLayerType: button.dataset.appointmentLayerType,
     sicknessId: button.dataset.sicknessId,
@@ -5218,6 +5582,8 @@ function finishScheduleDeleteHold(event) {
     lessonId,
     tripId,
     appointmentGroupId,
+    appointmentProjectId,
+    appointmentTodoId,
     appointmentId,
     appointmentLayerType,
     sicknessId,
@@ -5241,7 +5607,9 @@ function finishScheduleDeleteHold(event) {
   else if (lessonId) deleteLesson(projectId, scheduleId, lessonId);
   else if (catalogType) deleteClassCatalogEntry(projectId, catalogType, catalogSubjectId, catalogGradeId, catalogClassId);
   else if (sicknessId) deleteSickness(projectId, sicknessId);
-  else if (appointmentId) deleteAppointment(projectId, appointmentGroupId, appointmentId, appointmentLayerType);
+  else if (appointmentTodoId) deleteAppointmentTodo(projectId, appointmentGroupId, appointmentProjectId, appointmentTodoId, appointmentLayerType);
+  else if (appointmentId) deleteAppointment(projectId, appointmentGroupId, appointmentId, appointmentLayerType, appointmentProjectId);
+  else if (appointmentProjectId) deleteAppointmentProject(projectId, appointmentGroupId, appointmentProjectId, appointmentLayerType);
   else if (appointmentGroupId) deleteAppointmentGroup(projectId, appointmentGroupId, appointmentLayerType);
   else if (tripId) deleteClassTrip(projectId, tripId);
   else deleteSchedule(projectId, scheduleId);
@@ -6705,18 +7073,18 @@ function openSchoolProjectDialog(project, schoolProject = null, entryType = "sch
   timeFields.hidden = isVacation;
   overridesField.hidden = isVacation;
   const dialogLabels = {
-    "school-project": ["Schulprojekt", "Schulprojekt"],
+    "school-project": ["Einzelveranstaltung", "Einzelveranstaltung"],
     vacation: ["Urlaub", "Urlaub"],
     "personal-appointment": ["Weiteren Termin", "Termin"]
   };
   const [noun, buttonNoun] = dialogLabels[schoolProjectDialog.dataset.entryType] || dialogLabels["school-project"];
   const dialogLabel = schoolProjectDialog.querySelector(".label");
-  if (dialogLabel) dialogLabel.textContent = schoolProjectDialog.dataset.entryType === "school-project" ? "Termine" : "Persönliche Termine";
+  if (dialogLabel) dialogLabel.textContent = schoolProjectDialog.dataset.entryType === "school-project" ? "Schulische Termine" : "Persönliche Termine";
   schoolProjectName.placeholder = schoolProjectDialog.dataset.entryType === "vacation"
     ? "z. B. Sommerurlaub"
     : schoolProjectDialog.dataset.entryType === "personal-appointment"
       ? "z. B. Arzttermin"
-      : "z. B. Theaterprojekt";
+      : "z. B. Schulfest";
   const timeDefaults = getIndividualEventTimeDefaults(project);
   if (schoolProject) {
     schoolProjectDialog.dataset.entryId = schoolProject.id;
@@ -6774,6 +7142,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
   } else {
     layer.groups.forEach((group) => {
       group.appointments = Array.isArray(group.appointments) ? group.appointments : [];
+      group.projects = Array.isArray(group.projects) ? group.projects : [];
       const card = document.createElement("section");
       card.className = "appointment-group-card";
       card.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
@@ -6787,30 +7156,31 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       add.className = "secondary-button appointment-add-button";
       add.textContent = "Termin hinzufügen";
       add.addEventListener("click", () => openAppointmentDialog(project, group, null, "individual"));
+      const addProject = document.createElement("button");
+      addProject.type = "button";
+      addProject.className = "secondary-button appointment-add-button";
+      addProject.textContent = "Projektgruppe hinzufügen";
+      addProject.addEventListener("click", () => openAppointmentProjectDialog(project, group, null, "individual"));
+      const actions = document.createElement("div");
+      actions.className = "appointment-group-actions";
+      actions.append(add, addProject);
       const entries = document.createElement("div");
       entries.className = "appointment-entry-list";
-      if (!group.appointments.length) {
+      if (!group.appointments.length && !group.projects.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
         empty.textContent = "In dieser Gruppe sind noch keine Termine eingetragen.";
         entries.append(empty);
       } else {
-        group.appointments.slice().sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)).forEach((appointment) => {
-          const row = document.createElement("article");
-          row.className = "appointment-entry";
-          const copy = document.createElement("div");
-          const entryName = document.createElement("strong");
-          entryName.textContent = appointment.name;
-          const date = document.createElement("span");
-          date.textContent = appointment.startTime && appointment.endTime
-            ? `${formatGermanDate(appointment.date)} · ${appointment.startTime}–${appointment.endTime}`
-            : `${formatGermanDate(appointment.date)} · Zeit noch offen`;
-          copy.append(entryName, date);
-          row.append(copy, createAppointmentMenu(project, group, appointment, "individual"));
-          entries.append(row);
+        group.appointments.slice().sort((a, b) => `${getAppointmentStartDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentStartDate(b)} ${b.startTime}`)).forEach((appointment) => {
+          entries.append(createAppointmentEntryRow(project, group, appointment, "individual"));
         });
       }
-      card.append(head, add, entries);
+      entries.hidden = !group.appointments.length && group.projects.length > 0;
+      const projectList = document.createElement("div");
+      projectList.className = "appointment-project-list";
+      group.projects.forEach((appointmentProject) => projectList.append(createAppointmentProjectCard(project, group, appointmentProject, "individual")));
+      card.append(head, actions, entries, projectList);
       list.append(card);
     });
   }
@@ -8554,6 +8924,7 @@ appointmentGroupForm.addEventListener("submit", (event) => {
       name,
       color: appointmentGroupColor.value || "#c9c1dd",
       appointments: [],
+      projects: [],
       createdAt: new Date().toISOString()
     });
   }
@@ -8570,10 +8941,17 @@ appointmentForm.addEventListener("submit", (event) => {
   const layerType = appointmentDialog.dataset.layerType || "appointments";
   const layer = project && getProjectLayer(project, layerType);
   const group = layer?.groups?.find((entry) => entry.id === appointmentDialog.dataset.groupId);
+  const appointmentProject = group?.projects?.find((entry) => entry.id === appointmentDialog.dataset.appointmentProjectId);
+  const appointmentContainer = appointmentProject || group;
   const name = appointmentName.value.trim();
-  if (!project || !group) return;
-  if (!name || !appointmentDate.value) {
-    appointmentDialogStatus.textContent = "Bitte Bezeichnung und Datum eintragen.";
+  if (!project || !group || !appointmentContainer) return;
+  if (!name || !appointmentStartDate.value || !appointmentEndDate.value) {
+    appointmentDialogStatus.textContent = "Bitte Bezeichnung sowie Start- und Enddatum eintragen.";
+    return;
+  }
+  if (appointmentEndDate.value < appointmentStartDate.value) {
+    appointmentDialogStatus.textContent = "Das Enddatum darf nicht vor dem Startdatum liegen.";
+    appointmentEndDate.focus();
     return;
   }
   if (Boolean(appointmentStartTime.value) !== Boolean(appointmentEndTime.value)) {
@@ -8585,19 +8963,20 @@ appointmentForm.addEventListener("submit", (event) => {
     appointmentEndTime.focus();
     return;
   }
-  group.appointments = Array.isArray(group.appointments) ? group.appointments : [];
+  appointmentContainer.appointments = Array.isArray(appointmentContainer.appointments) ? appointmentContainer.appointments : [];
   const appointmentData = {
     name,
-    date: appointmentDate.value,
+    startDate: appointmentStartDate.value,
+    endDate: appointmentEndDate.value,
     startTime: appointmentStartTime.value,
     endTime: appointmentEndTime.value,
     isDeadline: appointmentIsDeadline.checked,
     overridesLessons: appointmentOverridesLessons.checked
   };
-  const existingAppointment = group.appointments.find((entry) => entry.id === appointmentDialog.dataset.appointmentId);
+  const existingAppointment = appointmentContainer.appointments.find((entry) => entry.id === appointmentDialog.dataset.appointmentId);
   if (existingAppointment) Object.assign(existingAppointment, appointmentData);
   else {
-    group.appointments.push({
+    appointmentContainer.appointments.push({
       id: globalThis.crypto?.randomUUID?.() ?? `appointment-${Date.now()}`,
       ...appointmentData,
       createdAt: new Date().toISOString()

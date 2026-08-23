@@ -9,6 +9,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Freie Minuteneingabe mit einheitlicher 5-Minuten-Uhrauswahl umgesetzt.
 - Urlaub als ganztägige Abwesenheit mit automatischem Unterrichtsausfall festgelegt.
 - Fachunabhängige Klassen, Schulansichten, Fächer- und Kurszuordnungen, globale Darstellungsvarianten sowie semantische Mehrfachauswahl ergänzt.
+- Schulische und persönliche Termingruppen um verschachtelte Projektgruppen mit Terminen und To-dos erweitert.
 
 ### 2026-08-22
 

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260823q">
+    <link rel="stylesheet" href="stundenplan.css?v=20260823x">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
@@ -232,7 +232,10 @@
           <span>Bezeichnung</span>
           <input id="appointmentName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Fachkonferenz">
         </label>
-        <label class="dialog-field"><span>Datum</span><input id="appointmentDate" type="date" required></label>
+        <div class="class-trip-date-fields">
+          <label class="dialog-field"><span>Startdatum</span><input id="appointmentStartDate" type="date" required></label>
+          <label class="dialog-field"><span>Enddatum</span><input id="appointmentEndDate" type="date" required></label>
+        </div>
         <div class="event-time-fields">
           <label class="dialog-field"><span>Beginn (optional)</span><input id="appointmentStartTime" type="time" step="60"></label>
           <label class="dialog-field"><span>Ende (optional)</span><input id="appointmentEndTime" type="time" step="60"></label>
@@ -303,7 +306,7 @@
     <form id="schoolProjectForm" method="dialog">
       <div>
         <span class="label">Individuelles Projekt</span>
-        <h2 id="schoolProjectDialogTitle">Schulprojekt hinzufügen</h2>
+        <h2 id="schoolProjectDialogTitle">Einzelveranstaltung hinzufügen</h2>
       </div>
       <div class="class-trip-dialog-grid">
         <label class="dialog-field">
@@ -323,7 +326,7 @@
       <p id="schoolProjectDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
         <button type="button" id="cancelSchoolProjectButton" class="secondary-button">Abbrechen</button>
-        <button type="submit" id="schoolProjectSubmitButton" class="secondary-button primary-action">Schulprojekt hinzufügen</button>
+        <button type="submit" id="schoolProjectSubmitButton" class="secondary-button primary-action">Einzelveranstaltung hinzufügen</button>
       </div>
     </form>
   </dialog>
@@ -495,6 +498,6 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260823q"></script>
+    <script src="stundenplan.js?v=20260823x"></script>
 </body>
 </html>
