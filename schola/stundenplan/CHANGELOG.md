@@ -10,6 +10,8 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Urlaub als ganztägige Abwesenheit mit automatischem Unterrichtsausfall festgelegt.
 - Fachunabhängige Klassen, Schulansichten, Fächer- und Kurszuordnungen, globale Darstellungsvarianten sowie semantische Mehrfachauswahl ergänzt.
 - Schulische und persönliche Termingruppen um einklappbare Gruppen sowie verschachtelte Projektgruppen mit Terminen und To-dos erweitert.
+- Automatische Startposition am aktuellen Zeitpunkt von der laufenden Aktualisierung des Zeitbalkens getrennt.
+- Wochentagswerte migrierter und importierter Stunden in Kalender, Statistik, Signalen und Export vereinheitlicht.
 
 ### 2026-08-22
 

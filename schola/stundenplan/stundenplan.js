@@ -596,7 +596,7 @@ function getTodaysLessonSignalEvents(now = new Date()) {
       || isSicknessForSchedule(schedule, now)) return;
     (Array.isArray(schedule.lessons) ? schedule.lessons : [])
       .filter((lesson) => (
-        lesson.day === weekday
+        Number(lesson.day) === weekday
         && isLessonActiveOnDate(lesson, schedule, now)
         && !isLessonSuppressedByClassProject(
           projects.find((project) => project.id === schedule.projectId),
@@ -930,7 +930,7 @@ function renderCombinedScheduleView(view) {
   schedules.forEach((schedule) => {
     (Array.isArray(schedule.lessons) ? schedule.lessons : []).forEach((lesson) => {
       if (dates.some((date) => (
-        lesson.day === ((date.getDay() + 6) % 7) + 1
+        Number(lesson.day) === ((date.getDay() + 6) % 7) + 1
         && isScheduleValidOn(schedule, date)
         && isLessonActiveOnDate(lesson, schedule, date)
         && !isSchoolHolidayForSchedule(schedule, date)
@@ -1053,7 +1053,7 @@ function renderCombinedScheduleView(view) {
       column.append(guide);
     }
     const lessonEntries = timedLessons.filter(({ lesson, schedule }) => (
-        lesson.day === weekday
+        Number(lesson.day) === weekday
         && isScheduleValidOn(schedule, date)
         && isLessonActiveOnDate(lesson, schedule, date)
         && !isSchoolHolidayForSchedule(schedule, date)
@@ -1110,7 +1110,7 @@ function renderCombinedScheduleView(view) {
     body.append(column);
   });
   calendar.append(body);
-  requestAnimationFrame(() => updateCurrentTimeIndicator());
+  requestAnimationFrame(() => updateCurrentTimeIndicator(new Date(), true));
 }
 
 function centerCurrentTimeIndicator(indicator) {
@@ -1126,7 +1126,7 @@ function centerCurrentTimeIndicator(indicator) {
   timeline.scrollTop = Math.max(0, Math.min(maximumScroll, indicatorPosition - desiredViewportPosition));
 }
 
-function updateCurrentTimeIndicator(now = new Date()) {
+function updateCurrentTimeIndicator(now = new Date(), centerOnCurrentTime = false) {
   document.querySelectorAll(".timeline-current-time").forEach((indicator) => {
     const axis = indicator.closest(".timeline-axis");
     const timelineStart = Number(axis?.dataset.timelineStart);
@@ -1139,7 +1139,7 @@ function updateCurrentTimeIndicator(now = new Date()) {
     indicator.hidden = !isVisible;
     if (!isVisible) return;
     indicator.style.top = `${((currentMinutes - timelineStart) / (timelineEnd - timelineStart)) * 100}%`;
-    centerCurrentTimeIndicator(indicator);
+    if (centerOnCurrentTime) centerCurrentTimeIndicator(indicator);
   });
 }
 
@@ -1497,7 +1497,7 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
       const exclusionDates = [];
       forEachDateKey(rangeStart, rangeEnd, (dateKey, date) => {
         const weekday = ((date.getDay() + 6) % 7) + 1;
-        if (lesson.day !== weekday) return;
+        if (Number(lesson.day) !== weekday) return;
         occurrenceDates.push(dateKey);
         if (
           !isLessonActiveOnDate(lesson, combinedSchedule, date)
@@ -6101,7 +6101,7 @@ function renderSchedulesProperties(project) {
       dayColumn.append(cell);
     });
     const dayLessons = layoutTimelineEntries(
-      schedule.lessons.filter((lesson) => lesson.day === day).map((lesson) => ({ lesson, schedule }))
+      schedule.lessons.filter((lesson) => Number(lesson.day) === day).map((lesson) => ({ lesson, schedule }))
     );
     dayLessons.forEach(({ lesson, lane, laneCount }) => {
       const card = renderLessonCard(lesson, { ...schedule, projectId: project.id, projectName: project.name });
@@ -6262,7 +6262,7 @@ function renderLessonStatistics() {
         || isSicknessForSchedule(combinedSchedule, cursor)) return;
       (Array.isArray(schedule.lessons) ? schedule.lessons : [])
         .filter((lesson) => (
-          lesson.day === weekday
+          Number(lesson.day) === weekday
           && isLessonActiveOnDate(lesson, combinedSchedule, cursor)
           && !isLessonSuppressedByClassProject(project, lesson, cursor)
           && isSameCatalogLesson(lesson, referenceLesson)
@@ -6309,7 +6309,7 @@ function calculateLessonRangeStatistics(project, schedules, referenceLesson, sch
         || isSchoolHolidayForSchedule(combinedSchedule, cursor)
         || isSicknessForSchedule(combinedSchedule, cursor)) return;
       (schedule.lessons || []).filter((lesson) => (
-        lesson.day === weekday
+        Number(lesson.day) === weekday
         && isLessonActiveOnDate(lesson, combinedSchedule, cursor)
         && !isLessonSuppressedByClassProject(project, lesson, cursor)
         && isSameCatalogLesson(lesson, referenceLesson)
