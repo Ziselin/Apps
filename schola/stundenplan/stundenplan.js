@@ -44,6 +44,7 @@ const appointmentStartTime = document.getElementById("appointmentStartTime");
 const appointmentEndTime = document.getElementById("appointmentEndTime");
 const appointmentIsDeadline = document.getElementById("appointmentIsDeadline");
 const appointmentOverridesLessons = document.getElementById("appointmentOverridesLessons");
+const appointmentCalendarVisible = document.getElementById("appointmentCalendarVisible");
 const appointmentDialogStatus = document.getElementById("appointmentDialogStatus");
 const appointmentSubmitButton = document.getElementById("appointmentSubmitButton");
 const cancelAppointmentButton = document.getElementById("cancelAppointmentButton");
@@ -404,7 +405,7 @@ function renderActiveCalendar() {
   const semanticSchoolYearStart = Number((project ? getProjectCalendarRange(project).startDate : "")?.slice(0, 4));
   const appointmentEntries = [appointmentLayer, individualLayer]
     .flatMap((entryLayer) => (Array.isArray(entryLayer?.groups) ? entryLayer.groups : []).filter((group) => group.calendarVisible !== false))
-    .flatMap((group) => getAppointmentGroupEntries(group).map((appointment) => ({
+    .flatMap((group) => getAppointmentGroupEntries(group).filter((appointment) => appointment.calendarVisible !== false).map((appointment) => ({
       id: appointment.id,
       name: `${group.name}${appointment.appointmentProjectName ? ` · ${appointment.appointmentProjectName}` : ""}: ${appointment.name}`,
       startDate: getAppointmentStartDate(appointment),
@@ -964,7 +965,7 @@ function renderCombinedScheduleView(view) {
     const dateKey = getLocalDateKey(date);
     return dateKey >= schoolProject.startDate && dateKey <= schoolProject.endDate;
   }));
-  const visibleAppointments = appointments.filter((appointment) => (
+  const visibleAppointments = appointments.filter((appointment) => appointment.calendarVisible !== false && (
     dates.some((date) => {
       const dateKey = getLocalDateKey(date);
       return dateKey >= getAppointmentStartDate(appointment) && dateKey <= getAppointmentEndDate(appointment);
@@ -1034,12 +1035,12 @@ function renderCombinedScheduleView(view) {
   ), Number.POSITIVE_INFINITY);
   const responsiveCardHeight = 80 + maximumPhaseCount * 24;
   const responsivePixelsPerMinute = Number.isFinite(shortestPhaseLessonMinutes)
-    ? Math.min(6.5, responsiveCardHeight / shortestPhaseLessonMinutes)
-    : 2.7;
+    ? Math.min(3.25, responsiveCardHeight / shortestPhaseLessonMinutes / 2)
+    : 1.35;
   const pixelsPerMinute = view === "day"
-    ? Math.max(2.7, responsivePixelsPerMinute)
-    : 1.8;
-  const minimumTimelineHeight = view === "day" ? 840 : 720;
+    ? Math.max(1.35, responsivePixelsPerMinute)
+    : .9;
+  const minimumTimelineHeight = view === "day" ? 420 : 360;
   body.style.setProperty("--timeline-body-height", `${Math.max(minimumTimelineHeight, timelineMinutes * pixelsPerMinute)}px`);
   const axis = document.createElement("div");
   axis.className = "timeline-axis";
@@ -3944,10 +3945,12 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
     appointmentEndTime.value = appointment.endTime || "";
     appointmentIsDeadline.checked = Boolean(appointment.isDeadline);
     appointmentOverridesLessons.checked = Boolean(appointment.overridesLessons);
+    appointmentCalendarVisible.checked = appointment.calendarVisible !== false;
   } else {
     delete appointmentDialog.dataset.appointmentId;
     appointmentDialogTitle.textContent = "Termin hinzufügen";
     appointmentSubmitButton.textContent = "Termin hinzufügen";
+    appointmentCalendarVisible.checked = true;
   }
   linkDateRangePicker(appointmentStartDate, appointmentEndDate);
   appointmentEndDate.min = appointmentStartDate.value;
@@ -9331,7 +9334,8 @@ appointmentForm.addEventListener("submit", (event) => {
     completed: appointmentIsDeadline.checked && existingAppointment?.isDeadline
       ? Boolean(existingAppointment.completed)
       : false,
-    overridesLessons: appointmentOverridesLessons.checked
+    overridesLessons: appointmentOverridesLessons.checked,
+    calendarVisible: appointmentCalendarVisible.checked
   };
   if (existingAppointment) Object.assign(existingAppointment, appointmentData);
   else {

@@ -17,6 +17,11 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Eigenständige Einzelveranstaltungen aus der Projektansicht in einen chronologischen Sidebar-Tab verschoben.
 - Eingeklappte schulische und persönliche Termingruppen per Ziehen dauerhaft sortierbar gemacht.
 - Separate Klassenfahrten-Rubrik aus „Schulische Termine“ entfernt, ohne bestehende Daten zu löschen.
+- Einzeltermine über eine dritte Dialog-Checkbox unabhängig in den Kalenderansichten ein- und ausblendbar gemacht.
+- Tagesfelder im Jahreskalender auf ein maximales Breite-Höhe-Verhältnis von 1,5:1 begrenzt.
+- Jahresraster gegen Zellüberlagerungen abgesichert und bei niedrigen Desktopfenstern zugunsten der Lesbarkeit scrollbar gemacht.
+- Wochenspalten und Tagesfelder auch in schmalen Monatskarten vollständig innerhalb ihrer Karten gehalten.
+- Vertikalen Zeitmaßstab und damit die Stundenfeldhöhe in Tages- und Wochenansicht halbiert.
 
 ### 2026-08-23
 
