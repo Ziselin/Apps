@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Hinzugefügt
 
+- Hauptmenü auf die zentrale, aus TimeMap abgeleitete Menüvorlage umgestellt.
 - Das bisherige methodische Werkzeugraster unter „Mehr“ wurde durch eine kompakte Checkbox-Liste für Timer, Periodensystem und „Text einfügen“ ersetzt. Die lokal gespeicherte Auswahl bestimmt, welche Mini-Apps in der unteren Schnellleiste erscheinen.
 - Schnellleiste und Auswahlfenster verwenden dieselben zentralen SVG-Icons wie die Mini-Apps-Sammlung der Schola-Hauptseite.
 - Das Periodensystem lässt sich aus der Schnellleiste in einem eigenen Classroom-Container öffnen und schließen, ohne seine fachliche Implementierung zu duplizieren.

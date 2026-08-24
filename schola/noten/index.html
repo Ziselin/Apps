@@ -7,14 +7,15 @@
   <title>Notenrechner · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/notenrechner-icon.svg?v=20260621b">
   <link rel="stylesheet" href="noten.css?v=20260621x">
+  <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
   <div id="gradeApp" class="app-frame workspace-mode-bridge">
     <section class="bridge-view" aria-label="Notenrechner">
       <header class="topbar">
         <div class="brand-plate">
-          <button type="button" id="menuButton" class="header-icon-button menu-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
-            <span class="menu-lines" aria-hidden="true"></span>
+          <button type="button" id="menuButton" class="header-icon-button menu-button app-menu-trigger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="app-menu-trigger-icon" aria-hidden="true"></span>
           </button>
           <div class="brand-mark">
             <a class="brand-home-link" href="../../index.html?project=schola" aria-label="Zur Schola-Startseite">
@@ -31,32 +32,34 @@
       </header>
 
       <div id="menuOverlay" class="menu-overlay" hidden></div>
-      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+      <aside id="sideMenu" class="side-menu app-menu-drawer" aria-hidden="true" inert data-app-menu>
         <div class="side-menu-inner">
-          <div class="side-menu-head">
-            <div><span class="label">Menü</span><strong>Notenrechner</strong></div>
-            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          <div class="side-menu-head app-menu-head">
+            <div class="app-menu-titleblock"><span class="label">Menü</span><strong>Notenrechner</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button app-menu-close" aria-label="Menü schließen">×</button>
           </div>
-          <div class="side-menu-list">
-            <details>
-              <summary>Projekte</summary>
+          <div class="side-menu-list app-menu-list">
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="projects" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-projects" aria-hidden="true"></span><span>Projekte</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="projects" hidden>
               <div class="project-choice-list" aria-label="Projektbereich wechseln">
                 <a class="project-choice" href="../../index.html">Atlas</a>
                 <a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a>
               </div>
-            </details>
-            <details>
-              <summary>Funktionsweise</summary>
-              <p>Oben werden erreichte und mögliche Punkte eingegeben. Das gewählte Bewertungsprofil bestimmt Notenstufe, Prozentwert und Abstand zur nächstbesseren Stufe.</p>
-            </details>
-            <details>
-              <summary>Datenstand</summary>
-              <p>Kein geprüfter Datenstand.</p>
-            </details>
-            <details>
-              <summary>Appbeschreibung</summary>
-              <p>Der Notenrechner ist die erste App des Projekts Schola. Bewertungsprofile bleiben von einzelnen Berechnungen getrennt und können später um amtliche Quellen ergänzt werden.</p>
-            </details>
+              </div>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="help" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-help" aria-hidden="true"></span><span>Funktionsweise</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Erreichte und mögliche Punkte werden mit einem gewählten Bewertungsprofil in Note, Prozentwert und Abstand zur nächsten Stufe übersetzt.</p></div>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="data" hidden><p>Bewertungsprofile sind von einzelnen Berechnungen getrennt. Amtliche Quellen können profilspezifisch ergänzt werden.</p></div>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="description" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-description" aria-hidden="true"></span><span>Appbeschreibung</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="description" hidden><p>Notenrechner ist die Bewertungs- und Profil-App des Projekts Schola.</p></div>
+            </section>
           </div>
         </div>
       </aside>
@@ -237,6 +240,7 @@
   </div>
   <script src="profile/mecklenburg-vorpommern.js?v=20260621a"></script>
   <script src="noten.js?v=20260621x"></script>
+  <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
 

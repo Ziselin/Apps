@@ -161,6 +161,14 @@ const nextCalendarPeriod = document.getElementById("nextCalendarPeriod");
 const lessonSignalsToggle = document.getElementById("lessonSignalsToggle");
 const exportButton = document.getElementById("exportButton");
 const exportMenu = document.getElementById("exportMenu");
+const overviewSidebarButton = document.getElementById("overviewSidebarButton");
+const overviewSidebar = document.getElementById("overviewSidebar");
+const overviewSidebarClose = document.getElementById("overviewSidebarClose");
+const overviewProjectsTab = document.getElementById("overviewProjectsTab");
+const overviewTodosTab = document.getElementById("overviewTodosTab");
+const overviewProjectsPanel = document.getElementById("overviewProjectsPanel");
+const overviewTodosPanel = document.getElementById("overviewTodosPanel");
+const overviewTodoCount = document.getElementById("overviewTodoCount");
 const calendarExportDialog = document.getElementById("calendarExportDialog");
 const calendarExportForm = document.getElementById("calendarExportForm");
 const calendarExportChoices = document.getElementById("calendarExportChoices");
@@ -262,6 +270,7 @@ function renderYear(startYear, calendarEntries = [], schoolYearMode = false) {
   calendar.replaceChildren();
   calendar.className = "year-calendar";
   calendar.closest(".calendar-shell")?.classList.remove("is-timeline-view");
+  calendar.closest(".calendar-shell")?.classList.add("is-year-view");
   calendarTitle.textContent = "Jahresübersicht";
   yearLabel.textContent = schoolYearMode
     ? `${startYear}/${String(startYear + 1).slice(-2)}`
@@ -436,6 +445,10 @@ function getAppointmentStartDate(appointment) {
 
 function getAppointmentEndDate(appointment) {
   return appointment?.endDate || appointment?.startDate || appointment?.date || "";
+}
+
+function getAppointmentSortDate(appointment) {
+  return appointment?.isDeadline ? getAppointmentEndDate(appointment) : getAppointmentStartDate(appointment);
 }
 
 function formatAppointmentDateRange(appointment) {
@@ -958,6 +971,7 @@ function renderCombinedScheduleView(view) {
   calendar.replaceChildren();
   calendar.className = `combined-timeline is-${view}-timeline`;
   calendar.closest(".calendar-shell")?.classList.add("is-timeline-view");
+  calendar.closest(".calendar-shell")?.classList.remove("is-year-view");
   calendarTitle.textContent = view === "day" ? "Tagesansicht" : "Wochenansicht";
   yearLabel.textContent = view === "day"
     ? dates[0].toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
@@ -1169,6 +1183,217 @@ function loadProjects() {
 
 function saveProjects() {
   localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+  if (overviewSidebar?.classList.contains("is-open")) renderOverviewSidebar();
+}
+
+function getOverviewAppointmentSources(project) {
+  return ["appointments", "individual"].flatMap((layerType) => {
+    const layer = getProjectLayer(project, layerType);
+    return (Array.isArray(layer?.groups) ? layer.groups : []).map((group) => ({ layerType, group }));
+  });
+}
+
+function compareOverviewDates(left, right) {
+  const today = getLocalDateKey(new Date());
+  const leftDate = left?.sortDate || "";
+  const rightDate = right?.sortDate || "";
+  const rank = (date) => !date ? 1 : date >= today ? 0 : 2;
+  const rankDifference = rank(leftDate) - rank(rightDate);
+  if (rankDifference) return rankDifference;
+  if (!leftDate && !rightDate) return 0;
+  return rank(leftDate) === 2 ? rightDate.localeCompare(leftDate) : leftDate.localeCompare(rightDate);
+}
+
+function collectOverviewProjects(project) {
+  if (!project) return [];
+  const groupedProjects = getOverviewAppointmentSources(project).flatMap(({ layerType, group }) => (
+    (Array.isArray(group.projects) ? group.projects : []).map((entry) => ({
+      key: `${layerType}:${group.id}:${entry.id}`,
+      name: entry.name || "Projektgruppe",
+      context: `${layerType === "individual" ? "Persönliche Termine" : "Schulische Termine"} · ${group.name}`,
+      color: group.color || "#bfd2e2",
+      entries: [
+        ...(entry.appointments || []).map((appointment) => ({
+          type: "appointment",
+          name: appointment.name || "Termin",
+          date: formatAppointmentDateRange(appointment),
+          time: appointment.startTime && appointment.endTime ? `${appointment.startTime}–${appointment.endTime}` : "",
+          sortDate: getAppointmentSortDate(appointment),
+          endDate: getAppointmentEndDate(appointment),
+          sortTime: appointment.startTime || "00:00"
+        })),
+        ...(entry.todos || []).map((todo) => ({
+          type: "todo",
+          name: todo.name || "To-do",
+          date: todo.dueDate ? formatGermanDate(todo.dueDate) : "Frist noch offen",
+          time: todo.completed ? "Erledigt" : "To-do",
+          sortDate: todo.dueDate || "",
+          endDate: todo.dueDate || "",
+          sortTime: "23:59",
+          completed: Boolean(todo.completed),
+          source: todo
+        }))
+      ].sort((a, b) => compareOverviewDates(a, b) || a.sortTime.localeCompare(b.sortTime))
+    }))
+  ));
+  const classProjects = (getProjectLayer(project, "classes")?.entries || []).map((entry) => ({
+    key: `classes:${entry.id}`,
+    name: entry.name || "Projekttag",
+    context: "Projekttage nach Klassen",
+    color: "#bfd2e2",
+    entries: [{
+      name: (entry.classNames || []).join(", ") || entry.className || "Klassen noch offen",
+      date: formatAppointmentDateRange(entry),
+      time: entry.allDay === false && entry.startTime && entry.endTime ? `${entry.startTime}–${entry.endTime}` : "Ganztägig",
+      sortDate: getAppointmentSortDate(entry),
+      endDate: getAppointmentEndDate(entry),
+      sortTime: entry.startTime || "00:00"
+    }]
+  }));
+  return [...groupedProjects, ...classProjects]
+    .filter((entry) => !entry.entries.length || entry.entries.some((projectEntry) => !projectEntry.endDate || projectEntry.endDate >= getLocalDateKey(new Date())))
+    .map((entry) => ({ ...entry, sortDate: entry.entries.slice().sort(compareOverviewDates)[0]?.sortDate || "" }))
+    .sort((a, b) => compareOverviewDates(a, b) || a.name.localeCompare(b.name, "de"));
+}
+
+function collectOverviewTodos(project) {
+  if (!project) return [];
+  return getOverviewAppointmentSources(project).flatMap(({ group }) => {
+    const directDeadlines = (group.appointments || []).filter((entry) => entry.isDeadline).map((entry) => ({
+      name: entry.name || "Frist", dueDate: getAppointmentEndDate(entry), completed: Boolean(entry.completed),
+      context: group.name, color: group.color || "#c9c1dd", source: entry
+    }));
+    const projectTodos = (group.projects || []).flatMap((appointmentProject) => [
+      ...(appointmentProject.todos || []).map((entry) => ({
+        name: entry.name || "To-do", dueDate: entry.dueDate || "", completed: Boolean(entry.completed),
+        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry
+      })),
+      ...(appointmentProject.appointments || []).filter((entry) => entry.isDeadline).map((entry) => ({
+        name: entry.name || "Frist", dueDate: getAppointmentEndDate(entry), completed: Boolean(entry.completed),
+        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry
+      }))
+    ]);
+    return [...directDeadlines, ...projectTodos];
+  }).sort((a, b) => Number(a.completed) - Number(b.completed)
+    || compareOverviewDates({ sortDate: a.dueDate }, { sortDate: b.dueDate })
+    || a.name.localeCompare(b.name, "de"));
+}
+
+function renderOverviewSidebar() {
+  const openProjectKeys = new Set([...overviewProjectsPanel.querySelectorAll(".overview-project-card[open]")].map((entry) => entry.dataset.projectKey));
+  const project = projects.find((entry) => entry.id === displayedProjectId);
+  const overviewProjects = collectOverviewProjects(project);
+  const todos = collectOverviewTodos(project);
+  overviewTodoCount.textContent = String(todos.filter((entry) => !entry.completed).length);
+  const projectList = document.createElement("div");
+  projectList.className = "overview-sidebar-list";
+  if (!overviewProjects.length) {
+    const empty = document.createElement("p");
+    empty.className = "overview-sidebar-empty";
+    empty.textContent = "Im ausgewählten Projektordner sind noch keine Projektgruppen oder Klassenprojekte angelegt.";
+    projectList.append(empty);
+  } else overviewProjects.forEach((entry) => {
+    const card = document.createElement("details");
+    card.className = "overview-sidebar-card overview-project-card";
+    card.dataset.projectKey = entry.key;
+    card.open = openProjectKeys.has(entry.key);
+    card.style.setProperty("--overview-color", entry.color);
+    const summary = document.createElement("summary");
+    const heading = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = entry.name;
+    const meta = document.createElement("small");
+    const count = entry.entries.length;
+    meta.textContent = `${entry.context} · ${count} ${count === 1 ? "Eintrag" : "Einträge"}`;
+    heading.append(title, meta);
+    summary.append(heading);
+    const entries = document.createElement("div");
+    entries.className = "overview-project-entries";
+    if (!count) {
+      const empty = document.createElement("p");
+      empty.className = "overview-project-entry overview-project-entry-empty";
+      empty.textContent = "Dieses Projekt enthält noch keine Termine.";
+      entries.append(empty);
+    } else entry.entries.forEach((projectEntry) => {
+      const row = document.createElement("div");
+      row.className = `overview-project-entry${projectEntry.type === "todo" ? " is-todo" : ""}${projectEntry.completed ? " is-completed" : ""}`;
+      if (projectEntry.type === "todo") {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = projectEntry.completed;
+        checkbox.setAttribute("aria-label", `${projectEntry.name} als erledigt markieren`);
+        checkbox.addEventListener("change", () => {
+          projectEntry.source.completed = checkbox.checked;
+          saveProjects();
+        });
+        row.append(checkbox);
+      }
+      const copy = document.createElement("span");
+      const rowTitle = document.createElement("strong");
+      rowTitle.textContent = projectEntry.name;
+      const rowMeta = document.createElement("small");
+      rowMeta.textContent = [projectEntry.date, projectEntry.time].filter(Boolean).join(" · ");
+      copy.append(rowTitle, rowMeta);
+      row.append(copy);
+      entries.append(row);
+    });
+    card.append(summary, entries);
+    projectList.append(card);
+  });
+  overviewProjectsPanel.replaceChildren(projectList);
+
+  const todoList = document.createElement("div");
+  todoList.className = "overview-sidebar-list";
+  if (!todos.length) {
+    const empty = document.createElement("p");
+    empty.className = "overview-sidebar-empty";
+    empty.textContent = "Noch keine To-dos oder als Frist markierten Termine vorhanden.";
+    todoList.append(empty);
+  } else todos.forEach((entry) => {
+    const label = document.createElement("label");
+    label.className = `overview-sidebar-card overview-todo-card${entry.completed ? " is-completed" : ""}`;
+    label.style.setProperty("--overview-color", entry.color);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = entry.completed;
+    const copy = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = entry.name;
+    const meta = document.createElement("small");
+    meta.textContent = `${entry.dueDate ? formatGermanDate(entry.dueDate) : "Ohne Frist"} · ${entry.context}`;
+    copy.append(title, meta);
+    checkbox.addEventListener("change", () => { entry.source.completed = checkbox.checked; saveProjects(); });
+    label.append(checkbox, copy);
+    todoList.append(label);
+  });
+  overviewTodosPanel.replaceChildren(todoList);
+}
+
+function setOverviewSidebarTab(tabName) {
+  const showProjects = tabName === "projects";
+  overviewProjectsTab.setAttribute("aria-selected", String(showProjects));
+  overviewTodosTab.setAttribute("aria-selected", String(!showProjects));
+  overviewProjectsPanel.hidden = !showProjects;
+  overviewTodosPanel.hidden = showProjects;
+}
+
+function setOverviewSidebarOpen(isOpen) {
+  const renderStage = document.querySelector(".render-stage");
+  const preservedScrollTop = renderStage?.scrollTop || 0;
+  const preservedScrollLeft = renderStage?.scrollLeft || 0;
+  overviewSidebar.classList.toggle("is-open", isOpen);
+  overviewSidebar.setAttribute("aria-hidden", String(!isOpen));
+  overviewSidebar.toggleAttribute("inert", !isOpen);
+  overviewSidebarButton.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    setExportMenuOpen(false);
+    renderOverviewSidebar();
+    overviewSidebarClose.focus({ preventScroll: true });
+  } else overviewSidebarButton.focus({ preventScroll: true });
+  if (renderStage) {
+    renderStage.scrollTop = preservedScrollTop;
+    renderStage.scrollLeft = preservedScrollLeft;
+  }
 }
 
 function setExportMenuOpen(isOpen) {
@@ -3865,6 +4090,31 @@ function createMovedProjectSection(project, type, titleText, buttonText, emptyTe
 
 function createAppointmentEntryRow(project, group, appointment, layerType, appointmentProject = null) {
   const row = document.createElement("article");
+  if (appointment.isDeadline) {
+    row.className = `appointment-entry appointment-todo-entry${appointment.completed ? " is-completed" : ""}`;
+    const checkLabel = document.createElement("label");
+    checkLabel.className = "appointment-todo-check";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = Boolean(appointment.completed);
+    checkbox.setAttribute("aria-label", `${appointment.name} als erledigt markieren`);
+    checkbox.addEventListener("change", () => {
+      appointment.completed = checkbox.checked;
+      row.classList.toggle("is-completed", appointment.completed);
+      saveProjects();
+    });
+    const copy = document.createElement("span");
+    copy.className = "appointment-todo-copy";
+    const name = document.createElement("strong");
+    name.textContent = appointment.name;
+    const deadline = document.createElement("small");
+    const dueDate = getAppointmentEndDate(appointment);
+    deadline.textContent = dueDate ? `Ablaufdatum: ${formatGermanDate(dueDate)}` : "Ablaufdatum noch offen";
+    copy.append(name, deadline);
+    checkLabel.append(checkbox, copy);
+    row.append(checkLabel, createAppointmentMenu(project, group, appointment, layerType, appointmentProject));
+    return row;
+  }
   row.className = "appointment-entry";
   const copy = document.createElement("div");
   const name = document.createElement("strong");
@@ -4000,7 +4250,7 @@ function createAppointmentTodoRow(project, group, appointmentProject, todo, laye
   const name = document.createElement("strong");
   name.textContent = todo.name;
   const deadline = document.createElement("small");
-  deadline.textContent = todo.dueDate ? `Frist: ${formatGermanDate(todo.dueDate)}` : "Frist noch offen";
+  deadline.textContent = todo.dueDate ? `Ablaufdatum: ${formatGermanDate(todo.dueDate)}` : "Ablaufdatum noch offen";
   copy.append(name, deadline);
   checkLabel.append(checkbox, copy);
   row.append(checkLabel, createAppointmentTodoMenu(project, group, appointmentProject, todo, layerType));
@@ -4041,7 +4291,7 @@ function createAppointmentProjectCard(project, group, appointmentProject, layerT
     const chronologicalEntries = [
       ...appointmentProject.appointments.map((appointment) => ({
         type: "appointment",
-        date: getAppointmentStartDate(appointment) || "9999-12-31",
+        date: getAppointmentSortDate(appointment) || "9999-12-31",
         time: appointment.startTime || "00:00",
         value: appointment
       })),
@@ -4157,7 +4407,7 @@ function renderAppointmentsProperties(project) {
       } else {
         group.appointments
           .slice()
-          .sort((a, b) => `${getAppointmentStartDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentStartDate(b)} ${b.startTime}`))
+          .sort((a, b) => `${getAppointmentSortDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentSortDate(b)} ${b.startTime}`))
           .forEach((appointment) => {
             appointmentList.append(createAppointmentEntryRow(project, group, appointment, "appointments"));
           });
@@ -7173,7 +7423,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
         empty.textContent = "In dieser Gruppe sind noch keine Termine eingetragen.";
         entries.append(empty);
       } else {
-        group.appointments.slice().sort((a, b) => `${getAppointmentStartDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentStartDate(b)} ${b.startTime}`)).forEach((appointment) => {
+        group.appointments.slice().sort((a, b) => `${getAppointmentSortDate(a)} ${a.startTime}`.localeCompare(`${getAppointmentSortDate(b)} ${b.startTime}`)).forEach((appointment) => {
           entries.append(createAppointmentEntryRow(project, group, appointment, "individual"));
         });
       }
@@ -8969,6 +9219,7 @@ appointmentForm.addEventListener("submit", (event) => {
     return;
   }
   appointmentContainer.appointments = Array.isArray(appointmentContainer.appointments) ? appointmentContainer.appointments : [];
+  const existingAppointment = appointmentContainer.appointments.find((entry) => entry.id === appointmentDialog.dataset.appointmentId);
   const appointmentData = {
     name,
     startDate: appointmentStartDate.value,
@@ -8976,9 +9227,11 @@ appointmentForm.addEventListener("submit", (event) => {
     startTime: appointmentStartTime.value,
     endTime: appointmentEndTime.value,
     isDeadline: appointmentIsDeadline.checked,
+    completed: appointmentIsDeadline.checked && existingAppointment?.isDeadline
+      ? Boolean(existingAppointment.completed)
+      : false,
     overridesLessons: appointmentOverridesLessons.checked
   };
-  const existingAppointment = appointmentContainer.appointments.find((entry) => entry.id === appointmentDialog.dataset.appointmentId);
   if (existingAppointment) Object.assign(existingAppointment, appointmentData);
   else {
     appointmentContainer.appointments.push({
@@ -9427,6 +9680,7 @@ document.addEventListener("keydown", (event) => {
     setMenuOpen(false);
     setBrowserMenuOpen(false);
     setExportMenuOpen(false);
+    if (overviewSidebar.classList.contains("is-open")) setOverviewSidebarOpen(false);
     closeCardMenus();
   }
 });
@@ -9445,6 +9699,10 @@ exportButton.addEventListener("click", (event) => {
   event.stopPropagation();
   setExportMenuOpen(exportButton.getAttribute("aria-expanded") !== "true");
 });
+overviewSidebarButton.addEventListener("click", () => setOverviewSidebarOpen(overviewSidebarButton.getAttribute("aria-expanded") !== "true"));
+overviewSidebarClose.addEventListener("click", () => setOverviewSidebarOpen(false));
+overviewProjectsTab.addEventListener("click", () => setOverviewSidebarTab("projects"));
+overviewTodosTab.addEventListener("click", () => setOverviewSidebarTab("todos"));
 exportMenu.addEventListener("click", (event) => {
   const button = event.target instanceof Element ? event.target.closest("[data-export-format]") : null;
   if (!button) return;

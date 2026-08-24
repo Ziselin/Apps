@@ -16,6 +16,7 @@ Dieses Manifest konkretisiert die projektweiten Regeln für den Kompetenzbereich
 - Das Schola-Projektmanifest liegt direkt unter `schola/schola-engineering-manifest.md`.
 - App-spezifische Dateien und Hilfsprogramme bleiben in der jeweiligen App.
 - Appübergreifende UI-Vorlagen werden aus `assets/ui` eingebunden und nicht in Schola-Appordnern dupliziert.
+- Das aus TimeMap abgeleitete Hauptmenü ist die verbindliche Schola-Vorlage; Struktur und Bedienlogik bleiben einheitlich, Inhalte werden appbezogen formuliert.
 
 ## Gemeinsame Schola-Grundsätze
 

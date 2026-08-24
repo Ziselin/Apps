@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Hinzugefügt
 
+- Hauptmenü auf die zentrale, aus TimeMap abgeleitete Menüvorlage umgestellt.
 - App-spezifisches Changelog und fortlaufende Versionsführung eingerichtet.
 - Fortschreibbare Präambel mit einer Kurzbeschreibung der App im Manifest ergänzt.
 

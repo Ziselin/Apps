@@ -4,6 +4,17 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-08-24
+
+- Rahmenlose Hauptansicht, höhenoptimiertes Jahresraster, einheitlich gewichtete Kopfleisten-Symbole und `file://`-sicheres zentrales Hauptmenü umgesetzt.
+- Als Frist markierte Termine als datierte To-dos mit Erledigt-Checkbox dargestellt.
+- Rechte Hauptseiten-Sidebar für Projektgruppen, Klassenprojekte und offene To-dos ergänzt.
+- Kalenderposition beim Öffnen und Schließen der rechten Sidebar stabilisiert.
+- Projektkarten mit scrollbar aufklappbaren Terminen und unabhängige To-do-Scrollfläche ergänzt.
+- Sidebar-Projekte, Termine und To-dos nach dem jeweils nächsten Datum geordnet.
+- Vollständig abgelaufene Projekte aus der Sidebar-Projektansicht ausgeblendet.
+- Projektinterne To-dos zusätzlich mit synchroner Erledigt-Checkbox in den aufgeklappten Projektkarten dargestellt.
+
 ### 2026-08-23
 
 - Freie Minuteneingabe mit einheitlicher 5-Minuten-Uhrauswahl umgesetzt.

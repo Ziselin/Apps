@@ -41,10 +41,10 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
     Die Apps eines Projekts werden als Unterordner in dessen Projektordner geführt. Das Projektmanifest liegt direkt im Projektordner. Für Atlas gilt `atlas/{earthmap,sourcerer,timemap,typemap}` mit `atlas/atlas-engineering-manifest.md`; für Schola gilt `schola/{classroom,noten,stundenplan}` sowie `schola/mini-apps/{…}` für eigenständig nutzbare Mini-Apps. App-spezifische Hilfsprogramme liegen bei ihrer App. Ein allgemeiner Sammelordner `docs` wird nicht für Projektmanifeste verwendet.
 
 11. **Jede Einzelapp führt ein eigenes Changelog.**
-    Im Stammordner jeder App liegt eine Markdown-Datei `CHANGELOG.md`. Sie protokolliert funktionale, gestalterische, technische und organisatorische Änderungen in knapper, chronologischer Form. Neue Einträge werden im selben Arbeitszusammenhang wie die Änderung ergänzt.
+    Im Stammordner jeder App liegt eine Markdown-Datei `CHANGELOG.md`. Sie protokolliert funktionale, gestalterische, technische und organisatorische Änderungen in knapper, chronologischer Form. Zusammengehörige Änderungen eines Funktionsbereichs werden in einem gemeinsamen Eintrag gebündelt; einzelne Arbeitsschritte und kleinteilige Korrekturfolgen werden nicht separat aufgelistet. Neue Einträge werden im selben Arbeitszusammenhang wie die Änderung ergänzt.
 
 12. **App-Versionen werden im Changelog gepflegt.**
-    Die Versionsnummer folgt grundsätzlich dem Schema `MAJOR.MINOR.PATCH`: `PATCH` für Korrekturen, `MINOR` für neue oder merklich erweiterte Funktionen und `MAJOR` für nicht rückwärtskompatible grundlegende Umbauten. Bis zur ersten stabilen Veröffentlichung beginnen Apps bei Version `0.1.0`. Noch nicht abgeschlossene Änderungen stehen unter `Unveröffentlicht` und werden bei einem Versionsschritt gemeinsam einer datierten Version zugeordnet.
+    Die Versionsnummer folgt grundsätzlich dem Schema `MAJOR.MINOR.PATCH`: `PATCH` für Korrekturen, `MINOR` für neue oder merklich erweiterte Funktionen und `MAJOR` für nicht rückwärtskompatible grundlegende Umbauten. Bis zur ersten stabilen Veröffentlichung beginnen Apps bei Version `0.1.0`. Nach einer veröffentlichten Version wird die Nummerierung mit der vorgesehenen nächsten Version fortgesetzt; noch nicht abgeschlossene Änderungen werden an dieser Stelle als `Unveröffentlicht` gekennzeichnet. Innerhalb einer Version werden Änderungen nach Arbeitstag gruppiert und in absteigender Datumsfolge dokumentiert.
 
 13. **Manifeste beginnen mit einer Präambel.**
     Direkt nach dem Titel enthält jedes Projekt- und App-Manifest eine kurze Präambel. Sie beschreibt Zweck, Charakter und Ausrichtung des zugehörigen Projekts beziehungsweise Produkts, wird bei der Anlage eines neuen Manifests automatisch ergänzt und im weiteren Entwicklungsverlauf angepasst, sobald sich Zweck, Zielgruppe oder wesentlicher Funktionsumfang verändern.
@@ -59,6 +59,7 @@ Dieses Manifest beschreibt verbindliche organisatorische Regeln für das gesamte
 
 - `assets/ui/export-template.css` – gemeinsame Darstellung von Exportbutton, Exportmenü und Dateiformat-Auswahl
 - `assets/ui/buttons.css` – gemeinsame Buttonzustände sowie die Einbindung zentraler UI-Symbole
+- `assets/ui/app-menu.css` und `assets/ui/app-menu.js` – gemeinsames Hauptmenü nach dem TimeMap-Muster mit app-spezifisch befüllbaren Akkordeonbereichen
 - `assets/ui/icons/settings.svg` – gemeinsames Symbol für Einstellungen
 - `assets/ui/icons/information.svg` – gemeinsames Symbol für kontextbezogene Informationen
 

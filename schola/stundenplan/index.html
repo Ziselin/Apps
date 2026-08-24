@@ -6,15 +6,16 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260823zc">
+    <link rel="stylesheet" href="stundenplan.css?v=20260824h">
+  <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
   <div id="scheduleApp" class="app-frame workspace-mode-render">
     <section class="render-view" aria-label="Stundenplan">
       <header class="topbar">
         <div class="brand-plate">
-          <button type="button" id="menuButton" class="header-icon-button" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
-            <span class="menu-lines" aria-hidden="true"></span>
+          <button type="button" id="menuButton" class="header-icon-button app-menu-trigger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu">
+            <span class="app-menu-trigger-icon" aria-hidden="true"></span>
           </button>
           <div class="brand-mark">
             <a class="brand-home-link" href="../../index.html?project=schola" aria-label="Zur Schola-Startseite">
@@ -40,40 +41,58 @@
             </div>
           </div>
           <button type="button" id="lessonSignalsToggle" class="header-icon-button topbar-icon-button lesson-signals-toggle" aria-pressed="false" title="Stundensignale aktivieren">
-            <span class="lesson-signals-icon" aria-hidden="true">♪</span>
+            <span class="topbar-action-icon lesson-signals-icon" aria-hidden="true"></span>
+          </button>
+          <button type="button" id="overviewSidebarButton" class="header-icon-button topbar-icon-button overview-sidebar-toggle" aria-label="Projekte und To-dos öffnen" title="Projekte und To-dos" aria-expanded="false" aria-controls="overviewSidebar">
+            <span class="topbar-action-icon overview-sidebar-icon" aria-hidden="true"></span>
           </button>
         </div>
       </header>
 
       <div id="menuOverlay" class="menu-overlay" hidden></div>
-      <aside id="sideMenu" class="side-menu" aria-hidden="true" inert>
+      <aside id="sideMenu" class="side-menu app-menu-drawer" aria-hidden="true" inert data-app-menu>
         <div class="side-menu-inner">
-          <div class="side-menu-head">
-            <div><span class="label">Menü</span><strong>Stundenplan</strong></div>
-            <button type="button" id="menuCloseButton" class="menu-close-button" aria-label="Menü schließen">×</button>
+          <div class="side-menu-head app-menu-head">
+            <div class="app-menu-titleblock"><span class="label">Menü</span><strong>Stundenplan</strong></div>
+            <button type="button" id="menuCloseButton" class="menu-close-button app-menu-close" aria-label="Menü schließen">×</button>
           </div>
-          <div class="side-menu-list">
-            <details>
-              <summary>Projekte</summary>
-              <div class="project-choice-list">
+          <div class="side-menu-list app-menu-list">
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="projects" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-projects" aria-hidden="true"></span><span>Projekte</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="projects" hidden>
+                <div class="project-choice-list">
                 <a class="project-choice" href="../../index.html">Atlas</a>
                 <a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a>
+                </div>
               </div>
-            </details>
-            <details>
-              <summary>Funktionsweise</summary>
-              <p>Der Kalender bildet später ein Schuljahr ab. Zeitraum, Stunden und schulfreie Tage werden im Einstellungsbereich festgelegt.</p>
-            </details>
-            <details>
-              <summary>Datenstand</summary>
-              <p>Noch keine Daten hinterlegt.</p>
-            </details>
-            <details>
-              <summary>Appbeschreibung</summary>
-              <p>Stundenplan ist die zweite App des Projekts Schola. Diese erste Fassung zeigt ausschließlich die formale Grundstruktur.</p>
-            </details>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="help" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-help" aria-hidden="true"></span><span>Funktionsweise</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Stundenplan verbindet Schuljahre, Unterrichtslogiken und Termine in einer gemeinsamen Tages-, Wochen- und Jahresansicht.</p></div>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="data" hidden><p>Projekt- und Kalenderdaten werden lokal im Browser gespeichert und können als JSON beziehungsweise ICS exportiert werden.</p></div>
+            </section>
+            <section class="app-menu-section">
+              <button type="button" class="app-menu-item" data-app-menu-panel="description" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-description" aria-hidden="true"></span><span>Appbeschreibung</span></button>
+              <div class="app-menu-panel" data-app-menu-popup="description" hidden><p>Stundenplan ist die Kalender- und Unterrichtsplanungs-App des Projekts Schola.</p></div>
+            </section>
           </div>
         </div>
+      </aside>
+
+      <aside id="overviewSidebar" class="overview-sidebar" aria-hidden="true" inert>
+        <header class="overview-sidebar-head">
+          <div><span class="label">Übersicht</span><h2>Projekte &amp; To-dos</h2></div>
+          <button type="button" id="overviewSidebarClose" class="overview-sidebar-close" aria-label="Sidebar schließen">×</button>
+        </header>
+        <div class="overview-sidebar-tabs" role="tablist" aria-label="Inhalt der Sidebar">
+          <button type="button" id="overviewProjectsTab" role="tab" aria-selected="true" aria-controls="overviewProjectsPanel">Projekte</button>
+          <button type="button" id="overviewTodosTab" role="tab" aria-selected="false" aria-controls="overviewTodosPanel">To-dos <span id="overviewTodoCount" class="overview-count">0</span></button>
+        </div>
+        <div id="overviewProjectsPanel" class="overview-sidebar-panel" role="tabpanel" aria-labelledby="overviewProjectsTab"></div>
+        <div id="overviewTodosPanel" class="overview-sidebar-panel" role="tabpanel" aria-labelledby="overviewTodosTab" hidden></div>
       </aside>
 
       <main class="render-stage">
@@ -498,6 +517,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260823zc"></script>
+    <script src="stundenplan.js?v=20260824i"></script>
+  <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
