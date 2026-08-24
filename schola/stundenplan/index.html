@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260824h">
+    <link rel="stylesheet" href="stundenplan.css?v=20260824j">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -89,9 +89,11 @@
         </header>
         <div class="overview-sidebar-tabs" role="tablist" aria-label="Inhalt der Sidebar">
           <button type="button" id="overviewProjectsTab" role="tab" aria-selected="true" aria-controls="overviewProjectsPanel">Projekte</button>
+          <button type="button" id="overviewEventsTab" role="tab" aria-selected="false" aria-controls="overviewEventsPanel">Einzelveranstaltungen</button>
           <button type="button" id="overviewTodosTab" role="tab" aria-selected="false" aria-controls="overviewTodosPanel">To-dos <span id="overviewTodoCount" class="overview-count">0</span></button>
         </div>
         <div id="overviewProjectsPanel" class="overview-sidebar-panel" role="tabpanel" aria-labelledby="overviewProjectsTab"></div>
+        <div id="overviewEventsPanel" class="overview-sidebar-panel" role="tabpanel" aria-labelledby="overviewEventsTab" hidden></div>
         <div id="overviewTodosPanel" class="overview-sidebar-panel" role="tabpanel" aria-labelledby="overviewTodosTab" hidden></div>
       </aside>
 
@@ -517,7 +519,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260824i"></script>
+    <script src="stundenplan.js?v=20260824l"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

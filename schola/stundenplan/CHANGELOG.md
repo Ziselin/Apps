@@ -14,6 +14,9 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Sidebar-Projekte, Termine und To-dos nach dem jeweils nächsten Datum geordnet.
 - Vollständig abgelaufene Projekte aus der Sidebar-Projektansicht ausgeblendet.
 - Projektinterne To-dos zusätzlich mit synchroner Erledigt-Checkbox in den aufgeklappten Projektkarten dargestellt.
+- Eigenständige Einzelveranstaltungen aus der Projektansicht in einen chronologischen Sidebar-Tab verschoben.
+- Eingeklappte schulische und persönliche Termingruppen per Ziehen dauerhaft sortierbar gemacht.
+- Separate Klassenfahrten-Rubrik aus „Schulische Termine“ entfernt, ohne bestehende Daten zu löschen.
 
 ### 2026-08-23
 

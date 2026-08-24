@@ -165,8 +165,10 @@ const overviewSidebarButton = document.getElementById("overviewSidebarButton");
 const overviewSidebar = document.getElementById("overviewSidebar");
 const overviewSidebarClose = document.getElementById("overviewSidebarClose");
 const overviewProjectsTab = document.getElementById("overviewProjectsTab");
+const overviewEventsTab = document.getElementById("overviewEventsTab");
 const overviewTodosTab = document.getElementById("overviewTodosTab");
 const overviewProjectsPanel = document.getElementById("overviewProjectsPanel");
+const overviewEventsPanel = document.getElementById("overviewEventsPanel");
 const overviewTodosPanel = document.getElementById("overviewTodosPanel");
 const overviewTodoCount = document.getElementById("overviewTodoCount");
 const calendarExportDialog = document.getElementById("calendarExportDialog");
@@ -1279,10 +1281,40 @@ function collectOverviewTodos(project) {
     || a.name.localeCompare(b.name, "de"));
 }
 
+function collectOverviewEvents(project) {
+  if (!project) return [];
+  const directAppointments = getOverviewAppointmentSources(project).flatMap(({ layerType, group }) => (
+    (group.appointments || []).filter((entry) => !entry.isDeadline).map((entry) => ({
+      name: entry.name || "Termin",
+      context: `${layerType === "individual" ? "Persönliche Termine" : "Schulische Termine"} · ${group.name}`,
+      color: group.color || "#c9c1dd",
+      sortDate: getAppointmentStartDate(entry),
+      endDate: getAppointmentEndDate(entry),
+      date: formatAppointmentDateRange(entry),
+      time: entry.startTime && entry.endTime ? `${entry.startTime}–${entry.endTime}` : "Zeit noch offen"
+    }))
+  ));
+  const singleEvents = (getProjectLayer(project, "individual")?.appliedEntries || [])
+    .filter((entry) => entry.type === "school-project")
+    .map((entry) => ({
+      name: entry.name || "Einzelveranstaltung",
+      context: "Schulische Termine",
+      color: entry.color || "#bfd2e2",
+      sortDate: getAppointmentStartDate(entry),
+      endDate: getAppointmentEndDate(entry),
+      date: formatAppointmentDateRange(entry),
+      time: entry.startTime && entry.endTime ? `${entry.startTime}–${entry.endTime}` : "Ganztägig"
+    }));
+  return [...directAppointments, ...singleEvents]
+    .filter((entry) => !entry.endDate || entry.endDate >= getLocalDateKey(new Date()))
+    .sort((a, b) => compareOverviewDates(a, b) || (a.time || "").localeCompare(b.time || ""));
+}
+
 function renderOverviewSidebar() {
   const openProjectKeys = new Set([...overviewProjectsPanel.querySelectorAll(".overview-project-card[open]")].map((entry) => entry.dataset.projectKey));
   const project = projects.find((entry) => entry.id === displayedProjectId);
   const overviewProjects = collectOverviewProjects(project);
+  const overviewEvents = collectOverviewEvents(project);
   const todos = collectOverviewTodos(project);
   overviewTodoCount.textContent = String(todos.filter((entry) => !entry.completed).length);
   const projectList = document.createElement("div");
@@ -1342,6 +1374,26 @@ function renderOverviewSidebar() {
   });
   overviewProjectsPanel.replaceChildren(projectList);
 
+  const eventList = document.createElement("div");
+  eventList.className = "overview-sidebar-list";
+  if (!overviewEvents.length) {
+    const empty = document.createElement("p");
+    empty.className = "overview-sidebar-empty";
+    empty.textContent = "Keine bevorstehenden Einzelveranstaltungen vorhanden.";
+    eventList.append(empty);
+  } else overviewEvents.forEach((entry) => {
+    const card = document.createElement("article");
+    card.className = "overview-sidebar-card";
+    card.style.setProperty("--overview-color", entry.color);
+    const title = document.createElement("strong");
+    title.textContent = entry.name;
+    const meta = document.createElement("small");
+    meta.textContent = [entry.date, entry.time, entry.context].filter(Boolean).join(" · ");
+    card.append(title, meta);
+    eventList.append(card);
+  });
+  overviewEventsPanel.replaceChildren(eventList);
+
   const todoList = document.createElement("div");
   todoList.className = "overview-sidebar-list";
   if (!todos.length) {
@@ -1371,10 +1423,13 @@ function renderOverviewSidebar() {
 
 function setOverviewSidebarTab(tabName) {
   const showProjects = tabName === "projects";
+  const showEvents = tabName === "events";
   overviewProjectsTab.setAttribute("aria-selected", String(showProjects));
-  overviewTodosTab.setAttribute("aria-selected", String(!showProjects));
+  overviewEventsTab.setAttribute("aria-selected", String(showEvents));
+  overviewTodosTab.setAttribute("aria-selected", String(!showProjects && !showEvents));
   overviewProjectsPanel.hidden = !showProjects;
-  overviewTodosPanel.hidden = showProjects;
+  overviewEventsPanel.hidden = !showEvents;
+  overviewTodosPanel.hidden = showProjects || showEvents;
 }
 
 function setOverviewSidebarOpen(isOpen) {
@@ -4340,6 +4395,47 @@ function createAppointmentGroupHeader(project, group, layerType) {
   return { head, isExpanded };
 }
 
+function enableAppointmentGroupReordering(list, project, layerType) {
+  let draggedCard = null;
+  const persistOrder = () => {
+    if (!draggedCard) return;
+    const layer = getProjectLayer(project, layerType);
+    const groupsById = new Map((layer.groups || []).map((group) => [group.id, group]));
+    layer.groups = [...list.querySelectorAll(":scope > .appointment-group-card[data-group-id]")]
+      .map((card) => groupsById.get(card.dataset.groupId))
+      .filter(Boolean);
+    saveProjects();
+    renderProjectBrowser();
+  };
+  list.querySelectorAll(":scope > .appointment-group-card[data-group-id]").forEach((card) => {
+    if (card.dataset.groupExpanded === "true") return;
+    card.draggable = true;
+    card.setAttribute("aria-roledescription", "verschiebbare eingeklappte Gruppe");
+    card.title = "Gedrückt halten und ziehen, um die Gruppe zu verschieben";
+    card.addEventListener("dragstart", (event) => {
+      draggedCard = card;
+      card.classList.add("is-reordering");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.groupId);
+    });
+    card.addEventListener("dragend", () => {
+      persistOrder();
+      card.classList.remove("is-reordering");
+      draggedCard = null;
+    });
+  });
+  list.addEventListener("dragover", (event) => {
+    if (!draggedCard) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const target = event.target instanceof Element ? event.target.closest(".appointment-group-card[data-group-id]") : null;
+    if (!target || target === draggedCard || target.parentElement !== list) return;
+    const bounds = target.getBoundingClientRect();
+    list.insertBefore(draggedCard, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
+  });
+  list.addEventListener("drop", (event) => event.preventDefault());
+}
+
 function renderAppointmentsProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
   detailPanelTitle.textContent = "Schulische Termine";
@@ -4382,8 +4478,10 @@ function renderAppointmentsProperties(project) {
       group.projects = Array.isArray(group.projects) ? group.projects : [];
       const groupCard = document.createElement("section");
       groupCard.className = "appointment-group-card";
+      groupCard.dataset.groupId = group.id;
       groupCard.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
       const { head: groupHead, isExpanded } = createAppointmentGroupHeader(project, group, "appointments");
+      groupCard.dataset.groupExpanded = String(isExpanded);
       const addAppointmentButton = document.createElement("button");
       addAppointmentButton.type = "button";
       addAppointmentButton.className = "secondary-button appointment-add-button";
@@ -4423,8 +4521,8 @@ function renderAppointmentsProperties(project) {
       groupCard.append(groupHead, groupBody);
       groupList.append(groupCard);
     });
+    enableAppointmentGroupReordering(groupList, project, "appointments");
   }
-  const classTrips = createMovedProjectSection(project, "class-trip", "Klassenfahrten", "Klassenfahrt hinzufügen", "Noch keine Klassenfahrt eingetragen.");
   const singleEvents = createMovedProjectSection(
     project,
     "school-project",
@@ -4433,7 +4531,7 @@ function renderAppointmentsProperties(project) {
     "Noch keine Einzelveranstaltung eingetragen.",
     { hideTitle: true, hideAddButton: true, hideWhenEmpty: true }
   );
-  sheet.append(head, rootActions, singleEvents, groupList, classTrips);
+  sheet.append(head, rootActions, singleEvents, groupList);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -7400,8 +7498,10 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       group.projects = Array.isArray(group.projects) ? group.projects : [];
       const card = document.createElement("section");
       card.className = "appointment-group-card";
+      card.dataset.groupId = group.id;
       card.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
       const { head, isExpanded } = createAppointmentGroupHeader(project, group, "individual");
+      card.dataset.groupExpanded = String(isExpanded);
       const add = document.createElement("button");
       add.type = "button";
       add.className = "secondary-button appointment-add-button";
@@ -7438,6 +7538,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       card.append(head, body);
       list.append(card);
     });
+    enableAppointmentGroupReordering(list, project, "individual");
   }
   section.append(title, intro, addGroupButton, list);
   return section;
@@ -9702,6 +9803,7 @@ exportButton.addEventListener("click", (event) => {
 overviewSidebarButton.addEventListener("click", () => setOverviewSidebarOpen(overviewSidebarButton.getAttribute("aria-expanded") !== "true"));
 overviewSidebarClose.addEventListener("click", () => setOverviewSidebarOpen(false));
 overviewProjectsTab.addEventListener("click", () => setOverviewSidebarTab("projects"));
+overviewEventsTab.addEventListener("click", () => setOverviewSidebarTab("events"));
 overviewTodosTab.addEventListener("click", () => setOverviewSidebarTab("todos"));
 exportMenu.addEventListener("click", (event) => {
   const button = event.target instanceof Element ? event.target.closest("[data-export-format]") : null;
