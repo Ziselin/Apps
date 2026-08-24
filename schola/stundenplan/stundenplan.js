@@ -2251,6 +2251,10 @@ function renderProjectBrowser() {
       exportProjectButton.setAttribute("aria-expanded", String(!exportSubmenu.hidden));
     });
     exportSubmenu.append(exportJsonButton, exportCalendarButton);
+    const projectIdButton = document.createElement("button");
+    projectIdButton.type = "button";
+    projectIdButton.textContent = "ID";
+    projectIdButton.addEventListener("click", () => { closeCardMenus(); openProjectCalendarIdDialog(project); });
     const deleteProjectButton = document.createElement("button");
     deleteProjectButton.type = "button";
     deleteProjectButton.className = "schedule-menu-delete";
@@ -2267,7 +2271,7 @@ function renderProjectBrowser() {
       projectMenu.hidden = !projectMenu.hidden;
       projectMenuButton.setAttribute("aria-expanded", String(!projectMenu.hidden));
     });
-    projectMenu.append(exportProjectButton, exportSubmenu, deleteProjectButton);
+    projectMenu.append(exportProjectButton, exportSubmenu, projectIdButton, deleteProjectButton);
     menuShell.append(projectMenuButton, projectMenu);
 
     row.append(toggle, icon, main, displayToggle, menuShell);
@@ -2395,6 +2399,20 @@ function renderProjectBrowser() {
     return card;
   });
   projectBrowserList.replaceChildren(...cards);
+}
+
+function openProjectCalendarIdDialog(project) {
+  const dialog = document.createElement("dialog"); dialog.className = "project-dialog project-id-dialog";
+  const form = document.createElement("form"); form.method = "dialog";
+  const heading = document.createElement("div"); heading.innerHTML = `<span class="label">Projektordner</span><h2>Kalender-ID</h2>`;
+  const note = document.createElement("p"); note.textContent = "Mit dieser ID kann Classroom Screen den zusammengeführten Stundenplan dieses Projektordners aufrufen.";
+  const value = document.createElement("input"); value.type = "text"; value.readOnly = true; value.value = `SP1:${project.id}`;
+  const actions = document.createElement("div"); actions.className = "dialog-actions";
+  const close = document.createElement("button"); close.type = "submit"; close.className = "secondary-button"; close.textContent = "Schließen";
+  const copy = document.createElement("button"); copy.type = "button"; copy.className = "secondary-button primary-action"; copy.textContent = "ID kopieren";
+  copy.addEventListener("click", async () => { try { await navigator.clipboard.writeText(value.value); } catch { value.select(); document.execCommand("copy"); } copy.textContent = "Kopiert"; setTimeout(() => { copy.textContent = "ID kopieren"; }, 1400); });
+  actions.append(close, copy); form.append(heading, note, value, actions); dialog.append(form); document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true }); dialog.showModal(); value.select();
 }
 
 function renderProjectDetail() {

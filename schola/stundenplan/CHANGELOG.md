@@ -22,6 +22,10 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Jahresraster gegen Zellüberlagerungen abgesichert und bei niedrigen Desktopfenstern zugunsten der Lesbarkeit scrollbar gemacht.
 - Wochenspalten und Tagesfelder auch in schmalen Monatskarten vollständig innerhalb ihrer Karten gehalten.
 - Vertikalen Zeitmaßstab und damit die Stundenfeldhöhe in Tages- und Wochenansicht halbiert.
+- Oberen Leerraum zwischen Kopfzeile und Kalendersteuerung auf höchstens die Hälfte reduziert.
+- Kopfzeile selbst auf 60 px verdichtet und Kalendersteuerung unmittelbar darunter positioniert.
+- Sichtbaren Abstand zwischen unterem Kalenderrand und Fußleiste etwa halbiert.
+- Stabile `SP1`-Projektordner-ID mit Kopierdialog im Projektmenü als Grundlage der Classroom-Screen-Anbindung ergänzt.
 
 ### 2026-08-23
 
