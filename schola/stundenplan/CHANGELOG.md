@@ -6,6 +6,14 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### 2026-08-25
 
+- Mehrtägige Unterrichtsstunden als gemeinsame Serie gespeichert, sodass abgewählte Wochentage entfernt und beim Zurückstellen keine Doppelstunden erzeugt werden.
+- Ungruppierte schulische und persönliche Einzeltermine in dieselbe Dialog-Zuordnung einbezogen und „Keine Gruppe“ als echte Ablageebene umgesetzt.
+- Gruppen- und Projektgruppenzuordnung aus den Terminkarten in die Bearbeitungsdialoge von Terminen, Fristen und To-dos verlegt.
+- Einzeltermine um eine direkte Auswahl ihrer Termin- oder Projektgruppe ergänzt.
+- Bestehende Termine per Ziehen zwischen Gruppen, Projektgruppen und der Einzeltermin-Ebene verschiebbar gemacht.
+- Trennlinie im Kopf eingeklappter Projektgruppen entfernt.
+- Projektgruppen innerhalb persönlicher und schulischer Termingruppen standardmäßig eingeklappt und separat aufklappbar gemacht.
+- Termingruppen im Projektbrowser mit gezielter Scrollnavigation zu ihren Editor-Karten verknüpft.
 - Mehrtägige Projekttage nach Klassen gleichen Unterricht nun über aktuelle Klassen-, Kurs- und Klassenstufen-Zuordnungen statt über fragile Anzeigenamen oder veraltete ID-Momentaufnahmen ab.
 - Projekttage können unabhängig steuern, ob sie Unterricht ausfallen lassen und ob sie selbst im Kalender erscheinen.
 - Klasseneditor um die Tabs „Allgemein“ und „Schülerliste“ mit stabilen kopierbaren Schüler-IDs sowie bearbeitbaren eindeutigen laufenden Nummern erweitert.
@@ -19,6 +27,11 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Ältere Projekttag-Zuweisungen werden über Schule, Klassenstufe und Kürzel auf die aktuellen Klassen-IDs aufgelöst.
 - Stundenkarten auf zwei Zeilen verdichtet und Raumangabe rechts unter der Klasse angeordnet.
 - Ausfalloption bei Projekttagen eindeutig auf den regulären Unterricht der zugewiesenen Klasse bezogen.
+- Sichtbarkeitsaugen von der Ausfalllogik getrennt: ausgeblendete Termine und Projekttage behalten ihre fachliche Wirkung.
+- Navigierbare Monatsansicht mit Unterricht, Ferien, Projekten, Terminen und Abwesenheiten ergänzt.
+- Heutigen Tag in Monats- und Jahresansicht einheitlich über die Tageszahl statt über einen zusätzlichen Zellrahmen hervorgehoben.
+- Klassenordner im Projektbrowser aufklappbar gemacht und eingerichtete Schulen als direkte Unterpunkte ergänzt.
+- Klassenbrowser bis zu Klassenstufen und Einzelfächern hierarchisch ausgebaut und mit gezielter Editor-Navigation verknüpft.
 
 ### 2026-08-24
 

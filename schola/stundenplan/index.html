@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260825f">
+  <link rel="stylesheet" href="stundenplan.css?v=20260825m">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -68,7 +68,7 @@
             </section>
             <section class="app-menu-section">
               <button type="button" class="app-menu-item" data-app-menu-panel="help" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-help" aria-hidden="true"></span><span>Funktionsweise</span></button>
-              <div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Stundenplan verbindet Schuljahre, Unterrichtslogiken und Termine in einer gemeinsamen Tages-, Wochen- und Jahresansicht.</p></div>
+              <div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Stundenplan verbindet Schuljahre, Unterrichtslogiken und Termine in einer gemeinsamen Tages-, Wochen-, Monats- und Jahresansicht.</p></div>
             </section>
             <section class="app-menu-section">
               <button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button>
@@ -104,6 +104,7 @@
               <div class="calendar-view-switcher" aria-label="Kalenderansicht">
                 <button type="button" data-calendar-view="day" aria-pressed="false">Tag</button>
                 <button type="button" data-calendar-view="week" aria-pressed="false">Woche</button>
+                <button type="button" data-calendar-view="month" aria-pressed="false">Monat</button>
                 <button type="button" data-calendar-view="year" aria-pressed="true">Jahr</button>
               </div>
               <div id="calendarDateNavigation" class="calendar-date-navigation" aria-label="Zeitraum wechseln" hidden>
@@ -253,6 +254,10 @@
           <span>Bezeichnung</span>
           <input id="appointmentName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Fachkonferenz">
         </label>
+        <label class="dialog-field">
+          <span>Zuordnung</span>
+          <select id="appointmentAssignment"></select>
+        </label>
         <div class="class-trip-date-fields">
           <label class="dialog-field"><span>Startdatum</span><input id="appointmentStartDate" type="date" required></label>
           <label class="dialog-field"><span>Enddatum</span><input id="appointmentEndDate" type="date" required></label>
@@ -334,6 +339,10 @@
         <label class="dialog-field">
           <span>Bezeichnung</span>
           <input id="schoolProjectName" type="text" maxlength="100" autocomplete="off" required placeholder="z. B. Theaterprojekt">
+        </label>
+        <label id="schoolProjectAssignmentField" class="dialog-field">
+          <span>Zuordnung</span>
+          <select id="schoolProjectAssignment"></select>
         </label>
         <div class="event-time-fields">
           <label class="dialog-field"><span>Startdatum</span><input id="schoolProjectDate" type="date" required></label>
@@ -546,7 +555,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260825m"></script>
+    <script src="stundenplan.js?v=20260825x"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

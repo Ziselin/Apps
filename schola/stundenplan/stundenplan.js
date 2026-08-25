@@ -38,6 +38,7 @@ const appointmentDialog = document.getElementById("appointmentDialog");
 const appointmentDialogTitle = document.getElementById("appointmentDialogTitle");
 const appointmentForm = document.getElementById("appointmentForm");
 const appointmentName = document.getElementById("appointmentName");
+const appointmentAssignment = document.getElementById("appointmentAssignment");
 const appointmentStartDate = document.getElementById("appointmentStartDate");
 const appointmentEndDate = document.getElementById("appointmentEndDate");
 const appointmentStartTime = document.getElementById("appointmentStartTime");
@@ -74,6 +75,8 @@ const schoolProjectDialog = document.getElementById("schoolProjectDialog");
 const schoolProjectDialogTitle = document.getElementById("schoolProjectDialogTitle");
 const schoolProjectForm = document.getElementById("schoolProjectForm");
 const schoolProjectName = document.getElementById("schoolProjectName");
+const schoolProjectAssignmentField = document.getElementById("schoolProjectAssignmentField");
+const schoolProjectAssignment = document.getElementById("schoolProjectAssignment");
 const schoolProjectDate = document.getElementById("schoolProjectDate");
 const schoolProjectEndDate = document.getElementById("schoolProjectEndDate");
 const schoolProjectStartTime = document.getElementById("schoolProjectStartTime");
@@ -250,6 +253,10 @@ let activeLayerType = null;
 let activeSchoolId = null;
 let activeClassSchoolId = null;
 let activeClassCatalogTab = "classes";
+let activeClassCatalogTarget = null;
+let pendingClassCatalogScrollTarget = null;
+let activeAppointmentGroupTarget = null;
+let pendingAppointmentGroupScrollTarget = null;
 let activeScheduleId = null;
 let displayRowsDraft = [];
 let lessonPhasesDraft = [];
@@ -266,7 +273,7 @@ const lessonEndAudio = new Audio("../../assets/stundenplan-ende.mp3");
 lessonStartAudio.preload = "auto";
 lessonEndAudio.preload = "auto";
 const expandedProjectIds = new Set(projects.map((project) => project.id));
-const expandableLayerIds = new Set(["holidays", "schedules", "individual", "appointments", "classes"]);
+const expandableLayerIds = new Set(["holidays", "classCatalog", "schedules", "individual", "appointments", "classes"]);
 const storedExpandedLayerKeys = (() => {
   try { return JSON.parse(localStorage.getItem(EXPANDED_LAYERS_STORAGE_KEY) || "null"); }
   catch { return null; }
@@ -275,6 +282,8 @@ const expandedLayerKeys = new Set(Array.isArray(storedExpandedLayerKeys)
   ? storedExpandedLayerKeys
   : projects.flatMap((project) => [...expandableLayerIds].map((layerId) => `${project.id}:${layerId}`)));
 const expandedAppointmentGroupKeys = new Set();
+const expandedAppointmentProjectKeys = new Set();
+let draggedAppointmentContext = null;
 
 const monthNames = [
   "Januar", "Februar", "März", "April", "Mai", "Juni",
@@ -290,11 +299,13 @@ function renderYear(startYear, calendarEntries = [], schoolYearMode = false) {
   calendar.replaceChildren();
   calendar.className = "year-calendar";
   calendar.closest(".calendar-shell")?.classList.remove("is-timeline-view");
+  calendar.closest(".calendar-shell")?.classList.remove("is-month-view");
   calendar.closest(".calendar-shell")?.classList.add("is-year-view");
   calendarTitle.textContent = "Jahresübersicht";
   yearLabel.textContent = schoolYearMode
     ? `${startYear}/${String(startYear + 1).slice(-2)}`
     : String(startYear);
+  const todayKey = getLocalDateKey(new Date());
 
   const months = Array.from({ length: 12 }, (_, index) => {
     const absoluteMonth = schoolYearMode ? index + 7 : index;
@@ -358,13 +369,17 @@ function renderYear(startYear, calendarEntries = [], schoolYearMode = false) {
         matchingEntries.some((entry) => entry.type === "public-holiday") ? "is-public-holiday" : "",
         matchingProjects.length ? "is-project" : "",
         entryColors.length ? "has-calendar-entry" : "",
-        entryColors.length > 1 ? "has-overlap" : ""
+        entryColors.length > 1 ? "has-overlap" : "",
+        dateKey === todayKey ? "is-today" : ""
       ].filter(Boolean).join(" ");
       if (entryColors.length) {
         day.style.setProperty("--day-color-a", entryColors[0]);
         day.style.setProperty("--day-color-b", entryColors[1] || entryColors[0]);
       }
-      day.textContent = String(dayNumber);
+      const dayNumberLabel = document.createElement("span");
+      dayNumberLabel.className = "year-day-number";
+      dayNumberLabel.textContent = String(dayNumber);
+      day.append(dayNumberLabel);
       if (matchingEntries.length) {
         const names = getCalendarEntryDisplayNames(matchingEntries);
         day.title = names.join(", ");
@@ -376,6 +391,120 @@ function renderYear(startYear, calendarEntries = [], schoolYearMode = false) {
     month.append(grid);
     calendar.append(month);
   });
+}
+
+function renderMonthView(project) {
+  if (livePhaseTimer) {
+    clearInterval(livePhaseTimer);
+    livePhaseTimer = null;
+  }
+  const reference = new Date(calendarReferenceDate);
+  reference.setHours(12, 0, 0, 0);
+  const year = reference.getFullYear();
+  const monthIndex = reference.getMonth();
+  const schedules = getCombinedSchedules();
+  const schoolProjects = getCombinedSchoolProjects();
+  const appointments = getCombinedAppointments().filter((entry) => entry.calendarVisible !== false);
+  const sicknessEntries = project?.layers?.find((entry) => entry.type === "sickness")?.entries || [];
+  const todayKey = getLocalDateKey(new Date());
+
+  calendar.replaceChildren();
+  calendar.className = "month-calendar-view";
+  calendar.setAttribute("aria-label", `Monatskalender ${monthNames[monthIndex]} ${year}`);
+  const shell = calendar.closest(".calendar-shell");
+  shell?.classList.remove("is-timeline-view", "is-year-view");
+  shell?.classList.add("is-month-view");
+  calendarTitle.textContent = "Monatsansicht";
+  yearLabel.textContent = `${monthNames[monthIndex]} ${year}`;
+
+  weekdayNames.forEach((name) => {
+    const weekday = document.createElement("span");
+    weekday.className = "month-view-weekday";
+    weekday.textContent = name;
+    calendar.append(weekday);
+  });
+  const leadingDays = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
+  for (let index = 0; index < leadingDays; index += 1) {
+    const empty = document.createElement("span");
+    empty.className = "month-view-day is-empty";
+    empty.setAttribute("aria-hidden", "true");
+    calendar.append(empty);
+  }
+  const dayCount = new Date(year, monthIndex + 1, 0).getDate();
+  for (let dayNumber = 1; dayNumber <= dayCount; dayNumber += 1) {
+    const date = new Date(year, monthIndex, dayNumber, 12);
+    const dateKey = getLocalDateKey(date);
+    const weekday = ((date.getDay() + 6) % 7) + 1;
+    const cell = document.createElement("section");
+    cell.className = [
+      "month-view-day",
+      weekday >= 6 ? "is-weekend" : "",
+      dateKey === todayKey ? "is-today" : ""
+    ].filter(Boolean).join(" ");
+    cell.setAttribute("aria-label", date.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+    const dayHead = document.createElement("header");
+    const number = document.createElement("strong");
+    number.textContent = String(dayNumber);
+    dayHead.append(number);
+    const entries = document.createElement("div");
+    entries.className = "month-view-entries";
+
+    getSchoolHolidaysForDate(date, schedules).forEach((holiday) => {
+      const item = document.createElement("span");
+      item.className = `month-view-entry is-holiday${holiday.type === "public-holiday" ? " is-public-holiday" : ""}`;
+      item.textContent = holiday.name;
+      item.title = holiday.name;
+      entries.append(item);
+    });
+    schedules.forEach((schedule) => {
+      (schedule.lessons || []).filter((lesson) => (
+        Number(lesson.day) === weekday
+        && isScheduleValidOn(schedule, date)
+        && isLessonActiveOnDate(lesson, schedule, date)
+        && !isSchoolHolidayForSchedule(schedule, date)
+        && !isSicknessForSchedule(schedule, date)
+        && !isLessonSuppressedByClassProject(project, lesson, date)
+      )).sort((a, b) => a.start.localeCompare(b.start)).forEach((lesson) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "month-view-entry is-lesson";
+        item.style.setProperty("--month-entry-color", lesson.color || "#bfd2e2");
+        item.textContent = `${lesson.start} ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
+        item.title = `${lesson.start}–${lesson.end} · ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
+        item.addEventListener("click", () => {
+          const sourceProject = projects.find((entry) => entry.id === schedule.projectId);
+          const sourceSchedule = sourceProject?.layers?.find((entry) => entry.type === "schedules")?.schedules?.find((entry) => entry.id === schedule.id);
+          const sourceLesson = sourceSchedule?.lessons?.find((entry) => entry.id === lesson.id);
+          if (sourceProject && sourceSchedule && sourceLesson) openExistingLessonDialog(sourceProject, sourceSchedule, sourceLesson);
+        });
+        entries.append(item);
+      });
+    });
+    schoolProjects.filter((entry) => dateKey >= (entry.startDate || entry.date) && dateKey <= (entry.endDate || entry.date)).forEach((entry) => {
+      const item = document.createElement("span");
+      item.className = "month-view-entry is-project";
+      item.style.setProperty("--month-entry-color", entry.color || "#e6d8a8");
+      item.textContent = entry.name || "Projekt";
+      item.title = entry.name || "Projekt";
+      entries.append(item);
+    });
+    appointments.filter((entry) => dateKey >= getAppointmentStartDate(entry) && dateKey <= getAppointmentEndDate(entry)).forEach((entry) => {
+      const item = document.createElement("span");
+      item.className = "month-view-entry is-appointment";
+      item.style.setProperty("--month-entry-color", entry.color || "#c9c1dd");
+      item.textContent = `${entry.startTime ? `${entry.startTime} ` : ""}${entry.name || entry.groupName || "Termin"}`;
+      item.title = entry.name || entry.groupName || "Termin";
+      entries.append(item);
+    });
+    sicknessEntries.filter((entry) => dateKey >= entry.startDate && dateKey <= entry.endDate).forEach(() => {
+      const item = document.createElement("span");
+      item.className = "month-view-entry is-sickness";
+      item.textContent = "Krankschreibung";
+      entries.append(item);
+    });
+    cell.append(dayHead, entries);
+    calendar.append(cell);
+  }
 }
 
 function getFederalStateName(code) {
@@ -408,10 +537,15 @@ function renderActiveCalendar() {
     button.setAttribute("aria-pressed", String(button.dataset.calendarView === mainCalendarView));
   });
   calendarDateNavigation.hidden = mainCalendarView === "year";
-  previousCalendarPeriod.setAttribute("aria-label", mainCalendarView === "day" ? "Voriger Tag" : "Vorige Woche");
-  nextCalendarPeriod.setAttribute("aria-label", mainCalendarView === "day" ? "Nächster Tag" : "Nächste Woche");
+  const periodName = mainCalendarView === "day" ? "Tag" : mainCalendarView === "month" ? "Monat" : "Woche";
+  previousCalendarPeriod.setAttribute("aria-label", `Voriger ${periodName}`);
+  nextCalendarPeriod.setAttribute("aria-label", `Nächster ${periodName}`);
   if (mainCalendarView === "day" || mainCalendarView === "week") {
     renderCombinedScheduleView(mainCalendarView);
+    return;
+  }
+  if (mainCalendarView === "month") {
+    renderMonthView(project);
     return;
   }
   const holidayLayer = project?.layers?.find((entry) => entry.type === "holidays");
@@ -434,7 +568,7 @@ function renderActiveCalendar() {
   const calendarEntries = [
     ...(Array.isArray(holidayLayer?.entries) ? holidayLayer.entries : []),
     ...(Array.isArray(individualLayer?.appliedEntries) ? individualLayer.appliedEntries : []),
-    ...(Array.isArray(classProjectLayer?.entries) ? classProjectLayer.entries.filter((entry) => entry.calendarVisible !== false) : []),
+    ...(Array.isArray(classProjectLayer?.entries) ? classProjectLayer.entries.filter((entry) => isClassProjectCalendarVisible(project, entry)) : []),
     ...appointmentEntries,
     ...(Array.isArray(sicknessLayer?.entries) ? sicknessLayer.entries : [])
   ];
@@ -496,7 +630,7 @@ function getCombinedSchoolProjects() {
       ...(Array.isArray(individualLayer?.appliedEntries) ? individualLayer.appliedEntries : [])
         .filter((entry) => ["school-project", "class-trip", "vacation", "personal-appointment"].includes(entry.type)),
       ...(Array.isArray(classProjectLayer?.entries) ? classProjectLayer.entries : [])
-        .filter((entry) => entry.calendarVisible !== false)
+        .filter((entry) => isClassProjectCalendarVisible(project, entry))
     ].map((entry) => ({ ...entry, projectId: project.id, projectName: project.name }));
   });
 }
@@ -1002,7 +1136,7 @@ function renderCombinedScheduleView(view) {
   calendar.replaceChildren();
   calendar.className = `combined-timeline is-${view}-timeline`;
   calendar.closest(".calendar-shell")?.classList.add("is-timeline-view");
-  calendar.closest(".calendar-shell")?.classList.remove("is-year-view");
+  calendar.closest(".calendar-shell")?.classList.remove("is-year-view", "is-month-view");
   calendarTitle.textContent = view === "day" ? "Tagesansicht" : "Wochenansicht";
   yearLabel.textContent = view === "day"
     ? dates[0].toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })
@@ -1802,8 +1936,6 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
   const legacyLessonClass = String(lesson.grade || "").trim().toLocaleLowerCase("de");
   const legacyLessonGrade = legacyLessonClass.match(/^\d+/)?.[0] || "";
   if (legacyLessonGrade) lessonGradeNames.add(legacyLessonGrade);
-  const hasVisibleLessonGrade = [...lessonGradeNames].some((gradeName) => layer?.gradeVisibility?.[gradeName] !== false);
-  if (lessonGradeNames.size && !hasVisibleLessonGrade) return false;
   const matchesClassProjectGroup = (group) => {
     if (!group) return false;
     const normalizedGroupName = String(group.className || "").trim().toLocaleLowerCase("de");
@@ -1894,7 +2026,7 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
     ? individualLayer.appliedEntries
     : (Array.isArray(individualLayer?.entries) ? individualLayer.entries : []);
   const groupedAppointments = [schoolAppointmentLayer, individualLayer].flatMap((appointmentLayer) => (
-    (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : []).filter((group) => group.calendarVisible !== false)
+    (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
       .flatMap((group) => getAppointmentGroupEntries(group))
   ));
   return individualEntries.some(overlapsLesson) || groupedAppointments.some(overlapsLesson);
@@ -2230,6 +2362,8 @@ function selectProject(projectId) {
   activeLayerType = null;
   activeScheduleId = null;
   activeSchoolId = null;
+  activeAppointmentGroupTarget = null;
+  pendingAppointmentGroupScrollTarget = null;
   renderProjectBrowser();
   renderProjectDetail();
   renderActiveCalendar();
@@ -2240,9 +2374,34 @@ function selectLayer(projectId, layerType) {
   activeLayerType = layerType;
   activeScheduleId = null;
   activeSchoolId = null;
+  activeAppointmentGroupTarget = null;
+  pendingAppointmentGroupScrollTarget = null;
   renderProjectBrowser();
   renderProjectDetail();
   renderActiveCalendar();
+}
+
+function selectAppointmentGroup(projectId, layerType, groupId) {
+  activeProjectId = projectId;
+  activeLayerType = layerType;
+  activeScheduleId = null;
+  activeSchoolId = null;
+  activeAppointmentGroupTarget = { projectId, layerType, groupId };
+  pendingAppointmentGroupScrollTarget = { ...activeAppointmentGroupTarget };
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function scrollToPendingAppointmentGroup(project, layerType) {
+  const target = pendingAppointmentGroupScrollTarget;
+  if (!target || target.projectId !== project.id || target.layerType !== layerType) return;
+  pendingAppointmentGroupScrollTarget = null;
+  requestAnimationFrame(() => {
+    const card = [...projectDetail.querySelectorAll(".appointment-group-card[data-group-id]")]
+      .find((entry) => entry.dataset.groupId === target.groupId);
+    card?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 }
 
 function selectSchool(projectId, schoolId) {
@@ -2250,6 +2409,32 @@ function selectSchool(projectId, schoolId) {
   activeLayerType = "holidays";
   activeScheduleId = null;
   activeSchoolId = schoolId;
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function selectClassCatalogSchool(projectId, schoolId) {
+  activeProjectId = projectId;
+  activeLayerType = "classCatalog";
+  activeScheduleId = null;
+  activeSchoolId = null;
+  activeClassSchoolId = schoolId;
+  activeClassCatalogTarget = null;
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function selectClassCatalogTarget(projectId, schoolId, tab, type = null, id = null) {
+  activeProjectId = projectId;
+  activeLayerType = "classCatalog";
+  activeScheduleId = null;
+  activeSchoolId = null;
+  activeClassSchoolId = schoolId;
+  activeClassCatalogTab = tab;
+  activeClassCatalogTarget = type && id ? { projectId, schoolId, type, id } : null;
+  pendingClassCatalogScrollTarget = activeClassCatalogTarget ? { ...activeClassCatalogTarget } : null;
   renderProjectBrowser();
   renderProjectDetail();
   renderActiveCalendar();
@@ -2303,9 +2488,12 @@ function createBrowserGroupRow(project, layerType, group) {
   row.className = "browser-group-row";
   const select = document.createElement("button");
   select.type = "button";
-  select.className = "schedule-tree-row browser-group-select";
+  const isActive = activeAppointmentGroupTarget?.projectId === project.id
+    && activeAppointmentGroupTarget.layerType === layerType
+    && activeAppointmentGroupTarget.groupId === group.id;
+  select.className = `schedule-tree-row browser-group-select${isActive ? " is-active" : ""}`;
   select.textContent = group.name;
-  select.addEventListener("click", () => selectLayer(project.id, layerType));
+  select.addEventListener("click", () => selectAppointmentGroup(project.id, layerType, group.id));
   const visibility = document.createElement("button");
   visibility.type = "button";
   visibility.className = `group-visibility-button${group.calendarVisible === false ? " is-hidden" : ""}`;
@@ -2480,6 +2668,64 @@ function renderProjectBrowser() {
             schoolRow.textContent = school.name;
             schoolRow.addEventListener("click", () => selectSchool(project.id, school.id));
             layerShell.append(schoolRow);
+          });
+        }
+        if (isLayerExpanded && layer.id === "classCatalog") {
+          const catalog = getClassCatalogData(project);
+          const makeBranch = (label, expansionId, onSelect, className = "") => {
+            const branch = document.createElement("div");
+            branch.className = `class-catalog-browser-branch ${className}`.trim();
+            const head = document.createElement("div");
+            head.className = "layer-tree-head";
+            const key = `${project.id}:${expansionId}`;
+            const branchExpanded = expandedLayerKeys.has(key);
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "layer-tree-toggle";
+            toggle.textContent = branchExpanded ? "−" : "+";
+            toggle.setAttribute("aria-expanded", String(branchExpanded));
+            toggle.setAttribute("aria-label", `${label} ${branchExpanded ? "zuklappen" : "aufklappen"}`);
+            toggle.addEventListener("click", () => toggleLayerExpanded(project.id, expansionId));
+            const select = document.createElement("button");
+            select.type = "button";
+            select.className = "schedule-tree-row class-catalog-browser-branch-label";
+            select.textContent = label;
+            select.addEventListener("click", onSelect);
+            head.append(toggle, select);
+            branch.append(head);
+            return { branch, branchExpanded };
+          };
+          ensureSchools(project).forEach((school) => {
+            const schoolExpansionId = `classCatalog:school:${school.id}`;
+            const schoolBranch = makeBranch(school.name, schoolExpansionId, () => selectClassCatalogSchool(project.id, school.id), "is-school");
+            if (schoolBranch.branchExpanded) {
+              [
+                { id: "classes", label: "Klassen", tab: "classes" },
+                { id: "subjects", label: "Fächer", tab: "subjects" }
+              ].forEach((category) => {
+                const categoryExpansionId = `${schoolExpansionId}:${category.id}`;
+                const categoryBranch = makeBranch(category.label, categoryExpansionId, () => selectClassCatalogTarget(project.id, school.id, category.tab), "is-category");
+                if (categoryBranch.branchExpanded) {
+                  const items = category.id === "classes"
+                    ? (catalog.grades || []).filter((grade) => grade.schoolId === school.id)
+                      .slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "de", { numeric: true }))
+                      .map((grade) => ({ id: grade.id, label: `${grade.name}. Klassenstufe`, type: "grade" }))
+                    : (catalog.subjects || []).filter((subject) => subject.schoolId === school.id)
+                      .slice().sort((a, b) => a.name.localeCompare(b.name, "de", { sensitivity: "base" }))
+                      .map((subject) => ({ id: subject.id, label: subject.name, type: "subject" }));
+                  items.forEach((item) => {
+                    const leaf = document.createElement("button");
+                    leaf.type = "button";
+                    leaf.className = `schedule-tree-row class-catalog-browser-leaf${activeClassCatalogTarget?.projectId === project.id && activeClassCatalogTarget?.type === item.type && activeClassCatalogTarget?.id === item.id ? " is-active" : ""}`;
+                    leaf.textContent = item.label;
+                    leaf.addEventListener("click", () => selectClassCatalogTarget(project.id, school.id, category.tab, item.type, item.id));
+                    categoryBranch.branch.append(leaf);
+                  });
+                }
+                schoolBranch.branch.append(categoryBranch.branch);
+              });
+            }
+            layerShell.append(schoolBranch.branch);
           });
         }
         if (isLayerExpanded && layer.id === "schedules") {
@@ -3762,6 +4008,13 @@ function getClassProjectGradeNames(entry) {
   return grades.size ? [...grades] : [""];
 }
 
+function isClassProjectCalendarVisible(project, entry) {
+  if (entry?.calendarVisible === false) return false;
+  const layer = project?.layers?.find((candidate) => candidate.type === "classes");
+  const gradeNames = getClassProjectGradeNames(entry);
+  return gradeNames.some((gradeName) => layer?.gradeVisibility?.[gradeName || "unassigned"] !== false);
+}
+
 function getClassProjectGradeFolders(project) {
   const layer = getProjectLayer(project, "classes");
   layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
@@ -4123,6 +4376,7 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
   appointmentDialog.dataset.groupId = group.id;
   appointmentDialog.dataset.layerType = layerType;
   appointmentDialog.dataset.appointmentProjectId = appointmentProject?.id || "";
+  populateAppointmentAssignmentSelect(appointmentAssignment, project, layerType, group.id, appointmentProject?.id || null, false, true);
   if (appointment) {
     appointmentDialog.dataset.appointmentId = appointment.id;
     appointmentDialogTitle.textContent = "Termin bearbeiten";
@@ -4337,6 +4591,27 @@ function createMovedProjectSection(project, type, titleText, buttonText, emptyTe
 
 function createAppointmentEntryRow(project, group, appointment, layerType, appointmentProject = null) {
   const row = document.createElement("article");
+  row.draggable = true;
+  row.dataset.appointmentId = appointment.id;
+  row.setAttribute("aria-roledescription", "verschiebbarer Termin");
+  row.title = "Ziehen, um den Termin einer anderen Gruppe oder Projektgruppe zuzuordnen";
+  row.addEventListener("dragstart", (event) => {
+    draggedAppointmentContext = {
+      projectId: project.id,
+      layerType,
+      sourceGroupId: group.id,
+      sourceProjectId: appointmentProject?.id || null,
+      appointmentId: appointment.id
+    };
+    row.classList.add("is-moving");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", appointment.id);
+  });
+  row.addEventListener("dragend", () => {
+    row.classList.remove("is-moving");
+    draggedAppointmentContext = null;
+    document.querySelectorAll(".appointment-drop-target.is-drop-target").forEach((target) => target.classList.remove("is-drop-target"));
+  });
   if (appointment.isDeadline) {
     row.className = `appointment-entry appointment-todo-entry${appointment.completed ? " is-completed" : ""}`;
     const checkLabel = document.createElement("label");
@@ -4375,6 +4650,93 @@ function createAppointmentEntryRow(project, group, appointment, layerType, appoi
   return row;
 }
 
+function populateAppointmentAssignmentSelect(select, project, layerType, groupId, appointmentProjectId = null, projectsOnly = false, includeUngrouped = false) {
+  const layer = getProjectLayer(project, layerType);
+  select.replaceChildren();
+  if (includeUngrouped) {
+    const ungrouped = document.createElement("option");
+    ungrouped.value = "::";
+    ungrouped.textContent = "Keine Gruppe";
+    select.append(ungrouped);
+  }
+  (Array.isArray(layer.groups) ? layer.groups : []).forEach((candidateGroup) => {
+    const optionGroup = document.createElement("optgroup");
+    optionGroup.label = candidateGroup.name;
+    if (!projectsOnly) {
+      const groupOption = document.createElement("option");
+      groupOption.value = `${candidateGroup.id}::`;
+      groupOption.textContent = "Keine Projektgruppe";
+      optionGroup.append(groupOption);
+    }
+    (Array.isArray(candidateGroup.projects) ? candidateGroup.projects : []).forEach((candidateProject) => {
+      const projectOption = document.createElement("option");
+      projectOption.value = `${candidateGroup.id}::${candidateProject.id}`;
+      projectOption.textContent = candidateProject.name;
+      optionGroup.append(projectOption);
+    });
+    if (optionGroup.children.length) select.append(optionGroup);
+  });
+  select.value = groupId ? `${groupId}::${appointmentProjectId || ""}` : "::";
+}
+
+function moveAppointmentToContainer(project, layerType, targetGroupId, targetProjectId = null) {
+  const context = draggedAppointmentContext;
+  if (!context || context.projectId !== project.id || context.layerType !== layerType) return false;
+  if (context.sourceGroupId === targetGroupId && context.sourceProjectId === targetProjectId) return false;
+  const layer = getProjectLayer(project, layerType);
+  const groups = Array.isArray(layer.groups) ? layer.groups : [];
+  const sourceGroup = groups.find((group) => group.id === context.sourceGroupId);
+  const targetGroup = groups.find((group) => group.id === targetGroupId);
+  if (!sourceGroup || !targetGroup) return false;
+  const sourceProject = context.sourceProjectId
+    ? (sourceGroup.projects || []).find((entry) => entry.id === context.sourceProjectId)
+    : null;
+  const sourceAppointments = sourceProject
+    ? (sourceProject.appointments = Array.isArray(sourceProject.appointments) ? sourceProject.appointments : [])
+    : (sourceGroup.appointments = Array.isArray(sourceGroup.appointments) ? sourceGroup.appointments : []);
+  const sourceIndex = sourceAppointments.findIndex((entry) => entry.id === context.appointmentId);
+  if (sourceIndex < 0) return false;
+  const targetProject = targetProjectId
+    ? (targetGroup.projects || []).find((entry) => entry.id === targetProjectId)
+    : null;
+  if (targetProjectId && !targetProject) return false;
+  const targetAppointments = targetProject
+    ? (targetProject.appointments = Array.isArray(targetProject.appointments) ? targetProject.appointments : [])
+    : (targetGroup.appointments = Array.isArray(targetGroup.appointments) ? targetGroup.appointments : []);
+  const [appointment] = sourceAppointments.splice(sourceIndex, 1);
+  targetAppointments.push(appointment);
+  expandedAppointmentGroupKeys.add(`${project.id}:${layerType}:${targetGroup.id}`);
+  if (targetProject) expandedAppointmentProjectKeys.add(`${project.id}:${layerType}:${targetGroup.id}:${targetProject.id}`);
+  draggedAppointmentContext = null;
+  saveProjects();
+  if (layerType === "individual") renderIndividualProjectsProperties(project);
+  else renderAppointmentsProperties(project);
+  renderActiveCalendar(project);
+  return true;
+}
+
+function enableAppointmentDropTarget(element, project, layerType, groupId, appointmentProjectId = null) {
+  element.classList.add("appointment-drop-target");
+  element.addEventListener("dragover", (event) => {
+    const context = draggedAppointmentContext;
+    if (!context || context.projectId !== project.id || context.layerType !== layerType) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    element.classList.add("is-drop-target");
+  });
+  element.addEventListener("dragleave", (event) => {
+    if (!element.contains(event.relatedTarget)) element.classList.remove("is-drop-target");
+  });
+  element.addEventListener("drop", (event) => {
+    if (!draggedAppointmentContext) return;
+    event.preventDefault();
+    event.stopPropagation();
+    element.classList.remove("is-drop-target");
+    moveAppointmentToContainer(project, layerType, groupId, appointmentProjectId);
+  });
+}
+
 function openAppointmentTodoDialog(project, group, appointmentProject, todo = null, layerType = "appointments") {
   const dialog = document.createElement("dialog");
   dialog.className = "project-dialog appointment-todo-dialog";
@@ -4407,6 +4769,13 @@ function openAppointmentTodoDialog(project, group, appointmentProject, todo = nu
   deadline.required = true;
   deadline.value = todo?.dueDate || "";
   deadlineField.append(deadlineLabel, deadline);
+  const assignmentField = document.createElement("label");
+  assignmentField.className = "dialog-field";
+  const assignmentLabel = document.createElement("span");
+  assignmentLabel.textContent = "Zuordnung";
+  const assignment = document.createElement("select");
+  populateAppointmentAssignmentSelect(assignment, project, layerType, group.id, appointmentProject.id, true);
+  assignmentField.append(assignmentLabel, assignment);
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
   const cancel = document.createElement("button");
@@ -4422,9 +4791,25 @@ function openAppointmentTodoDialog(project, group, appointmentProject, todo = nu
     event.preventDefault();
     const name = input.value.trim();
     if (!name || !deadline.value) return;
+    const [targetGroupId, targetProjectId] = assignment.value.split("::");
+    const layer = getProjectLayer(project, layerType);
+    const targetGroup = layer.groups?.find((entry) => entry.id === targetGroupId);
+    const targetProject = targetGroup?.projects?.find((entry) => entry.id === targetProjectId);
+    if (!targetProject) return;
     appointmentProject.todos = Array.isArray(appointmentProject.todos) ? appointmentProject.todos : [];
-    if (todo) Object.assign(todo, { name, dueDate: deadline.value });
-    else appointmentProject.todos.push({ id: globalThis.crypto?.randomUUID?.() ?? `appointment-todo-${Date.now()}`, name, dueDate: deadline.value, completed: false });
+    targetProject.todos = Array.isArray(targetProject.todos) ? targetProject.todos : [];
+    if (todo) {
+      Object.assign(todo, { name, dueDate: deadline.value });
+      if (targetProject !== appointmentProject) {
+        const sourceIndex = appointmentProject.todos.findIndex((entry) => entry.id === todo.id);
+        if (sourceIndex >= 0) appointmentProject.todos.splice(sourceIndex, 1);
+        targetProject.todos.push(todo);
+      }
+    } else {
+      targetProject.todos.push({ id: globalThis.crypto?.randomUUID?.() ?? `appointment-todo-${Date.now()}`, name, dueDate: deadline.value, completed: false });
+    }
+    expandedAppointmentGroupKeys.add(`${project.id}:${layerType}:${targetGroup.id}`);
+    expandedAppointmentProjectKeys.add(`${project.id}:${layerType}:${targetGroup.id}:${targetProject.id}`);
     saveProjects();
     dialog.close();
     if (layerType === "individual") renderIndividualProjectsProperties(project);
@@ -4432,7 +4817,7 @@ function openAppointmentTodoDialog(project, group, appointmentProject, todo = nu
   });
   dialog.addEventListener("close", () => dialog.remove(), { once: true });
   actions.append(cancel, submit);
-  form.append(heading, field, deadlineField, actions);
+  form.append(heading, field, deadlineField, assignmentField, actions);
   dialog.append(form);
   document.body.append(dialog);
   dialog.showModal();
@@ -4509,11 +4894,32 @@ function createAppointmentProjectCard(project, group, appointmentProject, layerT
   appointmentProject.todos = Array.isArray(appointmentProject.todos) ? appointmentProject.todos : [];
   const card = document.createElement("section");
   card.className = "appointment-project-card";
+  enableAppointmentDropTarget(card, project, layerType, group.id, appointmentProject.id);
+  const projectKey = `${project.id}:${layerType}:${group.id}:${appointmentProject.id}`;
+  const isExpanded = expandedAppointmentProjectKeys.has(projectKey);
+  card.dataset.projectExpanded = String(isExpanded);
   const head = document.createElement("div");
   head.className = "appointment-group-head appointment-project-head";
-  const name = document.createElement("h4");
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "appointment-group-toggle appointment-project-toggle";
+  toggle.textContent = isExpanded ? "−" : "+";
+  toggle.setAttribute("aria-expanded", String(isExpanded));
+  toggle.setAttribute("aria-label", `${appointmentProject.name} ${isExpanded ? "einklappen" : "ausklappen"}`);
+  const name = document.createElement("button");
+  name.type = "button";
+  name.className = "appointment-group-title appointment-project-title";
   name.textContent = appointmentProject.name;
-  head.append(name, createAppointmentMenu(project, group, null, layerType, appointmentProject));
+  name.setAttribute("aria-expanded", String(isExpanded));
+  const toggleProject = () => {
+    if (isExpanded) expandedAppointmentProjectKeys.delete(projectKey);
+    else expandedAppointmentProjectKeys.add(projectKey);
+    if (layerType === "individual") renderIndividualProjectsProperties(project);
+    else renderAppointmentsProperties(project);
+  };
+  toggle.addEventListener("click", toggleProject);
+  name.addEventListener("click", toggleProject);
+  head.append(toggle, name, createAppointmentMenu(project, group, null, layerType, appointmentProject));
   const add = document.createElement("button");
   add.type = "button";
   add.className = "secondary-button appointment-add-button";
@@ -4555,7 +4961,11 @@ function createAppointmentProjectCard(project, group, appointmentProject, layerT
         : createAppointmentTodoRow(project, group, appointmentProject, entry.value, layerType));
     });
   }
-  card.append(head, actions, entries);
+  const body = document.createElement("div");
+  body.className = "appointment-project-body";
+  body.hidden = !isExpanded;
+  body.append(actions, entries);
+  card.append(head, body);
   return card;
 }
 
@@ -4671,6 +5081,7 @@ function renderAppointmentsProperties(project) {
       const groupCard = document.createElement("section");
       groupCard.className = "appointment-group-card";
       groupCard.dataset.groupId = group.id;
+      enableAppointmentDropTarget(groupCard, project, "appointments", group.id);
       groupCard.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
       const { head: groupHead, isExpanded } = createAppointmentGroupHeader(project, group, "appointments");
       groupCard.dataset.groupExpanded = String(isExpanded);
@@ -4689,6 +5100,7 @@ function renderAppointmentsProperties(project) {
       groupActions.append(addAppointmentButton, addProjectButton);
       const appointmentList = document.createElement("div");
       appointmentList.className = "appointment-entry-list";
+      enableAppointmentDropTarget(appointmentList, project, "appointments", group.id);
       if (!group.appointments.length && !group.projects.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
@@ -4725,6 +5137,7 @@ function renderAppointmentsProperties(project) {
   );
   sheet.append(head, rootActions, singleEvents, groupList);
   projectDetail.replaceChildren(sheet);
+  scrollToPendingAppointmentGroup(project, "appointments");
   saveProjects();
 }
 
@@ -5607,6 +6020,7 @@ function renderClassCatalogProperties(project) {
     visibleGrades.slice().sort((a, b) => Number(a.name) - Number(b.name)).forEach((grade) => {
       const gradeCard = document.createElement("section");
       gradeCard.className = "class-catalog-grade";
+      gradeCard.dataset.classCatalogGradeId = grade.id;
       const gradeHead = document.createElement("div");
       gradeHead.className = "class-catalog-grade-head";
       const gradeTitle = document.createElement("strong");
@@ -5660,6 +6074,7 @@ function renderClassCatalogProperties(project) {
     visibleSubjects.forEach((subject) => {
       const subjectCard = document.createElement("section");
       subjectCard.className = "class-catalog-subject";
+      subjectCard.dataset.classCatalogSubjectId = subject.id;
       const subjectHead = document.createElement("div");
       subjectHead.className = "appointment-group-head class-catalog-subject-head";
       const subjectTitle = document.createElement("h3");
@@ -5748,6 +6163,17 @@ function renderClassCatalogProperties(project) {
   });
   sheet.append(head, schoolTabs, contentTabs, classSection, subjectSection);
   projectDetail.replaceChildren(sheet);
+  if (pendingClassCatalogScrollTarget?.projectId === project.id
+    && pendingClassCatalogScrollTarget.schoolId === activeClassSchoolId) {
+    const target = pendingClassCatalogScrollTarget;
+    pendingClassCatalogScrollTarget = null;
+    requestAnimationFrame(() => {
+      const selector = target.type === "grade"
+        ? `[data-class-catalog-grade-id="${CSS.escape(target.id)}"]`
+        : `[data-class-catalog-subject-id="${CSS.escape(target.id)}"]`;
+      projectDetail.querySelector(selector)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }
   saveProjects();
 }
 
@@ -7292,6 +7718,34 @@ function getSelectedLessonDays() {
     .sort((a, b) => a - b);
 }
 
+function getLessonSeriesFingerprint(lesson) {
+  return JSON.stringify({
+    schoolId: lesson.schoolId || "",
+    start: lesson.start || "",
+    end: lesson.end || "",
+    subjectId: lesson.subjectId || "",
+    subject: lesson.subject || "",
+    grade: lesson.grade || "",
+    gradeLevelId: lesson.gradeLevelId || "",
+    classId: lesson.classId || "",
+    courseId: lesson.courseId || "",
+    classIds: [...(lesson.classIds || [])].sort(),
+    room: lesson.room || "",
+    color: lesson.color || "",
+    teachingForm: getLessonTeachingForm(lesson),
+    abWeek: lesson.abWeek || "A",
+    epochHalf: lesson.epochHalf || "first",
+    phases: lesson.phases || []
+  });
+}
+
+function getLessonSeriesMembers(schedule, lesson) {
+  const lessons = Array.isArray(schedule.lessons) ? schedule.lessons : [];
+  if (lesson.seriesId) return lessons.filter((entry) => entry.seriesId === lesson.seriesId);
+  const fingerprint = getLessonSeriesFingerprint(lesson);
+  return lessons.filter((entry) => !entry.seriesId && getLessonSeriesFingerprint(entry) === fingerprint);
+}
+
 function configureLessonDayAvailability(schedule) {
   const activeDays = new Set(getScheduleActiveDays(schedule));
   lessonDayButtons.forEach((button) => {
@@ -7374,7 +7828,7 @@ function openExistingLessonDialog(project, schedule, lesson) {
   deleteLessonButton.dataset.lessonId = lesson.id;
   deleteLessonButton.setAttribute("aria-label", `${lesson.subject || "Stunde"} löschen – gedrückt halten`);
   configureLessonDayAvailability(schedule);
-  setLessonDays([lesson.day]);
+  setLessonDays(getLessonSeriesMembers(schedule, lesson).map((entry) => entry.day));
   lessonStart.value = lesson.start;
   lessonEnd.value = lesson.end;
   lessonRoom.value = lesson.room || "";
@@ -7835,12 +8289,15 @@ function openSchoolProjectDialog(project, schoolProject = null, entryType = "sch
   schoolProjectDialog.dataset.projectId = project.id;
   schoolProjectDialog.dataset.entryType = schoolProject?.type || entryType;
   const isVacation = schoolProjectDialog.dataset.entryType === "vacation";
+  const assignmentLayerType = schoolProjectDialog.dataset.entryType === "school-project" ? "appointments" : "individual";
   const nameField = schoolProjectName.closest(".dialog-field");
   const timeFields = schoolProjectStartTime.closest(".event-time-fields");
   const overridesField = schoolProjectOverridesLessons.closest(".dialog-checkbox");
   nameField.hidden = isVacation;
   timeFields.hidden = isVacation;
   overridesField.hidden = isVacation;
+  schoolProjectAssignmentField.hidden = isVacation;
+  if (!isVacation) populateAppointmentAssignmentSelect(schoolProjectAssignment, project, assignmentLayerType, null, null, false, true);
   const dialogLabels = {
     "school-project": ["Einzelveranstaltung", "Einzelveranstaltung"],
     vacation: ["Urlaub", "Urlaub"],
@@ -7915,6 +8372,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       const card = document.createElement("section");
       card.className = "appointment-group-card";
       card.dataset.groupId = group.id;
+      enableAppointmentDropTarget(card, project, "individual", group.id);
       card.style.setProperty("--appointment-group-color", group.color || "#c9c1dd");
       const { head, isExpanded } = createAppointmentGroupHeader(project, group, "individual");
       card.dataset.groupExpanded = String(isExpanded);
@@ -7933,6 +8391,7 @@ function createPersonalAppointmentGroupsSection(project, layer) {
       actions.append(add, addProject);
       const entries = document.createElement("div");
       entries.className = "appointment-entry-list";
+      enableAppointmentDropTarget(entries, project, "individual", group.id);
       if (!group.appointments.length && !group.projects.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
@@ -8132,9 +8591,18 @@ function renderIndividualProjectsProperties(project) {
 
   section.append(sectionTitle, launcherButton, list);
   const appointmentGroups = createPersonalAppointmentGroupsSection(project, layer);
+  const personalSingleEvents = createMovedProjectSection(
+    project,
+    "personal-appointment",
+    "Einzeltermine",
+    "Einzeltermin hinzufügen",
+    "Noch kein ungruppierter Einzeltermin eingetragen.",
+    { hideAddButton: true, hideWhenEmpty: true }
+  );
   const sicknessSection = createSicknessSection(project);
-  sheet.append(head, section, appointmentGroups, sicknessSection);
+  sheet.append(head, section, personalSingleEvents, appointmentGroups, sicknessSection);
   projectDetail.replaceChildren(sheet);
+  scrollToPendingAppointmentGroup(project, "individual");
   saveProjects();
   renderActiveCalendar(project);
 }
@@ -9649,6 +10117,9 @@ calendarViewButtons.forEach((button) => {
 function moveCalendarPeriod(direction) {
   if (mainCalendarView === "week") {
     calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction * 7);
+  } else if (mainCalendarView === "month") {
+    calendarReferenceDate.setDate(1);
+    calendarReferenceDate.setMonth(calendarReferenceDate.getMonth() + direction);
   } else if (mainCalendarView === "day") {
     calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction);
     while (calendarReferenceDate.getDay() === 0 || calendarReferenceDate.getDay() === 6) {
@@ -9715,8 +10186,13 @@ appointmentForm.addEventListener("submit", (event) => {
   const group = layer?.groups?.find((entry) => entry.id === appointmentDialog.dataset.groupId);
   const appointmentProject = group?.projects?.find((entry) => entry.id === appointmentDialog.dataset.appointmentProjectId);
   const appointmentContainer = appointmentProject || group;
+  const [targetGroupId, targetProjectId = ""] = appointmentAssignment.value.split("::");
+  const targetGroup = layer?.groups?.find((entry) => entry.id === targetGroupId);
+  const targetProject = targetGroup?.projects?.find((entry) => entry.id === targetProjectId);
+  const targetContainer = targetProject || targetGroup;
+  const moveToUngrouped = !targetGroupId;
   const name = appointmentName.value.trim();
-  if (!project || !group || !appointmentContainer) return;
+  if (!project || !group || !appointmentContainer || (!moveToUngrouped && !targetContainer) || (targetProjectId && !targetProject)) return;
   if (!name || !appointmentStartDate.value || !appointmentEndDate.value) {
     appointmentDialogStatus.textContent = "Bitte Bezeichnung sowie Start- und Enddatum eintragen.";
     return;
@@ -9750,14 +10226,28 @@ appointmentForm.addEventListener("submit", (event) => {
     overridesLessons: appointmentOverridesLessons.checked,
     calendarVisible: appointmentCalendarVisible.checked
   };
-  if (existingAppointment) Object.assign(existingAppointment, appointmentData);
-  else {
-    appointmentContainer.appointments.push({
+  const savedAppointment = existingAppointment || {
       id: globalThis.crypto?.randomUUID?.() ?? `appointment-${Date.now()}`,
-      ...appointmentData,
       createdAt: new Date().toISOString()
-    });
+  };
+  Object.assign(savedAppointment, appointmentData);
+  if (existingAppointment) {
+    const sourceIndex = appointmentContainer.appointments.findIndex((entry) => entry.id === existingAppointment.id);
+    if (sourceIndex >= 0 && (moveToUngrouped || targetContainer !== appointmentContainer)) appointmentContainer.appointments.splice(sourceIndex, 1);
   }
+  if (moveToUngrouped) {
+    const individualLayer = getProjectLayer(project, "individual");
+    individualLayer.entries = Array.isArray(individualLayer.entries) ? individualLayer.entries : [];
+    savedAppointment.type = layerType === "appointments" ? "school-project" : "personal-appointment";
+    individualLayer.entries.push(savedAppointment);
+    individualLayer.appliedEntries = structuredClone(individualLayer.entries);
+    individualLayer.appliedAt = new Date().toISOString();
+  } else if (!existingAppointment || targetContainer !== appointmentContainer) {
+    targetContainer.appointments = Array.isArray(targetContainer.appointments) ? targetContainer.appointments : [];
+    targetContainer.appointments.push(savedAppointment);
+  }
+  if (targetGroup) expandedAppointmentGroupKeys.add(`${project.id}:${layerType}:${targetGroup.id}`);
+  if (targetProject) expandedAppointmentProjectKeys.add(`${project.id}:${layerType}:${targetGroup.id}:${targetProject.id}`);
   saveProjects();
   appointmentDialog.close();
   if (layerType === "individual") renderIndividualProjectsProperties(project);
@@ -9955,6 +10445,13 @@ schoolProjectForm.addEventListener("submit", (event) => {
     return;
   }
   layer.entries = Array.isArray(layer.entries) ? layer.entries : [];
+  const assignmentLayerType = entryType === "school-project" ? "appointments" : "individual";
+  const assignmentLayer = getProjectLayer(project, assignmentLayerType);
+  const [targetGroupId, targetProjectId = ""] = isVacation ? ["", ""] : schoolProjectAssignment.value.split("::");
+  const targetGroup = assignmentLayer.groups?.find((entry) => entry.id === targetGroupId);
+  const targetProject = targetGroup?.projects?.find((entry) => entry.id === targetProjectId);
+  const targetContainer = targetProject || targetGroup;
+  if (!isVacation && targetGroupId && (!targetContainer || (targetProjectId && !targetProject))) return;
   const entryData = {
     name,
     startDate: schoolProjectDate.value,
@@ -9964,14 +10461,23 @@ schoolProjectForm.addEventListener("submit", (event) => {
     overridesLessons: isVacation || schoolProjectOverridesLessons.checked
   };
   const existingEntry = layer.entries.find((entry) => entry.id === schoolProjectDialog.dataset.entryId);
-  if (existingEntry) Object.assign(existingEntry, entryData);
-  else {
-    layer.entries.push({
+  const savedEntry = existingEntry || {
       id: globalThis.crypto?.randomUUID?.() ?? `school-project-${Date.now()}`,
       type: entryType,
-      ...entryData,
       createdAt: new Date().toISOString()
-    });
+  };
+  Object.assign(savedEntry, entryData);
+  if (targetContainer && !isVacation) {
+    if (existingEntry) {
+      const sourceIndex = layer.entries.findIndex((entry) => entry.id === existingEntry.id);
+      if (sourceIndex >= 0) layer.entries.splice(sourceIndex, 1);
+    }
+    targetContainer.appointments = Array.isArray(targetContainer.appointments) ? targetContainer.appointments : [];
+    targetContainer.appointments.push(savedEntry);
+    expandedAppointmentGroupKeys.add(`${project.id}:${assignmentLayerType}:${targetGroup.id}`);
+    if (targetProject) expandedAppointmentProjectKeys.add(`${project.id}:${assignmentLayerType}:${targetGroup.id}:${targetProject.id}`);
+  } else if (!existingEntry) {
+    layer.entries.push(savedEntry);
   }
   layer.appliedEntries = structuredClone(layer.entries);
   layer.appliedAt = new Date().toISOString();
@@ -10184,23 +10690,30 @@ lessonForm.addEventListener("submit", (event) => {
   };
   const existingLesson = schedule.lessons.find((entry) => entry.id === lessonDialog.dataset.lessonId);
   if (existingLesson) {
+    const seriesMembers = getLessonSeriesMembers(schedule, existingLesson);
+    const seriesId = existingLesson.seriesId || globalThis.crypto?.randomUUID?.() || `lesson-series-${Date.now()}`;
     const primaryDay = selectedDays.includes(existingLesson.day) ? existingLesson.day : selectedDays[0];
-    Object.assign(existingLesson, lessonData, { day: primaryDay });
+    const seriesMemberIds = new Set(seriesMembers.map((entry) => entry.id));
+    schedule.lessons = schedule.lessons.filter((entry) => entry === existingLesson || !seriesMemberIds.has(entry.id));
+    Object.assign(existingLesson, lessonData, { day: primaryDay, seriesId });
     selectedDays
       .filter((day) => day !== primaryDay)
       .forEach((day) => {
         schedule.lessons.push({
           id: globalThis.crypto?.randomUUID?.() ?? `lesson-${Date.now()}-${day}`,
           ...structuredClone(lessonData),
-          day
+          day,
+          seriesId
         });
       });
   } else {
+    const seriesId = globalThis.crypto?.randomUUID?.() || `lesson-series-${Date.now()}`;
     selectedDays.forEach((day) => {
       schedule.lessons.push({
         id: globalThis.crypto?.randomUUID?.() ?? `lesson-${Date.now()}-${day}`,
         ...structuredClone(lessonData),
-        day
+        day,
+        seriesId
       });
     });
   }
