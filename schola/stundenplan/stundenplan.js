@@ -832,7 +832,10 @@ function renderLessonCard(lesson, schedule, date = null) {
   const room = document.createElement("small");
   room.textContent = lesson.room || "Raum fehlt";
   room.className = lesson.room ? "lesson-card-room" : "lesson-card-room is-missing";
-  card.append(heading, time, room);
+  const meta = document.createElement("span");
+  meta.className = "lesson-card-meta";
+  meta.append(time, room);
+  card.append(heading, meta);
   configureLivePhase(card, lesson, date);
   card.addEventListener("click", () => {
     const originalProject = projects.find((entry) => entry.id === schedule.projectId);
@@ -3923,7 +3926,7 @@ function openClassProjectDialog(project, entry = null) {
   times.append(makeField("Zeit von", timeStart), makeField("bis", timeEnd));
   const overridesLessonsLabel = document.createElement("label"); overridesLessonsLabel.className = "dialog-checkbox";
   const overridesLessons = document.createElement("input"); overridesLessons.type = "checkbox"; overridesLessons.checked = entry?.overridesLessons !== false;
-  const overridesLessonsCopy = document.createElement("span"); overridesLessonsCopy.textContent = "Mein regulärer Unterricht fällt für diesen Zeitraum aus.";
+  const overridesLessonsCopy = document.createElement("span"); overridesLessonsCopy.textContent = "Der reguläre Unterricht der Klasse fällt für diesen Zeitraum aus.";
   overridesLessonsLabel.append(overridesLessons, overridesLessonsCopy);
   const calendarVisibleLabel = document.createElement("label"); calendarVisibleLabel.className = "dialog-checkbox";
   const calendarVisible = document.createElement("input"); calendarVisible.type = "checkbox"; calendarVisible.checked = entry?.calendarVisible !== false;

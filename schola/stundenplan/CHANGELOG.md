@@ -17,6 +17,8 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Menüs der Fachkarten wieder kollisionsfrei am rechten Kartenrand ausgerichtet.
 - Zeitlich begrenzte Projekttage blenden auch Kursstunden über deren aktuelle Herkunftsklassen zuverlässig aus.
 - Ältere Projekttag-Zuweisungen werden über Schule, Klassenstufe und Kürzel auf die aktuellen Klassen-IDs aufgelöst.
+- Stundenkarten auf zwei Zeilen verdichtet und Raumangabe rechts unter der Klasse angeordnet.
+- Ausfalloption bei Projekttagen eindeutig auf den regulären Unterricht der zugewiesenen Klasse bezogen.
 
 ### 2026-08-24
 

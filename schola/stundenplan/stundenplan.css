@@ -1960,6 +1960,9 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
 .timeline-lesson-card:hover, .timeline-lesson-card:focus-visible { outline: 2px solid rgba(33,54,51,.42); outline-offset: -2px; }
 .lesson-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
 .lesson-card-heading > span { flex: 0 0 auto; font-size: .78rem; font-weight: 700; }
+.lesson-card-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.lesson-card-meta > small { min-width: 0; }
+.lesson-card-meta .lesson-card-room { margin-left: auto; text-align: right; }
 .timeline-lesson-card strong { flex: 0 0 auto; }
 .timeline-lesson-card small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .live-phase {
