@@ -1780,12 +1780,17 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
   const dateKey = getLocalDateKey(date);
   const catalog = getClassCatalogData(project);
   const subject = (catalog.subjects || []).find((entry) => entry.id === lesson.subjectId);
-  const currentCourse = (subject?.courses || []).find((entry) => entry.id === lesson.courseId);
+  const matchingCourses = lesson.courseId
+    ? (catalog.subjects || []).flatMap((catalogSubject) => (catalogSubject.courses || [])
+      .filter((course) => course.id === lesson.courseId)
+      .map((course) => ({ course, subject: catalogSubject })))
+    : [];
   const lessonClassIds = [...new Set([
     lesson.classId,
     ...(lesson.classIds || []),
-    ...(currentCourse?.classIds || [])
+    ...matchingCourses.flatMap(({ course }) => course.classIds || [])
   ].filter(Boolean))];
+  const effectiveLessonSchoolId = lesson.schoolId || subject?.schoolId || matchingCourses[0]?.subject?.schoolId || "";
   const lessonGrades = (catalog.grades || []).filter((grade) => (
     (grade.classes || []).some((classEntry) => lessonClassIds.includes(classEntry.id))
     || (lesson.gradeLevelId && grade.id === lesson.gradeLevelId)
@@ -1798,7 +1803,7 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
   if (lessonGradeNames.size && !hasVisibleLessonGrade) return false;
   const matchesClassProjectGroup = (group) => {
     if (!group) return false;
-    if (group.schoolId && lesson.schoolId && group.schoolId !== lesson.schoolId) return false;
+    if (group.schoolId && effectiveLessonSchoolId && group.schoolId !== effectiveLessonSchoolId) return false;
     const groupClassIds = group.targetType === "grade"
       ? (catalog.grades || [])
         .filter((grade) => String(grade.name || "").trim().toLocaleLowerCase("de") === String(group.gradeName || "").trim().toLocaleLowerCase("de")
@@ -1819,8 +1824,8 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
   };
   const suppressedByClassProject = (Array.isArray(layer?.entries) ? layer.entries : []).some((entry) => {
     if (entry.overridesLessons === false) return false;
-    if (Array.isArray(entry.schoolIds) && entry.schoolIds.length && lesson.schoolId && !entry.schoolIds.includes(lesson.schoolId)) return false;
-    if ((!Array.isArray(entry.schoolIds) || !entry.schoolIds.length) && entry.schoolId && lesson.schoolId && entry.schoolId !== lesson.schoolId) return false;
+    if (Array.isArray(entry.schoolIds) && entry.schoolIds.length && effectiveLessonSchoolId && !entry.schoolIds.includes(effectiveLessonSchoolId)) return false;
+    if ((!Array.isArray(entry.schoolIds) || !entry.schoolIds.length) && entry.schoolId && effectiveLessonSchoolId && entry.schoolId !== effectiveLessonSchoolId) return false;
     const startDate = entry.startDate || entry.date;
     const endDate = entry.endDate || entry.date;
     if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
@@ -1836,7 +1841,8 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
       : !(entry.startTime && entry.endTime);
     if (allDay) return true;
     if (!entry.startTime || !entry.endTime) return false;
-    return lesson.start < entry.endTime && lesson.end > entry.startTime;
+    return timeToMinutes(lesson.start) < timeToMinutes(entry.endTime)
+      && timeToMinutes(lesson.end) > timeToMinutes(entry.startTime);
   });
   if (suppressedByClassProject) return true;
   const overlapsLesson = (entry) => {
@@ -1861,7 +1867,8 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
         || String(entry.className || entry.class || "").trim().toLocaleLowerCase("de") === lessonClass;
       if (hasTargets && !matchesTarget) return false;
     }
-    return lesson.start < entry.endTime && lesson.end > entry.startTime;
+    return timeToMinutes(lesson.start) < timeToMinutes(entry.endTime)
+      && timeToMinutes(lesson.end) > timeToMinutes(entry.startTime);
   };
   const individualLayer = project?.layers?.find((entry) => entry.type === "individual");
   const schoolAppointmentLayer = project?.layers?.find((entry) => entry.type === "appointments");

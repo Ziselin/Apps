@@ -15,6 +15,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Klassen und Fächer im Eigenschaftenbereich in zwei kompakte Tabs aufgeteilt.
 - Klassen innerhalb einer Klassenstufe nach ihrem Kürzel alphabetisch sortiert.
 - Menüs der Fachkarten wieder kollisionsfrei am rechten Kartenrand ausgerichtet.
+- Zeitlich begrenzte Projekttage blenden auch Kursstunden über deren aktuelle Herkunftsklassen zuverlässig aus.
 
 ### 2026-08-24
 
