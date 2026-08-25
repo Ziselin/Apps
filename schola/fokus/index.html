@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Fokus · Schola</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
+  <link rel="stylesheet" href="fokus.css?v=20260825c">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260825c">
+  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260825c">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="../../index.html?project=schola" aria-label="Zur Schola-Übersicht">
+        <img src="../../assets/fokus-icon.svg" alt="">
+        <span><strong>fokus</strong><small>Aufgabenspaces</small></span>
+      </a>
+      <nav class="mode-switch" aria-label="Arbeitsbereich">
+        <button type="button" data-mode="teacher">Erstellen</button>
+        <button type="button" data-mode="student" class="is-active">Bearbeiten</button>
+      </nav>
+      <div class="status-pill" id="saveStatus">Lokal gespeichert</div>
+    </header>
+
+    <main>
+      <section id="teacherView" class="view teacher-view" hidden>
+        <aside class="sidebar">
+          <div class="sidebar-heading"><span>Aufgabenbereiche</span><button id="addTask" class="icon-button" type="button" title="Aufgabenbereich hinzufügen">+</button></div>
+          <div id="taskNavigation" class="task-navigation"></div>
+          <div class="score-total"><span>Gesamt</span><strong><span id="totalBe">0</span> BE</strong></div>
+          <button id="showCodes" class="secondary wide" type="button">Codeliste</button>
+        </aside>
+
+        <div class="workspace">
+          <div class="workspace-head">
+            <div>
+              <span class="eyebrow">Lehrkraft-Werkstatt</span>
+              <input id="projectTitle" class="title-input" value="Neuer Aufgabenspace" aria-label="Titel des Aufgabenspaces">
+            </div>
+            <div class="actions">
+              <button id="previewProject" class="secondary" type="button">Vorschau</button>
+              <button id="exportProject" class="primary" type="button">Schülerversion exportieren</button>
+            </div>
+          </div>
+          <label class="field-label">Einleitung für die Schüler
+            <textarea id="projectIntro" rows="3" placeholder="Worum geht es? Was ist vor dem Start wichtig?"></textarea>
+          </label>
+          <div id="taskEditor" class="task-editor"></div>
+        </div>
+      </section>
+
+      <section id="projectBrowserView" class="view project-browser-view z-browser-scope" hidden>
+        <button id="returnFocusEditor" class="workspace-strip workspace-strip-top" type="button"><span>Editor</span></button>
+        <main class="settings-stage">
+          <section class="settings-panel browser-panel" aria-labelledby="focusBrowserTitle">
+            <div class="panel-head">
+              <div><span class="eyebrow">Browser</span><h2 id="focusBrowserTitle">Projekte</h2></div>
+              <div class="browser-actions-menu-shell">
+                <button id="focusBrowserActions" class="browser-actions-button" type="button" aria-label="Projektaktionen" aria-expanded="false"><span class="browser-actions-dots" aria-hidden="true"></span></button>
+                <div id="focusBrowserMenu" class="browser-actions-menu" hidden>
+                  <button id="newFocusProject" type="button">Neues Projekt</button>
+                  <label>Lehrerversion importieren<input id="teacherProjectImport" type="file" accept=".fokus-lehrer,application/json"></label>
+                </div>
+              </div>
+            </div>
+            <div id="focusProjectList" class="project-browser-list" aria-label="Fokus-Projekte"></div>
+          </section>
+          <section class="settings-panel detail-panel" aria-labelledby="focusDetailTitle">
+            <div class="panel-head"><div><span class="eyebrow">Editor</span><h2 id="focusDetailTitle">Projekt</h2></div></div>
+            <div id="focusProjectDetail" class="project-detail"></div>
+          </section>
+        </main>
+      </section>
+
+      <section id="studentView" class="view student-view">
+        <div id="studentLanding" class="student-landing">
+          <img src="../../assets/fokus-icon.svg" alt="" class="landing-icon">
+          <span class="eyebrow">Lokaler Prüfungsraum</span>
+          <h1>Bereit für deinen Fokus?</h1>
+          <p>Importiere die von deiner Lehrkraft bereitgestellte Datei. Bis zum Start kannst du alles lesen, aber nichts bearbeiten.</p>
+          <label class="file-button primary">Fokus-Datei importieren<input id="studentImport" type="file" accept=".fokus,application/json"></label>
+          <p class="privacy-note">Die Arbeit bleibt auf diesem Gerät. Fokus überträgt keine Daten.</p>
+        </div>
+        <div id="studentProject" class="student-project" hidden>
+          <header class="project-header">
+            <div><span class="eyebrow" id="sessionLabel">Noch nicht gestartet</span><h1 id="studentTitle"></h1></div>
+            <div class="session-actions"><span id="sessionClock" class="session-clock">00:00</span><button id="startSession" class="primary" type="button">Bearbeitung starten</button><button id="finishSession" class="primary" type="button" hidden>Arbeit abgeben</button></div>
+          </header>
+          <p id="studentIntro" class="student-intro"></p>
+          <div id="studentTasks" class="student-tasks"></div>
+        </div>
+      </section>
+    </main>
+    <button id="teacherWorkspaceSwitch" class="workspace-strip" type="button" hidden><span>Browser / Editor</span></button>
+  </div>
+
+  <dialog id="codesDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="eyebrow">Zugang ohne Konto</span><h2>Codeliste</h2></div><button class="icon-button" value="cancel" aria-label="Schließen">×</button></div>
+      <p>Ein Code wird beim Import einer Ergebnisdatei automatisch erkannt. Du kannst ihn hier auch manuell ausstreichen.</p>
+      <div class="unlock-note"><span>Lehrkraft-Entsperrcode</span><strong id="teacherUnlockCode"></strong><small>Nur in deiner lokalen Werkstatt sichtbar.</small></div>
+      <div class="code-tools"><input id="codeCount" type="number" min="1" max="100" value="12" aria-label="Anzahl Codes"><button id="generateCodes" class="secondary" type="button">Codes erzeugen</button><label class="file-button secondary">Ergebnis importieren<input id="resultImport" type="file" accept=".fokus-resultat,application/json"></label></div>
+      <div id="codeList" class="code-list"></div>
+      <div class="dialog-actions"><button id="copyCodes" class="secondary" type="button">Verfügbare Codes kopieren</button><button class="primary" value="default">Fertig</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="taskTypeDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-head"><div><span class="eyebrow">Aufgabenbereich</span><h2>Aufgabentyp auswählen</h2></div><button class="icon-button" value="cancel" aria-label="Schließen">×</button></div>
+      <p>Wähle, wie die Schüler in diesem Aufgabenbereich arbeiten sollen.</p>
+      <div class="task-type-list">
+        <button id="createTextTask" class="task-type-option" type="button">
+          <span class="task-type-icon" aria-hidden="true">T</span>
+          <span><strong>Textaufgabe</strong><small>Erklärung, Bewertungseinheiten, Wortgrenze und ein frei wachsendes Textfeld</small></span>
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="startDialog">
+    <form id="startForm" class="dialog-card compact">
+      <span class="eyebrow">Verbindlicher Start</span><h2>Bearbeitung beginnen</h2>
+      <p>Nach dem Start werden Zeit und Fokuswechsel protokolliert. Nach mehr als 10 Sekunden außerhalb dieser Ansicht wird die Arbeit gesperrt.</p>
+      <label class="field-label">Dein vierstelliger Code<input id="studentCode" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="K7MP" minlength="4" maxlength="4" required></label>
+      <p id="codeError" class="error" role="alert"></p>
+      <div class="dialog-actions"><button id="cancelStart" class="secondary" type="button">Abbrechen</button><button class="primary" type="submit">Jetzt starten</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="finishDialog">
+    <form id="finishForm" class="dialog-card compact">
+      <span class="eyebrow">Verbindliche Abgabe</span><h2>Arbeit abschließen</h2>
+      <p>Gib deinen vollständigen Namen ein. Erst mit der Bestätigung werden Zeit und Tracking beendet und die Ergebnisdatei erzeugt.</p>
+      <label class="field-label">Vollständiger Name<input id="studentFullName" autocomplete="name" placeholder="Vorname Nachname" required minlength="3"></label>
+      <p id="nameError" class="error" role="alert"></p>
+      <div class="dialog-actions"><button id="cancelFinish" class="secondary" type="button">Arbeit fortsetzen</button><button class="primary" type="submit">Bestätigen und exportieren</button></div>
+    </form>
+  </dialog>
+
+  <div id="focusWarning" class="focus-warning" hidden><strong>Zurück zu Fokus</strong><span>Die Arbeit wird nach <b id="warningSeconds">10</b> Sekunden gesperrt.</span></div>
+  <div id="lockScreen" class="lock-screen" hidden>
+    <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="fokus.js?v=20260825c"></script>
+</body>
+</html>

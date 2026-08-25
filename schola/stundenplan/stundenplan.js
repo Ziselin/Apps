@@ -95,6 +95,20 @@ const classCatalogGrade = document.getElementById("classCatalogGrade");
 const classCatalogClassOptions = document.getElementById("classCatalogClassOptions");
 const classCatalogFixedGrade = document.getElementById("classCatalogFixedGrade");
 const classCatalogDisplayModeButtons = [...document.querySelectorAll("[data-class-display-mode]")];
+const classCatalogTabs = document.getElementById("classCatalogTabs");
+const classCatalogGeneralTab = document.getElementById("classCatalogGeneralTab");
+const classCatalogStudentsTab = document.getElementById("classCatalogStudentsTab");
+const classCatalogGeneralPanel = document.getElementById("classCatalogGeneralPanel");
+const classCatalogStudentsPanel = document.getElementById("classCatalogStudentsPanel");
+const classStudentList = document.getElementById("classStudentList");
+const addClassStudentButton = document.getElementById("addClassStudentButton");
+const classCatalogTeacherFields = document.getElementById("classCatalogTeacherFields");
+const classCatalogTeacherOne = document.getElementById("classCatalogTeacherOne");
+const classCatalogTeacherTwoField = document.getElementById("classCatalogTeacherTwoField");
+const classCatalogTeacherTwo = document.getElementById("classCatalogTeacherTwo");
+const addSecondClassTeacherButton = document.getElementById("addSecondClassTeacherButton");
+const classCatalogIdField = document.getElementById("classCatalogIdField");
+const openClassCatalogIdButton = document.getElementById("openClassCatalogIdButton");
 const lessonGradePreview = document.getElementById("lessonGradePreview");
 const classCatalogDialogStatus = document.getElementById("classCatalogDialogStatus");
 const classCatalogSubmitButton = document.getElementById("classCatalogSubmitButton");
@@ -182,6 +196,7 @@ const PROJECT_STORAGE_KEY = "schola-stundenplan-projects-v1";
 const DISPLAY_PROJECT_STORAGE_KEY = "schola-stundenplan-display-project-v1";
 const LESSON_SIGNALS_STORAGE_KEY = "schola-stundenplan-signals-enabled-v1";
 const EXPANDED_LAYERS_STORAGE_KEY = "schola-stundenplan-expanded-layers-v1";
+const CLASS_DIRECTORY_STORAGE_KEY = "schola-stundenplan-class-directory-v1";
 const SCHEDULE_DELETE_HOLD_MS = 820;
 const HOLIDAY_NORMALIZATION_VERSION = "mv-school-types-2026-07-27-1";
 const MV_VOCATIONAL_ONLY_DATES = new Set(["2026-11-26", "2026-11-27"]);
@@ -225,6 +240,7 @@ const FEDERAL_STATES = [
   ["TH", "Thüringen"]
 ];
 let projects = loadProjects();
+let classStudentDraft = [];
 migrateKnownHolidayCorrections(projects);
 let activeProjectId = projects[0]?.id ?? null;
 let displayedProjectId = projects.some((project) => project.id === localStorage.getItem(DISPLAY_PROJECT_STORAGE_KEY))
@@ -233,6 +249,7 @@ let displayedProjectId = projects.some((project) => project.id === localStorage.
 let activeLayerType = null;
 let activeSchoolId = null;
 let activeClassSchoolId = null;
+let activeClassCatalogTab = "classes";
 let activeScheduleId = null;
 let displayRowsDraft = [];
 let lessonPhasesDraft = [];
@@ -1194,7 +1211,30 @@ function loadProjects() {
 
 function saveProjects() {
   localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+  publishClassDirectory();
   if (overviewSidebar?.classList.contains("is-open")) renderOverviewSidebar();
+}
+
+function publishClassDirectory() {
+  const classes = projects.flatMap((project) => {
+    const catalog = project.layers?.find((entry) => entry.type === "classCatalog");
+    return (catalog?.grades || []).flatMap((grade) => (grade.classes || []).filter((classEntry) => classEntry.id).map((classEntry) => ({
+      id: classEntry.id,
+      transportId: `KL1:${classEntry.id}`,
+      projectId: project.id,
+      projectName: project.name,
+      schoolId: grade.schoolId || "",
+      gradeId: grade.id,
+      gradeName: grade.name,
+      className: classEntry.name || getClassDisplayText(grade.name, classEntry.suffix, classEntry.displayMode),
+      suffix: classEntry.suffix || "",
+      displayMode: classEntry.displayMode || "normal",
+      teachers: structuredClone(classEntry.teachers || []),
+      students: structuredClone(classEntry.students || []),
+      updatedAt: new Date().toISOString()
+    })));
+  });
+  localStorage.setItem(CLASS_DIRECTORY_STORAGE_KEY, JSON.stringify({ format: "schola-class-directory", version: 1, classes }));
 }
 
 function getOverviewAppointmentSources(project) {
@@ -1484,6 +1524,71 @@ function downloadExportFile(content, filename, type) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function exportClassGrade(project, grade) {
+  const payload = {
+    type: "schola-stundenplan-klassenstufe",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    source: { projectId: project.id, projectName: project.name, schoolId: grade.schoolId },
+    grade: structuredClone(grade)
+  };
+  downloadExportFile(
+    JSON.stringify(payload, null, 2),
+    `${makeExportFilename(project.name)}-klassenstufe-${makeExportFilename(grade.name)}.json`,
+    "application/json;charset=utf-8"
+  );
+}
+
+async function importClassGrade(project, file, trigger) {
+  try {
+    const payload = JSON.parse(await file.text());
+    if (payload?.type !== "schola-stundenplan-klassenstufe" || payload?.version !== 1 || !payload.grade) {
+      throw new Error("Die Datei ist keine exportierte Stundenplan-Klassenstufe.");
+    }
+    const layer = getClassCatalogData(project);
+    const gradeName = String(payload.grade.name || "").trim();
+    if (!gradeName || !Array.isArray(payload.grade.classes)) throw new Error("Die Klassenstufe enthält keine gültigen Klassendaten.");
+    if (layer.grades.some((grade) => grade.schoolId === activeClassSchoolId && grade.name === gradeName)) {
+      throw new Error(`${gradeName}. Klassenstufe ist in dieser Schule bereits vorhanden.`);
+    }
+    const usedGradeIds = new Set(layer.grades.map((grade) => grade.id));
+    const usedClassIds = new Set(layer.grades.flatMap((grade) => grade.classes || []).map((entry) => entry.id));
+    const usedStudentIds = new Set(layer.grades.flatMap((grade) => grade.classes || []).flatMap((entry) => entry.students || []).map((student) => student.id));
+    const createId = (prefix) => globalThis.crypto?.randomUUID?.() || `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let gradeId = payload.grade.id || createId("grade");
+    if (usedGradeIds.has(gradeId)) gradeId = createId("grade");
+    const displayMode = layer.classDisplayMode || "normal";
+    const classes = payload.grade.classes.map((sourceClass) => {
+      const suffix = String(sourceClass.suffix ?? "").trim();
+      let classId = sourceClass.id || createId("class");
+      if (usedClassIds.has(classId)) classId = createId("class");
+      usedClassIds.add(classId);
+      const students = (Array.isArray(sourceClass.students) ? sourceClass.students : []).map((sourceStudent, index) => {
+        let studentId = sourceStudent.id || createId("student");
+        if (usedStudentIds.has(studentId)) studentId = createId("student");
+        usedStudentIds.add(studentId);
+        return { id: studentId, number: Math.max(1, Number(sourceStudent.number) || index + 1), name: String(sourceStudent.name || "").trim() };
+      });
+      return {
+        id: classId,
+        suffix,
+        displayMode,
+        name: getClassDisplayText(gradeName, suffix, displayMode),
+        teachers: (Array.isArray(sourceClass.teachers) ? sourceClass.teachers : []).map((teacher) => String(teacher || "").trim()).filter(Boolean).slice(0, 2),
+        students
+      };
+    });
+    layer.grades.push({ id: gradeId, name: gradeName, schoolId: activeClassSchoolId, classes });
+    syncLessonCatalogLabels(project);
+    saveProjects();
+    renderClassCatalogProperties(project);
+    renderActiveCalendar(project);
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : "Die Klassenstufe konnte nicht importiert werden.");
+    if (trigger) trigger.focus();
+  }
 }
 
 function exportProject(projectId = displayedProjectId) {
@@ -4819,8 +4924,19 @@ function getClassCatalogData(project) {
     layer.classDisplayMode = layer.grades.flatMap((grade) => grade.classes || []).find((entry) => validDisplayModes.has(entry.displayMode))?.displayMode || "normal";
   }
   layer.grades.forEach((grade) => (grade.classes || []).forEach((classEntry) => {
+    classEntry.id ||= globalThis.crypto?.randomUUID?.() ?? `class-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     classEntry.displayMode = layer.classDisplayMode;
     classEntry.name = getClassDisplayText(grade.name, classEntry.suffix, layer.classDisplayMode);
+    classEntry.teachers = (Array.isArray(classEntry.teachers) ? classEntry.teachers : [classEntry.teacher])
+      .map((teacher) => String(teacher || "").trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    classEntry.students = (Array.isArray(classEntry.students) ? classEntry.students : []).map((student, index) => ({
+      ...student,
+      id: student.id || (globalThis.crypto?.randomUUID?.() ?? `student-${Date.now()}-${index}`),
+      number: Math.max(1, Number.parseInt(student.number, 10) || index + 1),
+      name: String(student.name || "").trim()
+    }));
   }));
   return layer;
 }
@@ -4868,6 +4984,146 @@ function updateClassDisplayPreviews() {
   });
 }
 
+function setClassCatalogTab(tab = "general") {
+  const showStudents = tab === "students";
+  classCatalogGeneralTab.setAttribute("aria-selected", String(!showStudents));
+  classCatalogStudentsTab.setAttribute("aria-selected", String(showStudents));
+  classCatalogGeneralPanel.hidden = showStudents;
+  classCatalogStudentsPanel.hidden = !showStudents;
+}
+
+function openStudentIdDialog(student) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog student-id-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = `<span class="label">Schülerliste</span><h2>Schüler-ID</h2>`;
+  const note = document.createElement("p");
+  note.className = "dialog-intro";
+  note.textContent = student.name ? `Stabile ID für ${student.name}.` : "Stabile ID dieses Schülereintrags.";
+  const value = document.createElement("input");
+  value.type = "text";
+  value.readOnly = true;
+  value.value = student.id;
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const close = document.createElement("button");
+  close.type = "submit";
+  close.className = "secondary-button";
+  close.textContent = "Schließen";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "secondary-button primary-action";
+  copy.textContent = "ID kopieren";
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(value.value); }
+    catch { value.select(); document.execCommand("copy"); }
+    copy.textContent = "Kopiert";
+    setTimeout(() => { copy.textContent = "ID kopieren"; }, 1400);
+  });
+  actions.append(close, copy);
+  form.append(heading, note, value, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.showModal();
+  value.select();
+}
+
+function openClassIdDialog() {
+  const classId = classCatalogDialog.dataset.draftClassId;
+  if (!classId) return;
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog student-id-dialog class-id-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = '<span class="label">Klassen</span><h2>Klassen-ID</h2>';
+  const note = document.createElement("p");
+  note.className = "dialog-intro";
+  note.textContent = "Diese ID verweist auf Klassenname, Klassenlehrer und die zugewiesene Schülerliste. Änderungen stehen nach dem Speichern bereit.";
+  const value = document.createElement("input");
+  value.type = "text";
+  value.readOnly = true;
+  value.value = `KL1:${classId}`;
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const close = document.createElement("button");
+  close.type = "submit";
+  close.className = "secondary-button";
+  close.textContent = "Schließen";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "secondary-button primary-action";
+  copy.textContent = "ID kopieren";
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(value.value); }
+    catch { value.select(); document.execCommand("copy"); }
+    copy.textContent = "Kopiert";
+    setTimeout(() => { copy.textContent = "ID kopieren"; }, 1400);
+  });
+  actions.append(close, copy);
+  form.append(heading, note, value, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.showModal();
+  value.select();
+}
+
+function renderClassStudentList() {
+  if (!classStudentDraft.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Noch keine Schüler angelegt.";
+    classStudentList.replaceChildren(empty);
+    return;
+  }
+  const rows = classStudentDraft
+    .slice()
+    .sort((a, b) => a.number - b.number || a.name.localeCompare(b.name, "de"))
+    .map((student) => {
+      const row = document.createElement("div");
+      row.className = "class-student-row";
+      const numberField = document.createElement("label");
+      numberField.innerHTML = "<span>Nr.</span>";
+      const number = document.createElement("input");
+      number.type = "number";
+      number.min = "1";
+      number.step = "1";
+      number.value = String(student.number);
+      number.setAttribute("aria-label", `Laufende Nummer für ${student.name || "Schüler"}`);
+      number.addEventListener("input", () => { student.number = Number.parseInt(number.value, 10) || 0; });
+      numberField.append(number);
+      const nameField = document.createElement("label");
+      nameField.innerHTML = "<span>Name</span>";
+      const name = document.createElement("input");
+      name.type = "text";
+      name.maxLength = 120;
+      name.value = student.name;
+      name.placeholder = "Vor- und Nachname";
+      name.addEventListener("input", () => { student.name = name.value; });
+      nameField.append(name);
+      const id = document.createElement("button");
+      id.type = "button";
+      id.className = "student-id-button";
+      id.textContent = "ID";
+      id.addEventListener("click", () => openStudentIdDialog(student));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "student-remove-button";
+      remove.textContent = "Löschen";
+      remove.addEventListener("click", () => {
+        classStudentDraft = classStudentDraft.filter((entry) => entry.id !== student.id);
+        renderClassStudentList();
+      });
+      row.append(numberField, nameField, id, remove);
+      return row;
+    });
+  classStudentList.replaceChildren(...rows);
+}
+
 function openClassCatalogDialog(project, mode, subject = null, grade = null, classEntry = null) {
   classCatalogForm.reset();
   classCatalogDialogStatus.textContent = "";
@@ -4875,6 +5131,10 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
   classCatalogDialog.dataset.subjectId = subject?.id || "";
   classCatalogDialog.dataset.gradeId = grade?.id || "";
   classCatalogDialog.dataset.classId = classEntry?.id || "";
+  classCatalogDialog.dataset.draftClassId = mode === "catalog-class"
+    ? (classEntry?.id || globalThis.crypto?.randomUUID?.() || `class-${Date.now()}`)
+    : "";
+  classCatalogDialog.classList.toggle("is-class-editor", mode === "catalog-class");
   classCatalogMode.value = mode;
   classCatalogGrade.replaceChildren(...Array.from({ length: 13 }, (_, index) => {
     const option = document.createElement("option");
@@ -4886,6 +5146,19 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
   classCatalogNameField.classList.toggle("is-class-suffix-field", mode === "catalog-class");
   classCatalogGradeField.hidden = mode !== "catalog-grade";
   classCatalogClassOptions.hidden = true;
+  classCatalogTeacherFields.hidden = mode !== "catalog-class";
+  classCatalogIdField.hidden = mode !== "catalog-class";
+  const teachers = Array.isArray(classEntry?.teachers) ? classEntry.teachers : [];
+  classCatalogTeacherOne.value = teachers[0] || "";
+  classCatalogTeacherTwo.value = teachers[1] || "";
+  classCatalogTeacherTwoField.hidden = !teachers[1];
+  addSecondClassTeacherButton.hidden = Boolean(teachers[1]);
+  classCatalogTabs.hidden = mode !== "catalog-class";
+  setClassCatalogTab("general");
+  classStudentDraft = mode === "catalog-class"
+    ? structuredClone(Array.isArray(classEntry?.students) ? classEntry.students : [])
+    : [];
+  renderClassStudentList();
   classCatalogGradePrefix.hidden = mode !== "catalog-class";
   if (mode === "subject") {
     classCatalogDialogTitle.textContent = subject ? "Fach bearbeiten" : "Fach hinzufügen";
@@ -4930,6 +5203,14 @@ function createClassCatalogMenu(project, type, subject, grade = null, classEntry
   edit.type = "button";
   edit.textContent = "Bearbeiten";
   edit.addEventListener("click", () => openClassCatalogDialog(project, type, subject, grade, classEntry));
+  const exportButton = document.createElement("button");
+  exportButton.type = "button";
+  exportButton.textContent = "Exportieren";
+  exportButton.addEventListener("click", () => {
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    exportClassGrade(project, grade);
+  });
   const remove = document.createElement("button");
   remove.type = "button";
   remove.className = "schedule-menu-delete";
@@ -4948,7 +5229,9 @@ function createClassCatalogMenu(project, type, subject, grade = null, classEntry
     menu.hidden = !menu.hidden;
     button.setAttribute("aria-expanded", String(!menu.hidden));
   });
-  menu.append(edit, remove);
+  menu.append(edit);
+  if (type === "catalog-grade") menu.append(exportButton);
+  menu.append(remove);
   shell.append(button, menu);
   return shell;
 }
@@ -5253,10 +5536,14 @@ function renderClassCatalogProperties(project) {
     empty.textContent = "Legen Sie zuerst eine Schule an.";
     schoolTabs.append(empty);
   }
+  const contentTabs = document.createElement("div");
+  contentTabs.className = "project-period-tabs class-catalog-content-tabs";
+  contentTabs.setAttribute("role", "tablist");
+  contentTabs.setAttribute("aria-label", "Klassenbereich auswählen");
   const classSection = document.createElement("section");
-  classSection.className = "property-section class-catalog-master-section";
-  const classSectionTitle = document.createElement("h3");
-  classSectionTitle.textContent = "Klassen hinzufügen";
+  classSection.className = "property-section class-catalog-master-section class-catalog-content-panel";
+  classSection.id = "classCatalogClassesPanel";
+  classSection.setAttribute("role", "tabpanel");
   const classSectionIntro = document.createElement("p");
   classSectionIntro.textContent = "Fügen Sie zuerst eine Klassenstufe hinzu und erstellen Sie darin die einzelnen Klassen.";
   const addGrade = document.createElement("button");
@@ -5265,6 +5552,24 @@ function renderClassCatalogProperties(project) {
   addGrade.disabled = !activeClassSchoolId;
   addGrade.textContent = "Klassenstufe hinzufügen";
   addGrade.addEventListener("click", () => openClassCatalogDialog(project, "catalog-grade"));
+  const importGrade = document.createElement("button");
+  importGrade.type = "button";
+  importGrade.className = "secondary-button";
+  importGrade.disabled = !activeClassSchoolId;
+  importGrade.textContent = "Klassenstufe importieren";
+  importGrade.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", () => {
+      const [file] = input.files || [];
+      if (file) void importClassGrade(project, file, importGrade);
+    }, { once: true });
+    input.click();
+  });
+  const gradeActions = document.createElement("div");
+  gradeActions.className = "class-catalog-grade-actions";
+  gradeActions.append(addGrade, importGrade);
   const gradeList = document.createElement("div");
   gradeList.className = "class-catalog-grade-list";
   const visibleGrades = layer.grades.filter((grade) => grade.schoolId === activeClassSchoolId);
@@ -5284,7 +5589,10 @@ function renderClassCatalogProperties(project) {
       gradeHead.append(gradeTitle, createClassCatalogMenu(project, "catalog-grade", null, grade));
       const classList = document.createElement("div");
       classList.className = "class-catalog-class-list";
-      grade.classes.forEach((classEntry) => {
+      grade.classes.slice().sort((a, b) => String(a.suffix || "").localeCompare(String(b.suffix || ""), "de", {
+        sensitivity: "base",
+        numeric: true
+      })).forEach((classEntry) => {
         const row = document.createElement("div");
         row.className = "class-catalog-class";
         const name = document.createElement("span");
@@ -5301,12 +5609,12 @@ function renderClassCatalogProperties(project) {
       gradeList.append(gradeCard);
     });
   }
-  classSection.append(classSectionTitle, classSectionIntro, addGrade, gradeList);
+  classSection.append(classSectionIntro, gradeActions, gradeList);
 
   const subjectSection = document.createElement("section");
-  subjectSection.className = "property-section";
-  const subjectSectionTitle = document.createElement("h3");
-  subjectSectionTitle.textContent = "Fächer";
+  subjectSection.className = "property-section class-catalog-content-panel";
+  subjectSection.id = "classCatalogSubjectsPanel";
+  subjectSection.setAttribute("role", "tabpanel");
   const subjectSectionIntro = document.createElement("p");
   subjectSectionIntro.textContent = "Fächer bleiben als unabhängige Stammdaten erhalten. Die Zuordnung zu Klassen und Kursen folgt im nächsten Schritt.";
   const addSubject = document.createElement("button");
@@ -5328,7 +5636,7 @@ function renderClassCatalogProperties(project) {
       const subjectCard = document.createElement("section");
       subjectCard.className = "class-catalog-subject";
       const subjectHead = document.createElement("div");
-      subjectHead.className = "appointment-group-head";
+      subjectHead.className = "appointment-group-head class-catalog-subject-head";
       const subjectTitle = document.createElement("h3");
       subjectTitle.textContent = subject.name;
       subjectHead.append(subjectTitle, createClassCatalogMenu(project, "subject", subject));
@@ -5391,8 +5699,29 @@ function renderClassCatalogProperties(project) {
       subjectList.append(subjectCard);
     });
   }
-  subjectSection.append(subjectSectionTitle, subjectSectionIntro, addSubject, subjectList);
-  sheet.append(head, schoolTabs, classSection, subjectSection);
+  subjectSection.append(subjectSectionIntro, addSubject, subjectList);
+  [
+    { id: "classes", label: "Klassen", panel: classSection },
+    { id: "subjects", label: "Fächer", panel: subjectSection }
+  ].forEach(({ id, label, panel }) => {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.id = `classCatalog${id === "classes" ? "Classes" : "Subjects"}Tab`;
+    tab.textContent = label;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", panel.id);
+    tab.setAttribute("aria-selected", String(activeClassCatalogTab === id));
+    panel.setAttribute("aria-labelledby", tab.id);
+    panel.hidden = activeClassCatalogTab !== id;
+    tab.addEventListener("click", () => {
+      activeClassCatalogTab = id;
+      contentTabs.querySelectorAll('[role="tab"]').forEach((entry) => entry.setAttribute("aria-selected", String(entry === tab)));
+      classSection.hidden = id !== "classes";
+      subjectSection.hidden = id !== "subjects";
+    });
+    contentTabs.append(tab);
+  });
+  sheet.append(head, schoolTabs, contentTabs, classSection, subjectSection);
   projectDetail.replaceChildren(sheet);
   saveProjects();
 }
@@ -9448,6 +9777,24 @@ sicknessForm.addEventListener("submit", (event) => {
   renderActiveCalendar(project);
 });
 cancelClassCatalogButton.addEventListener("click", () => classCatalogDialog.close());
+classCatalogGeneralTab.addEventListener("click", () => setClassCatalogTab("general"));
+classCatalogStudentsTab.addEventListener("click", () => setClassCatalogTab("students"));
+addClassStudentButton.addEventListener("click", () => {
+  const nextNumber = classStudentDraft.reduce((maximum, student) => Math.max(maximum, Number(student.number) || 0), 0) + 1;
+  classStudentDraft.push({
+    id: globalThis.crypto?.randomUUID?.() ?? `student-${Date.now()}`,
+    number: nextNumber,
+    name: ""
+  });
+  renderClassStudentList();
+  classStudentList.querySelector(".class-student-row:last-child input[type='text']")?.focus();
+});
+addSecondClassTeacherButton.addEventListener("click", () => {
+  classCatalogTeacherTwoField.hidden = false;
+  addSecondClassTeacherButton.hidden = true;
+  classCatalogTeacherTwo.focus();
+});
+openClassCatalogIdButton.addEventListener("click", openClassIdDialog);
 classCatalogName.addEventListener("input", () => {
   if (classCatalogMode.value === "catalog-class") updateClassDisplayPreviews();
 });
@@ -9465,6 +9812,23 @@ classCatalogForm.addEventListener("submit", (event) => {
   if (!name) {
     classCatalogDialogStatus.textContent = "Bitte eine Bezeichnung eintragen.";
     return;
+  }
+  if (mode === "catalog-class") {
+    const normalizedStudents = classStudentDraft.map((student) => ({
+      id: student.id,
+      number: Number.parseInt(student.number, 10),
+      name: String(student.name || "").trim()
+    }));
+    const invalidStudent = normalizedStudents.find((student) => !student.name || !Number.isInteger(student.number) || student.number < 1);
+    const numbers = normalizedStudents.map((student) => student.number);
+    if (invalidStudent || new Set(numbers).size !== numbers.length) {
+      setClassCatalogTab("students");
+      classCatalogDialogStatus.textContent = invalidStudent
+        ? "Bitte für jeden Schüler einen Namen und eine positive laufende Nummer eintragen."
+        : "Jede laufende Nummer darf innerhalb der Klasse nur einmal vergeben werden.";
+      return;
+    }
+    classStudentDraft = normalizedStudents;
   }
   const subject = layer.subjects.find((entry) => entry.id === classCatalogDialog.dataset.subjectId);
   const grade = layer.grades.find((entry) => entry.id === classCatalogDialog.dataset.gradeId);
@@ -9505,18 +9869,24 @@ classCatalogForm.addEventListener("submit", (event) => {
     grade.classes = Array.isArray(grade.classes) ? grade.classes : [];
     const displayMode = layer.classDisplayMode || "normal";
     const fullName = getClassDisplayText(grade.name, name, displayMode);
+    const teachers = [classCatalogTeacherOne.value, classCatalogTeacherTwo.value]
+      .map((teacher) => teacher.trim())
+      .filter(Boolean)
+      .slice(0, 2);
     const duplicate = grade.classes.some((entry) => String(entry.suffix || entry.name).toLocaleLowerCase("de") === name.toLocaleLowerCase("de") && entry.id !== classCatalogDialog.dataset.classId);
     if (duplicate) {
       classCatalogDialogStatus.textContent = "Diese Klasse ist in der Klassenstufe bereits vorhanden.";
       return;
     }
     const existing = grade.classes.find((entry) => entry.id === classCatalogDialog.dataset.classId);
-    if (existing) Object.assign(existing, { suffix: name, displayMode, name: fullName });
+    if (existing) Object.assign(existing, { suffix: name, displayMode, name: fullName, teachers, students: structuredClone(classStudentDraft) });
     else grade.classes.push({
-      id: globalThis.crypto?.randomUUID?.() ?? `class-${Date.now()}`,
+      id: classCatalogDialog.dataset.draftClassId || globalThis.crypto?.randomUUID?.() || `class-${Date.now()}`,
       suffix: name,
       displayMode,
-      name: fullName
+      name: fullName,
+      teachers,
+      students: structuredClone(classStudentDraft)
     });
   } else return;
   syncLessonCatalogLabels(project);

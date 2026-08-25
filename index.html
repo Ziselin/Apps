@@ -468,6 +468,22 @@
       align-items: start;
     }
 
+    .collection-heading {
+      grid-column: 1 / -1;
+      margin: 0 12px 10px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .collection-heading[data-schola-heading="mini-apps"] {
+      margin-top: 34px;
+    }
+
     .app-tile {
       position: relative;
       display: grid;
@@ -569,19 +585,11 @@
       display: block;
     }
 
-    .collection-switch {
-      position: fixed; right: 18px; bottom: 20px; z-index: 20;
-      padding: 11px 14px; border: 1px solid rgba(33, 54, 51, 0.13); border-radius: 12px;
-      background: rgba(249, 249, 244, 0.84); color: var(--muted);
-      font: 700 0.7rem/1 Arial, Helvetica, sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
-      cursor: pointer; backdrop-filter: blur(14px);
-    }
-    .collection-switch:hover, .collection-switch:focus-visible { color: var(--ink); background: #fafaf5; outline: none; }
-    body:not(.project-schola) .collection-switch { display: none; }
-
     [data-search-card][hidden] {
       display: none;
     }
+
+    [data-schola-heading][hidden] { display: none; }
 
     @media (max-width: 960px) {
       .topbar {
@@ -778,6 +786,7 @@
             <span class="app-description">(in Vorbereitung)</span>
           </span>
         </div>
+        <h2 class="collection-heading" data-schola-heading="apps" hidden>Haupt-Apps</h2>
         <a class="app-tile" href="./schola/noten/index.html" data-search-card data-app-link data-schola-app data-search-text="notenrechner schola noten punkte prozent bewertung" hidden>
           <img class="app-icon" src="./assets/notenrechner-icon.svg?v=20260621b" alt="" aria-hidden="true">
           <span class="app-copy">
@@ -792,9 +801,17 @@
             <span class="app-description">v1.0</span>
           </span>
         </a>
+        <a class="app-tile" href="./schola/fokus/index.html" data-search-card data-app-link data-schola-app data-search-text="fokus schola aufgaben text editor schreiben prüfung bewertungseinheiten wortgrenze" hidden>
+          <img class="app-icon" src="./assets/fokus-icon.svg?v=20260825a" alt="" aria-hidden="true">
+          <span class="app-copy">
+            <span class="app-title">Fokus</span>
+            <span class="app-description">Aufgabenspaces erstellen und bearbeiten</span>
+          </span>
+        </a>
         <a class="app-tile" href="./schola/classroom/index.html" data-search-card data-app-link data-schola-app data-search-text="classroom schola screen unterricht präsentation browser editor" hidden>
           <img class="app-icon" src="./assets/classroom-icon.svg?v=20260811a" alt="" aria-hidden="true"><span class="app-copy"><span class="app-title">Classroom Screen</span><span class="app-description">(in Vorbereitung)</span></span>
         </a>
+        <h2 class="collection-heading" data-schola-heading="mini-apps" hidden>Mini-Apps</h2>
         <a class="app-tile" href="./schola/mini-apps/timer/index.html" data-search-card data-app-link data-schola-mini-app data-search-text="timer mini-app fokuszeit phasen nta countdown" hidden>
           <img class="app-icon" src="./assets/timer-icon.svg?v=20260814a" alt="" aria-hidden="true">
           <span class="app-copy"><span class="app-title">Timer</span><span class="app-description">Fokuszeit, Phasen und NTA</span></span>
@@ -820,8 +837,6 @@
     </section>
   </main>
 
-  <button id="collectionSwitch" class="collection-switch" type="button" aria-pressed="false">Mini-Apps</button>
-
   <script>
     const homeMenuButton = document.getElementById("homeMenuButton");
     const homeMenuCloseButton = document.getElementById("homeMenuCloseButton");
@@ -830,22 +845,10 @@
     const appSearch = document.querySelector(".app-search");
     const collectionGrid = document.querySelector(".collection-grid");
     const collectionCards = [...document.querySelectorAll("[data-search-card]")];
+    const scholaHeadings = [...document.querySelectorAll("[data-schola-heading]")];
     const homeClaim = document.getElementById("homeClaim");
     const emptyState = document.querySelector("[data-empty-state]");
     let activeHomeProject = "atlas";
-    let scholaCollection = "apps";
-
-    function setScholaCollection(collection) {
-      scholaCollection = collection === "mini-apps" ? "mini-apps" : "apps";
-      const showingMiniApps = scholaCollection === "mini-apps";
-      const switchButton = document.getElementById("collectionSwitch");
-      if (switchButton) {
-        switchButton.textContent = showingMiniApps ? "Apps" : "Mini-Apps";
-        switchButton.setAttribute("aria-pressed", String(showingMiniApps));
-      }
-      if (appSearch && activeHomeProject === "schola") appSearch.placeholder = showingMiniApps ? "Mini-Apps durchsuchen" : "Apps durchsuchen";
-      runSearch();
-    }
 
     function setHomeProject(projectName, options = {}) {
       activeHomeProject = projectName === "schola" ? "schola" : "atlas";
@@ -857,7 +860,7 @@
       if (appSearch) {
         appSearch.value = "";
         appSearch.disabled = false;
-        appSearch.placeholder = isSchola && scholaCollection === "mini-apps" ? "Mini-Apps durchsuchen" : "Apps durchsuchen";
+        appSearch.placeholder = "Apps durchsuchen";
       }
       if (emptyState) {
         emptyState.textContent = "Keine passende App gefunden.";
@@ -935,7 +938,7 @@
       collectionCards.forEach((card) => {
         const text = normalizeSearch(card.dataset.searchText ?? card.textContent ?? "");
         const belongsToProject = activeHomeProject === "schola"
-          ? (scholaCollection === "mini-apps" ? card.hasAttribute("data-schola-mini-app") : card.hasAttribute("data-schola-app"))
+          ? (card.hasAttribute("data-schola-app") || card.hasAttribute("data-schola-mini-app"))
           : card.hasAttribute("data-atlas-app");
         const isVisible = belongsToProject && (!query || text.includes(query));
         card.hidden = !isVisible;
@@ -944,14 +947,16 @@
         }
       });
 
+      scholaHeadings.forEach((heading) => {
+        const attribute = heading.dataset.scholaHeading === "mini-apps" ? "data-schola-mini-app" : "data-schola-app";
+        const hasVisibleCards = collectionCards.some((card) => card.hasAttribute(attribute) && !card.hidden);
+        heading.hidden = activeHomeProject !== "schola" || !hasVisibleCards;
+      });
+
       collectionGrid?.classList.toggle("has-no-results", visibleCount === 0);
     }
 
     appSearch?.addEventListener("input", runSearch);
-
-    document.getElementById("collectionSwitch")?.addEventListener("click", () => {
-      setScholaCollection(scholaCollection === "apps" ? "mini-apps" : "apps");
-    });
 
     document.querySelectorAll("[data-project-select]").forEach((button) => {
       button.addEventListener("click", () => {

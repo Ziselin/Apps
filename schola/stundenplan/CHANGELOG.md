@@ -8,6 +8,13 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 - Mehrtägige Projekttage nach Klassen gleichen Unterricht nun über aktuelle Klassen-, Kurs- und Klassenstufen-Zuordnungen statt über fragile Anzeigenamen oder veraltete ID-Momentaufnahmen ab.
 - Projekttage können unabhängig steuern, ob sie Unterricht ausfallen lassen und ob sie selbst im Kalender erscheinen.
+- Klasseneditor um die Tabs „Allgemein“ und „Schülerliste“ mit stabilen kopierbaren Schüler-IDs sowie bearbeitbaren eindeutigen laufenden Nummern erweitert.
+- Allgemein-Tab mit kompaktem Klassenkürzel-Feld und bis zu zwei optionalen Klassenlehrern ergänzt.
+- Stabile `KL1`-Klassen-ID mit Kopierdialog und lokal aktualisiertem Transportdatensatz für Klassenname, Klassenlehrer und Schülerliste ergänzt.
+- Klassenstufen samt Klassen-, Lehrer- und Schülerdaten als eigene JSON-Dateien importier- und exportierbar gemacht.
+- Klassen und Fächer im Eigenschaftenbereich in zwei kompakte Tabs aufgeteilt.
+- Klassen innerhalb einer Klassenstufe nach ihrem Kürzel alphabetisch sortiert.
+- Menüs der Fachkarten wieder kollisionsfrei am rechten Kartenrand ausgerichtet.
 
 ### 2026-08-24
 

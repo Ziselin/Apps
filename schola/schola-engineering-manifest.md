@@ -27,8 +27,8 @@ Dieses Manifest konkretisiert die projektweiten Regeln für den Kompetenzbereich
 
 ## Mini-Apps
 
-- Die Schola-Hauptseite trennt in ihrer Darstellung zwischen vollständigen Apps und eigenständig erreichbaren Mini-Apps.
-- Der Umschalter `Mini-Apps` befindet sich unten rechts in derselben Formsprache und Position wie der Browser-/Editor-Umschalter des Classroom Screens. Beim Wechsel bleibt die Schola-Hauptseite bestehen; lediglich die angezeigte Sammlung wird ausgetauscht.
+- Die Schola-Hauptseite zeigt vollständige Apps und eigenständig erreichbare Mini-Apps gemeinsam auf einer Seite. Haupt-Apps stehen in einem eigenen Abschnitt oben, Mini-Apps in gleicher Kachelform direkt darunter.
+- Einen Umschalter oder getrennte Sammlungsseiten für Mini-Apps gibt es nicht. Suche und Navigation erfassen beide Abschnitte gemeinsam.
 - Mini-Apps sind eigenständige fachliche Einheiten mit eigenem Manifest und Changelog. Sie können allein oder eingebettet in Schola- und später gegebenenfalls Atlas-Apps ausgeführt werden.
 - Eine Mini-App besitzt genau eine fachliche Implementierung. Einbettungen dürfen Host-spezifische Oberflächen ergänzen, aber keine unabhängigen Kopien der Mini-App-Logik führen.
 - Eigenständige Mini-App-Ansichten zeigen nur die für Steuerung und Funktion erforderliche Oberfläche und keinen Browser-/Editor-Arbeitsbereich einer einbettenden App.

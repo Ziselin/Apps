@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-    <link rel="stylesheet" href="stundenplan.css?v=20260824s">
+    <link rel="stylesheet" href="stundenplan.css?v=20260825e">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -359,26 +359,52 @@
         <h2 id="classCatalogDialogTitle">Fach hinzufügen</h2>
       </div>
       <input id="classCatalogMode" type="hidden">
-      <label id="classCatalogNameField" class="dialog-field">
-        <span id="classCatalogNameLabel">Bezeichnung</span>
-        <span class="class-catalog-name-control">
-          <strong id="classCatalogGradePrefix" class="class-catalog-grade-prefix" hidden></strong>
-          <input id="classCatalogName" type="text" maxlength="80" autocomplete="off">
-        </span>
-      </label>
-      <label id="classCatalogGradeField" class="dialog-field" hidden>
-        <span>Klassenstufe</span>
-        <select id="classCatalogGrade"></select>
-      </label>
-      <section id="classCatalogClassOptions" class="class-catalog-class-options" hidden>
-        <p>Klassenstufe <strong id="classCatalogFixedGrade"></strong></p>
-        <div class="class-catalog-display-modes" role="group" aria-label="Darstellung der Klasse">
-          <button type="button" data-class-display-mode="normal" aria-pressed="true"></button>
-          <button type="button" data-class-display-mode="subscript" aria-pressed="false"></button>
-          <button type="button" data-class-display-mode="superscript" aria-pressed="false"></button>
-          <button type="button" data-class-display-mode="hyphen" aria-pressed="false"></button>
-          <button type="button" data-class-display-mode="smallcaps" aria-pressed="false"></button>
+      <div id="classCatalogTabs" class="lesson-dialog-tabs class-catalog-tabs" role="tablist" aria-label="Klassendetails" hidden>
+        <button type="button" id="classCatalogGeneralTab" role="tab" aria-selected="true" aria-controls="classCatalogGeneralPanel">Allgemein</button>
+        <button type="button" id="classCatalogStudentsTab" role="tab" aria-selected="false" aria-controls="classCatalogStudentsPanel">Schülerliste</button>
+      </div>
+      <section id="classCatalogGeneralPanel" class="class-catalog-tab-panel" role="tabpanel" aria-labelledby="classCatalogGeneralTab">
+        <label id="classCatalogNameField" class="dialog-field">
+          <span id="classCatalogNameLabel">Bezeichnung</span>
+          <span class="class-catalog-name-control">
+            <strong id="classCatalogGradePrefix" class="class-catalog-grade-prefix" hidden></strong>
+            <input id="classCatalogName" type="text" maxlength="80" autocomplete="off">
+          </span>
+        </label>
+        <label id="classCatalogGradeField" class="dialog-field" hidden>
+          <span>Klassenstufe</span>
+          <select id="classCatalogGrade"></select>
+        </label>
+        <section id="classCatalogClassOptions" class="class-catalog-class-options" hidden>
+          <p>Klassenstufe <strong id="classCatalogFixedGrade"></strong></p>
+          <div class="class-catalog-display-modes" role="group" aria-label="Darstellung der Klasse">
+            <button type="button" data-class-display-mode="normal" aria-pressed="true"></button>
+            <button type="button" data-class-display-mode="subscript" aria-pressed="false"></button>
+            <button type="button" data-class-display-mode="superscript" aria-pressed="false"></button>
+            <button type="button" data-class-display-mode="hyphen" aria-pressed="false"></button>
+            <button type="button" data-class-display-mode="smallcaps" aria-pressed="false"></button>
+          </div>
+        </section>
+        <section id="classCatalogTeacherFields" class="class-catalog-teacher-fields" hidden>
+          <label class="dialog-field">
+            <span>Klassenlehrer</span>
+            <input id="classCatalogTeacherOne" type="text" maxlength="120" autocomplete="off" placeholder="Name (optional)">
+          </label>
+          <label id="classCatalogTeacherTwoField" class="dialog-field" hidden>
+            <span>Zweiter Klassenlehrer</span>
+            <input id="classCatalogTeacherTwo" type="text" maxlength="120" autocomplete="off" placeholder="Name (optional)">
+          </label>
+          <button type="button" id="addSecondClassTeacherButton" class="secondary-button">Zweiten Klassenlehrer hinzufügen</button>
+        </section>
+        <div id="classCatalogIdField" class="class-catalog-id-field" hidden>
+          <span><strong>Klassen-ID</strong><small>Überträgt Klassenname, Klassenlehrer und Schülerliste.</small></span>
+          <button type="button" id="openClassCatalogIdButton" class="secondary-button">ID</button>
         </div>
+      </section>
+      <section id="classCatalogStudentsPanel" class="class-catalog-tab-panel class-student-panel" role="tabpanel" aria-labelledby="classCatalogStudentsTab" hidden>
+        <p class="dialog-intro">Verwalten Sie Namen und laufende Nummern dieser Klasse. Die stabile ID bleibt über den jeweiligen ID-Button erreichbar.</p>
+        <div id="classStudentList" class="class-student-list"></div>
+        <button type="button" id="addClassStudentButton" class="secondary-button">Schüler hinzufügen</button>
       </section>
       <p id="classCatalogDialogStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
@@ -520,7 +546,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260825b"></script>
+    <script src="stundenplan.js?v=20260825i"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
