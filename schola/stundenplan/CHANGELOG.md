@@ -4,6 +4,11 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-08-25
+
+- Mehrtägige Projekttage nach Klassen gleichen Unterricht nun über aktuelle Klassen-, Kurs- und Klassenstufen-Zuordnungen statt über fragile Anzeigenamen oder veraltete ID-Momentaufnahmen ab.
+- Projekttage können unabhängig steuern, ob sie Unterricht ausfallen lassen und ob sie selbst im Kalender erscheinen.
+
 ### 2026-08-24
 
 - Rahmenlose Hauptansicht, höhenoptimiertes Jahresraster, einheitlich gewichtete Kopfleisten-Symbole und `file://`-sicheres zentrales Hauptmenü umgesetzt.

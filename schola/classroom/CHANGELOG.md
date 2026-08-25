@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Hinzugefügt
 
+- Die kompakte Stundenanzeige berücksichtigt den unabhängigen Unterrichtsausfall-Schalter klassenbezogener Projekttage.
 - Stundenplan als auswählbare Mini-App der Schnellleiste mit Projektordner-ID-Dialog ergänzt.
 - Stundenplan-Mini-App um einen blanken Tagesrahmen im Verhältnis 1:5 und die live animierte aktuelle Unterrichtsstunde mit Phasenverlauf ergänzt.
 - Stundenplanfeld auf kompakte halbe Breite reduziert und frei verschiebbar mit gespeicherter Position eingerichtet.
