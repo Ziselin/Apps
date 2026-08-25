@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Fokus · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
-  <link rel="stylesheet" href="fokus.css?v=20260825c">
-  <link rel="stylesheet" href="fokus-fixes.css?v=20260825c">
-  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260825c">
+  <link rel="stylesheet" href="fokus.css?v=20260825r">
+  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260825r">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260825r">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -120,6 +120,16 @@
     </form>
   </dialog>
 
+  <dialog id="classLinkDialog">
+    <form id="classLinkForm" class="dialog-card compact">
+      <div class="dialog-head"><div><span class="eyebrow">Stundenplan-Verknüpfung</span><h2>Klasse hinzufügen</h2></div><button id="cancelClassLink" class="icon-button" type="button" aria-label="Schließen">×</button></div>
+      <p>Füge die Klassen-ID aus dem Stundenplan ein. Die Klasse und ihre Schülerliste werden lokal übernommen.</p>
+      <label class="field-label">Klassen-ID<input id="classLinkId" autocomplete="off" spellcheck="false" placeholder="KL1:…" required></label>
+      <p id="classLinkError" class="error" role="alert"></p>
+      <div class="dialog-actions"><button id="cancelClassLinkAction" class="secondary" type="button">Abbrechen</button><button class="primary" type="submit">Klasse hinzufügen</button></div>
+    </form>
+  </dialog>
+
   <dialog id="startDialog">
     <form id="startForm" class="dialog-card compact">
       <span class="eyebrow">Verbindlicher Start</span><h2>Bearbeitung beginnen</h2>
@@ -145,6 +155,6 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260825c"></script>
+  <script src="fokus.js?v=20260825r"></script>
 </body>
 </html>

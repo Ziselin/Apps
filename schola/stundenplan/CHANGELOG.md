@@ -16,6 +16,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Klassen innerhalb einer Klassenstufe nach ihrem Kürzel alphabetisch sortiert.
 - Menüs der Fachkarten wieder kollisionsfrei am rechten Kartenrand ausgerichtet.
 - Zeitlich begrenzte Projekttage blenden auch Kursstunden über deren aktuelle Herkunftsklassen zuverlässig aus.
+- Ältere Projekttag-Zuweisungen werden über Schule, Klassenstufe und Kürzel auf die aktuellen Klassen-IDs aufgelöst.
 
 ### 2026-08-24
 

@@ -1803,7 +1803,22 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
   if (lessonGradeNames.size && !hasVisibleLessonGrade) return false;
   const matchesClassProjectGroup = (group) => {
     if (!group) return false;
-    if (group.schoolId && effectiveLessonSchoolId && group.schoolId !== effectiveLessonSchoolId) return false;
+    const normalizedGroupName = String(group.className || "").trim().toLocaleLowerCase("de");
+    const normalizedGroupGrade = String(group.gradeName || "").trim().toLocaleLowerCase("de");
+    const normalizedGroupSuffix = String(group.suffix || "").trim().toLocaleLowerCase("de");
+    const currentClassIds = group.targetType === "class"
+      ? (catalog.grades || [])
+        .filter((grade) => (!group.schoolId || !grade.schoolId || grade.schoolId === group.schoolId)
+          && (!normalizedGroupGrade || String(grade.name || "").trim().toLocaleLowerCase("de") === normalizedGroupGrade))
+        .flatMap((grade) => (grade.classes || [])
+          .filter((classEntry) => {
+            const suffix = String(classEntry.suffix || "").trim().toLocaleLowerCase("de");
+            const name = String(classEntry.name || "").trim().toLocaleLowerCase("de");
+            return (normalizedGroupSuffix && suffix === normalizedGroupSuffix)
+              || (normalizedGroupName && name === normalizedGroupName);
+          })
+          .map((classEntry) => classEntry.id))
+      : [];
     const groupClassIds = group.targetType === "grade"
       ? (catalog.grades || [])
         .filter((grade) => String(grade.name || "").trim().toLocaleLowerCase("de") === String(group.gradeName || "").trim().toLocaleLowerCase("de")
@@ -1812,15 +1827,15 @@ function isLessonSuppressedByClassProject(project, lesson, date) {
       : group.targetType === "course"
         ? (catalog.subjects || []).flatMap((catalogSubject) => (catalogSubject.courses || []))
           .find((course) => course.id === group.courseId)?.classIds || group.classIds || []
-        : group.classIds || [];
+        : [...new Set([...(group.classIds || []), ...currentClassIds])];
     if (lessonClassIds.some((classId) => groupClassIds.includes(classId))) return true;
     if (group.targetType === "course" && lesson.courseId && group.courseId === lesson.courseId) return true;
+    if (group.schoolId && effectiveLessonSchoolId && group.schoolId !== effectiveLessonSchoolId) return false;
     if (group.targetType === "grade") {
-      const gradeName = String(group.gradeName || "").trim().toLocaleLowerCase("de");
-      return Boolean(gradeName && lessonGradeNames.has(gradeName));
+      return Boolean(normalizedGroupGrade && lessonGradeNames.has(normalizedGroupGrade));
     }
     return Boolean(group.targetType === "class"
-      && String(group.className || "").trim().toLocaleLowerCase("de") === legacyLessonClass);
+      && normalizedGroupName === legacyLessonClass);
   };
   const suppressedByClassProject = (Array.isArray(layer?.entries) ? layer.entries : []).some((entry) => {
     if (entry.overridesLessons === false) return false;
