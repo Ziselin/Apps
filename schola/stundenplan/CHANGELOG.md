@@ -9,6 +9,8 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - „Projekttage nach Klassen“ in „Schulische Termine“ überführt: gemeinsamer Ereignisdialog mit optionaler Klassen-/Kurszuweisung, getrennten Auswirkungen auf Klassenunterricht und eigenen Unterricht sowie personenbezogener Fristlogik; Klassen erzeugen keine Browserordner mehr.
 - Bestehende klassenbezogene Projekte verlustfrei als ungruppierte schulische Termine migriert und für die manuelle Gruppenorganisation vorbereitet.
 - Die Zuordnung von Einzelereignissen unterscheidet allgemeine Gruppen und darin liegende Projektgruppen jetzt eindeutig; beide Ebenen sind direkt auswählbar.
+- Schulische Termine um einen optionalen Ort/Raum ergänzt; Tages- und Wochenansicht zeigen Klassenbezug und Raum wie bei Unterrichtsstunden oben rechts untereinander.
+- Unterrichtsstunden zeigen 15 Minuten vor Beginn einen kreideroten, rückwärts laufenden Vorbereitungsbalken und wechseln zum Stundenbeginn live in den regulären Phasenverlauf.
 - Kurse um eine Schülerauswahl mit Checkboxdialog, stabilen Schüler-IDs und gekoppelten Herkunftsklassen erweitert.
 
 ### 2026-08-25

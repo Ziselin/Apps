@@ -39,6 +39,8 @@ const appointmentDialogTitle = document.getElementById("appointmentDialogTitle")
 const appointmentForm = document.getElementById("appointmentForm");
 const appointmentName = document.getElementById("appointmentName");
 const appointmentAssignment = document.getElementById("appointmentAssignment");
+const appointmentRoomField = document.getElementById("appointmentRoomField");
+const appointmentRoom = document.getElementById("appointmentRoom");
 const appointmentClassSection = document.getElementById("appointmentClassSection");
 const appointmentClassSummary = document.getElementById("appointmentClassSummary");
 const appointmentClassButton = document.getElementById("appointmentClassButton");
@@ -853,12 +855,51 @@ function getScheduleReferenceDate() {
 function updateLivePhaseElement(element, now = new Date()) {
   const lessonStartMs = Number(element.dataset.lessonStartMs);
   const lessonEndMs = Number(element.dataset.lessonEndMs);
-  if (!Number.isFinite(lessonStartMs) || !Number.isFinite(lessonEndMs) || now.getTime() < lessonStartMs || now.getTime() >= lessonEndMs) {
+  const nowMs = now.getTime();
+  const prestartDurationMs = 15 * 60 * 1000;
+  const showPrestart = element.dataset.showPrestart !== "false";
+  const isPrestart = showPrestart && nowMs >= lessonStartMs - prestartDurationMs && nowMs < lessonStartMs;
+  const isActive = nowMs >= lessonStartMs && nowMs < lessonEndMs;
+  if (!Number.isFinite(lessonStartMs) || !Number.isFinite(lessonEndMs) || (!isPrestart && !isActive)) {
     element.hidden = true;
+    element.classList.remove("is-prestart");
+    return;
+  }
+  const formatCountdown = (remainingSeconds) => {
+    const minutes = String(Math.floor(remainingSeconds / 60)).padStart(2, "0");
+    const seconds = String(remainingSeconds % 60).padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
+  element.hidden = false;
+  element.classList.toggle("is-prestart", isPrestart);
+  const countdown = element.querySelector(".live-phase-remaining");
+  const progress = element.querySelector(".live-phase-progress");
+  if (isPrestart) {
+    const remainingSeconds = Math.max(0, Math.ceil((lessonStartMs - nowMs) / 1000));
+    const remainingRatio = Math.min(1, Math.max(0, (lessonStartMs - nowMs) / prestartDurationMs));
+    const remainingCountdown = formatCountdown(remainingSeconds);
+    countdown.querySelector(".live-phase-total").textContent = `Beginn in ${remainingCountdown}`;
+    countdown.querySelector(".live-phase-current").textContent = "";
+    countdown.setAttribute("aria-label", `Unterrichtsbeginn in ${remainingCountdown}.`);
+    countdown.title = `Unterrichtsbeginn in ${remainingCountdown}`;
+    progress.classList.remove("is-dense");
+    const segment = document.createElement("span");
+    segment.className = "live-phase-segment is-current";
+    segment.style.flexGrow = "1";
+    segment.title = `Unterrichtsbeginn in ${remainingCountdown}`;
+    const label = document.createElement("span");
+    label.className = "live-phase-segment-label";
+    label.textContent = "Beginn in";
+    const track = document.createElement("span");
+    track.className = "live-phase-segment-track";
+    track.style.setProperty("--segment-progress", `${remainingRatio * 100}%`);
+    track.style.setProperty("--segment-relative-width", "100%");
+    segment.append(label, track);
+    progress.replaceChildren(segment);
     return;
   }
   const phases = JSON.parse(element.dataset.phases || "[]");
-  const elapsedSeconds = Math.floor((now.getTime() - lessonStartMs) / 1000);
+  const elapsedSeconds = Math.floor((nowMs - lessonStartMs) / 1000);
   let phaseStartSeconds = 0;
   let phase = phases.at(-1);
   let phaseIndex = Math.max(0, phases.length - 1);
@@ -875,21 +916,13 @@ function updateLivePhaseElement(element, now = new Date()) {
   const phaseDurationSeconds = phase.durationMinutes * 60;
   const elapsedInPhase = Math.max(0, elapsedSeconds - phaseStartSeconds);
   const phaseRemainingSeconds = Math.max(0, phaseDurationSeconds - elapsedInPhase);
-  const totalRemainingSeconds = Math.max(0, Math.ceil((lessonEndMs - now.getTime()) / 1000));
-  const formatCountdown = (remainingSeconds) => {
-    const minutes = String(Math.floor(remainingSeconds / 60)).padStart(2, "0");
-    const seconds = String(remainingSeconds % 60).padStart(2, "0");
-    return `${minutes}:${seconds}`;
-  };
-  element.hidden = false;
+  const totalRemainingSeconds = Math.max(0, Math.ceil((lessonEndMs - nowMs) / 1000));
   const totalCountdown = formatCountdown(totalRemainingSeconds);
   const phaseCountdown = formatCountdown(phaseRemainingSeconds);
-  const countdown = element.querySelector(".live-phase-remaining");
   countdown.querySelector(".live-phase-total").textContent = totalCountdown;
   countdown.querySelector(".live-phase-current").textContent = `(${phaseCountdown})`;
   countdown.setAttribute("aria-label", `Gesamte Stunde: ${totalCountdown} verbleibend. Aktuelle Phase ${phase.name}: ${phaseCountdown} verbleibend.`);
   countdown.title = `Gesamt verbleibend: ${totalCountdown} · Phase verbleibend: ${phaseCountdown}`;
-  const progress = element.querySelector(".live-phase-progress");
   const totalPhaseSeconds = phases.reduce((sum, candidate) => sum + Math.max(1, Number(candidate.durationMinutes) * 60), 0);
   const maximumPhaseSeconds = phases.reduce((maximum, candidate) => (
     Math.max(maximum, Math.max(1, Number(candidate.durationMinutes) * 60))
@@ -926,7 +959,7 @@ function updateLivePhaseElement(element, now = new Date()) {
   progress.replaceChildren(...segments);
 }
 
-function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht") {
+function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht", showPrestart = true) {
   if (mainCalendarView !== "day" || !date || getLocalDateKey(date) !== getLocalDateKey(new Date())) return;
   const lessonMinutes = Math.max(0, timeToMinutes(lesson.end) - timeToMinutes(lesson.start));
   const phases = Array.isArray(lesson.phases) && lesson.phases.length
@@ -939,9 +972,10 @@ function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht")
   live.dataset.lessonStartMs = String(new Date(`${getLocalDateKey(date)}T${lesson.start}:00`).getTime());
   live.dataset.lessonEndMs = String(new Date(`${getLocalDateKey(date)}T${lesson.end}:00`).getTime());
   live.dataset.phases = JSON.stringify(phases);
+  live.dataset.showPrestart = String(showPrestart);
   live.innerHTML = "<span class=\"live-phase-copy\"><span class=\"live-phase-remaining\"><span class=\"live-phase-total\"></span> <strong class=\"live-phase-current\"></strong></span></span><span class=\"live-phase-progress\"></span>";
   const phaseSummary = phases.map((phase) => `${phase.name}, ${phase.durationMinutes} Minuten`).join("; ");
-  card.setAttribute("aria-description", `Phasen: ${phaseSummary}. Die erste Zeit zeigt die verbleibende Gesamtzeit, die Zeit in Klammern die verbleibende Zeit der aktuellen Phase.`);
+  card.setAttribute("aria-description", `${showPrestart ? "Ab 15 Minuten vor Beginn wird die verbleibende Vorbereitungszeit angezeigt. " : ""}Phasen: ${phaseSummary}. Die erste Zeit zeigt die verbleibende Gesamtzeit, die Zeit in Klammern die verbleibende Zeit der aktuellen Phase.`);
   card.title = `${card.title} · Phasen: ${phaseSummary}`;
   card.append(live);
   updateLivePhaseElement(live);
@@ -1004,16 +1038,33 @@ function renderSchoolProjectCard(schoolProject, start, end) {
   const name = document.createElement("strong");
   name.textContent = schoolProject.name;
   const assignedClasses = (schoolProject.classNames || []).join(", ") || schoolProject.className;
-  if (schoolProject.type === "class-trip" && assignedClasses) {
+  if (schoolProject.type === "school-project") {
+    const heading = document.createElement("span");
+    heading.className = "lesson-card-heading";
+    const classLabel = document.createElement("span");
+    classLabel.textContent = assignedClasses || "";
+    heading.append(name, classLabel);
+    const time = document.createElement("small");
+    time.textContent = `${minutesToTime(start)}–${minutesToTime(end)}`;
+    const room = document.createElement("small");
+    room.className = "lesson-card-room";
+    room.textContent = schoolProject.room || "";
+    const meta = document.createElement("span");
+    meta.className = "lesson-card-meta";
+    meta.append(time, room);
+    card.append(heading, meta);
+  } else if (schoolProject.type === "class-trip" && assignedClasses) {
     const classLabel = document.createElement("small");
     classLabel.textContent = `Klasse ${assignedClasses}`;
     card.append(name, classLabel);
   } else {
     card.append(name);
   }
-  const time = document.createElement("small");
-  time.textContent = `${minutesToTime(start)}–${minutesToTime(end)}`;
-  card.append(time);
+  if (schoolProject.type !== "school-project") {
+    const time = document.createElement("small");
+    time.textContent = `${minutesToTime(start)}–${minutesToTime(end)}`;
+    card.append(time);
+  }
   card.addEventListener("click", () => {
     const project = projects.find((entry) => entry.id === schoolProject.projectId);
     const originalEntry = project?.layers?.find((entry) => entry.type === (schoolProject.type === "class-project" ? "classes" : "individual"))
@@ -1035,6 +1086,8 @@ function renderAppointmentTimelineCard(appointment, date = null) {
   card.title = `${appointment.projectName} / ${appointment.groupName}`;
   const name = document.createElement("strong");
   name.textContent = appointment.name;
+  const isSchoolAppointment = appointment.layerType === "appointments";
+  const assignedClasses = (appointment.classNames || []).join(", ") || appointment.className || "";
   const group = document.createElement("small");
   group.textContent = appointment.appointmentProjectName
     ? `${appointment.groupName} · ${appointment.appointmentProjectName}`
@@ -1043,13 +1096,28 @@ function renderAppointmentTimelineCard(appointment, date = null) {
   time.textContent = appointment.startTime && appointment.endTime
     ? `${appointment.startTime}–${appointment.endTime}`
     : "Zeit noch offen";
-  card.append(name, group, time);
+  if (isSchoolAppointment) {
+    const heading = document.createElement("span");
+    heading.className = "lesson-card-heading";
+    const classLabel = document.createElement("span");
+    classLabel.textContent = assignedClasses;
+    heading.append(name, classLabel);
+    const room = document.createElement("small");
+    room.className = "lesson-card-room";
+    room.textContent = appointment.room || "";
+    const meta = document.createElement("span");
+    meta.className = "lesson-card-meta";
+    meta.append(time, room);
+    card.append(heading, meta, group);
+  } else {
+    card.append(name, group, time);
+  }
   if (appointment.startTime && appointment.endTime) {
     configureLivePhase(card, {
       start: appointment.startTime,
       end: appointment.endTime,
       phases: []
-    }, date, appointment.name || "Termin");
+    }, date, appointment.name || "Termin", false);
   }
   card.addEventListener("click", () => {
     const project = projects.find((entry) => entry.id === appointment.projectId);
@@ -2153,6 +2221,7 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
           uid: `${entry.type}-${entry.id}-${dateKey}`,
           title: entry.name || ({ "class-trip": "Klassenfahrt", "school-project": "Einzelveranstaltung", vacation: "Urlaub", "personal-appointment": "Termin" }[entry.type]),
           description: (entry.classNames || []).join(", ") || entry.className || entry.class || "",
+          location: entry.room || "",
           startDate: dateKey,
           startTime: entry.startTime,
           endTime: entry.endTime,
@@ -2171,6 +2240,7 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
         uid: `appointment-${group.id}-${appointment.appointmentProjectId || "direct"}-${appointment.id}`,
         title: appointment.name || group.name || "Termin",
         description: [group.name, appointment.appointmentProjectName].filter(Boolean).join(" · "),
+        location: appointment.room || "",
         startDate: getAppointmentStartDate(appointment),
         endDate: getAppointmentEndDate(appointment),
         startTime: appointment.startTime,
@@ -4433,6 +4503,7 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
   appointmentDialog.dataset.ungrouped = String(!group);
   populateAppointmentAssignmentSelect(appointmentAssignment, project, layerType, group?.id || null, appointmentProject?.id || null, false, true);
   const isSchoolAppointment = layerType === "appointments";
+  appointmentRoomField.hidden = !isSchoolAppointment;
   appointmentClassSection.hidden = !isSchoolAppointment;
   appointmentOverridesClassLessonsField.hidden = !isSchoolAppointment;
   appointmentSelectedClassKeys = isSchoolAppointment ? getStoredClassTargetKeys(project, appointment) : [];
@@ -4443,6 +4514,7 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
     appointmentDialogTitle.textContent = "Termin bearbeiten";
     appointmentSubmitButton.textContent = "Änderungen speichern";
     appointmentName.value = appointment.name || "";
+    appointmentRoom.value = isSchoolAppointment ? (appointment.room || "") : "";
     appointmentStartDate.value = getAppointmentStartDate(appointment);
     appointmentEndDate.value = getAppointmentEndDate(appointment);
     appointmentStartTime.value = appointment.startTime || "";
@@ -4457,6 +4529,7 @@ function openAppointmentDialog(project, group, appointment = null, layerType = "
     appointmentSubmitButton.textContent = "Termin hinzufügen";
     appointmentCalendarVisible.checked = true;
     appointmentOverridesClassLessons.checked = false;
+    appointmentRoom.value = "";
   }
   linkDateRangePicker(appointmentStartDate, appointmentEndDate);
   appointmentEndDate.min = appointmentStartDate.value;
@@ -10473,6 +10546,7 @@ appointmentForm.addEventListener("submit", (event) => {
     : { classGroups: [], classIds: [], classNames: [], schoolIds: [] };
   const appointmentData = {
     name,
+    room: layerType === "appointments" ? appointmentRoom.value.trim() : "",
     startDate: appointmentStartDate.value,
     endDate: appointmentEndDate.value,
     startTime: appointmentStartTime.value,

@@ -2092,6 +2092,17 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
 }
 .live-phase-remaining { flex: 0 0 auto; color: var(--ink-soft); }
 .live-phase-current { color: var(--ink); font-weight: 700; }
+.live-phase.is-prestart {
+  background: rgba(255, 246, 244, .9);
+  box-shadow: inset 0 0 0 1px rgba(154, 61, 61, .18);
+}
+.live-phase.is-prestart .live-phase-remaining,
+.live-phase.is-prestart .live-phase-segment-label { color: #8f3030; font-weight: 700; }
+.live-phase.is-prestart .live-phase-segment-track { background: rgba(143, 48, 48, .16); }
+.live-phase.is-prestart .live-phase-segment-track::before { background: #b75252; }
+.live-phase.is-prestart .live-phase-segment.is-current .live-phase-segment-track {
+  box-shadow: inset 0 0 0 1px rgba(143, 48, 48, .38);
+}
 .live-phase-progress {
   display: flex;
   gap: 2px;

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-  <link rel="stylesheet" href="stundenplan.css?v=20260827b">
+  <link rel="stylesheet" href="stundenplan.css?v=20260827d">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -257,6 +257,10 @@
         <label class="dialog-field">
           <span>Zuordnung</span>
           <select id="appointmentAssignment"></select>
+        </label>
+        <label id="appointmentRoomField" class="dialog-field">
+          <span>Ort / Raum (optional)</span>
+          <input id="appointmentRoom" type="text" maxlength="80" autocomplete="off" placeholder="z. B. Aula oder Raum 204">
         </label>
         <fieldset id="appointmentClassSection" class="class-project-class-picker">
           <legend>Beteiligte Klassen, Klassenstufen oder Kurse (optional)</legend>
@@ -561,7 +565,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260827b"></script>
+    <script src="stundenplan.js?v=20260827d"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
