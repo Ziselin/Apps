@@ -5114,6 +5114,48 @@ function createAppointmentProjectCard(project, group, appointmentProject, layerT
   return card;
 }
 
+function getNextAppointmentInGroup(group, now = new Date()) {
+  const todayKey = getLocalDateKey(now);
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return getAppointmentGroupEntries(group)
+    .filter((appointment) => {
+      if (appointment.isDeadline && appointment.completed) return false;
+      const endDate = getAppointmentEndDate(appointment);
+      if (!endDate || endDate < todayKey) return false;
+      if (endDate > todayKey) return true;
+      return !appointment.endTime || appointment.endTime >= currentTime;
+    })
+    .sort((a, b) => {
+      const aStart = getAppointmentStartDate(a) || "9999-12-31";
+      const bStart = getAppointmentStartDate(b) || "9999-12-31";
+      const aIsActive = aStart <= todayKey && getAppointmentEndDate(a) >= todayKey;
+      const bIsActive = bStart <= todayKey && getAppointmentEndDate(b) >= todayKey;
+      if (aIsActive !== bIsActive) return aIsActive ? -1 : 1;
+      return `${aStart} ${a.startTime || "00:00"}`.localeCompare(`${bStart} ${b.startTime || "00:00"}`);
+    })[0] || null;
+}
+
+function getAppointmentGroupPreview(group, now = new Date()) {
+  const appointment = getNextAppointmentInGroup(group, now);
+  if (!appointment) return "Kein anstehender Termin";
+  const todayKey = getLocalDateKey(now);
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const startDate = getAppointmentStartDate(appointment);
+  const endDate = getAppointmentEndDate(appointment);
+  const dateLabel = startDate < todayKey && endDate >= todayKey
+    ? `läuft bis ${formatGermanDate(endDate)}`
+    : startDate === todayKey
+      ? "heute"
+      : startDate === getLocalDateKey(tomorrow)
+        ? "morgen"
+        : formatGermanDate(startDate);
+  const timeLabel = appointment.startTime
+    ? appointment.endTime ? `${appointment.startTime}–${appointment.endTime}` : appointment.startTime
+    : "Zeit offen";
+  return `Nächster Termin: ${dateLabel} · ${timeLabel} · ${appointment.name || "Termin"}`;
+}
+
 function createAppointmentGroupHeader(project, group, layerType) {
   const groupKey = `${project.id}:${layerType}:${group.id}`;
   const isExpanded = expandedAppointmentGroupKeys.has(groupKey);
@@ -5130,6 +5172,13 @@ function createAppointmentGroupHeader(project, group, layerType) {
   title.className = "appointment-group-title";
   title.textContent = group.name;
   title.setAttribute("aria-expanded", String(isExpanded));
+  const titleBlock = document.createElement("div");
+  titleBlock.className = "appointment-group-title-block";
+  const preview = document.createElement("small");
+  preview.className = "appointment-group-next";
+  preview.textContent = getAppointmentGroupPreview(group);
+  preview.title = preview.textContent;
+  titleBlock.append(title, preview);
   const toggleGroup = () => {
     if (isExpanded) expandedAppointmentGroupKeys.delete(groupKey);
     else expandedAppointmentGroupKeys.add(groupKey);
@@ -5138,7 +5187,7 @@ function createAppointmentGroupHeader(project, group, layerType) {
   };
   toggle.addEventListener("click", toggleGroup);
   title.addEventListener("click", toggleGroup);
-  head.append(toggle, title, createAppointmentMenu(project, group, null, layerType));
+  head.append(toggle, titleBlock, createAppointmentMenu(project, group, null, layerType));
   return { head, isExpanded };
 }
 
@@ -5715,7 +5764,7 @@ function renderClassStudentList() {
   classStudentList.replaceChildren(...rows);
 }
 
-function openClassCatalogDialog(project, mode, subject = null, grade = null, classEntry = null) {
+function openClassCatalogDialog(project, mode, subject = null, grade = null, classEntry = null, initialTab = "general") {
   classCatalogForm.reset();
   classCatalogDialogStatus.textContent = "";
   classCatalogDialog.dataset.projectId = project.id;
@@ -5745,7 +5794,7 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
   classCatalogTeacherTwoField.hidden = !teachers[1];
   addSecondClassTeacherButton.hidden = Boolean(teachers[1]);
   classCatalogTabs.hidden = mode !== "catalog-class";
-  setClassCatalogTab("general");
+  setClassCatalogTab(mode === "catalog-class" && initialTab === "students" ? "students" : "general");
   classStudentDraft = mode === "catalog-class"
     ? structuredClone(Array.isArray(classEntry?.students) ? classEntry.students : [])
     : [];
@@ -5774,7 +5823,13 @@ function openClassCatalogDialog(project, mode, subject = null, grade = null, cla
     ? "Änderungen speichern"
     : mode === "catalog-class" ? "Klasse erstellen" : "Hinzufügen";
   classCatalogDialog.showModal();
-  requestAnimationFrame(() => (mode === "catalog-grade" ? classCatalogGrade : classCatalogName).focus());
+  requestAnimationFrame(() => {
+    if (mode === "catalog-class" && initialTab === "students") {
+      (classStudentList.querySelector(".class-student-row input[type='text']") || addClassStudentButton).focus();
+    } else {
+      (mode === "catalog-grade" ? classCatalogGrade : classCatalogName).focus();
+    }
+  });
 }
 
 function createClassCatalogMenu(project, type, subject, grade = null, classEntry = null) {
@@ -6308,8 +6363,26 @@ function renderClassCatalogProperties(project) {
         const row = document.createElement("div");
         row.className = "class-catalog-class";
         const name = document.createElement("span");
+        name.className = "class-catalog-class-name";
         renderClassDisplay(name, grade.name, classEntry.suffix, classEntry.displayMode);
-        row.append(name, createClassCatalogMenu(project, "catalog-class", null, grade, classEntry));
+        const metadata = document.createElement("div");
+        metadata.className = "class-catalog-class-meta";
+        const teacher = document.createElement("button");
+        teacher.type = "button";
+        teacher.className = "class-catalog-class-detail";
+        const teacherNames = (classEntry.teachers || []).filter(Boolean);
+        teacher.textContent = teacherNames.length ? teacherNames.join(" / ") : "Klassenlehrer fehlt";
+        teacher.title = "Allgemeine Klassendaten öffnen";
+        teacher.addEventListener("click", () => openClassCatalogDialog(project, "catalog-class", null, grade, classEntry, "general"));
+        const students = document.createElement("button");
+        students.type = "button";
+        students.className = "class-catalog-class-detail is-students";
+        const studentCount = (classEntry.students || []).length;
+        students.textContent = `${studentCount} Schüler`;
+        students.title = "Schülerliste öffnen";
+        students.addEventListener("click", () => openClassCatalogDialog(project, "catalog-class", null, grade, classEntry, "students"));
+        metadata.append(teacher, students);
+        row.append(name, metadata, createClassCatalogMenu(project, "catalog-class", null, grade, classEntry));
         classList.append(row);
       });
       const addClass = document.createElement("button");

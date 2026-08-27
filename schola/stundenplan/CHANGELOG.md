@@ -11,6 +11,8 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Die Zuordnung von Einzelereignissen unterscheidet allgemeine Gruppen und darin liegende Projektgruppen jetzt eindeutig; beide Ebenen sind direkt auswählbar.
 - Schulische Termine um einen optionalen Ort/Raum ergänzt; Tages- und Wochenansicht zeigen Klassenbezug und Raum wie bei Unterrichtsstunden oben rechts untereinander.
 - Unterrichtsstunden zeigen 15 Minuten vor Beginn einen kreideroten, rückwärts laufenden Vorbereitungsbalken und wechseln zum Stundenbeginn live in den regulären Phasenverlauf.
+- Schulische und persönliche Termingruppen zeigen im Gruppenkopf den jeweils nächsten anstehenden Termin – einschließlich der Termine aus enthaltenen Projektgruppen.
+- Klassenkarten zeigen Klassenlehrer und Schülerzahl als direkte Sprungziele zu „Allgemein“ beziehungsweise „Schülerliste“ im Klassendialog.
 - Kurse um eine Schülerauswahl mit Checkboxdialog, stabilen Schüler-IDs und gekoppelten Herkunftsklassen erweitert.
 
 ### 2026-08-25
