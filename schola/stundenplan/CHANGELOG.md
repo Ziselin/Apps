@@ -4,6 +4,13 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-08-27
+
+- „Projekttage nach Klassen“ in „Schulische Termine“ überführt: gemeinsamer Ereignisdialog mit optionaler Klassen-/Kurszuweisung, getrennten Auswirkungen auf Klassenunterricht und eigenen Unterricht sowie personenbezogener Fristlogik; Klassen erzeugen keine Browserordner mehr.
+- Bestehende klassenbezogene Projekte verlustfrei als ungruppierte schulische Termine migriert und für die manuelle Gruppenorganisation vorbereitet.
+- Die Zuordnung von Einzelereignissen unterscheidet allgemeine Gruppen und darin liegende Projektgruppen jetzt eindeutig; beide Ebenen sind direkt auswählbar.
+- Kurse um eine Schülerauswahl mit Checkboxdialog, stabilen Schüler-IDs und gekoppelten Herkunftsklassen erweitert.
+
 ### 2026-08-25
 
 - Mehrtägige Unterrichtsstunden als gemeinsame Serie gespeichert, sodass abgewählte Wochentage entfernt und beim Zurückstellen keine Doppelstunden erzeugt werden.

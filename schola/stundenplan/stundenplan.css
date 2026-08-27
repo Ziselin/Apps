@@ -1100,6 +1100,10 @@ button.month-view-entry:focus-visible { outline: 1px solid var(--ink-soft); outl
 }
 .class-project-target-chip.is-grade { background: rgba(198,215,189,.42); color: var(--ink); }
 .class-project-target-chip.is-course { border-color: rgba(70,105,132,.3); background: color-mix(in srgb, var(--project-blue) 68%, white); color: var(--ink); }
+.class-project-target-chip.is-student { background: rgba(255,255,252,.78); color: var(--ink); }
+.class-course-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.class-course-selection-summary { display: grid; gap: 7px; }
+.class-course-selection-summary > strong { margin-top: 3px; font-size: .75rem; color: var(--ink-soft); }
 .class-target-checkbox-list { display: grid; gap: 7px; max-height: min(52vh, 430px); overflow-y: auto; padding-right: 3px; }
 .class-target-checkbox {
   display: grid;
@@ -1122,6 +1126,7 @@ button.month-view-entry:focus-visible { outline: 1px solid var(--ink-soft); outl
 .class-target-checkbox > span > small { display: block; }
 .class-target-checkbox strong { color: var(--ink); font-size: .82rem; }
 .class-target-checkbox small { margin-top: 2px; color: var(--muted); font-size: .7rem; }
+.class-target-student-class { display: inline; margin: 0; color: inherit; font-size: inherit; }
 .property-section { display: grid; gap: 13px; }
 .property-section h3 { margin: 0; font-size: .88rem; }
 .property-list { display: grid; gap: 8px; }

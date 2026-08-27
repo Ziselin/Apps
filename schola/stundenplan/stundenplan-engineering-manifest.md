@@ -14,7 +14,9 @@ Dieses Manifest regelt den spezifischen Kompetenzbereich der App Stundenplan. Es
 
 - Ein Projektordner ist die fachliche Einheit eines Stundenplanprojekts.
 - Schulen bündeln Schulart, Bezeichnung, Bundesland, Schuljahr, Zeitmodelle und die zugehörigen Ferien. Eine separate Ferien-Kategorie gibt es nicht mehr.
-- Individuelle Projekte, klassenbezogene Projekttage und Stundenplandaten bleiben davon getrennte Kalenderschichten.
+- Schulische Ereignisse bilden eine gemeinsame Kalenderschicht. Klassen, Klassenstufen und Kurse sind optionale Eigenschaften eines Ereignisses und erzeugen keine eigenen Browserordner; die sichtbare Organisation bestimmen ausschließlich manuell angelegte Termin- und Projektgruppen.
+- Die Wirkung eines schulischen Ereignisses auf den Unterricht der ausgewählten Klassen und auf den eigenen Unterricht der Lehrkraft wird unabhängig voneinander gespeichert.
+- Persönliche Termine und Stundenplandaten bleiben davon getrennte Kalenderschichten.
 - Fächer, Klassen und Stundenpläne referenzieren eine konkrete Schule. Unterrichtsstatistik, Ferienausnahmen und Zeitmodelle werden dadurch eindeutig aus derselben Schule abgeleitet.
 - Identische Ferien desselben Bundeslands und Zeitraums werden in der Kalenderdarstellung nur einmal gezeichnet, intern aber mit allen betroffenen Schulen verknüpft.
 - Die maximale Kalenderspanne eines Projektordners wird aus sämtlichen Schulen ermittelt und darf in den Ordnereinstellungen manuell angepasst werden.
