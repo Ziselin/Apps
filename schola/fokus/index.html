@@ -6,23 +6,37 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Fokus · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
-  <link rel="stylesheet" href="fokus.css?v=20260827f">
-  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827f">
-  <link rel="stylesheet" href="fokus-fixes.css?v=20260827f">
+  <link rel="stylesheet" href="fokus.css?v=20260827j">
+  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827j">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260827j">
+  <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
   <div id="app" class="app-shell">
     <header class="topbar">
-      <a class="brand" href="../../index.html?project=schola" aria-label="Zur Schola-Übersicht">
-        <img src="../../assets/fokus-icon.svg" alt="">
-        <span><strong>fokus</strong><small>Aufgabenspaces</small></span>
-      </a>
+      <div class="brand-plate">
+        <button type="button" id="menuButton" class="header-icon-button app-menu-trigger" aria-label="Menü öffnen" aria-expanded="false" aria-controls="sideMenu"><span class="app-menu-trigger-icon" aria-hidden="true"></span></button>
+        <div class="brand-mark"><a class="brand-home-link" href="../../index.html?project=schola" aria-label="Zur Schola-Startseite"><img class="brand-bird" src="../../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true"></a><span class="brand-name">fokus</span></div>
+      </div>
       <nav class="mode-switch" aria-label="Arbeitsbereich">
         <button type="button" data-mode="teacher">Erstellen</button>
         <button type="button" data-mode="student" class="is-active">Bearbeiten</button>
       </nav>
       <div class="status-pill" id="saveStatus">Lokal gespeichert</div>
     </header>
+
+    <div id="menuOverlay" class="menu-overlay" hidden></div>
+    <aside id="sideMenu" class="side-menu app-menu-drawer" aria-hidden="true" inert data-app-menu>
+      <div class="side-menu-inner">
+        <div class="side-menu-head app-menu-head"><div class="app-menu-titleblock"><span class="eyebrow">Menü</span><strong>Fokus</strong></div><button type="button" id="menuCloseButton" class="menu-close-button app-menu-close" aria-label="Menü schließen">×</button></div>
+        <div class="side-menu-list app-menu-list">
+          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="projects" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-projects" aria-hidden="true"></span><span>Projekte</span></button><div class="app-menu-panel" data-app-menu-popup="projects" hidden><div class="project-choice-list"><a class="project-choice" href="../../index.html">Atlas</a><a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a></div></div></section>
+          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="help" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-help" aria-hidden="true"></span><span>Funktionsweise</span></button><div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Fokus erstellt lokale Aufgabenspaces und begleitet eine konzentrierte Bearbeitung.</p></div></section>
+          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button><div class="app-menu-panel" data-app-menu-popup="data" hidden><p>Projekte, Klassen und Arbeitsstände bleiben lokal und werden nur über Dateien übertragen.</p></div></section>
+          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="description" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-description" aria-hidden="true"></span><span>Appbeschreibung</span></button><div class="app-menu-panel" data-app-menu-popup="description" hidden><p>Fokus ist die Aufgaben- und Prüfungsraum-App des Projekts Schola.</p></div></section>
+        </div>
+      </div>
+    </aside>
 
     <main>
       <section id="teacherView" class="view teacher-view" hidden>
@@ -159,6 +173,7 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260827f"></script>
+  <script src="fokus.js?v=20260827j"></script>
+  <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
