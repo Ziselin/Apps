@@ -239,3 +239,84 @@ body.session-active .student-view { min-height: 100vh; }
 .focus-submission-card strong { font-size:.9rem; }
 .focus-submission-card small { color:var(--muted); }
 .focus-submission-import { justify-self:start; }
+.task-material-editor { display:grid; gap:12px; margin-top:10px; }
+.task-material-list { display:grid; gap:12px; }
+.task-material-card { overflow:hidden; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,252,.48); }
+.task-material-head { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:8px 10px 8px 14px; border-bottom:1px solid var(--line); }
+.task-material-head > div { display:grid; gap:2px; min-width:0; }
+.task-material-head strong { overflow:hidden; font-size:.84rem; text-overflow:ellipsis; white-space:nowrap; }
+.task-material-remove { display:grid; place-items:center; flex:0 0 auto; width:32px; height:32px; padding:0; border:0; border-radius:8px; color:var(--muted); background:transparent; font-size:1.3rem; cursor:pointer; }
+.task-material-remove:hover { color:var(--danger); background:rgba(255,255,252,.8); }
+.task-material-typemap { display:block; width:100%; height:320px; border:0; background:#fff; }
+.task-material-image { display:block; width:100%; max-height:520px; object-fit:contain; background:#fff; }
+.task-material-add { position:relative; justify-self:start; }
+.task-material-add-button { display:grid; place-items:center; width:38px; height:38px; padding:0; border:1px solid var(--line-strong); border-radius:10px; color:var(--ink); background:rgba(255,255,252,.72); font-size:1.35rem; cursor:pointer; }
+.task-material-add-button:hover,.task-material-add-button:focus-visible { background:#fff; }
+.task-material-menu { position:absolute; z-index:12; top:calc(100% + 6px); left:0; display:grid; min-width:190px; padding:5px; border:1px solid var(--line); border-radius:11px; background:#f9f9f4; box-shadow:0 12px 30px rgba(33,54,51,.14); }
+.task-material-menu[hidden] { display:none; }
+.task-material-menu button { min-height:37px; padding:8px 10px; border:0; border-radius:7px; color:var(--ink); background:transparent; font:inherit; font-size:.82rem; text-align:left; cursor:pointer; }
+.task-material-menu button:hover { background:rgba(33,54,51,.07); }
+.student-task-materials { display:grid; gap:16px; margin:18px 0 22px; }
+.student-task-materials figure { margin:0; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:#fff; }
+.student-task-materials img { display:block; width:100%; max-height:680px; object-fit:contain; }
+.student-task-typemap { display:block; width:100%; height:380px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+.task-material-display-option { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-top:1px solid var(--line); cursor:pointer; }
+.task-material-display-option input { flex:0 0 auto; width:17px; height:17px; margin:2px 0 0; accent-color:var(--ink); }
+.task-material-display-option span { display:grid; gap:2px; }
+.task-material-display-option strong { font-size:.8rem; }
+.task-material-display-option small { color:var(--muted); font-size:.72rem; line-height:1.4; }
+.task-material-typemap.is-full,.student-task-typemap.is-full { overflow:hidden; }
+
+/* Ruhige, klar gegliederte Werkstatt für Aufgabenbereiche. */
+.teacher-view .workspace { justify-self:center; width:calc(100% - 48px); min-width:0; max-width:960px; }
+.task-editor { margin-top:30px; }
+.task-card { overflow:visible; padding:0; border-radius:16px; background:rgba(250,250,246,.9); box-shadow:0 12px 34px rgba(33,54,51,.065); }
+.task-head { display:grid; grid-template-columns:40px minmax(0,1fr) 104px; gap:14px; align-items:center; padding:22px 24px 20px; border-bottom:1px solid var(--line); }
+.task-number { width:36px; height:36px; border-radius:10px; color:var(--accent); background:rgba(49,93,85,.1); font-size:.84rem; }
+.task-title-group { display:grid; gap:2px; min-width:0; }
+.task-title-group .eyebrow { color:var(--accent); font-size:.63rem; }
+.task-title { width:100%; min-width:0; padding:2px 0 4px; border:0; border-bottom:1px solid transparent; border-radius:0; background:transparent; font-size:1.35rem; line-height:1.25; }
+.task-title:hover { border-bottom-color:var(--line); }
+.task-title:focus { border-bottom-color:var(--accent); box-shadow:none; }
+.be-field { position:relative; display:grid; grid-template-columns:1fr auto; gap:2px 5px; width:104px; }
+.be-field input { grid-column:1 / -1; width:100%; padding-right:34px; font-variant-numeric:tabular-nums; }
+.be-field .field-unit { position:absolute; right:11px; bottom:11px; color:var(--muted); font-size:.69rem; font-weight:700; pointer-events:none; }
+.task-editor-section { margin:0; padding:22px 24px; border-bottom:1px solid var(--line); }
+.task-section-label { display:block; color:var(--ink); font-size:.79rem; font-weight:700; letter-spacing:.015em; }
+.task-section-hint { margin:3px 0 12px; color:var(--muted); font-size:.76rem; line-height:1.45; }
+.task-instruction-section textarea,.cloze-content-section textarea { display:block; width:100%; min-height:104px; margin:0; background:rgba(255,255,252,.78); line-height:1.55; }
+.task-response-config { display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:24px; align-items:end; background:rgba(238,238,231,.32); }
+.task-response-config .task-section-hint { margin-bottom:0; }
+.word-limit-field { width:150px; }
+.field-optional { color:var(--muted); font-size:.66rem; font-weight:400; }
+.task-editor-footer { display:flex; justify-content:flex-end; padding:10px 16px; }
+.task-editor-footer .danger-link { min-height:34px; padding:7px 9px; font-size:.75rem; }
+.task-editor-footer .danger-link:hover { border-radius:8px; background:rgba(154,67,61,.07); }
+
+.task-material-editor { gap:14px; margin:0; background:rgba(238,238,231,.18); }
+.task-material-title { display:flex; align-items:start; justify-content:space-between; gap:16px; }
+.task-material-title .task-section-hint { margin-bottom:0; }
+.task-material-list:empty { display:none; }
+.task-material-list { gap:10px; }
+.task-material-card { border-radius:10px; background:#fff; box-shadow:0 2px 8px rgba(33,54,51,.035); }
+.task-material-head { min-height:45px; padding:7px 8px 7px 12px; }
+.task-material-head .eyebrow { font-size:.58rem; }
+.task-material-add-button { display:flex; gap:8px; align-items:center; width:auto; height:38px; padding:0 12px 0 9px; border-color:var(--line); border-radius:9px; font-size:.79rem; font-weight:700; }
+.task-material-add-button > span:first-child { display:grid; place-items:center; width:20px; height:20px; border-radius:6px; color:#fff; background:var(--accent); font-size:1rem; font-weight:400; line-height:1; }
+.task-material-menu { top:calc(100% + 7px); min-width:278px; padding:6px; border-radius:10px; }
+.task-material-menu button { display:grid; gap:2px; min-height:52px; padding:8px 10px; }
+.task-material-menu button strong { font-size:.8rem; }
+.task-material-menu button small { color:var(--muted); font-size:.69rem; line-height:1.35; }
+
+.cloze-content-section textarea { min-height:148px; }
+.cloze-word-bank-editor { gap:13px; margin:18px 0 0; padding:14px 16px; border-radius:10px; background:rgba(223,230,225,.34); }
+.cloze-word-bank-toggle { font-size:.79rem; }
+.cloze-word-bank-editor textarea { min-height:72px; margin-top:1px; }
+.cloze-preview-wrap { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.cloze-preview-wrap > .eyebrow { margin-bottom:7px; }
+.cloze-preview { margin:0; padding:16px; border-style:dashed; border-radius:10px; background:rgba(255,255,252,.58); }
+
+@media(max-width:680px){
+  .teacher-view .workspace{width:calc(100% - 30px)}.task-head{grid-template-columns:36px minmax(0,1fr);padding:18px 16px}.be-field{grid-column:2;width:132px}.task-editor-section{padding:18px 16px}.task-response-config{grid-template-columns:1fr;gap:14px}.word-limit-field{width:100%}.task-material-menu{min-width:min(278px,calc(100vw - 64px))}
+}
+@media(min-width:761px) and (max-width:1120px){.workspace-head{flex-wrap:wrap}.workspace-head .actions{flex-wrap:wrap}.title-input{width:min(100%,580px)}}

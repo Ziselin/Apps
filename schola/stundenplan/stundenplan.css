@@ -1102,6 +1102,16 @@ button.month-view-entry:focus-visible { outline: 1px solid var(--ink-soft); outl
 .class-project-target-chip.is-course { border-color: rgba(70,105,132,.3); background: color-mix(in srgb, var(--project-blue) 68%, white); color: var(--ink); }
 .class-project-target-chip.is-student { background: rgba(255,255,252,.78); color: var(--ink); }
 .class-course-selection-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.class-course-id-button { margin-right: auto; }
+.class-course-id-dialog input[readonly] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255,255,252,.7);
+  color: var(--ink);
+  font: .78rem/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
 .class-course-selection-summary { display: grid; gap: 7px; }
 .class-course-selection-summary > strong { margin-top: 3px; font-size: .75rem; color: var(--ink-soft); }
 .class-target-checkbox-list { display: grid; gap: 7px; max-height: min(52vh, 430px); overflow-y: auto; padding-right: 3px; }

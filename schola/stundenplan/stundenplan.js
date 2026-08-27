@@ -1447,7 +1447,33 @@ function publishClassDirectory() {
       updatedAt: new Date().toISOString()
     })));
   });
-  localStorage.setItem(CLASS_DIRECTORY_STORAGE_KEY, JSON.stringify({ format: "schola-class-directory", version: 1, classes }));
+  const courses = projects.flatMap((project) => {
+    const catalog = project.layers?.find((entry) => entry.type === "classCatalog");
+    if (!catalog) return [];
+    const studentsById = new Map((catalog.grades || []).flatMap((grade) => (grade.classes || []).flatMap((classEntry) => (
+      (classEntry.students || []).map((student) => [student.id, {
+        ...structuredClone(student),
+        classId: classEntry.id,
+        className: classEntry.name || getClassDisplayText(grade.name, classEntry.suffix, classEntry.displayMode),
+        gradeId: grade.id,
+        gradeName: grade.name
+      }])
+    ))));
+    return (catalog.subjects || []).flatMap((subject) => (subject.courses || []).filter((course) => course.id).map((course) => ({
+      id: course.id,
+      transportId: `KU1:${course.id}`,
+      projectId: project.id,
+      projectName: project.name,
+      schoolId: subject.schoolId || "",
+      subjectId: subject.id,
+      subjectName: subject.name,
+      courseName: course.name,
+      classIds: structuredClone(course.classIds || []),
+      students: (course.studentIds || []).map((studentId) => studentsById.get(studentId)).filter(Boolean),
+      updatedAt: new Date().toISOString()
+    })));
+  });
+  localStorage.setItem(CLASS_DIRECTORY_STORAGE_KEY, JSON.stringify({ format: "schola-class-directory", version: 2, classes, courses }));
 }
 
 function getOverviewAppointmentSources(project) {
@@ -5550,6 +5576,7 @@ function getClassCatalogData(project) {
     subject.classIds = Array.isArray(subject.classIds) ? subject.classIds : [];
     subject.courses = Array.isArray(subject.courses) ? subject.courses : [];
     subject.courses.forEach((course) => {
+      course.id ||= globalThis.crypto?.randomUUID?.() ?? `course-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       course.classIds = Array.isArray(course.classIds) ? course.classIds : [];
       course.studentIds = Array.isArray(course.studentIds) ? course.studentIds : [];
     });
@@ -6137,6 +6164,51 @@ function openCourseStudentSelectionDialog(project, subject, classIds, initialStu
   dialog.showModal();
 }
 
+function openCourseIdDialog(project, subject, course) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog class-course-id-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = subject.name;
+  const title = document.createElement("h2");
+  title.textContent = "Kurs-ID";
+  heading.append(label, title);
+  const note = document.createElement("p");
+  note.className = "dialog-intro";
+  note.textContent = `Diese ID verweist auf „${course.name}“ und überträgt ausschließlich die aktuell ausgewählten Kursschüler.`;
+  const value = document.createElement("input");
+  value.type = "text";
+  value.readOnly = true;
+  value.value = `KU1:${course.id}`;
+  value.setAttribute("aria-label", `Kurs-ID für ${course.name}`);
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const close = document.createElement("button");
+  close.type = "submit";
+  close.className = "secondary-button";
+  close.textContent = "Schließen";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "secondary-button primary-action";
+  copy.textContent = "ID kopieren";
+  copy.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(value.value); }
+    catch { value.select(); document.execCommand("copy"); }
+    copy.textContent = "Kopiert";
+    setTimeout(() => { copy.textContent = "ID kopieren"; }, 1400);
+  });
+  actions.append(close, copy);
+  form.append(heading, note, value, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.showModal();
+  value.select();
+}
+
 function openCourseDialog(project, subject, course = null) {
   let selectedClassIds = [...(course?.classIds || [])];
   let selectedStudentIds = [...(course?.studentIds || [])];
@@ -6228,6 +6300,14 @@ function openCourseDialog(project, subject, course = null) {
   status.className = "property-status";
   const actions = document.createElement("div");
   actions.className = "dialog-actions";
+  if (course) {
+    const showId = document.createElement("button");
+    showId.type = "button";
+    showId.className = "secondary-button class-course-id-button";
+    showId.textContent = "ID";
+    showId.addEventListener("click", () => openCourseIdDialog(project, subject, course));
+    actions.append(showId);
+  }
   const cancel = document.createElement("button");
   cancel.type = "button";
   cancel.className = "secondary-button";

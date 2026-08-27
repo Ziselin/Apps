@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Fokus · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
-  <link rel="stylesheet" href="fokus.css?v=20260827j">
-  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827j">
-  <link rel="stylesheet" href="fokus-fixes.css?v=20260827j">
+  <link rel="stylesheet" href="fokus.css?v=20260827m">
+  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827k">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260827m">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -148,6 +148,17 @@
     </form>
   </dialog>
 
+  <dialog id="taskTypeMapDialog">
+    <form id="taskTypeMapForm" class="dialog-card compact">
+      <div class="dialog-head"><div><span class="eyebrow">Aufgabenmaterial</span><h2>Text aus TypeMap einfügen</h2></div><button id="cancelTaskTypeMap" class="icon-button" type="button" aria-label="Schließen">×</button></div>
+      <p>Fügen Sie die TypeMap-ID ein. Der aktuelle Textstand wird lokal in die Aufgabe übernommen.</p>
+      <label class="field-label">TypeMap-ID<input id="taskTypeMapId" autocomplete="off" spellcheck="false" placeholder="TM1:…" required></label>
+      <p id="taskTypeMapError" class="error" role="alert"></p>
+      <div class="dialog-actions"><button id="cancelTaskTypeMapAction" class="secondary" type="button">Abbrechen</button><button id="insertTaskTypeMap" class="primary" type="submit">Text einfügen</button></div>
+    </form>
+  </dialog>
+  <input id="taskMaterialImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
   <dialog id="startDialog">
     <form id="startForm" class="dialog-card compact">
       <span class="eyebrow">Verbindlicher Start</span><h2>Bearbeitung beginnen</h2>
@@ -173,7 +184,7 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260827j"></script>
+  <script src="fokus.js?v=20260827m"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

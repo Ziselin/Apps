@@ -13,6 +13,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Unterrichtsstunden zeigen 15 Minuten vor Beginn einen kreideroten, rückwärts laufenden Vorbereitungsbalken und wechseln zum Stundenbeginn live in den regulären Phasenverlauf.
 - Schulische und persönliche Termingruppen zeigen im Gruppenkopf den jeweils nächsten anstehenden Termin – einschließlich der Termine aus enthaltenen Projektgruppen.
 - Klassenkarten zeigen Klassenlehrer und Schülerzahl als direkte Sprungziele zu „Allgemein“ beziehungsweise „Schülerliste“ im Klassendialog.
+- Kurse erhalten eine kopierbare `KU1`-ID; der lokale Klassenkatalog transportiert darüber Fach, Kursname und ausschließlich die ausgewählten Kursschüler.
 - Kurse um eine Schülerauswahl mit Checkboxdialog, stabilen Schüler-IDs und gekoppelten Herkunftsklassen erweitert.
 
 ### 2026-08-25
