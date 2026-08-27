@@ -188,6 +188,26 @@ body.session-active .student-view { min-height: 100vh; }
 .focus-class-title-line .schedule-menu-shell { flex:0 0 auto; }
 .focus-student-submission-editor { display:grid; gap:16px; padding-top:20px; }
 .focus-student-submission-editor select { width:100%; min-height:42px; padding:9px 38px 9px 11px; border:1px solid var(--line); border-radius:10px; color:var(--ink); background:rgba(255,255,252,.72); font:inherit; }
+.cloze-author-field { margin-top:18px; }
+.cloze-author-field textarea { width:100%; min-height:150px; }
+.cloze-author-field small { font-weight:400; line-height:1.45; }
+.cloze-preview { margin-top:16px; padding:18px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,252,.5); line-height:2.2; white-space:pre-wrap; }
+.cloze-preview-gap { display:inline-block; min-width:72px; margin:0 3px; padding:0 8px; border-bottom:2px solid var(--ink-soft); color:var(--muted); text-align:center; }
+.student-cloze-text { margin-top:20px; font-size:17px; line-height:2.65; white-space:pre-wrap; }
+.student-cloze-input { display:inline-block; width:clamp(90px,18vw,190px); min-height:38px; margin:6px 7px; padding:7px 10px 5px; border:1px solid rgba(49,93,85,.22); border-bottom:3px solid #47766c; border-radius:7px 7px 3px 3px; background:#fffefa; box-shadow:0 2px 5px rgba(33,54,51,.06); font:inherit; line-height:1.3; text-align:center; vertical-align:middle; }
+.student-cloze-input:hover { border-color:rgba(49,93,85,.42); border-bottom-color:#315d55; }
+.student-cloze-input:focus { outline:0; border-color:#315d55; border-bottom-color:#234a43; box-shadow:0 0 0 3px rgba(49,93,85,.12); }
+.student-cloze-input:disabled { opacity:1; color:#69736f; border-color:rgba(49,93,85,.18); border-bottom-color:#66877f; background:#f4f4ee; box-shadow:none; }
+.cloze-field-config { grid-template-columns:1fr auto; }
+.cloze-word-bank-editor { display:grid; gap:12px; margin-top:16px; padding:16px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,252,.42); }
+.cloze-word-bank-toggle { display:flex; align-items:center; gap:9px; font-weight:700; }
+.cloze-word-bank-toggle input { width:18px; height:18px; margin:0; padding:0; }
+.cloze-word-bank-editor textarea { min-height:76px; }
+.cloze-word-bank { display:flex; flex-wrap:wrap; gap:7px; }
+.cloze-word-bank > span { padding:5px 9px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,252,.75); font-size:.78rem; }
+.student-cloze-word-bank { display:grid; gap:9px; margin-top:18px; padding:14px; border:1px solid var(--line); border-radius:12px; background:rgba(223,230,225,.42); }
+.session-actions { flex-wrap:wrap; justify-content:flex-end; }
+.preview-exit-button { flex:0 0 100%; width:100%; }
 .focus-submission-card { display:grid; gap:5px; padding:16px; border:1px dashed var(--line-strong); border-radius:12px; background:rgba(255,255,252,.35); }
 .focus-submission-card.has-submission { border-style:solid; background:rgba(198,215,189,.22); }
 .focus-submission-card p { margin:0; color:var(--muted); }

@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Fokus · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
-  <link rel="stylesheet" href="fokus.css?v=20260825r">
-  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260825r">
-  <link rel="stylesheet" href="fokus-fixes.css?v=20260825r">
+  <link rel="stylesheet" href="fokus.css?v=20260827f">
+  <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827f">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260827f">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -86,7 +86,7 @@
         <div id="studentProject" class="student-project" hidden>
           <header class="project-header">
             <div><span class="eyebrow" id="sessionLabel">Noch nicht gestartet</span><h1 id="studentTitle"></h1></div>
-            <div class="session-actions"><span id="sessionClock" class="session-clock">00:00</span><button id="startSession" class="primary" type="button">Bearbeitung starten</button><button id="finishSession" class="primary" type="button" hidden>Arbeit abgeben</button></div>
+            <div class="session-actions"><span id="sessionClock" class="session-clock">00:00</span><button id="startSession" class="primary" type="button">Bearbeitung starten</button><button id="finishSession" class="primary" type="button" hidden>Arbeit abgeben</button><button id="endTeacherPreview" class="secondary preview-exit-button" type="button" hidden>Vorschau beenden</button></div>
           </header>
           <p id="studentIntro" class="student-intro"></p>
           <div id="studentTasks" class="student-tasks"></div>
@@ -115,6 +115,10 @@
         <button id="createTextTask" class="task-type-option" type="button">
           <span class="task-type-icon" aria-hidden="true">T</span>
           <span><strong>Textaufgabe</strong><small>Erklärung, Bewertungseinheiten, Wortgrenze und ein frei wachsendes Textfeld</small></span>
+        </button>
+        <button id="createClozeTask" class="task-type-option" type="button">
+          <span class="task-type-icon" aria-hidden="true">L</span>
+          <span><strong>Lückentext</strong><small>Fließtext mit markierten Lücken und hinterlegten Lösungen</small></span>
         </button>
       </div>
     </form>
@@ -155,6 +159,6 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260825r"></script>
+  <script src="fokus.js?v=20260827f"></script>
 </body>
 </html>
