@@ -6,15 +6,35 @@ window.SCHOLA_PSE_PHASE_DATA = {
     "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/periodictable/JSON",
     "retrieved": "2026-08-14"
   },
+  "criticalSource": {
+    "name": "NIST Chemistry WebBook, SRD 69 und NIST SRD/JPCRD",
+    "url": "https://webbook.nist.gov/chemistry/",
+    "retrieved": "2026-08-29",
+    "note": "Kritische Punkte werden nur für elementare Stoffe mit dokumentierter kritischer Temperatur und dokumentiertem kritischen Druck geführt.",
+    "references": {
+      "1": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C1333740&Mask=4&Units=SI",
+      "2": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7440597&Mask=4&Units=SI",
+      "7": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7727379&Mask=4&Units=SI",
+      "8": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7782447&Mask=4&Units=SI",
+      "17": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7782505&Mask=1C&Units=SI",
+      "18": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7440371&Mask=7&Units=SI",
+      "36": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7439909&Mask=407&Units=SI",
+      "54": "https://srd.nist.gov/JPCRD/jpcrd73.pdf"
+    }
+  },
   "referencePressureHpa": 1013.25,
   "elements": {
     "1": {
       "meltingK": 13.81,
-      "boilingK": 20.28
+      "boilingK": 20.28,
+      "criticalK": 33.18,
+      "criticalPressureHpa": 13000
     },
     "2": {
       "meltingK": 0.95,
-      "boilingK": 4.22
+      "boilingK": 4.22,
+      "criticalK": 5.2,
+      "criticalPressureHpa": 2274
     },
     "3": {
       "meltingK": 453.65,
@@ -34,11 +54,15 @@ window.SCHOLA_PSE_PHASE_DATA = {
     },
     "7": {
       "meltingK": 63.15,
-      "boilingK": 77.36
+      "boilingK": 77.36,
+      "criticalK": 126.19,
+      "criticalPressureHpa": 33978
     },
     "8": {
       "meltingK": 54.36,
-      "boilingK": 90.2
+      "boilingK": 90.2,
+      "criticalK": 154.58,
+      "criticalPressureHpa": 50430
     },
     "9": {
       "meltingK": 53.53,
@@ -74,11 +98,15 @@ window.SCHOLA_PSE_PHASE_DATA = {
     },
     "17": {
       "meltingK": 171.65,
-      "boilingK": 239.11
+      "boilingK": 239.11,
+      "criticalK": 416.956,
+      "criticalPressureHpa": 79914
     },
     "18": {
       "meltingK": 83.8,
-      "boilingK": 87.3
+      "boilingK": 87.3,
+      "criticalK": 150.86,
+      "criticalPressureHpa": 48980.5
     },
     "19": {
       "meltingK": 336.53,
@@ -150,7 +178,9 @@ window.SCHOLA_PSE_PHASE_DATA = {
     },
     "36": {
       "meltingK": 115.79,
-      "boilingK": 119.93
+      "boilingK": 119.93,
+      "criticalK": 209.46,
+      "criticalPressureHpa": 55201.9
     },
     "37": {
       "meltingK": 312.46,
@@ -222,7 +252,9 @@ window.SCHOLA_PSE_PHASE_DATA = {
     },
     "54": {
       "meltingK": 161.36,
-      "boilingK": 165.03
+      "boilingK": 165.03,
+      "criticalK": 289.74,
+      "criticalPressureHpa": 58400
     },
     "55": {
       "meltingK": 301.59,

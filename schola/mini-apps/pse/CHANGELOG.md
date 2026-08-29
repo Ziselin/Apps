@@ -7,6 +7,19 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 ### Ergänzt
 
 - Ein Drei-Punkte-Menü im Kopfbereich kopiert die stabile ID der aktuell gewählten Darstellung in die Zwischenablage und bestätigt den Vorgang direkt in der App.
+- Kleine Kachelbeschriftungen verwenden die lokal gebündelte Source Sans 3 und werden beim Überfahren nicht mehr mitskaliert, damit sie auch auf dunklen Ansichten klar gerastert bleiben.
+- Bei schmalen Fenstern bleiben Ordnungszahl und Elementname sichtbar; die Kollisionsprüfung verkleinert Namen zunächst behutsam und blendet sie erst aus, wenn auch die kompakte Stufe nicht passt.
+- Elementnamen sind in allen Fenstergrößen besser lesbar; lange Namen werden innerhalb der Kachel mit einem Auslassungszeichen gekürzt.
+- Die Kacheloption „Radioaktivität und Aggregatzustand“ ergänzt oberhalb des Radioaktivitätssymbols kompakte Zeichen für fest, flüssig, gasförmig und unbekannt.
+- In der eigenen Aggregatzustandsansicht bleibt das zusätzliche Zustandssymbol verborgen, da dort bereits die Kachelfarbe den Zustand codiert.
+- Die Kollisionsprüfung der Kachelmetadaten berücksichtigt nur noch die tatsächlich konkurrierende Ordnungszahl, sodass Zustands- und Radioaktivitätssymbole nicht irrtümlich rasterweit ausgeblendet werden.
+- Die Aggregatzustandsansicht erkennt überkritische Fluide, wenn Temperatur und Druck über einem vollständig hinterlegten NIST-Kritikpunkt liegen; dokumentiert sind Wasserstoff, Helium, Stickstoff, Sauerstoff, Chlor, Argon, Krypton und Xenon.
+- Unbekannte Aggregatzustände bleiben ohne Fragezeichen; fehlt das Zustandssymbol oder wird es in der Aggregatzustandsansicht bewusst ausgelassen, rückt ein vorhandenes Radioaktivitätssymbol an die erste Position.
+- Das Gassymbol skaliert Punktgröße und Abstände nun mit der Kachelhöhe und bleibt dadurch auch in kleinen Darstellungen kompakt.
+- Die kleinen Aggregatzustandssymbole beziehen sich fest auf 25 °C und 1 bar; nur die eigene Aggregatzustandsansicht reagiert weiterhin auf frei gewählte Temperatur- und Druckwerte.
+- Der frühere Erdoberflächen-Mittelwert wurde durch einen eindeutig beschrifteten Standardbedingungen-Knopf für 25 °C und 1 bar ersetzt.
+- Temperatur und Druck stehen in der Aggregatzustandsansicht nun untereinander mit vorangestellter Feldbezeichnung, gekoppeltem Schieberegler und einem platzsparenden Reload-Symbol für die Standardwerte.
+- Manuell eingegebene Temperatur- und Druckwerte dürfen den jeweiligen Sliderbereich überschreiten und werden dennoch vollständig berechnet; nur der Regler bleibt dabei am Bereichsende stehen.
 
 ### Organisiert
 

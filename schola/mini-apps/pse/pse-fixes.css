@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("../../../assets/fonts/source-sans-3/SourceSans3-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -47,7 +55,7 @@
     gap: 2px; height: min(390px, calc(100dvh - 66px));
   }
   .element { display: grid; place-items: center; padding: 0; border-radius: 3px; }
-  .element-number, .element-name, .series-label { display: none; }
+  .element-mass, .element-radioactivity, .series-label { display: none; }
   .element-symbol { align-self: center; font-size: clamp(0.55rem, 3.1vw, 0.85rem); line-height: 1; }
   .group-number { overflow: hidden; font-size: 0.42rem; }
 }
@@ -89,6 +97,10 @@
   fill: currentColor;
 }
 
+.element-phase {
+  display: none;
+}
+
 .periodic-table[data-tile-meta="radioactivity"] .element-mass {
   display: none !important;
 }
@@ -97,11 +109,27 @@
   display: block;
 }
 
+.periodic-table[data-tile-meta="radioactivity"] .element-phase {
+  display: block;
+}
+
+.periodic-table[data-view="state"] .element-phase {
+  display: none !important;
+}
+
+.periodic-table[data-tile-meta="radioactivity"] .element[data-state="unbekannt"] .element-phase {
+  display: none !important;
+}
+
 .periodic-table.pse-hide-meta .element-radioactivity {
   display: none !important;
 }
 
 .periodic-table.pse-hide-radioactivity .element-radioactivity {
+  display: none !important;
+}
+
+.periodic-table.pse-hide-radioactivity .element-phase {
   display: none !important;
 }
 
@@ -553,6 +581,7 @@ html.focus-embed .periodic-table.is-long {
 .periodic-table[data-view="state"] .element[data-state="fest"] { --element-color: #d8c8b9; }
 .periodic-table[data-view="state"] .element[data-state="flüssig"] { --element-color: #9fc8cf; }
 .periodic-table[data-view="state"] .element[data-state="gasförmig"] { --element-color: #c7d8e5; }
+.periodic-table[data-view="state"] .element[data-state="überkritisch"] { --element-color: #9fc7b5; }
 .periodic-table[data-view="state"] .element[data-state="unbekannt"] { --element-color: #d8d8d0; }
 .periodic-table[data-view="material-class"] .element[data-material="metal"] { --element-color: #63b5d2; }
 .periodic-table[data-view="material-class"] .element[data-material="metalloid"] { --element-color: #d45b96; }
@@ -664,6 +693,16 @@ html.focus-embed .periodic-table.is-long {
 .element-mass,
 .element-name {
   display: block;
+  font-family: "Source Sans 3", Arial, Helvetica, sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Kleine Beschriftungen bleiben beim Hover auf ihrem nativen Pixelraster. */
+.element:hover,
+.element:focus-visible {
+  transform: translateY(-2px);
 }
 
 .element-number {
@@ -682,7 +721,15 @@ html.focus-embed .periodic-table.is-long {
   right: 2px;
   bottom: clamp(2px, 0.36vw, 5px);
   left: 2px;
-  font-size: clamp(0.42rem, 15cqh, 0.56rem);
+  overflow: hidden;
+  font-size: clamp(0.5rem, 16cqh, 0.65rem);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.periodic-table.pse-tight-names .element-name {
+  font-size: clamp(0.46rem, 14cqh, 0.58rem);
 }
 
 .element-symbol {
@@ -783,9 +830,9 @@ html.focus-embed .periodic-table.is-long {
 }
 
 .phase-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  display: grid;
+  grid-template-columns: auto minmax(112px, auto) minmax(180px, 520px) auto;
+  align-items: center;
   justify-content: center;
   gap: 10px;
   margin: 14px auto 0;
@@ -798,25 +845,39 @@ html.focus-embed .periodic-table.is-long {
 }
 
 .phase-controls label {
-  display: grid;
-  gap: 5px;
+  display: contents;
   color: var(--soft);
   font-size: 0.7rem;
   font-weight: 700;
 }
 
-.phase-controls label span {
+.phase-field-label {
+  grid-column: 1;
+  text-align: right;
+}
+
+.phase-value-field {
+  grid-column: 2;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 5px;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(250, 250, 245, 0.72);
 }
 
-.phase-controls input {
+.temperature-control > * {
+  grid-row: 1;
+}
+
+.pressure-control > * {
+  grid-row: 2;
+}
+
+.phase-controls input[type="number"] {
   width: 86px;
   border: 0;
   outline: 0;
@@ -826,20 +887,57 @@ html.focus-embed .periodic-table.is-long {
   font-size: 0.82rem;
 }
 
+.phase-controls .phase-slider {
+  grid-column: 3;
+  width: min(40vw, 520px);
+  min-width: 180px;
+  accent-color: var(--accent);
+}
+
 .phase-controls button {
-  min-height: 38px;
-  padding: 0 13px;
+  grid-row: 1 / 3;
+  grid-column: 4;
+  align-self: stretch;
+  min-height: 34px;
+  width: 38px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--paper);
   cursor: pointer;
 }
 
+.standard-conditions-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: auto;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 .phase-controls p {
-  flex-basis: 100%;
+  grid-row: 3;
+  grid-column: 1 / -1;
   color: var(--muted);
   font-size: 0.68rem;
   text-align: center;
+}
+
+@media (max-width: 700px) {
+  .phase-controls {
+    grid-template-columns: auto minmax(104px, auto) minmax(80px, 1fr) auto;
+  }
+
+  .phase-controls .phase-slider {
+    width: min(34vw, 300px);
+    min-width: 80px;
+  }
+
+  .phase-controls p {
+    grid-row: 3;
+  }
 }
 
 .periodic-table.pse-hide-names .element-name {
@@ -863,11 +961,22 @@ html.focus-embed .periodic-table.is-long {
 }
 
 @media (max-width: 700px) {
-  .element-number,
   .element-mass,
-  .element-radioactivity,
-  .element-name {
+  .series-label {
     display: none !important;
+  }
+
+  .element-number {
+    top: 2px;
+    left: 2px;
+    font-size: clamp(0.42rem, 1.7vw, 0.56rem);
+  }
+
+  .element-name {
+    right: 1px;
+    bottom: 2px;
+    left: 1px;
+    font-size: clamp(0.46rem, 1.8vw, 0.56rem);
   }
 
   .element-symbol {
@@ -1084,8 +1193,7 @@ html.focus-embed .periodic-table.is-long {
 .periodic-table[data-view="origin"] .element-mass,
 .periodic-table[data-view="origin"] .element-symbol,
 .periodic-table[data-view="origin"] .element-name{z-index:1}
-.periodic-table[data-view="origin"] .element-mass,
-.periodic-table[data-view="origin"] .element-radioactivity{display:none!important}
+.periodic-table[data-view="origin"] .element-mass{display:none!important}
 
 /* Ordnungszahl und Kachelmetadatum teilen sich Raster, Größe und Mittelachse. */
 .element{
@@ -1102,8 +1210,60 @@ html.focus-embed .periodic-table.is-long {
   font-size:var(--tile-order-size);
 }
 .element-radioactivity{
+  top:calc(var(--tile-corner-inset) + var(--tile-icon-size) + 2px);
+  right:var(--tile-corner-inset);
+  width:var(--tile-icon-size);
+  height:var(--tile-icon-size);
+}
+.periodic-table[data-view="state"] .element-radioactivity,
+.periodic-table[data-tile-meta="radioactivity"] .element[data-state="unbekannt"] .element-radioactivity{
+  top:var(--tile-corner-inset);
+}
+
+.element{
+  --tile-icon-size:clamp(7px,18cqh,11px);
+  --gas-dot-size:clamp(1.5px,4cqh,3px);
+  --gas-dot-offset-x:clamp(2.5px,7cqh,4px);
+  --gas-dot-offset-y:clamp(1.75px,5cqh,3px);
+}
+.element-phase{
+  position:absolute;
+  z-index:1;
   top:var(--tile-corner-inset);
   right:var(--tile-corner-inset);
-  width:var(--tile-order-size);
-  height:var(--tile-order-size);
+  width:var(--tile-icon-size);
+  height:var(--tile-icon-size);
+  color:currentColor;
+  line-height:0;
+}
+.element-phase::before{
+  position:absolute;
+  inset:0;
+  content:"";
+}
+.element[data-state="fest"] .element-phase::before{
+  inset:17%;
+  border-radius:1px;
+  background:currentColor;
+}
+.element[data-state="flüssig"] .element-phase::before{
+  background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 5c2.3-2 4.7 2 7 0s4.7 2 7 0M1 11c2.3-2 4.7 2 7 0s4.7 2 7 0' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 5c2.3-2 4.7 2 7 0s4.7 2 7 0M1 11c2.3-2 4.7 2 7 0s4.7 2 7 0' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.element[data-state="gasförmig"] .element-phase::before{
+  width:var(--gas-dot-size);
+  height:var(--gas-dot-size);
+  margin:auto;
+  border-radius:50%;
+  background:currentColor;
+  box-shadow:
+    calc(-1 * var(--gas-dot-offset-x)) var(--gas-dot-offset-y) 0 currentColor,
+    var(--gas-dot-offset-x) calc(-1 * var(--gas-dot-offset-y)) 0 currentColor;
+}
+.element[data-state="überkritisch"] .element-phase::before{
+  inset:10%;
+  border:1.5px solid currentColor;
+  border-radius:50%;
+  background:radial-gradient(circle,currentColor 0 22%,transparent 25%);
 }

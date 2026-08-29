@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260829c">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260829n">
 </head>
 <body>
   <main class="pse-app">
@@ -44,9 +44,17 @@
         <p id="discoveryStatus" aria-live="polite"></p>
       </div>
       <div id="phaseControls" class="phase-controls" hidden>
-        <label>Temperatur <span><input id="temperatureInput" type="number" min="-273.15" step="1" value="15"> °C</span></label>
-        <label>Druck <span><input id="pressureInput" type="number" min="0" step="0.01" value="1013.25"> hPa</span></label>
-        <button id="earthSurfaceButton" type="button">Durchschnitt Erdoberfläche</button>
+        <label class="phase-control-row temperature-control">
+          <span class="phase-field-label">Temperatur</span>
+          <span class="phase-value-field"><input id="temperatureInput" type="number" min="-273.15" step="1" value="25"> °C</span>
+          <input id="temperatureSlider" class="phase-slider" type="range" min="-273.15" max="6000" step="1" value="25" aria-label="Temperatur einstellen">
+        </label>
+        <label class="phase-control-row pressure-control">
+          <span class="phase-field-label">Druck</span>
+          <span class="phase-value-field"><input id="pressureInput" type="number" min="0" step="100" value="1000"> hPa</span>
+          <input id="pressureSlider" class="phase-slider" type="range" min="0" max="100000" step="100" value="1000" aria-label="Druck einstellen">
+        </label>
+        <button id="standardConditionsButton" type="button" title="Standardbedingungen: 25 °C und 1 bar" aria-label="Standardbedingungen einstellen: 25 °C und 1 bar"><span class="standard-conditions-icon" aria-hidden="true"></span></button>
         <p id="phaseStatus">Berechnung aus PubChem-Schmelz- und Siedepunkten; Druckkorrektur als Näherung nahe Oberflächenbedingungen.</p>
       </div>
     </section>
@@ -84,7 +92,7 @@
         <p class="tile-setting-label">Angabe oben rechts</p>
         <div class="segmented-control">
           <label><input type="radio" name="tileMeta" value="mass" checked><span>Atommasse</span></label>
-          <label><input type="radio" name="tileMeta" value="radioactivity"><span>Radioaktivität</span></label>
+          <label><input type="radio" name="tileMeta" value="radioactivity"><span>Radioaktivität und Aggregatzustand</span></label>
         </div>
         <p class="tile-setting-label">Name</p>
         <div class="segmented-control">
@@ -136,13 +144,13 @@
     </form>
   </dialog>
   <script src="elements-data.js?v=20260814b"></script>
-  <script src="phase-data.js?v=20260814a"></script>
+  <script src="phase-data.js?v=20260829b"></script>
   <script src="abundance-data.js?v=20260814a"></script>
   <script src="substance-data.js?v=20260814a"></script>
   <script src="electronic-data.js?v=20260814a"></script>
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260829d"></script>
+  <script src="pse.js?v=20260829o"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ const elements = JSON.parse(await readFile(new URL('elements.json', root), 'utf8
 const context = { window: {} };
 vm.runInNewContext(await readFile(new URL('phase-data.js', root), 'utf8'), context);
 const phaseData = context.window.SCHOLA_PSE_PHASE_DATA;
+const standardPhaseConditions = { temperatureC: 25, pressureHpa: 1000 };
 const adjustedBoilingPoint = (boilingK, pressureHpa) => {
   if (!Number.isFinite(boilingK) || !Number.isFinite(pressureHpa) || pressureHpa <= 0) return null;
   const denominator = (1 / boilingK) - (8.314 / 85000) * Math.log(pressureHpa / phaseData.referencePressureHpa);
@@ -15,6 +16,7 @@ const phaseAt = (element, temperatureC, pressureHpa) => {
   const values = phaseData.elements[element.number];
   if (!values) return 'unbekannt';
   const temperatureK = Math.max(0, temperatureC + 273.15);
+  if (Number.isFinite(values.criticalK) && Number.isFinite(values.criticalPressureHpa) && temperatureK > values.criticalK && pressureHpa > values.criticalPressureHpa) return 'überkritisch';
   if (element.number === 2 && pressureHpa < 25300) {
     if (pressureHpa === 0) return temperatureK === 0 ? 'flüssig' : 'gasförmig';
     const heliumBoiling = adjustedBoilingPoint(values.boilingK, pressureHpa);
@@ -34,7 +36,7 @@ const phaseAt = (element, temperatureC, pressureHpa) => {
   return 'unbekannt';
 };
 
-const mismatches = elements.filter(element => element.state !== 'unbekannt' && phaseAt(element, 15, 1013.25) !== element.state).map(element => ({ number: element.number, symbol: element.symbol, stored: element.state, calculated: phaseAt(element, 15, 1013.25) }));
+const mismatches = elements.filter(element => element.state !== 'unbekannt' && phaseAt(element, standardPhaseConditions.temperatureC, standardPhaseConditions.pressureHpa) !== element.state).map(element => ({ number: element.number, symbol: element.symbol, stored: element.state, calculated: phaseAt(element, standardPhaseConditions.temperatureC, standardPhaseConditions.pressureHpa) }));
 const reversed = elements.filter(element => { const value = phaseData.elements[element.number]; return Number.isFinite(value?.meltingK) && Number.isFinite(value?.boilingK) && value.boilingK <= value.meltingK; }).map(element => ({ number: element.number, symbol: element.symbol, meltingK: phaseData.elements[element.number].meltingK, boilingK: phaseData.elements[element.number].boilingK }));
 const zeroKelvin = elements.map(element => ({ number: element.number, symbol: element.symbol, phase: phaseAt(element, -273.15, 0) }));
 console.log(JSON.stringify({ mismatches, reversed, zeroKelvinSummary: Object.groupBy(zeroKelvin, item => item.phase), missingMelting: elements.filter(element => !Number.isFinite(phaseData.elements[element.number]?.meltingK)).map(element => element.symbol), missingBoiling: elements.filter(element => !Number.isFinite(phaseData.elements[element.number]?.boilingK)).map(element => element.symbol) }, null, 2));
