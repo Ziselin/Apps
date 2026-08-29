@@ -657,7 +657,7 @@ html.focus-embed .periodic-table.is-long {
 .periodic-table[data-view="resistivity"] .element[data-electronic="unknown"] { --element-color: #c9c9c3; }
 .periodic-table[data-view="resistivity"] .element:is([data-electronic="r3"],[data-electronic="r4"],[data-electronic="r5"]) .element-mass { color: inherit; }
 
-/* Häufigkeiten: logarithmische Massenanteile über alle drei Bezugsräume. */
+/* Häufigkeiten: logarithmische Massenanteile über alle vier Bezugsräume. */
 .periodic-table[data-view^="abundance-"] .element[data-abundance="gt10"] { --element-color: #e33d3d; }
 .periodic-table[data-view^="abundance-"] .element[data-abundance="gt1"] { --element-color: #d93687; }
 .periodic-table[data-view^="abundance-"] .element[data-abundance="gt-1"] { --element-color: #ec7b2d; }

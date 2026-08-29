@@ -23,6 +23,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 - Feste Zahlenfeldbreiten verhindern Layoutsprünge bei langen Werten. Separate Maximalfelder steuern die Sliderbereiche; das Reload-Symbol stellt Standardbedingungen und voreingestellte Maxima gemeinsam wieder her.
 - Die Einheitenknöpfe in den linken Wertefeldern öffnen nach oben und schalten Temperatur zwischen °C, K und °F sowie Druck zwischen hPa und bar um, ohne die intern gespeicherten SI-nahen Rechenwerte zu verändern.
 - Die Phasenslider füllen auch in schmalen Fenstern ihre gesamte responsive Grid-Spalte und schließen ohne eine zusätzliche viewportabhängige Lücke an die Maximalfelder an.
+- Die Häufigkeitsansichten enthalten nun ein Bulk-Moon-PSE für den gesamten Mond. Es verwendet dieselben logarithmischen Massenanteilsfarben wie die Erde und dokumentiert modellbasierte Werte aus Taylor und McLennan.
 
 ### Organisiert
 
