@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Fokus · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/fokus-icon.svg">
-  <link rel="stylesheet" href="fokus.css?v=20260827m">
+  <link rel="stylesheet" href="fokus.css?v=20260829i">
   <link rel="stylesheet" href="../../assets/ui/browser-tree.css?v=20260827k">
-  <link rel="stylesheet" href="fokus-fixes.css?v=20260827m">
+  <link rel="stylesheet" href="fokus-fixes.css?v=20260829i">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -32,7 +32,7 @@
         <div class="side-menu-list app-menu-list">
           <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="projects" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-projects" aria-hidden="true"></span><span>Projekte</span></button><div class="app-menu-panel" data-app-menu-popup="projects" hidden><div class="project-choice-list"><a class="project-choice" href="../../index.html">Atlas</a><a class="project-choice" href="../../index.html?project=schola" aria-current="page">Schola</a></div></div></section>
           <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="help" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-help" aria-hidden="true"></span><span>Funktionsweise</span></button><div class="app-menu-panel" data-app-menu-popup="help" hidden><p>Fokus erstellt lokale Aufgabenspaces und begleitet eine konzentrierte Bearbeitung.</p></div></section>
-          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button><div class="app-menu-panel" data-app-menu-popup="data" hidden><p>Projekte, Klassen und Arbeitsstände bleiben lokal und werden nur über Dateien übertragen.</p></div></section>
+          <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="data" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-data" aria-hidden="true"></span><span>Datenstand</span></button><div class="app-menu-panel" data-app-menu-popup="data" hidden><p>Projekte, Klassen und Arbeitsstände bleiben lokal und werden nur über Dateien übertragen.</p><div class="focus-device-settings"><span class="eyebrow">Dieses Browserprofil</span><strong id="focusDeviceId"></strong><label for="focusDeviceLabel">Gerätebezeichnung</label><input id="focusDeviceLabel" maxlength="40" autocomplete="off" placeholder="z. B. Laptop 1"><small>Die browserlokale Kennung und diese Bezeichnung werden im Arbeitsprotokoll gespeichert.</small></div></div></section>
           <section class="app-menu-section"><button type="button" class="app-menu-item" data-app-menu-panel="description" aria-expanded="false"><span class="app-menu-item-icon app-menu-icon-description" aria-hidden="true"></span><span>Appbeschreibung</span></button><div class="app-menu-panel" data-app-menu-popup="description" hidden><p>Fokus ist die Aufgaben- und Prüfungsraum-App des Projekts Schola.</p></div></section>
         </div>
       </div>
@@ -157,6 +157,24 @@
       <div class="dialog-actions"><button id="cancelTaskTypeMapAction" class="secondary" type="button">Abbrechen</button><button id="insertTaskTypeMap" class="primary" type="submit">Text einfügen</button></div>
     </form>
   </dialog>
+  <dialog id="interactiveMaterialDialog">
+    <form method="dialog" class="dialog-card compact">
+      <div class="dialog-head"><div><span class="eyebrow">Aufgabenmaterial</span><h2>Interaktives Material</h2></div><button class="icon-button" value="cancel" aria-label="Schließen">×</button></div>
+      <p>Wählen Sie eine Schola-Mini-App aus, die in der Aufgabe interaktiv verwendet werden soll.</p>
+      <div class="task-type-list">
+        <button id="selectPseMaterial" class="task-type-option" type="button"><span class="task-type-icon" aria-hidden="true">P</span><span><strong>Periodensystem der Elemente</strong><small>Einen in der PSE-App gespeicherten Zustand über seine ID übernehmen</small></span></button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="pseMaterialDialog">
+    <form id="pseMaterialForm" class="dialog-card compact">
+      <div class="dialog-head"><div><span class="eyebrow">Interaktives Material</span><h2>Periodensystem einfügen</h2></div><button id="cancelPseMaterial" class="icon-button" type="button" aria-label="Schließen">×</button></div>
+      <p>Fügen Sie die in der PSE-App kopierte ID ein. Der dort festgelegte Zustand wird interaktiv übernommen.</p>
+      <label class="field-label">PSE-ID<input id="pseMaterialId" autocomplete="off" spellcheck="false" placeholder="PSE1:…" required></label>
+      <p id="pseMaterialError" class="error" role="alert"></p>
+      <div class="dialog-actions"><button id="cancelPseMaterialAction" class="secondary" type="button">Abbrechen</button><button class="primary" type="submit">Periodensystem einfügen</button></div>
+    </form>
+  </dialog>
   <input id="taskMaterialImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
 
   <dialog id="startDialog">
@@ -184,7 +202,7 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260827m"></script>
+  <script src="fokus.js?v=20260829i"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

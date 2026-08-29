@@ -4,6 +4,10 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ## Unveröffentlicht
 
+### Ergänzt
+
+- Ein Drei-Punkte-Menü im Kopfbereich kopiert die stabile ID der aktuell gewählten Darstellung in die Zwischenablage und bestätigt den Vorgang direkt in der App.
+
 ### Organisiert
 
 - Das zentrale App-Icon bildet nun eine vollständige Helium-Elementkachel mit Ordnungszahl, Atommasse, Symbol und Namen ab und bleibt die gemeinsame Referenz für Schola-Hauptseite und Classroom Screen.

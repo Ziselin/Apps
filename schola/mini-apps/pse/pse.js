@@ -20,6 +20,11 @@ const discoveryStatus=document.getElementById('discoveryStatus');
 const periodicTableTitle=document.getElementById('periodicTableTitle');
 const detailContextBackButton=document.getElementById('detailContextBackButton');
 const detailOverviewButton=document.getElementById('detailOverviewButton');
+const viewMenu=document.getElementById('viewMenu');
+const viewMenuButton=document.getElementById('viewMenuButton');
+const viewMenuPopup=document.getElementById('viewMenuPopup');
+const copyViewIdButton=document.getElementById('copyViewIdButton');
+const copyStatus=document.getElementById('copyStatus');
 const detailElementStack=[];
 const categories=['alkali','alkaline','transition','post-transition','metalloid','nonmetal','halogen','noble','lanthanide','actinide'];
 const settingsKey='schola-pse-settings-v2';
@@ -66,6 +71,16 @@ const viewInformation={
 
 function infoCard(title,text,formula=''){return`<section class="info-card"><h3>${title}</h3><p>${text}</p>${formula?`<p class="info-formula">${formula}</p>`:''}</section>`}
 function openViewInformation(){const content=viewInformation[settings.view]??viewInformation.traditional;const title=viewTitles[settings.view]??'Herkömmliche Darstellung';infoDialogTitle.textContent=title;infoDialogBody.innerHTML=`<p class="info-intro">${content.intro}</p><div class="info-grid">${infoCard('Physikalische Grundlage',content.physics)}${infoCard('Chemische Bedeutung',content.chemistry)}${infoCard('Mathematische Darstellung',content.math)}<section class="info-card info-note"><h3>Einordnung und Grenzen</h3><p>${content.limits}</p></section></div>`;infoDialog.showModal()}
+
+function setViewMenuOpen(open,{focusTrigger=false}={}){viewMenuPopup.hidden=!open;viewMenuButton.setAttribute('aria-expanded',String(open));if(open)copyViewIdButton.focus();else if(focusTrigger)viewMenuButton.focus()}
+let copyStatusTimer=0;
+function showCopyStatus(message){clearTimeout(copyStatusTimer);copyStatus.textContent=message;copyStatus.hidden=false;copyStatusTimer=setTimeout(()=>copyStatus.hidden=true,2200)}
+async function copyText(text){if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(text);return}catch{}}const field=document.createElement('textarea');field.value=text;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';document.body.append(field);field.select();const copied=document.execCommand('copy');field.remove();if(!copied)throw new Error('copy failed')}
+function encodePseState(value){const bytes=new TextEncoder().encode(JSON.stringify(value));let binary='';bytes.forEach(byte=>binary+=String.fromCharCode(byte));return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function decodePseState(value){try{const encoded=String(value||'').trim().replace(/^PSE1:/i,'').replace(/-/g,'+').replace(/_/g,'/'),binary=atob(encoded.padEnd(Math.ceil(encoded.length/4)*4,'=')),bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));return JSON.parse(new TextDecoder().decode(bytes))}catch{return null}}
+function pseStateId(){return`PSE1:${encodePseState({layout:settings.layout,view:settings.view,tileMeta:settings.tileMeta,nameMode:settings.nameMode,temperature:settings.temperature,pressure:settings.pressure,discoveryIndex:settings.discoveryIndex})}`}
+function applyPseStateId(value){const state=decodePseState(value);if(!state)return false;if(state.layout==='long')settings.layout='long';if(state.tileMeta==='radioactivity')settings.tileMeta='radioactivity';if(state.nameMode==='origin')settings.nameMode='origin';if(['traditional','family','state','material-class','body','life','density','discovery','origin',...abundanceViews,...electronicViews].includes(state.view))settings.view=state.view;if(Number.isFinite(Number(state.temperature)))settings.temperature=Number(state.temperature);if(Number.isFinite(Number(state.pressure))&&Number(state.pressure)>=0)settings.pressure=Number(state.pressure);if(Number.isFinite(Number(state.discoveryIndex)))settings.discoveryIndex=Math.max(0,Math.min(discoveryYears.length-1,Number(state.discoveryIndex)));return true}
+async function copyActiveViewId(){const viewId=pseStateId();setViewMenuOpen(false);try{await copyText(viewId);showCopyStatus('PSE-ID kopiert.')}catch{showCopyStatus('ID konnte nicht kopiert werden.')}}
 
 function categoryClass(element){return `category-${element.category}`}
 function materialClass(element){const metalloids=new Set([5,14,32,33,51,52,85,117,118]);if(metalloids.has(element.number))return'metalloid';const nonmetals=new Set([1,2,6,7,8,9,10,15,16,17,18,34,35,36,53,54,86]);return nonmetals.has(element.number)?'nonmetal':'metal'}
@@ -247,6 +262,8 @@ detailContextBackButton.onclick=()=>{const previousSymbol=detailElementStack.pop
 detailOverviewButton.onclick=showTable;
 document.getElementById('infoButton').onclick=openViewInformation;
 document.getElementById('settingsButton').onclick=()=>settingsDialog.showModal();
+viewMenuButton.onclick=()=>setViewMenuOpen(viewMenuPopup.hidden);
+copyViewIdButton.onclick=copyActiveViewId;
 document.querySelectorAll('input[name="layout"]').forEach(input=>input.onchange=()=>applyLayout(input.value));
 document.querySelectorAll('input[name="tileMeta"]').forEach(input=>input.onchange=()=>applyTileMeta(input.value));
 document.querySelectorAll('input[name="nameMode"]').forEach(input=>input.onchange=()=>applyNameMode(input.value));
@@ -256,7 +273,8 @@ pressureInput.oninput=()=>{const value=Number(pressureInput.value);if(Number.isF
 discoverySlider.oninput=()=>{settings.discoveryIndex=Number(discoverySlider.value);updateDiscoveryDisplay();saveSettings()};
 document.getElementById('earthSurfaceButton').onclick=()=>{settings.temperature=15;settings.pressure=1013.25;syncPhaseControls();saveSettings()};
 document.addEventListener('pointerdown',event=>document.querySelectorAll('.model-menu[open]').forEach(menu=>{if(!menu.contains(event.target))menu.removeAttribute('open')}));
-document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;const menu=document.querySelector('.model-menu[open]');if(menu){menu.removeAttribute('open');event.preventDefault();return}if(!detailView.hidden)showTable()});
+document.addEventListener('pointerdown',event=>{if(!viewMenuPopup.hidden&&!viewMenu.contains(event.target))setViewMenuOpen(false)});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(!viewMenuPopup.hidden){setViewMenuOpen(false,{focusTrigger:true});event.preventDefault();return}const menu=document.querySelector('.model-menu[open]');if(menu){menu.removeAttribute('open');event.preventDefault();return}if(!detailView.hidden)showTable()});
 let resizeFrame=0,settleFrame=0;
 function scheduleTileFit(){cancelAnimationFrame(resizeFrame);cancelAnimationFrame(settleFrame);resizeFrame=requestAnimationFrame(()=>{fitTileContent();settleFrame=requestAnimationFrame(()=>{fitTileContent();if(settings.view==='discovery')syncDiscoveryWidth()})})}
 window.addEventListener('resize',scheduleTileFit);
@@ -264,7 +282,7 @@ try{
   const data=window.SCHOLA_PSE_DATA;
   if(!data||!Array.isArray(data.elements)||data.elements.length!==118)throw new Error('Elementdaten sind unvollständig.');
   elements=data.elements;
-  loadSettings();loadNameMode();
+  loadSettings();loadNameMode();applyPseStateId(new URLSearchParams(location.search).get('focusPse'));
   render();
 }catch(error){
   console.error('PSE-Daten konnten nicht geladen werden.',error);

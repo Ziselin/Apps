@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260815zg">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260829a">
 </head>
 <body>
   <main class="pse-app">
@@ -22,6 +22,14 @@
         <button id="settingsButton" class="settings-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
           <span class="z-button-icon z-icon-settings" aria-hidden="true"></span>
         </button>
+        <div id="viewMenu" class="view-menu">
+          <button id="viewMenuButton" class="settings-button view-menu-button" type="button" aria-label="Menü öffnen" aria-haspopup="menu" aria-expanded="false" aria-controls="viewMenuPopup" title="Menü">
+            <span class="view-menu-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+          </button>
+          <div id="viewMenuPopup" class="view-menu-popup" role="menu" hidden>
+            <button id="copyViewIdButton" type="button" role="menuitem">ID kopieren</button>
+          </div>
+        </div>
       </div>
     </header>
     <section id="tableView" class="table-view" aria-label="Periodensystem der Elemente">
@@ -55,6 +63,7 @@
       <article id="elementDetail" class="element-detail"></article>
     </section>
     <p id="loadError" class="load-error" hidden>Die Elementdaten konnten nicht geladen werden.</p>
+    <p id="copyStatus" class="copy-status" role="status" aria-live="polite" hidden></p>
   </main>
   <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
     <form method="dialog">
@@ -110,6 +119,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260815za"></script>
+  <script src="pse.js?v=20260829b"></script>
 </body>
 </html>
