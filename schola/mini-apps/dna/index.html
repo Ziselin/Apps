@@ -7,7 +7,7 @@
   <title>DNA · Schola</title>
   <link rel="icon" href="../../../assets/dna-icon.svg">
   <link rel="stylesheet" href="dna.css?v=20260816a">
-  <link rel="stylesheet" href="dna-fixes.css?v=20260816c">
+  <link rel="stylesheet" href="dna-fixes.css?v=20260829j">
 </head>
 <body>
   <main class="dna-app">
@@ -19,6 +19,15 @@
 
     <section class="stage" aria-label="DNA-Modell">
       <canvas id="dnaCanvas" aria-label="Drehbares Modell einer DNA-Doppelhelix mit Basenpaaren"></canvas>
+      <section id="baseDetail" class="base-detail" role="dialog" aria-modal="false" aria-labelledby="baseDetailTitle" hidden>
+        <button id="baseDetailClose" class="base-detail-close" type="button" aria-label="Detailfenster schließen">×</button>
+        <span class="eyebrow">Freie Base</span>
+        <h2 id="baseDetailTitle"></h2>
+        <div class="base-molecule-wrap">
+          <canvas id="baseMoleculeCanvas" aria-label="Frei drehbares Kugel-Stab-Modell"></canvas>
+        </div>
+        <strong id="baseDetailFormula" class="base-detail-formula"></strong>
+      </section>
       <button id="rotationButton" class="rotation-button" type="button" aria-pressed="true"><span aria-hidden="true">↻</span> Rotation</button>
       <div class="orientation" aria-hidden="true"><span>5′</span><i></i><span>3′</span></div>
     </section>
@@ -27,9 +36,10 @@
       <div><span class="eyebrow">Legende</span><h2>Dargestellte Bestandteile</h2></div>
       <div id="viewLegend" class="view-legend"></div>
       <p id="modeNote" class="mode-note">Die reduzierte Darstellung zeigt die Gesamtform. Die ungleichen Abstände der Rückgräte bilden große und kleine Furche.</p>
-      <details><summary>Was zeigt das Modell?</summary><p>Die beiden Zucker-Phosphat-Rückgrate verlaufen gegenläufig. Im Inneren verbinden sich A mit T und G mit C. Abstände, Atomgrößen und Bindungswinkel sind für die Übersicht didaktisch vereinfacht.</p></details>
     </aside>
   </main>
-  <script src="dna.js?v=20260816c"></script>
+  <script src="structure-data.js?v=4C64-20260829b"></script>
+  <script src="base-structure-data.js?v=20260829a"></script>
+  <script src="dna.js?v=20260829y"></script>
 </body>
 </html>
