@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260829a">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260829c">
 </head>
 <body>
   <main class="pse-app">
@@ -111,6 +111,30 @@
       <footer><button class="primary-button" value="close">Schließen</button></footer>
     </form>
   </dialog>
+  <dialog id="copyViewDialog" class="settings-dialog copy-view-dialog" aria-labelledby="copyViewTitle">
+    <form method="dialog">
+      <header class="settings-dialog-head">
+        <div><span class="eyebrow">PSE-Darstellung</span><h2 id="copyViewTitle">ID kopieren</h2></div>
+        <button class="dialog-close" value="close" aria-label="Dialog schließen">×</button>
+      </header>
+      <div class="settings-dialog-body">
+        <section class="settings-section" aria-labelledby="pseAccessTitle">
+          <h3 id="pseAccessTitle">Zugriff auf Elemente</h3>
+          <div class="pse-access-options" role="radiogroup" aria-label="Freigegebene Elementansichten">
+            <label><input type="radio" name="pseAccess" value="table"><span><strong>1 · Nur Periodensystem</strong><small>Die Elemente können nicht geöffnet werden.</small></span></label>
+            <label><input type="radio" name="pseAccess" value="facts"><span><strong>2 · Elementinformationen</strong><small>Die Datenseite ist zugänglich, Atommodelle bleiben gesperrt.</small></span></label>
+            <label><input type="radio" name="pseAccess" value="bohr"><span><strong>3 · Mit Bohr-Modell</strong><small>Elementinformationen und Bohrsches Atommodell sind zugänglich.</small></span></label>
+            <label><input type="radio" name="pseAccess" value="all" checked><span><strong>4 · Vollständig</strong><small>Zusätzlich sind Orbitalbesetzung und Orbitalformen zugänglich.</small></span></label>
+          </div>
+        </section>
+        <section class="settings-section pse-id-section">
+          <label for="copyViewIdValue">Darstellungs-ID</label>
+          <textarea id="copyViewIdValue" rows="3" readonly></textarea>
+        </section>
+      </div>
+      <footer><button value="close">Abbrechen</button><button id="confirmCopyViewId" class="primary-button" type="button">ID kopieren</button></footer>
+    </form>
+  </dialog>
   <script src="elements-data.js?v=20260814b"></script>
   <script src="phase-data.js?v=20260814a"></script>
   <script src="abundance-data.js?v=20260814a"></script>
@@ -119,6 +143,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260829b"></script>
+  <script src="pse.js?v=20260829d"></script>
 </body>
 </html>

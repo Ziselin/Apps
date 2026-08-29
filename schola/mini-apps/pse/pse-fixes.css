@@ -523,6 +523,32 @@
   cursor: pointer;
 }
 
+.copy-view-dialog { width: min(620px, calc(100% - 28px)); }
+.pse-access-options { display: grid; gap: 8px; }
+.pse-access-options label { display: block; }
+.pse-access-options input { position: absolute; opacity: 0; pointer-events: none; }
+.pse-access-options span { display: grid; gap: 3px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.pse-access-options strong { font-size: .84rem; }
+.pse-access-options small { color: var(--muted); font-size: .7rem; line-height: 1.4; }
+.pse-access-options input:checked + span { border-color: var(--ink); background: rgba(33,54,51,.045); box-shadow: inset 0 0 0 1px var(--ink); }
+.pse-access-options input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pse-id-section { padding-bottom: 20px; }
+.pse-id-section label { display: block; margin-bottom: 7px; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.pse-id-section textarea { width: 100%; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: rgba(255,255,255,.55); font: .7rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.copy-view-dialog footer { gap: 8px; }
+.copy-view-dialog footer > button:not(.primary-button) { padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: transparent; cursor: pointer; }
+.element:disabled { opacity: 1; cursor: default; }
+
+/* Im Fokus-Material bestimmt allein die Containerbreite die PSE-Größe;
+   zusätzliche Höhe bleibt innerhalb des eingebetteten Dokuments scrollbar. */
+html.focus-embed .periodic-table:not(.is-long) {
+  --tile-width: calc((100cqw - 85px) / 18);
+}
+html.focus-embed .periodic-table.is-long {
+  --tile-width: calc((100cqw - 155px) / 32);
+  min-width: 0;
+}
+
 .periodic-table[data-view="state"] .element { --element-color: #d9ddd8; }
 .periodic-table[data-view="state"] .element[data-state="fest"] { --element-color: #d8c8b9; }
 .periodic-table[data-view="state"] .element[data-state="flüssig"] { --element-color: #9fc8cf; }
