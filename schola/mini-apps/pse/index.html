@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20260829n">
+  <link rel="stylesheet" href="pse-fixes.css?v=20260829q">
 </head>
 <body>
   <main class="pse-app">
@@ -44,16 +44,18 @@
         <p id="discoveryStatus" aria-live="polite"></p>
       </div>
       <div id="phaseControls" class="phase-controls" hidden>
-        <label class="phase-control-row temperature-control">
-          <span class="phase-field-label">Temperatur</span>
-          <span class="phase-value-field"><input id="temperatureInput" type="number" min="-273.15" step="1" value="25"> °C</span>
+        <div class="phase-control-row temperature-control">
+          <label class="phase-field-label" for="temperatureInput">Temperatur</label>
+          <span class="phase-value-field"><input id="temperatureInput" type="number" min="-273.15" step="1" value="25"><span class="phase-unit-picker"><button id="temperatureUnitButton" class="phase-unit-button" type="button" aria-haspopup="menu" aria-expanded="false">°C</button><span id="temperatureUnitMenu" class="phase-unit-menu" role="menu" hidden><button type="button" role="menuitemradio" data-unit="c">°C</button><button type="button" role="menuitemradio" data-unit="k">K</button><button type="button" role="menuitemradio" data-unit="f">°F</button></span></span></span>
           <input id="temperatureSlider" class="phase-slider" type="range" min="-273.15" max="6000" step="1" value="25" aria-label="Temperatur einstellen">
-        </label>
-        <label class="phase-control-row pressure-control">
-          <span class="phase-field-label">Druck</span>
-          <span class="phase-value-field"><input id="pressureInput" type="number" min="0" step="100" value="1000"> hPa</span>
+          <label class="phase-max-field" title="Maximalwert des Temperatursliders"><span class="visually-hidden">Maximalwert des Temperatursliders</span><input id="temperatureSliderMaxInput" type="number" value="6000"></label>
+        </div>
+        <div class="phase-control-row pressure-control">
+          <label class="phase-field-label" for="pressureInput">Druck</label>
+          <span class="phase-value-field"><input id="pressureInput" type="number" min="0" step="100" value="1000"><span class="phase-unit-picker"><button id="pressureUnitButton" class="phase-unit-button" type="button" aria-haspopup="menu" aria-expanded="false">hPa</button><span id="pressureUnitMenu" class="phase-unit-menu" role="menu" hidden><button type="button" role="menuitemradio" data-unit="hpa">hPa</button><button type="button" role="menuitemradio" data-unit="bar">bar</button></span></span></span>
           <input id="pressureSlider" class="phase-slider" type="range" min="0" max="100000" step="100" value="1000" aria-label="Druck einstellen">
-        </label>
+          <label class="phase-max-field" title="Maximalwert des Drucksliders"><span class="visually-hidden">Maximalwert des Drucksliders</span><input id="pressureSliderMaxInput" type="number" value="100000"></label>
+        </div>
         <button id="standardConditionsButton" type="button" title="Standardbedingungen: 25 °C und 1 bar" aria-label="Standardbedingungen einstellen: 25 °C und 1 bar"><span class="standard-conditions-icon" aria-hidden="true"></span></button>
         <p id="phaseStatus">Berechnung aus PubChem-Schmelz- und Siedepunkten; Druckkorrektur als Näherung nahe Oberflächenbedingungen.</p>
       </div>
@@ -151,6 +153,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20260829o"></script>
+  <script src="pse.js?v=20260829p"></script>
 </body>
 </html>

@@ -20,6 +20,8 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 - Der frühere Erdoberflächen-Mittelwert wurde durch einen eindeutig beschrifteten Standardbedingungen-Knopf für 25 °C und 1 bar ersetzt.
 - Temperatur und Druck stehen in der Aggregatzustandsansicht nun untereinander mit vorangestellter Feldbezeichnung, gekoppeltem Schieberegler und einem platzsparenden Reload-Symbol für die Standardwerte.
 - Manuell eingegebene Temperatur- und Druckwerte dürfen den jeweiligen Sliderbereich überschreiten und werden dennoch vollständig berechnet; nur der Regler bleibt dabei am Bereichsende stehen.
+- Feste Zahlenfeldbreiten verhindern Layoutsprünge bei langen Werten. Separate Maximalfelder steuern die Sliderbereiche; das Reload-Symbol stellt Standardbedingungen und voreingestellte Maxima gemeinsam wieder her.
+- Die Einheitenknöpfe in den linken Wertefeldern öffnen nach oben und schalten Temperatur zwischen °C, K und °F sowie Druck zwischen hPa und bar um, ohne die intern gespeicherten SI-nahen Rechenwerte zu verändern.
 
 ### Organisiert
 
