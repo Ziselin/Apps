@@ -951,8 +951,8 @@ html.focus-embed .periodic-table.is-long {
 
 .phase-controls .phase-slider {
   grid-column: 3;
-  width: min(40vw, 520px);
-  min-width: 180px;
+  width: 100%;
+  min-width: 0;
   accent-color: var(--accent);
 }
 
@@ -1022,11 +1022,6 @@ html.focus-embed .periodic-table.is-long {
 
   .phase-value-field { width: 124px; }
   .phase-max-field { width: 72px; }
-
-  .phase-controls .phase-slider {
-    width: min(34vw, 300px);
-    min-width: 60px;
-  }
 
   .phase-controls p {
     grid-row: 3;
