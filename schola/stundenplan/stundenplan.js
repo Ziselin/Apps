@@ -272,6 +272,7 @@ let activeAppointmentGroupTarget = null;
 let pendingAppointmentGroupScrollTarget = null;
 let activeScheduleId = null;
 let activeScheduleVersionId = projects[0]?.layers?.find((entry) => entry.type === "schedules")?.versions?.[0]?.id || null;
+let activeSupervisionVersionId = null;
 let displayRowsDraft = [];
 let lessonPhasesDraft = [];
 let mainCalendarView = "year";
@@ -486,12 +487,7 @@ function renderMonthView(project) {
         item.style.setProperty("--month-entry-color", lesson.color || "#bfd2e2");
         item.textContent = `${lesson.start} ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
         item.title = `${lesson.start}–${lesson.end} · ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
-        item.addEventListener("click", () => {
-          const sourceProject = projects.find((entry) => entry.id === schedule.projectId);
-          const sourceSchedule = sourceProject?.layers?.find((entry) => entry.type === "schedules")?.schedules?.find((entry) => entry.id === schedule.id);
-          const sourceLesson = sourceSchedule?.lessons?.find((entry) => entry.id === lesson.id);
-          if (sourceProject && sourceSchedule && sourceLesson) openExistingLessonDialog(sourceProject, sourceSchedule, sourceLesson);
-        });
+        item.addEventListener("click", () => openCalendarLessonDialog(schedule, lesson));
         entries.append(item);
       });
     });
@@ -632,8 +628,60 @@ function formatAppointmentDateRange(appointment) {
 function getCombinedSchedules() {
   return projects.filter((project) => project.id === displayedProjectId).flatMap((project) => {
     const layer = project.layers?.find((entry) => entry.type === "schedules");
-    return (Array.isArray(layer?.schedules) ? layer.schedules : [])
+    const schedules = (Array.isArray(layer?.schedules) ? layer.schedules : [])
       .map((schedule) => ({ ...schedule, projectId: project.id, projectName: project.name }));
+    const substitutions = (Array.isArray(layer?.substitutions) ? layer.substitutions : []).map((entry) => {
+      const date = entry.date ? new Date(`${entry.date}T12:00:00`) : null;
+      const weekday = date && !Number.isNaN(date.getTime()) ? ((date.getDay() + 6) % 7) + 1 : 1;
+      return {
+        id: `substitution-schedule-${entry.id}`,
+        name: "Vertretungen",
+        schoolId: entry.schoolId || "",
+        projectId: project.id,
+        projectName: project.name,
+        substitutionId: entry.id,
+        validFrom: entry.date,
+        validUntil: entry.date,
+        activeDays: [weekday],
+        displayRows: [],
+        lessons: [{
+          id: `substitution-lesson-${entry.id}`,
+          day: weekday,
+          start: entry.startTime,
+          end: entry.endTime,
+          subject: entry.subject || "Vertretung",
+          grade: entry.classNames?.join(", ") || entry.className || "Klasse offen",
+          room: entry.room || "",
+          classId: entry.classIds?.[0] || "",
+          classIds: entry.classIds || [],
+          courseId: entry.classGroups?.find((group) => group.targetType === "course")?.courseId || "",
+          color: "#d9c9a9"
+        }]
+      };
+    });
+    const supervisions = (Array.isArray(layer?.supervisionVersions) ? layer.supervisionVersions : []).map((version) => ({
+      id: `supervision-schedule-${version.id}`,
+      name: version.name || "Aufsichten",
+      schoolId: version.schoolId || "",
+      projectId: project.id,
+      projectName: project.name,
+      supervisionVersionId: version.id,
+      validFrom: version.validFrom,
+      validUntil: version.validUntil,
+      activeDays: version.activeDays || [1, 2, 3, 4, 5],
+      displayRows: [],
+      lessons: (version.entries || []).filter((entry) => (version.activeDays || []).includes(Number(entry.day))).map((entry) => ({
+        id: `supervision-lesson-${entry.id}`,
+        day: Number(entry.day),
+        start: entry.startTime,
+        end: entry.endTime,
+        subject: "Aufsicht",
+        grade: "",
+        room: entry.location || "",
+        color: "#d8c9a7"
+      }))
+    }));
+    return [...schedules, ...substitutions, ...supervisions];
   });
 }
 
@@ -701,6 +749,15 @@ function isScheduleValidOn(schedule, date) {
       || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
     ))[0];
     if (activeVersion && activeVersion.id !== schedule.versionId) return false;
+  }
+  if (schedule.projectId && schedule.supervisionVersionId) {
+    const project = projects.find((entry) => entry.id === schedule.projectId);
+    const versions = project?.layers?.find((entry) => entry.type === "schedules")?.supervisionVersions || [];
+    const dateKey = getLocalDateKey(date);
+    const activeVersion = versions.filter((version) => (
+      version.validFrom && version.validUntil && dateKey >= version.validFrom && dateKey <= version.validUntil
+    )).sort((a, b) => String(b.validFrom).localeCompare(String(a.validFrom)) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")))[0];
+    if (activeVersion && activeVersion.id !== schedule.supervisionVersionId) return false;
   }
   return true;
 }
@@ -1015,6 +1072,20 @@ function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht",
   }
 }
 
+function openCalendarLessonDialog(schedule, lesson) {
+  const project = projects.find((entry) => entry.id === schedule.projectId);
+  if (!project) return;
+  const schedulesLayer = project.layers?.find((entry) => entry.type === "schedules");
+  if (schedule.substitutionId) {
+    const substitution = schedulesLayer?.substitutions?.find((entry) => entry.id === schedule.substitutionId);
+    if (substitution) openSubstitutionDialog(project, substitution);
+    return;
+  }
+  const originalSchedule = schedulesLayer?.schedules?.find((entry) => entry.id === schedule.id);
+  const originalLesson = originalSchedule?.lessons?.find((entry) => entry.id === lesson.id);
+  if (originalSchedule && originalLesson) openExistingLessonDialog(project, originalSchedule, originalLesson);
+}
+
 function renderLessonCard(lesson, schedule, date = null) {
   const card = document.createElement("button");
   card.type = "button";
@@ -1041,13 +1112,7 @@ function renderLessonCard(lesson, schedule, date = null) {
   meta.append(time, room);
   card.append(heading, meta);
   configureLivePhase(card, lesson, date);
-  card.addEventListener("click", () => {
-    const originalProject = projects.find((entry) => entry.id === schedule.projectId);
-    const originalSchedule = originalProject?.layers?.find((entry) => entry.type === "schedules")
-      ?.schedules?.find((entry) => entry.id === schedule.id);
-    const originalLesson = originalSchedule?.lessons?.find((entry) => entry.id === lesson.id);
-    if (originalProject && originalSchedule && originalLesson) openExistingLessonDialog(originalProject, originalSchedule, originalLesson);
-  });
+  card.addEventListener("click", () => openCalendarLessonDialog(schedule, lesson));
   return card;
 }
 
@@ -1637,9 +1702,15 @@ function collectOverviewTodos(project) {
       color: entry.color || "#c9c1dd",
       source: entry
     }));
-  return [...groupedTodos, ...ungroupedDeadlines].sort((a, b) => Number(a.completed) - Number(b.completed)
-    || compareOverviewDates({ sortDate: a.dueDate }, { sortDate: b.dueDate })
-    || a.name.localeCompare(b.name, "de"));
+  const today = getLocalDateKey(new Date());
+  return [...groupedTodos, ...ungroupedDeadlines]
+    .map((entry) => ({ ...entry, isOverdue: Boolean(!entry.completed && entry.dueDate && entry.dueDate < today) }))
+    .sort((a, b) => {
+      const priority = (entry) => entry.isOverdue ? 0 : entry.completed ? 2 : 1;
+      return priority(a) - priority(b)
+        || (a.dueDate || "9999-12-31").localeCompare(b.dueDate || "9999-12-31")
+        || a.name.localeCompare(b.name, "de");
+    });
 }
 
 function collectOverviewEvents(project) {
@@ -1764,7 +1835,7 @@ function renderOverviewSidebar() {
     todoList.append(empty);
   } else todos.forEach((entry) => {
     const label = document.createElement("label");
-    label.className = `overview-sidebar-card overview-todo-card${entry.completed ? " is-completed" : ""}`;
+    label.className = `overview-sidebar-card overview-todo-card${entry.completed ? " is-completed" : ""}${entry.isOverdue ? " is-overdue" : ""}`;
     label.style.setProperty("--overview-color", entry.color);
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -1773,7 +1844,7 @@ function renderOverviewSidebar() {
     const title = document.createElement("strong");
     title.textContent = entry.name;
     const meta = document.createElement("small");
-    meta.textContent = `${entry.dueDate ? formatGermanDate(entry.dueDate) : "Ohne Frist"} · ${entry.context}`;
+    meta.textContent = `${entry.isOverdue ? "Überfällig · " : ""}${entry.dueDate ? formatGermanDate(entry.dueDate) : "Ohne Frist"} · ${entry.context}`;
     copy.append(title, meta);
     checkbox.addEventListener("change", () => { entry.source.completed = checkbox.checked; saveProjects(); });
     label.append(checkbox, copy);
@@ -2660,6 +2731,48 @@ function selectScheduleVersion(projectId, versionId) {
   renderActiveCalendar();
 }
 
+function selectSubstitutions(projectId) {
+  activeProjectFolderId = null;
+  activeProjectId = projectId;
+  activeLayerType = "substitutions";
+  activeScheduleId = null;
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function selectSupervisions(projectId, versionId = null) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const versions = project ? ensureSupervisionVersions(project) : [];
+  activeProjectFolderId = null;
+  activeProjectId = projectId;
+  activeLayerType = "supervisions";
+  activeSupervisionVersionId = versionId || activeSupervisionVersionId || versions[0]?.id || null;
+  activeScheduleId = null;
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function duplicateSupervisionVersion(project, versionId) {
+  const versions = ensureSupervisionVersions(project);
+  const sourceIndex = versions.findIndex((entry) => entry.id === versionId);
+  if (sourceIndex < 0) return;
+  const copy = structuredClone(versions[sourceIndex]);
+  copy.id = globalThis.crypto?.randomUUID?.() ?? `supervision-version-${Date.now()}`;
+  copy.name = `${copy.name || "Aufsichtsplan"} – Kopie`;
+  copy.validFrom = "";
+  copy.validUntil = "";
+  copy.createdAt = new Date().toISOString();
+  copy.entries = (copy.entries || []).map((entry, index) => ({ ...entry, id: globalThis.crypto?.randomUUID?.() ?? `supervision-${Date.now()}-${index}` }));
+  versions.splice(sourceIndex + 1, 0, copy);
+  activeSupervisionVersionId = copy.id;
+  saveProjects();
+  renderProjectBrowser();
+  renderSupervisionsProperties(project);
+  renderActiveCalendar(project);
+}
+
 function duplicateScheduleVersion(project, versionId) {
   const layer = getProjectLayer(project, "schedules");
   ensureScheduleVersions(project);
@@ -3065,6 +3178,85 @@ function renderProjectBrowser() {
         }
         if (isLayerExpanded && layer.id === "schedules") {
           const scheduleLayer = getProjectLayer(project, "schedules");
+          const supervisionKey = "schedules:supervisions";
+          const supervisionsExpanded = expandedLayerKeys.has(`${project.id}:${supervisionKey}`);
+          const supervisionShell = document.createElement("div");
+          supervisionShell.className = "schedule-version-tree supervision-tree";
+          const supervisionHead = document.createElement("div");
+          supervisionHead.className = "schedule-version-tree-head";
+          const supervisionToggle = document.createElement("button");
+          supervisionToggle.type = "button";
+          supervisionToggle.className = "layer-tree-toggle";
+          supervisionToggle.textContent = supervisionsExpanded ? "−" : "+";
+          supervisionToggle.setAttribute("aria-expanded", String(supervisionsExpanded));
+          supervisionToggle.addEventListener("click", () => toggleLayerExpanded(project.id, supervisionKey));
+          const supervisionRow = document.createElement("button");
+          supervisionRow.type = "button";
+          supervisionRow.className = `schedule-tree-row schedule-version-tree-label${project.id === activeProjectId && activeLayerType === "supervisions" ? " is-active" : ""}`;
+          supervisionRow.textContent = "Aufsichten";
+          supervisionRow.addEventListener("click", () => selectSupervisions(project.id));
+          supervisionHead.append(supervisionToggle, supervisionRow, document.createElement("span"));
+          supervisionShell.append(supervisionHead);
+          if (supervisionsExpanded) {
+            ensureSupervisionVersions(project).forEach((version) => {
+              const entry = document.createElement("div");
+              entry.className = "schedule-tree-entry";
+              const versionRow = document.createElement("button");
+              versionRow.type = "button";
+              versionRow.className = `schedule-tree-row schedule-version-logic${version.id === activeSupervisionVersionId ? " is-active" : ""}`;
+              versionRow.textContent = version.name;
+              versionRow.addEventListener("click", () => selectSupervisions(project.id, version.id));
+              const menuShell = document.createElement("div");
+              menuShell.className = "schedule-menu-shell schedule-tree-menu-shell";
+              const menuButton = document.createElement("button");
+              menuButton.type = "button";
+              menuButton.className = "schedule-menu-button schedule-tree-menu-button";
+              menuButton.setAttribute("aria-label", `Menü für ${version.name}`);
+              menuButton.setAttribute("aria-expanded", "false");
+              menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+              const menu = document.createElement("div");
+              menu.className = "schedule-menu schedule-tree-menu";
+              menu.hidden = true;
+              const duplicate = document.createElement("button");
+              duplicate.type = "button";
+              duplicate.textContent = "Duplizieren";
+              duplicate.addEventListener("click", () => duplicateSupervisionVersion(project, version.id));
+              const remove = document.createElement("button");
+              remove.type = "button";
+              remove.className = "schedule-menu-delete";
+              remove.textContent = "Löschen";
+              remove.dataset.projectId = project.id;
+              remove.dataset.supervisionVersionId = version.id;
+              remove.setAttribute("aria-label", `${version.name} löschen – gedrückt halten`);
+              remove.title = "Zum Löschen gedrückt halten";
+              remove.addEventListener("pointerdown", beginScheduleDeleteHold);
+              remove.addEventListener("pointerup", finishScheduleDeleteHold);
+              remove.addEventListener("pointercancel", cancelScheduleDeleteHold);
+              remove.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+              menuButton.addEventListener("click", () => { menu.hidden = !menu.hidden; menuButton.setAttribute("aria-expanded", String(!menu.hidden)); });
+              menu.append(duplicate, remove);
+              menuShell.append(menuButton, menu);
+              entry.append(versionRow, menuShell);
+              supervisionShell.append(entry);
+            });
+          }
+          layerShell.append(supervisionShell);
+          scheduleLayer.substitutions = Array.isArray(scheduleLayer.substitutions) ? scheduleLayer.substitutions : [];
+          const substitutionsShell = document.createElement("div");
+          substitutionsShell.className = "schedule-version-tree substitution-tree";
+          const substitutionsHead = document.createElement("div");
+          substitutionsHead.className = "schedule-version-tree-head";
+          const substitutionsSpacer = document.createElement("span");
+          substitutionsSpacer.className = "layer-tree-spacer";
+          substitutionsSpacer.setAttribute("aria-hidden", "true");
+          const substitutionsRow = document.createElement("button");
+          substitutionsRow.type = "button";
+          substitutionsRow.className = `schedule-tree-row schedule-version-tree-label${project.id === activeProjectId && activeLayerType === "substitutions" ? " is-active" : ""}`;
+          substitutionsRow.textContent = "Vertretungen";
+          substitutionsRow.addEventListener("click", () => selectSubstitutions(project.id));
+          substitutionsHead.append(substitutionsSpacer, substitutionsRow, document.createElement("span"));
+          substitutionsShell.append(substitutionsHead);
+          layerShell.append(substitutionsShell);
           ensureScheduleVersions(project).forEach((version) => {
             const versionKey = `schedules:version:${version.id}`;
             const versionExpanded = expandedLayerKeys.has(`${project.id}:${versionKey}`);
@@ -3456,6 +3648,16 @@ function renderProjectDetail() {
 
   if (activeLayerType === "schedules") {
     renderSchedulesProperties(project);
+    return;
+  }
+
+  if (activeLayerType === "substitutions") {
+    renderSubstitutionsProperties(project);
+    return;
+  }
+
+  if (activeLayerType === "supervisions") {
+    renderSupervisionsProperties(project);
     return;
   }
 
@@ -7142,6 +7344,29 @@ function ensureScheduleVersions(project) {
   return layer.versions;
 }
 
+function ensureSupervisionVersions(project) {
+  const layer = getProjectLayer(project, "schedules");
+  layer.supervisionVersions = Array.isArray(layer.supervisionVersions) ? layer.supervisionVersions : [];
+  if (!layer.supervisionVersions.length) {
+    const range = getProjectCalendarRange(project);
+    layer.supervisionVersions.push({
+      id: globalThis.crypto?.randomUUID?.() ?? `supervision-version-${Date.now()}`,
+      name: "Aufsichtsplan 1",
+      schoolId: ensureSchools(project)[0]?.id || "",
+      validFrom: range.startDate || "",
+      validUntil: range.endDate || "",
+      activeDays: [1, 2, 3, 4, 5],
+      entries: [],
+      createdAt: new Date().toISOString()
+    });
+  }
+  layer.supervisionVersions.forEach((version) => {
+    version.activeDays = Array.isArray(version.activeDays) ? version.activeDays : [1, 2, 3, 4, 5];
+    version.entries = Array.isArray(version.entries) ? version.entries : [];
+  });
+  return layer.supervisionVersions;
+}
+
 function createSchoolPeriods(source = {}, startDate = "", endDate = "") {
   const models = source.models && typeof source.models === "object" ? source.models : {};
   const range = (value = {}) => ({ startDate: value.startDate || "", endDate: value.endDate || "" });
@@ -7516,6 +7741,23 @@ function deleteScheduleVersion(projectId, versionId) {
   renderActiveCalendar(project);
 }
 
+function deleteSupervisionVersion(projectId, versionId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "schedules");
+  if (!project || !layer) return;
+  const versions = ensureSupervisionVersions(project);
+  if (versions.length <= 1) {
+    window.alert("Mindestens eine Aufsichtsplan-Version muss erhalten bleiben.");
+    return;
+  }
+  layer.supervisionVersions = versions.filter((version) => version.id !== versionId);
+  if (activeSupervisionVersionId === versionId) activeSupervisionVersionId = layer.supervisionVersions[0]?.id || null;
+  saveProjects();
+  renderProjectBrowser();
+  renderSupervisionsProperties(project);
+  renderActiveCalendar(project);
+}
+
 function deleteHolidayScope(projectId, scopeType) {
   const project = projects.find((entry) => entry.id === projectId);
   const layer = project?.layers?.find((entry) => entry.type === "holidays");
@@ -7724,6 +7966,7 @@ function beginScheduleDeleteHold(event) {
     projectId: button.dataset.projectId,
     projectFolderId: button.dataset.projectFolderId,
     scheduleVersionId: button.dataset.scheduleVersionId,
+    supervisionVersionId: button.dataset.supervisionVersionId,
     scheduleId: button.dataset.scheduleId,
     lessonId: button.dataset.lessonId,
     tripId: button.dataset.tripId,
@@ -7760,6 +8003,7 @@ function finishScheduleDeleteHold(event) {
     projectId,
     projectFolderId,
     scheduleVersionId,
+    supervisionVersionId,
     scheduleId,
     lessonId,
     tripId,
@@ -7784,6 +8028,7 @@ function finishScheduleDeleteHold(event) {
   if (!armed || !releasedOnButton) return;
   if (projectFolderId) deleteProjectFolder(projectFolderId);
   else if (scheduleVersionId) deleteScheduleVersion(projectId, scheduleVersionId);
+  else if (supervisionVersionId) deleteSupervisionVersion(projectId, supervisionVersionId);
   else if (schoolId) deleteSchool(projectId, schoolId);
   else if (holidayScopeType) deleteHolidayScope(projectId, holidayScopeType);
   else if (classProjectId) deleteClassProject(projectId, classProjectId);
@@ -7961,6 +8206,381 @@ function createScheduleLogicTransferMenu(project) {
   menu.append(exportButton, importButton);
   shell.append(button, menu);
   return shell;
+}
+
+function openSubstitutionDialog(project, substitution = null) {
+  let selectedKeys = substitution ? getStoredClassTargetKeys(project, substitution) : [];
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog substitution-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = `<span class="label">Vertretungen</span><h2>${substitution ? "Vertretungsstunde bearbeiten" : "Vertretungsstunde hinzufügen"}</h2>`;
+  const fields = document.createElement("div");
+  fields.className = "substitution-dialog-grid";
+  const makeField = (labelText, type, value = "") => {
+    const label = document.createElement("label");
+    label.className = "dialog-field";
+    const caption = document.createElement("span");
+    caption.textContent = labelText;
+    const input = document.createElement("input");
+    input.type = type;
+    input.value = value;
+    input.required = type !== "text" || labelText !== "Raum";
+    label.append(caption, input);
+    return { label, input };
+  };
+  const date = makeField("Datum", "date", substitution?.date || "");
+  const start = makeField("von", "time", substitution?.startTime || "");
+  const end = makeField("bis", "time", substitution?.endTime || "");
+  const room = makeField("Raum", "text", substitution?.room || "");
+  room.input.maxLength = 40;
+  const subject = makeField("Fach", "text", substitution?.subject || "");
+  subject.input.maxLength = 80;
+  subject.label.classList.add("substitution-subject-field");
+  fields.append(date.label, start.label, end.label, room.label, subject.label);
+  const classSection = document.createElement("section");
+  classSection.className = "substitution-class-section";
+  const classHead = document.createElement("div");
+  classHead.className = "schedule-title-line";
+  const classTitle = document.createElement("strong");
+  classTitle.textContent = "Klasse";
+  const chooseClass = document.createElement("button");
+  chooseClass.type = "button";
+  chooseClass.className = "secondary-button";
+  chooseClass.textContent = "Klasse auswählen";
+  const summary = document.createElement("div");
+  summary.className = "class-project-target-summary";
+  renderClassTargetSummary(summary, getConfiguredClassGroups(project), selectedKeys);
+  chooseClass.addEventListener("click", () => openClassTargetPicker(project, selectedKeys, (keys, groups) => {
+    selectedKeys = keys;
+    renderClassTargetSummary(summary, groups, selectedKeys);
+  }, "Vertretungsstunde"));
+  classHead.append(classTitle, chooseClass);
+  classSection.append(classHead, summary);
+  const status = document.createElement("p");
+  status.className = "property-status";
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = substitution ? "Änderungen speichern" : "Vertretungsstunde hinzufügen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!date.input.value || !start.input.value || !end.input.value || end.input.value <= start.input.value || !selectedKeys.length) {
+      status.textContent = "Bitte Datum, gültige Uhrzeiten und mindestens eine Klasse auswählen.";
+      return;
+    }
+    const layer = getProjectLayer(project, "schedules");
+    layer.substitutions = Array.isArray(layer.substitutions) ? layer.substitutions : [];
+    const targets = getSerializedClassTargets(project, selectedKeys);
+    const values = {
+      date: date.input.value,
+      startTime: start.input.value,
+      endTime: end.input.value,
+      room: room.input.value.trim(),
+      subject: subject.input.value.trim(),
+      ...targets,
+      schoolId: targets.classGroups?.[0]?.schoolId || "",
+      className: targets.classNames?.[0] || ""
+    };
+    if (substitution) Object.assign(substitution, values);
+    else layer.substitutions.unshift({ id: globalThis.crypto?.randomUUID?.() ?? `substitution-${Date.now()}`, ...values, createdAt: new Date().toISOString() });
+    saveProjects();
+    dialog.close();
+    renderProjectBrowser();
+    renderSubstitutionsProperties(project);
+    renderActiveCalendar(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, fields, classSection, status, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function openSupervisionDialog(project, version, supervision = null, defaults = {}) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog substitution-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = `<span class="label">${escapeHtml(version.name)}</span><h2>${supervision ? "Aufsicht bearbeiten" : "Aufsicht hinzufügen"}</h2>`;
+  const grid = document.createElement("div");
+  grid.className = "substitution-dialog-grid supervision-dialog-grid";
+  const dayLabel = document.createElement("label");
+  dayLabel.className = "dialog-field";
+  dayLabel.innerHTML = "<span>Wochentag</span>";
+  const day = document.createElement("select");
+  weekdayNames.forEach((name, index) => {
+    const option = document.createElement("option");
+    option.value = String(index + 1);
+    option.textContent = name;
+    option.selected = Number(supervision?.day || defaults.day || version.activeDays[0] || 1) === index + 1;
+    option.disabled = !version.activeDays.includes(index + 1);
+    day.append(option);
+  });
+  dayLabel.append(createSelectShell(day));
+  const makeField = (caption, type, value = "") => {
+    const label = document.createElement("label");
+    label.className = "dialog-field";
+    const span = document.createElement("span");
+    span.textContent = caption;
+    const input = document.createElement("input");
+    input.type = type;
+    input.value = value;
+    input.required = true;
+    label.append(span, input);
+    return { label, input };
+  };
+  const start = makeField("von", "time", supervision?.startTime || defaults.startTime || "");
+  const end = makeField("bis", "time", supervision?.endTime || defaults.endTime || "");
+  const location = makeField("Ort", "text", supervision?.location || "");
+  location.input.maxLength = 80;
+  grid.append(dayLabel, start.label, end.label, location.label);
+  const status = document.createElement("p");
+  status.className = "property-status";
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = supervision ? "Änderungen speichern" : "Aufsicht hinzufügen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!day.value || !start.input.value || !end.input.value || end.input.value <= start.input.value || !location.input.value.trim()) {
+      status.textContent = "Bitte Wochentag, gültige Uhrzeiten und einen Ort eintragen.";
+      return;
+    }
+    const values = { day: Number(day.value), startTime: start.input.value, endTime: end.input.value, location: location.input.value.trim() };
+    if (supervision) Object.assign(supervision, values);
+    else version.entries.unshift({ id: globalThis.crypto?.randomUUID?.() ?? `supervision-${Date.now()}`, ...values, createdAt: new Date().toISOString() });
+    saveProjects();
+    dialog.close();
+    renderSupervisionsProperties(project);
+    renderActiveCalendar(project);
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, grid, status, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+function renderSupervisionWeekGrid(project, version) {
+  const shell = document.createElement("div");
+  shell.className = "supervision-week-grid-shell";
+  const grid = document.createElement("div");
+  grid.className = "supervision-week-grid";
+  const corner = document.createElement("div");
+  corner.className = "supervision-grid-corner";
+  corner.textContent = "Zeit";
+  grid.append(corner);
+  version.activeDays.forEach((dayNumber) => {
+    const heading = document.createElement("div");
+    heading.className = "supervision-grid-day";
+    heading.textContent = weekdayNames[dayNumber - 1];
+    grid.append(heading);
+  });
+  for (let hour = 7; hour < 18; hour += 1) {
+    const startTime = `${String(hour).padStart(2, "0")}:00`;
+    const endTime = `${String(hour + 1).padStart(2, "0")}:00`;
+    const time = document.createElement("div");
+    time.className = "supervision-grid-time";
+    time.textContent = `${startTime}–${endTime}`;
+    grid.append(time);
+    version.activeDays.forEach((dayNumber) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "supervision-grid-cell";
+      cell.setAttribute("aria-label", `${weekdayNames[dayNumber - 1]}, ${startTime} bis ${endTime}: Aufsicht hinzufügen`);
+      const entries = version.entries.filter((entry) => Number(entry.day) === dayNumber && entry.startTime < endTime && entry.endTime > startTime);
+      if (entries.length) {
+        cell.classList.add("has-supervision");
+        entries.forEach((entry) => {
+          const item = document.createElement("span");
+          item.className = "supervision-grid-entry";
+          item.innerHTML = `<strong>${escapeHtml(entry.location)}</strong><small>${entry.startTime}–${entry.endTime}</small>`;
+          item.addEventListener("click", (event) => {
+            event.stopPropagation();
+            openSupervisionDialog(project, version, entry);
+          });
+          cell.append(item);
+        });
+      }
+      cell.addEventListener("click", () => openSupervisionDialog(project, version, null, { day: dayNumber, startTime, endTime }));
+      grid.append(cell);
+    });
+  }
+  grid.style.setProperty("--supervision-days", String(version.activeDays.length));
+  grid.style.minWidth = `${112 + (version.activeDays.length * 112)}px`;
+  shell.append(grid);
+  return shell;
+}
+
+function renderSupervisionsProperties(project) {
+  detailPanelLabel.textContent = "Stundenpläne";
+  detailPanelTitle.textContent = "Aufsichten";
+  const versions = ensureSupervisionVersions(project);
+  if (!versions.some((entry) => entry.id === activeSupervisionVersionId)) activeSupervisionVersionId = versions[0]?.id || null;
+  const version = versions.find((entry) => entry.id === activeSupervisionVersionId);
+  if (!version) return;
+  const sheet = document.createElement("section");
+  sheet.className = "property-sheet";
+  const intro = document.createElement("p");
+  intro.textContent = "Aufsichten wiederholen sich an den ausgewählten Wochentagen innerhalb der Gültigkeit dieser Version. Eine Stundenplanlogik ist nicht erforderlich.";
+  const settings = document.createElement("div");
+  settings.className = "schedule-version-properties supervision-version-properties";
+  const nameLabel = document.createElement("label");
+  nameLabel.innerHTML = "<span>Bezeichnung</span>";
+  const name = document.createElement("input");
+  name.value = version.name;
+  nameLabel.append(name);
+  const schoolLabel = document.createElement("label");
+  schoolLabel.innerHTML = "<span>Schule</span>";
+  const school = document.createElement("select");
+  ensureSchools(project).forEach((entry) => {
+    const option = document.createElement("option");
+    option.value = entry.id;
+    option.textContent = entry.name;
+    option.selected = entry.id === version.schoolId;
+    school.append(option);
+  });
+  schoolLabel.append(createSelectShell(school));
+  const fromLabel = document.createElement("label");
+  fromLabel.innerHTML = "<span>Gültig von</span>";
+  const from = document.createElement("input");
+  from.type = "date";
+  from.value = version.validFrom || "";
+  fromLabel.append(from);
+  const untilLabel = document.createElement("label");
+  untilLabel.innerHTML = "<span>Gültig bis</span>";
+  const until = document.createElement("input");
+  until.type = "date";
+  until.value = version.validUntil || "";
+  untilLabel.append(until);
+  settings.append(nameLabel, schoolLabel, fromLabel, untilLabel);
+  const days = document.createElement("fieldset");
+  days.className = "schedule-active-days";
+  const legend = document.createElement("legend");
+  legend.textContent = "Wochentage";
+  const dayButtons = document.createElement("div");
+  dayButtons.className = "lesson-day-buttons";
+  weekdayNames.forEach((dayName, index) => {
+    const dayNumber = index + 1;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = dayName;
+    button.setAttribute("aria-pressed", String(version.activeDays.includes(dayNumber)));
+    button.addEventListener("click", () => {
+      if (version.activeDays.includes(dayNumber) && version.activeDays.length === 1) return;
+      version.activeDays = version.activeDays.includes(dayNumber) ? version.activeDays.filter((entry) => entry !== dayNumber) : [...version.activeDays, dayNumber].sort();
+      saveProjects();
+      renderSupervisionsProperties(project);
+      renderActiveCalendar(project);
+    });
+    dayButtons.append(button);
+  });
+  days.append(legend, dayButtons);
+  const saveSettings = () => {
+    if (!name.value.trim() || !from.value || !until.value || until.value < from.value) return;
+    version.name = name.value.trim();
+    version.schoolId = school.value;
+    version.validFrom = from.value;
+    version.validUntil = until.value;
+    saveProjects();
+    renderProjectBrowser();
+    renderActiveCalendar(project);
+  };
+  [name, school, from, until].forEach((field) => field.addEventListener("change", saveSettings));
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "secondary-button primary-action schedule-add-button";
+  add.textContent = "Aufsicht hinzufügen";
+  add.addEventListener("click", () => openSupervisionDialog(project, version));
+  const list = document.createElement("div");
+  list.className = "substitution-list substitution-info-list";
+  version.entries.forEach((entry) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "substitution-card";
+    card.innerHTML = `<strong>${weekdayNames[Number(entry.day) - 1] || "Wochentag"}</strong><span>${entry.startTime}–${entry.endTime} · ${escapeHtml(entry.location)}</span>`;
+    card.addEventListener("click", () => openSupervisionDialog(project, version, entry));
+    list.append(card);
+  });
+  const weekGrid = renderSupervisionWeekGrid(project, version);
+  sheet.append(intro, settings, days, add, weekGrid, list);
+  projectDetail.replaceChildren(sheet);
+}
+
+function renderSubstitutionsProperties(project) {
+  detailPanelLabel.textContent = "Stundenpläne";
+  detailPanelTitle.textContent = "Vertretungen";
+  const layer = getProjectLayer(project, "schedules");
+  layer.substitutions = Array.isArray(layer.substitutions) ? layer.substitutions : [];
+  const sheet = document.createElement("section");
+  sheet.className = "property-sheet";
+  const head = document.createElement("div");
+  head.className = "property-sheet-head schedule-transfer-head";
+  const intro = document.createElement("p");
+  intro.textContent = "Hier stehen einzelne, nicht wiederkehrende Vertretungsstunden. Neu hinzugefügte Stunden erscheinen immer oben.";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "secondary-button primary-action";
+  add.textContent = "Vertretungsstunde hinzufügen";
+  add.addEventListener("click", () => openSubstitutionDialog(project));
+  head.append(intro, add);
+  const list = document.createElement("div");
+  list.className = "substitution-list";
+  if (!layer.substitutions.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "Noch keine Vertretungsstunden eingetragen.";
+    list.append(empty);
+  } else {
+    const columns = document.createElement("div");
+    columns.className = "substitution-info-head";
+    ["Datum", "Zeit", "Klasse/Klassenstufe", "Raum", "Fach"].forEach((label) => {
+      const column = document.createElement("span");
+      column.textContent = label;
+      columns.append(column);
+    });
+    list.append(columns);
+    layer.substitutions.forEach((entry) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "substitution-card substitution-info-row";
+      [
+        ["Datum", formatGermanDate(entry.date)],
+        ["Zeit", `${entry.startTime}–${entry.endTime}`],
+        ["Klasse/Klassenstufe", entry.classNames?.join(", ") || entry.className || "–"],
+        ["Raum", entry.room || "–"],
+        ["Fach", entry.subject || "Vertretung"]
+      ].forEach(([label, value]) => {
+        const cell = document.createElement("span");
+        cell.dataset.label = label;
+        cell.textContent = value;
+        card.append(cell);
+      });
+      card.addEventListener("click", () => openSubstitutionDialog(project, entry));
+      list.append(card);
+    });
+  }
+  sheet.append(head, list);
+  projectDetail.replaceChildren(sheet);
 }
 
 function renderSchedulesProperties(project) {

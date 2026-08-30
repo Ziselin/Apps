@@ -6,6 +6,16 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### 2026-08-30
 
+- Aufsichtspläne zeigen ihre Einträge in einem klickbaren Wochenraster mit festen 60-Minuten-Zeilen, ohne Stundenbezeichnungen oder Pausen.
+- Der Unterordner „Aufsichten“ verwaltet versionierte, wiederkehrende Aufsichtspläne mit Schule, wählbaren Wochentagen, Gültigkeit sowie einzelnen Einträgen aus Zeit und Ort – ohne Fach, Klasse oder Verlauf.
+- Aufsichtsplan-Versionen können über ihr Browsermenü geschützt durch Gedrückthalten gelöscht werden; mindestens eine Version bleibt erhalten.
+- „Stundenpläne“ erhält den Unterordner „Vertretungen“ für einmalige Stunden mit Datum, Zeit, Klasse und Raum; neue Einträge stehen oben und erscheinen obligatorisch wie Unterricht im Kalender.
+- Vertretungsstunden erhalten ein frei eintragbares Fach, das in der Kalenderdarstellung als Stundenbezeichnung erscheint.
+- Ein Klick auf eine Vertretungsstunde in Tages-, Wochen- oder Monatsansicht öffnet unmittelbar ihren Bearbeitungsdialog.
+- Vertretungen erscheinen im Editor als ruhige, bündig ausgerichtete Infozeilen mit Datum, Zeit, Klasse/Klassenstufe, Raum und Fach.
+- Der Projektbrowser zeigt nur den Unterordner „Vertretungen“; einzelne Vertretungsstunden bleiben der Editorliste und dem Kalender vorbehalten.
+- Zeitfelder in Vertretungs- und Aufsichtsdialogen erhalten ausreichend Breite für sauber getrennte und zentrierte Stunden-, Doppelpunkt- und Minutenbereiche.
+- Unerledigte überfällige To-dos bleiben in der Stundenplan-Sidebar ganz oben und werden kreiderot hervorgehoben.
 - Jeder Haupt-Projektordner repräsentiert genau ein Schuljahr und bewahrt dessen Klassen, Kurse sowie schulische und persönliche Termine global; bestehende Projekte werden verlustfrei in dieses Modell überführt.
 - Projekttitel und Kalenderrahmen liegen im Haupt-Projektordner; ausschließlich die darin enthaltenen Stundenplanversionen besitzen eigene Gültigkeitszeiträume.
 - Der Browser gliedert „Stundenpläne“ in vollständige, zeitlich gültige Stundenplanversionen und deren sämtliche Stundenplanlogiken; bestehende Logiken werden gemeinsam in die erste Version migriert.

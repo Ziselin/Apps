@@ -278,6 +278,15 @@ button, input, select, textarea { font-family: inherit; }
 .overview-todo-card > span strong,
 .overview-todo-card > span small { display: block; min-width: 0; }
 .overview-todo-card.is-completed strong { color: var(--muted); text-decoration: line-through; }
+.overview-todo-card.is-overdue {
+  --overview-color: #b64d43 !important;
+  border-color: rgba(182,77,67,.36);
+  border-left-color: #b64d43;
+  background: rgba(182,77,67,.09);
+}
+.overview-todo-card.is-overdue strong,
+.overview-todo-card.is-overdue small { color: #8f302a; }
+.overview-todo-card.is-overdue > input { accent-color: #b64d43; }
 #overviewTodosPanel { overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 390px) {
   .overview-sidebar-tabs { grid-template-columns: 1fr; }
@@ -2041,6 +2050,88 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
 .schedule-version-properties input { width: 100%; min-height: 39px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,252,.68); color: var(--ink); font: inherit; font-size: .86rem; outline: none; }
 .schedule-version-properties input:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33,54,51,.075); }
 .schedule-version-properties .schedule-validity-hint { grid-column: 1 / -1; }
+.supervision-version-properties { grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) repeat(2, minmax(145px, .8fr)); }
+.supervision-version-properties .select-shell,
+.supervision-version-properties select { width: 100%; }
+
+.supervision-week-grid-shell {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.supervision-week-grid {
+  display: grid;
+  grid-template-columns: 112px repeat(var(--supervision-days), minmax(112px, 1fr));
+}
+
+.supervision-grid-corner,
+.supervision-grid-day,
+.supervision-grid-time {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--milk);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.supervision-grid-day { justify-content: center; }
+.supervision-grid-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.supervision-grid-cell {
+  min-height: 58px;
+  padding: 4px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.supervision-grid-cell:hover { background: color-mix(in srgb, var(--project-blue) 46%, transparent); }
+.supervision-grid-cell.has-supervision { background: color-mix(in srgb, var(--project-blue) 64%, transparent); }
+
+.supervision-grid-entry {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, var(--line));
+  border-radius: 8px;
+  background: var(--milk-light);
+  cursor: pointer;
+}
+
+.supervision-grid-entry + .supervision-grid-entry { margin-top: 4px; }
+.supervision-grid-entry small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.project-dialog.substitution-dialog { width: min(660px, calc(100vw - 28px)); }
+.substitution-dialog-grid { display: grid; grid-template-columns: minmax(140px, 1.15fr) repeat(2, minmax(108px, .75fr)) minmax(76px, .8fr); gap: 10px; }
+.substitution-dialog-grid .five-minute-time-control { min-width: 108px; }
+.substitution-subject-field { grid-column: 1 / -1; }
+.substitution-class-section { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,252,.34); }
+.substitution-list { display: grid; gap: 8px; }
+.substitution-card { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(0, 1.3fr); gap: 12px; align-items: center; width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,252,.58); color: var(--ink); text-align: left; cursor: pointer; }
+.substitution-card:hover,
+.substitution-card:focus-visible { outline: none; border-color: var(--line-strong); background: rgba(255,255,252,.86); }
+.substitution-card span { color: var(--muted); font-size: .76rem; }
+.substitution-info-list { gap: 5px; }
+.substitution-info-head,
+.substitution-info-row { display: grid; grid-template-columns: minmax(92px,.85fr) minmax(105px,.9fr) minmax(150px,1.35fr) minmax(70px,.65fr) minmax(110px,1fr); gap: 10px; align-items: center; }
+.substitution-info-head { padding: 0 13px 4px; color: var(--muted); font-size: .66rem; font-weight: 700; }
+.substitution-card.substitution-info-row { padding: 10px 13px; background: rgba(255,255,252,.42); }
+.substitution-card.substitution-info-row span { overflow: hidden; color: var(--ink-soft); font-size: .76rem; font-weight: 400; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 680px) {
+  .substitution-info-head { display: none; }
+  .substitution-info-row { grid-template-columns: 1fr 1fr; }
+  .substitution-card.substitution-info-row span { display: grid; gap: 2px; white-space: normal; }
+  .substitution-card.substitution-info-row span::before { content: attr(data-label); color: var(--muted); font-size: .62rem; font-weight: 700; }
+}
 .schedule-validity select:focus,
 .schedule-validity input:focus { border-color: var(--line-strong); box-shadow: 0 0 0 3px rgba(33,54,51,.075); }
 .schedule-week {
@@ -3205,7 +3296,7 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
   .trip-date-fields { grid-template-columns: 1fr; }
   .class-trip-date-fields { grid-template-columns: 1fr; }
   .event-time-fields { grid-template-columns: 1fr; }
-  .schedule-validity, .schedule-version-properties, .lesson-dialog-grid { grid-template-columns: 1fr; }
+  .schedule-validity, .schedule-version-properties, .substitution-dialog-grid, .lesson-dialog-grid { grid-template-columns: 1fr; }
   .lesson-dialog-wide { grid-column: auto; }
   .display-default-fields { grid-template-columns: 1fr; }
   .display-default-fields > .display-default-group,
