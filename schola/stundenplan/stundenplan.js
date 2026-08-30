@@ -477,9 +477,7 @@ function renderMonthView(project) {
         Number(lesson.day) === weekday
         && isScheduleValidOn(schedule, date)
         && isLessonActiveOnDate(lesson, schedule, date)
-        && !isSchoolHolidayForSchedule(schedule, date)
-        && !isSicknessForSchedule(schedule, date)
-        && !isLessonSuppressedByClassProject(project, lesson, date)
+        && !isScheduleLessonSuppressed(schedule, lesson, date)
       )).sort((a, b) => a.start.localeCompare(b.start)).forEach((lesson) => {
         const item = document.createElement("button");
         item.type = "button";
@@ -678,7 +676,7 @@ function getCombinedSchedules() {
         subject: "Aufsicht",
         grade: "",
         room: entry.location || "",
-        color: "#d8c9a7"
+          color: entry.color || "#bfd2e2"
       }))
     }));
     return [...schedules, ...substitutions, ...supervisions];
@@ -760,6 +758,21 @@ function isScheduleValidOn(schedule, date) {
     if (activeVersion && activeVersion.id !== schedule.supervisionVersionId) return false;
   }
   return true;
+}
+
+function isMandatorySupervision(schedule) {
+  return Boolean(schedule?.supervisionVersionId);
+}
+
+function isScheduleLessonSuppressed(schedule, lesson, date) {
+  if (isMandatorySupervision(schedule)) return false;
+  return isSchoolHolidayForSchedule(schedule, date)
+    || isSicknessForSchedule(schedule, date)
+    || isLessonSuppressedByClassProject(
+      projects.find((project) => project.id === schedule.projectId),
+      lesson,
+      date
+    );
 }
 
 function getLessonTeachingForm(lesson) {
@@ -859,18 +872,12 @@ function getTodaysLessonSignalEvents(now = new Date()) {
   const weekday = ((now.getDay() + 6) % 7) + 1;
   const events = [];
   getCombinedSchedules().forEach((schedule) => {
-    if (!isScheduleValidOn(schedule, now)
-      || isSchoolHolidayForSchedule(schedule, now)
-      || isSicknessForSchedule(schedule, now)) return;
+    if (!isScheduleValidOn(schedule, now)) return;
     (Array.isArray(schedule.lessons) ? schedule.lessons : [])
       .filter((lesson) => (
         Number(lesson.day) === weekday
         && isLessonActiveOnDate(lesson, schedule, now)
-        && !isLessonSuppressedByClassProject(
-          projects.find((project) => project.id === schedule.projectId),
-          lesson,
-          now
-        )
+        && !isScheduleLessonSuppressed(schedule, lesson, now)
       ))
       .forEach((lesson) => {
         events.push({
@@ -944,6 +951,7 @@ function updateLivePhaseElement(element, now = new Date()) {
   const nowMs = now.getTime();
   const prestartDurationMs = 15 * 60 * 1000;
   const showPrestart = element.dataset.showPrestart !== "false";
+  const prestartName = element.dataset.prestartName || "Unterricht";
   const isPrestart = showPrestart && nowMs >= lessonStartMs - prestartDurationMs && nowMs < lessonStartMs;
   const isActive = nowMs >= lessonStartMs && nowMs < lessonEndMs;
   if (!Number.isFinite(lessonStartMs) || !Number.isFinite(lessonEndMs) || (!isPrestart && !isActive)) {
@@ -964,18 +972,18 @@ function updateLivePhaseElement(element, now = new Date()) {
     const remainingSeconds = Math.max(0, Math.ceil((lessonStartMs - nowMs) / 1000));
     const remainingRatio = Math.min(1, Math.max(0, (lessonStartMs - nowMs) / prestartDurationMs));
     const remainingCountdown = formatCountdown(remainingSeconds);
-    countdown.querySelector(".live-phase-total").textContent = `Beginn in ${remainingCountdown}`;
+    countdown.querySelector(".live-phase-total").textContent = `${prestartName} in ${remainingCountdown}`;
     countdown.querySelector(".live-phase-current").textContent = "";
-    countdown.setAttribute("aria-label", `Unterrichtsbeginn in ${remainingCountdown}.`);
-    countdown.title = `Unterrichtsbeginn in ${remainingCountdown}`;
+    countdown.setAttribute("aria-label", `${prestartName} beginnt in ${remainingCountdown}.`);
+    countdown.title = `${prestartName} beginnt in ${remainingCountdown}`;
     progress.classList.remove("is-dense");
     const segment = document.createElement("span");
     segment.className = "live-phase-segment is-current";
     segment.style.flexGrow = "1";
-    segment.title = `Unterrichtsbeginn in ${remainingCountdown}`;
+    segment.title = `${prestartName} beginnt in ${remainingCountdown}`;
     const label = document.createElement("span");
     label.className = "live-phase-segment-label";
-    label.textContent = "Beginn in";
+    label.textContent = `${prestartName} in`;
     const track = document.createElement("span");
     track.className = "live-phase-segment-track";
     track.style.setProperty("--segment-progress", `${remainingRatio * 100}%`);
@@ -1059,6 +1067,7 @@ function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht",
   live.dataset.lessonEndMs = String(new Date(`${getLocalDateKey(date)}T${lesson.end}:00`).getTime());
   live.dataset.phases = JSON.stringify(phases);
   live.dataset.showPrestart = String(showPrestart);
+  live.dataset.prestartName = defaultPhaseName;
   live.innerHTML = "<span class=\"live-phase-copy\"><span class=\"live-phase-remaining\"><span class=\"live-phase-total\"></span> <strong class=\"live-phase-current\"></strong></span></span><span class=\"live-phase-progress\"></span>";
   const phaseSummary = phases.map((phase) => `${phase.name}, ${phase.durationMinutes} Minuten`).join("; ");
   card.setAttribute("aria-description", `${showPrestart ? "Ab 15 Minuten vor Beginn wird die verbleibende Vorbereitungszeit angezeigt. " : ""}Phasen: ${phaseSummary}. Die erste Zeit zeigt die verbleibende Gesamtzeit, die Zeit in Klammern die verbleibende Zeit der aktuellen Phase.`);
@@ -1079,6 +1088,13 @@ function openCalendarLessonDialog(schedule, lesson) {
   if (schedule.substitutionId) {
     const substitution = schedulesLayer?.substitutions?.find((entry) => entry.id === schedule.substitutionId);
     if (substitution) openSubstitutionDialog(project, substitution);
+    return;
+  }
+  if (schedule.supervisionVersionId) {
+    const version = schedulesLayer?.supervisionVersions?.find((entry) => entry.id === schedule.supervisionVersionId);
+    const supervisionId = String(lesson.id || "").replace(/^supervision-lesson-/, "");
+    const supervision = version?.entries?.find((entry) => entry.id === supervisionId);
+    if (version && supervision) openSupervisionDialog(project, version, supervision);
     return;
   }
   const originalSchedule = schedulesLayer?.schedules?.find((entry) => entry.id === schedule.id);
@@ -1111,7 +1127,7 @@ function renderLessonCard(lesson, schedule, date = null) {
   meta.className = "lesson-card-meta";
   meta.append(time, room);
   card.append(heading, meta);
-  configureLivePhase(card, lesson, date);
+  configureLivePhase(card, lesson, date, isMandatorySupervision(schedule) ? "Aufsicht" : "Unterricht");
   card.addEventListener("click", () => openCalendarLessonDialog(schedule, lesson));
   return card;
 }
@@ -1281,13 +1297,7 @@ function renderCombinedScheduleView(view) {
         Number(lesson.day) === ((date.getDay() + 6) % 7) + 1
         && isScheduleValidOn(schedule, date)
         && isLessonActiveOnDate(lesson, schedule, date)
-        && !isSchoolHolidayForSchedule(schedule, date)
-        && !isSicknessForSchedule(schedule, date)
-        && !isLessonSuppressedByClassProject(
-          projects.find((project) => project.id === schedule.projectId),
-          lesson,
-          date
-        )
+        && !isScheduleLessonSuppressed(schedule, lesson, date)
       ))) {
         timedLessons.push({ lesson, schedule });
       }
@@ -1405,13 +1415,7 @@ function renderCombinedScheduleView(view) {
         Number(lesson.day) === weekday
         && isScheduleValidOn(schedule, date)
         && isLessonActiveOnDate(lesson, schedule, date)
-        && !isSchoolHolidayForSchedule(schedule, date)
-        && !isSicknessForSchedule(schedule, date)
-        && !isLessonSuppressedByClassProject(
-          projects.find((project) => project.id === schedule.projectId),
-          lesson,
-          date
-        )
+        && !isScheduleLessonSuppressed(schedule, lesson, date)
       ));
     const projectEntries = visibleSchoolProjects
       .filter((schoolProject) => {
@@ -8354,6 +8358,33 @@ function openSupervisionDialog(project, version, supervision = null, defaults = 
   const location = makeField("Ort", "text", supervision?.location || "");
   location.input.maxLength = 80;
   grid.append(dayLabel, start.label, end.label, location.label);
+  let selectedColor = supervision?.color || "#bfd2e2";
+  const colorField = document.createElement("fieldset");
+  colorField.className = "lesson-color-field supervision-color-field";
+  const colorLegend = document.createElement("legend");
+  colorLegend.textContent = "Farbe";
+  const colorPalette = document.createElement("div");
+  colorPalette.className = "lesson-color-palette";
+  const setSelectedColor = (color) => {
+    selectedColor = color;
+    [...colorPalette.children].forEach((swatch) => {
+      const isActive = swatch.dataset.color === color;
+      swatch.classList.toggle("is-active", isActive);
+      swatch.setAttribute("aria-pressed", String(isActive));
+    });
+  };
+  LESSON_COLORS.forEach(([color, name]) => {
+    const swatch = document.createElement("button");
+    swatch.type = "button";
+    swatch.className = "lesson-color-swatch";
+    swatch.dataset.color = color;
+    swatch.style.setProperty("--swatch-color", color);
+    swatch.setAttribute("aria-label", name);
+    swatch.addEventListener("click", () => setSelectedColor(color));
+    colorPalette.append(swatch);
+  });
+  colorField.append(colorLegend, colorPalette);
+  setSelectedColor(selectedColor);
   const status = document.createElement("p");
   status.className = "property-status";
   const actions = document.createElement("div");
@@ -8373,7 +8404,7 @@ function openSupervisionDialog(project, version, supervision = null, defaults = 
       status.textContent = "Bitte Wochentag, gültige Uhrzeiten und einen Ort eintragen.";
       return;
     }
-    const values = { day: Number(day.value), startTime: start.input.value, endTime: end.input.value, location: location.input.value.trim() };
+    const values = { day: Number(day.value), startTime: start.input.value, endTime: end.input.value, location: location.input.value.trim(), color: selectedColor };
     if (supervision) Object.assign(supervision, values);
     else version.entries.unshift({ id: globalThis.crypto?.randomUUID?.() ?? `supervision-${Date.now()}`, ...values, createdAt: new Date().toISOString() });
     saveProjects();
@@ -8383,7 +8414,7 @@ function openSupervisionDialog(project, version, supervision = null, defaults = 
   });
   dialog.addEventListener("close", () => dialog.remove(), { once: true });
   actions.append(cancel, submit);
-  form.append(heading, grid, status, actions);
+  form.append(heading, grid, colorField, status, actions);
   dialog.append(form);
   document.body.append(dialog);
   dialog.showModal();
@@ -8416,12 +8447,21 @@ function renderSupervisionWeekGrid(project, version) {
       cell.type = "button";
       cell.className = "supervision-grid-cell";
       cell.setAttribute("aria-label", `${weekdayNames[dayNumber - 1]}, ${startTime} bis ${endTime}: Aufsicht hinzufügen`);
-      const entries = version.entries.filter((entry) => Number(entry.day) === dayNumber && entry.startTime < endTime && entry.endTime > startTime);
+      const entries = version.entries.filter((entry) => (
+        Number(entry.day) === dayNumber
+        && entry.startTime >= startTime
+        && entry.startTime < endTime
+      ));
       if (entries.length) {
         cell.classList.add("has-supervision");
         entries.forEach((entry) => {
           const item = document.createElement("span");
           item.className = "supervision-grid-entry";
+          item.style.setProperty("--supervision-color", entry.color || "#bfd2e2");
+          const startOffset = Math.max(0, timeToMinutes(entry.startTime) - timeToMinutes(startTime));
+          const duration = Math.max(5, timeToMinutes(entry.endTime) - timeToMinutes(entry.startTime));
+          item.style.top = `${(startOffset / 60) * 100}%`;
+          item.style.height = `${(duration / 60) * 100}%`;
           item.innerHTML = `<strong>${escapeHtml(entry.location)}</strong><small>${entry.startTime}–${entry.endTime}</small>`;
           item.addEventListener("click", (event) => {
             event.stopPropagation();
