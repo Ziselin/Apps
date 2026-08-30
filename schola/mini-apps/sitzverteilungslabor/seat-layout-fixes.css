@@ -1,0 +1,81 @@
+/* Geometrie-Ergänzungen für eine freie Mitte und klar getrennte Sitzpunkte. */
+.parliament {
+  height: clamp(230px, 30vw, 330px);
+}
+
+.seat-dot {
+  z-index: 1;
+  padding: 0;
+  border: 1px solid rgba(33, 54, 51, .32);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .72);
+}
+
+.seat-dot:hover,
+.seat-dot:focus-visible {
+  z-index: 5;
+}
+
+.hemicycle-summary {
+  z-index: 3;
+  bottom: 7px;
+  min-width: 76px;
+  padding: 5px 9px 3px;
+  border-radius: 18px;
+  background: rgba(250, 250, 245, .94);
+  pointer-events: none;
+}
+
+.hemicycle-summary b {
+  line-height: .95;
+}
+
+.party-row {
+  grid-template-columns: 18px minmax(0, 1fr) 92px 32px;
+}
+
+.party-color-picker {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.party-color-picker .party-color {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(33, 54, 51, .24);
+  border-radius: inherit;
+  background: var(--party-color);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.party-color-picker:hover .party-color {
+  transform: scaleX(1.18);
+}
+
+.party-color-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100% !important;
+  height: 100%;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.party-color-input:focus-visible + .party-color {
+  box-shadow: 0 0 0 3px rgba(33, 54, 51, .2);
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 430px) {
+  .party-row {
+    grid-template-columns: 18px minmax(0, 1fr) 78px 32px;
+  }
+}

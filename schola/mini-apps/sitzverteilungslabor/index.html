@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Sitzverteilungslabor · Schola</title>
+  <link rel="icon" href="../../../assets/sitzverteilungslabor-icon.svg">
+  <link rel="stylesheet" href="sitzverteilungslabor.css?v=20260830a">
+  <link rel="stylesheet" href="seat-layout-fixes.css?v=20260830a">
+</head>
+<body>
+  <main class="lab-app">
+    <header class="app-head">
+      <a class="brand" href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
+      <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Sitzverteilungslabor</h1></div>
+      <div class="head-actions"><button id="randomButton" class="quiet" type="button">Zufall</button><button id="resetButton" class="quiet" type="button">Zurücksetzen</button><span id="saveState" class="save-state" aria-live="polite">Automatisch gespeichert</span></div>
+    </header>
+
+    <section class="intro" aria-labelledby="labQuestion">
+      <div><span class="eyebrow">Forscherfrage</span><h2 id="labQuestion">Was ändert sich, wenn dieselben Stimmen anders in Sitze umgerechnet werden?</h2></div>
+      <p>Verändere links die Wahl. Rechts siehst du sofort, wie daraus ein Parlament wird.</p>
+    </section>
+
+    <section class="workspace">
+      <aside class="control-panel" aria-label="Wahldaten und Einstellungen">
+        <div class="section-head"><div><span class="eyebrow">1 · Wahlergebnis</span><h2>Parteien und Stimmen</h2></div><button id="addPartyButton" class="secondary compact" type="button">+ Partei</button></div>
+        <div id="partyEditor" class="party-editor"></div>
+        <p id="shareHint" class="soft-note" aria-live="polite"></p>
+
+        <div class="control-grid">
+          <fieldset><legend>Stimmen als</legend><div class="segmented"><label><input type="radio" name="mode" value="percent" checked><span>Prozent</span></label><label><input type="radio" name="mode" value="absolute"><span>Anzahl</span></label></div></fieldset>
+          <label class="field"><span>Sitze im Parlament</span><input id="seatInput" type="number" min="1" max="10000" step="1" inputmode="numeric"></label>
+          <label class="field"><span>Sperrklausel</span><span class="input-suffix"><input id="thresholdInput" type="number" min="0" max="100" step="0.1" inputmode="decimal"><b>%</b></span></label>
+          <fieldset><legend>Ansicht</legend><div class="segmented"><label><input type="radio" name="view" value="compare" checked><span>Vergleich</span></label><label><input type="radio" name="view" value="single"><span>Einzeln</span></label></div></fieldset>
+        </div>
+        <label id="methodField" class="field"><span>Verfahren</span><select id="methodSelect"><option value="sainte-lague">Sainte-Laguë/Schepers</option><option value="dhondt">D’Hondt</option><option value="hare">Hare/Niemeyer</option></select></label>
+        <div id="validation" class="validation" role="status"></div>
+      </aside>
+
+      <section class="results" aria-live="polite">
+        <div class="assumption-bar" id="assumptionBar"></div>
+        <article class="parliament-card">
+          <div class="section-head"><div><span class="eyebrow">2 · Ergebnis</span><h2 id="resultTitle">Das neue Parlament</h2></div><div id="gallagherBadge" class="metric-badge"></div></div>
+          <div id="parliament" class="parliament" role="img"></div>
+          <div id="legend" class="legend"></div>
+        </article>
+        <article id="comparisonCard" class="analysis-card"><div class="section-head"><div><span class="eyebrow">3 · Vergleichen</span><h2>Wo unterscheiden sich die Verfahren?</h2></div></div><div id="comparison"></div></article>
+        <article class="analysis-card"><div class="section-head"><div><span class="eyebrow">Genau hinsehen</span><h2>Stimmen und Sitze</h2></div></div><div id="resultTable" class="table-wrap"></div></article>
+        <details class="calculation-card"><summary><span><span class="eyebrow">Nachvollziehen</span><b>Rechenweg anzeigen</b></span><span aria-hidden="true">+</span></summary><div id="calculation"></div></details>
+        <section id="methodCards" class="method-cards" aria-label="Die Verfahren kurz erklärt"></section>
+      </section>
+    </section>
+  </main>
+  <script src="allocation-engine.js?v=20260830a"></script>
+  <script src="sitzverteilungslabor.js?v=20260830a"></script>
+</body>
+</html>
