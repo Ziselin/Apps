@@ -6,7 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### 2026-08-30
 
-- Aufsichtspläne zeigen ihre Einträge in einem klickbaren Wochenraster mit festen 60-Minuten-Zeilen, ohne Stundenbezeichnungen oder Pausen.
+- Aufsichtspläne zeigen ihre Einträge in einem klickbaren Wochenraster mit festen 60-Minuten-Zeilen, ohne Stundenbezeichnungen oder Pausen; freie Felder öffnen zuverlässig unmittelbar den Dialog mit frei anpassbarer Zeit.
 - Der Unterordner „Aufsichten“ verwaltet versionierte, wiederkehrende Aufsichtspläne mit Schule, wählbaren Wochentagen, Gültigkeit sowie einzelnen Einträgen aus Zeit und Ort – ohne Fach, Klasse oder Verlauf.
 - Aufsichtsplan-Versionen können über ihr Browsermenü geschützt durch Gedrückthalten gelöscht werden; mindestens eine Version bleibt erhalten.
 - „Stundenpläne“ erhält den Unterordner „Vertretungen“ für einmalige Stunden mit Datum, Zeit, Klasse und Raum; neue Einträge stehen oben und erscheinen obligatorisch wie Unterricht im Kalender.

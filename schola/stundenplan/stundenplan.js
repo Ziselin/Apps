@@ -2089,6 +2089,15 @@ function escapeIcalendarText(value) {
     .replace(/;/g, "\\;");
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function formatIcalendarDate(dateKey) {
   return String(dateKey).replaceAll("-", "");
 }
@@ -8441,7 +8450,7 @@ function renderSupervisionsProperties(project) {
   const sheet = document.createElement("section");
   sheet.className = "property-sheet";
   const intro = document.createElement("p");
-  intro.textContent = "Aufsichten wiederholen sich an den ausgewählten Wochentagen innerhalb der Gültigkeit dieser Version. Eine Stundenplanlogik ist nicht erforderlich.";
+  intro.textContent = "Aufsichten wiederholen sich an den ausgewählten Wochentagen innerhalb der Gültigkeit dieser Version. Zum Einrichten auf ein Zeitfeld im Wochenraster klicken; die genaue Zeit lässt sich anschließend im Dialog anpassen.";
   const settings = document.createElement("div");
   settings.className = "schedule-version-properties supervision-version-properties";
   const nameLabel = document.createElement("label");
@@ -8506,11 +8515,6 @@ function renderSupervisionsProperties(project) {
     renderActiveCalendar(project);
   };
   [name, school, from, until].forEach((field) => field.addEventListener("change", saveSettings));
-  const add = document.createElement("button");
-  add.type = "button";
-  add.className = "secondary-button primary-action schedule-add-button";
-  add.textContent = "Aufsicht hinzufügen";
-  add.addEventListener("click", () => openSupervisionDialog(project, version));
   const list = document.createElement("div");
   list.className = "substitution-list substitution-info-list";
   version.entries.forEach((entry) => {
@@ -8522,7 +8526,7 @@ function renderSupervisionsProperties(project) {
     list.append(card);
   });
   const weekGrid = renderSupervisionWeekGrid(project, version);
-  sheet.append(intro, settings, days, add, weekGrid, list);
+  sheet.append(intro, settings, days, weekGrid, list);
   projectDetail.replaceChildren(sheet);
 }
 
