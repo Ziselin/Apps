@@ -51,32 +51,35 @@
       </section>
 
       <section id="workspace" class="workspace" hidden>
-        <aside class="course-browser">
-          <div class="browser-head"><div><span class="eyebrow">Schuljahr</span><h2 id="projectName">–</h2></div><button type="button" id="changeCalendarButton" class="quiet-button">Wechseln</button></div>
-          <label class="search-field"><span>Suchen</span><input id="courseSearch" type="search" placeholder="Fach oder Klasse"></label>
-          <nav id="courseList" class="course-list" aria-label="Fachplan auswählen"></nav>
-        </aside>
-
-        <section class="plan-stage">
+        <section id="planStage" class="plan-stage">
           <div class="plan-head">
             <div><span id="planMeta" class="eyebrow">Fach · Klasse</span><h1 id="planTitle">Stoffverteilungsplan</h1></div>
-            <div class="plan-actions"><button type="button" id="addRowButton" class="quiet-button">Freie Zeile</button><button type="button" id="settingsButton" class="quiet-button">Planrahmen</button></div>
+            <div class="plan-actions"><label class="course-picker"><span>Fach / Kurs</span><select id="courseSelect" aria-label="Fach oder Kurs auswählen"></select></label><button type="button" id="settingsButton" class="quiet-button">Planrahmen</button></div>
           </div>
           <div id="summaryCards" class="summary-cards"></div>
           <div class="view-toolbar">
             <div class="segmented" aria-label="Zeilen filtern"><button data-filter="all" aria-pressed="true">Alle</button><button data-filter="open" aria-pressed="false">Offen</button><button data-filter="planned" aria-pressed="false">Geplant</button><button data-filter="done" aria-pressed="false">Erledigt</button></div>
             <label class="compact-check"><input id="showHolidays" type="checkbox" checked> Ferien anzeigen</label>
           </div>
-          <div class="table-shell"><table><thead><tr><th class="week-col">Woche / Termin</th><th>Thema / Unterrichtsvorhaben</th><th>Kompetenzen</th><th>Inhalte · Methoden · Material</th><th>Diagnose / Leistung</th><th class="status-col">Stand</th></tr></thead><tbody id="planRows"></tbody></table></div>
+          <div class="table-shell"><table><thead><tr><th class="week-col">Woche / Termin</th><th>Thema · Kompetenzen · Inhalte</th><th>Diagnose / Leistung</th><th class="status-col">Stand</th></tr></thead><tbody id="planRows"></tbody></table></div>
           <p id="emptyPlan" class="empty-state" hidden>Für diese Auswahl wurden im Stundenplan keine Unterrichtstermine gefunden.</p>
+        </section>
+        <section id="topicStage" class="plan-stage topic-stage" hidden>
+          <div class="plan-head"><div><span class="eyebrow">Editor</span><h1>Fachpläne und Themen</h1><p class="stage-intro">Wählen Sie zuerst bewusst aus, welche Fächer und Klassen oder Kurse Sie planen. Anschließend legen Sie je Fachplan Themenfolge und Stundenumfang fest.</p></div><button type="button" id="changeCalendarButton" class="quiet-button">Kalender wechseln</button></div>
+          <section class="course-manager" aria-labelledby="courseManagerTitle"><div class="section-head"><div><span class="eyebrow">Fachpläne</span><h2 id="courseManagerTitle">Fächer und Klassen zuweisen</h2></div></div><div class="course-create-row"><label><span>Fach</span><select id="subjectSelect"></select></label><label><span>Klasse / Kurs</span><select id="targetSelect"></select></label><button type="button" id="addCourseButton" class="primary-button">Fachplan hinzufügen</button></div><div id="configuredCourseList" class="configured-course-list"></div><p id="emptyCourses" class="empty-state compact">Noch kein Fachplan ausgewählt.</p></section>
+          <div class="topic-editor-head"><div><span class="eyebrow">Aktiver Fachplan</span><h2 id="topicCourseTitle">Themen und Stunden</h2></div><button type="button" id="addTopicButton" class="primary-button">Thema hinzufügen</button></div>
+          <div id="topicSummary" class="summary-cards"></div>
+          <div id="topicList" class="topic-list"></div>
+          <p id="emptyTopics" class="empty-state">Noch keine Themen angelegt.</p>
         </section>
       </section>
     </main>
+    <footer id="workspaceFooter" class="workspace-footer" aria-label="Arbeitsbereich wechseln" hidden><button type="button" data-workspace-view="plan" aria-pressed="true">Stoffverteilung</button><button type="button" data-workspace-view="topics" aria-pressed="false">Themeneditor</button></footer>
   </div>
 
-  <dialog id="settingsDialog"><form id="settingsForm" method="dialog"><div class="dialog-head"><div><span class="eyebrow">Planrahmen</span><h2>Orientierung und Reserve</h2></div><button type="button" id="closeSettingsButton" class="dialog-close">×</button></div><div class="dialog-grid"><label><span>Rahmenplan / Quelle</span><input id="frameworkInput" placeholder="z. B. Rahmenplan Chemie M-V 8–10"></label><label><span>Link oder Fundstelle</span><input id="frameworkUrlInput" type="url" placeholder="https://…"></label><label><span>Reserve in Prozent</span><input id="reserveInput" type="number" min="0" max="40" step="1" value="10"></label><label><span>Übergeordnetes Jahresziel</span><textarea id="yearGoalInput" rows="3"></textarea></label></div><div class="dialog-actions"><button type="submit" class="primary-button">Übernehmen</button></div></form></dialog>
+  <dialog id="settingsDialog"><form id="settingsForm" method="dialog"><div class="dialog-head"><div><span class="eyebrow">Planrahmen</span><h2>Fachliche Orientierung</h2></div><button type="button" id="closeSettingsButton" class="dialog-close">×</button></div><div class="dialog-grid"><label><span>Rahmenplan / Quelle</span><input id="frameworkInput" placeholder="z. B. Rahmenplan Chemie M-V 8–10"></label><label><span>Link oder Fundstelle</span><input id="frameworkUrlInput" type="url" placeholder="https://…"></label><label><span>Übergeordnetes Jahresziel</span><textarea id="yearGoalInput" rows="3"></textarea></label></div><div class="dialog-actions"><button type="submit" class="primary-button">Übernehmen</button></div></form></dialog>
 
-  <script src="stoffverteilung.js?v=20260830a"></script>
+  <script src="stoffverteilung.js?v=20260830d"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>
