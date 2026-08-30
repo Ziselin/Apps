@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-  <link rel="stylesheet" href="stundenplan.css?v=20260827h">
+  <link rel="stylesheet" href="stundenplan.css?v=20260830f">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -32,7 +32,7 @@
             <div id="exportMenu" class="export-menu" hidden>
               <button type="button" data-export-format="json">
                 <span class="file-format-badge" aria-hidden="true">JSON</span>
-                <span><strong>Projektordner</strong><small>Zur späteren Wiederherstellung</small></span>
+                <span><strong>Schuljahr</strong><small>Zur späteren Wiederherstellung</small></span>
               </button>
               <button type="button" data-export-format="ics">
                 <span class="file-format-badge" aria-hidden="true">ICS</span>
@@ -134,25 +134,25 @@
       <main class="settings-stage">
         <section class="settings-panel browser-panel" aria-labelledby="calendarSettingsTitle">
           <div class="panel-head">
-            <div><span class="label">Browser</span><h2 id="calendarSettingsTitle">Projekte</h2></div>
+            <div><span class="label">Browser</span><h2 id="calendarSettingsTitle">Projektordner</h2></div>
             <div class="browser-actions-menu-shell">
               <button type="button" id="browserActionsButton" class="browser-actions-button" aria-label="Projektaktionen" aria-expanded="false" aria-controls="browserActionsMenu">
                 <span class="browser-actions-dots" aria-hidden="true"></span>
               </button>
               <div id="browserActionsMenu" class="browser-actions-menu" role="menu" hidden>
-                <button type="button" id="newProjectButton" role="menuitem">Neues Projekt</button>
+                <button type="button" id="newProjectButton" role="menuitem">Neuer Projektordner</button>
                 <button type="button" id="importProjectButton" role="menuitem">Importieren</button>
               </div>
             </div>
           </div>
-          <div id="projectBrowserList" class="project-browser-list" aria-label="Stundenplan-Projekte"></div>
+          <div id="projectBrowserList" class="project-browser-list" aria-label="Schuljahres-Projektordner"></div>
         </section>
         <section class="settings-panel" aria-labelledby="detailPanelTitle">
           <div class="panel-head">
             <div><span id="detailPanelLabel" class="label">Einstellungen</span><h2 id="detailPanelTitle">Stundenplan</h2></div>
           </div>
           <div id="projectDetail" class="project-detail">
-            <p class="empty-state">Wählen Sie links einen Projektordner aus oder legen Sie ein neues Projekt an.</p>
+            <p class="empty-state">Wählen Sie links einen Projektordner aus oder legen Sie zunächst einen an.</p>
           </div>
         </section>
       </main>
@@ -162,8 +162,8 @@
   <dialog id="newProjectDialog" class="project-dialog" aria-labelledby="newProjectTitle">
     <form id="newProjectForm" method="dialog">
       <div>
-        <span class="label">Projektordner</span>
-        <h2 id="newProjectTitle">Neues Projekt</h2>
+        <span class="label">Browser</span>
+        <h2 id="newProjectTitle">Neuer Projektordner</h2>
       </div>
       <label class="dialog-field">
         <span>Name</span>
@@ -171,7 +171,7 @@
       </label>
       <div class="dialog-actions">
         <button type="button" id="cancelProjectButton" class="secondary-button">Abbrechen</button>
-        <button type="submit" class="secondary-button primary-action">Projekt anlegen</button>
+        <button type="submit" class="secondary-button primary-action">Projektordner anlegen</button>
       </div>
     </form>
   </dialog>
@@ -179,17 +179,17 @@
     <form id="importProjectForm" method="dialog">
       <div>
         <span class="label">Projektordner</span>
-        <h2 id="importProjectDialogTitle">Projekt importieren</h2>
+        <h2 id="importProjectDialogTitle">Projektordner importieren</h2>
         <p class="dialog-intro">Wählen Sie eine zuvor aus Stundenplan exportierte JSON-Datei aus.</p>
       </div>
       <label class="dialog-field">
-        <span>Projektdatei</span>
+        <span>Schuljahresdatei</span>
         <input id="importProjectFile" type="file" accept=".json,application/json" required>
       </label>
       <p id="importProjectStatus" class="property-status" role="status" aria-live="polite"></p>
       <div class="dialog-actions">
         <button type="button" id="cancelImportProjectButton" class="secondary-button">Abbrechen</button>
-        <button type="submit" class="secondary-button primary-action">Projekt importieren</button>
+        <button type="submit" class="secondary-button primary-action">Schuljahr importieren</button>
       </div>
     </form>
   </dialog>
@@ -565,7 +565,7 @@
       </div>
     </form>
   </dialog>
-    <script src="stundenplan.js?v=20260827h"></script>
+    <script src="stundenplan.js?v=20260830f"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

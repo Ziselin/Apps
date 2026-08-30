@@ -203,6 +203,7 @@ const calendarExportStatus = document.getElementById("calendarExportStatus");
 const cancelCalendarExportButton = document.getElementById("cancelCalendarExportButton");
 
 const PROJECT_STORAGE_KEY = "schola-stundenplan-projects-v1";
+const PROJECT_FOLDERS_STORAGE_KEY = "schola-stundenplan-project-folders-v1";
 const DISPLAY_PROJECT_STORAGE_KEY = "schola-stundenplan-display-project-v1";
 const LESSON_SIGNALS_STORAGE_KEY = "schola-stundenplan-signals-enabled-v1";
 const EXPANDED_LAYERS_STORAGE_KEY = "schola-stundenplan-expanded-layers-v1";
@@ -226,7 +227,7 @@ const LESSON_COLORS = [
 const LAYER_TYPES = [
   { id: "holidays", title: "Schulen", description: "Schulen, Zeitmodelle und zugehörige Ferien" },
   { id: "classCatalog", title: "Klassen", description: "Fachunabhängige Klassenstufen und semantisch eindeutige Einzelklassen" },
-  { id: "schedules", title: "Stundenplanlogiken", description: "Mögliche Zeitraster einer Schule, etwa Einzel- und Blockstunden oder unterschiedliche Pausenfolgen" },
+  { id: "schedules", title: "Stundenpläne", description: "Zeitlich gültige Stundenplanversionen mit den jeweils zugehörigen Stundenplanlogiken" },
   { id: "individual", title: "Persönliche Termine", description: "Urlaub, weitere persönliche Termine und Krankschreibungen" },
   { id: "appointments", title: "Schulische Termine", description: "Schulische Ereignisse mit optionalem Klassenbezug und getrennten Unterrichtsauswirkungen" },
   { id: "classes", title: "Projekttage nach Klassen", description: "Ehemalige klassenbezogene Projektschicht", hiddenInBrowser: true },
@@ -251,10 +252,13 @@ const FEDERAL_STATES = [
   ["TH", "Thüringen"]
 ];
 let projects = loadProjects();
+let projectFolders = loadProjectFolders(projects);
 migrateClassProjectsToSchoolAppointments(projects);
 let classStudentDraft = [];
 migrateKnownHolidayCorrections(projects);
+projects.forEach((project) => ensureScheduleVersions(project));
 let activeProjectId = projects[0]?.id ?? null;
+let activeProjectFolderId = null;
 let displayedProjectId = projects.some((project) => project.id === localStorage.getItem(DISPLAY_PROJECT_STORAGE_KEY))
   ? localStorage.getItem(DISPLAY_PROJECT_STORAGE_KEY)
   : projects[0]?.id ?? null;
@@ -267,6 +271,7 @@ let pendingClassCatalogScrollTarget = null;
 let activeAppointmentGroupTarget = null;
 let pendingAppointmentGroupScrollTarget = null;
 let activeScheduleId = null;
+let activeScheduleVersionId = projects[0]?.layers?.find((entry) => entry.type === "schedules")?.versions?.[0]?.id || null;
 let displayRowsDraft = [];
 let lessonPhasesDraft = [];
 let mainCalendarView = "year";
@@ -282,6 +287,7 @@ const lessonEndAudio = new Audio("../../assets/stundenplan-ende.mp3");
 lessonStartAudio.preload = "auto";
 lessonEndAudio.preload = "auto";
 const expandedProjectIds = new Set(projects.map((project) => project.id));
+const expandedProjectFolderIds = new Set(projectFolders.map((folder) => folder.id));
 const expandableLayerIds = new Set(["holidays", "classCatalog", "schedules", "individual", "appointments"]);
 const storedExpandedLayerKeys = (() => {
   try { return JSON.parse(localStorage.getItem(EXPANDED_LAYERS_STORAGE_KEY) || "null"); }
@@ -670,10 +676,33 @@ function getLocalDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function isScheduleValidOn(schedule, date) {
+function isScheduleWithinOwnValidity(schedule, date) {
+  const project = schedule.projectId ? projects.find((entry) => entry.id === schedule.projectId) : null;
+  const version = project?.layers?.find((entry) => entry.type === "schedules")?.versions?.find((entry) => entry.id === schedule.versionId);
+  const validitySource = version || schedule;
+  if (validitySource.validityPending) return false;
   const dateKey = getLocalDateKey(date);
-  return (!schedule.validFrom || dateKey >= schedule.validFrom)
-    && (!schedule.validUntil || dateKey <= schedule.validUntil);
+  return (!validitySource.validFrom || dateKey >= validitySource.validFrom)
+    && (!validitySource.validUntil || dateKey <= validitySource.validUntil);
+}
+
+function isScheduleValidOn(schedule, date) {
+  if (!isScheduleWithinOwnValidity(schedule, date)) return false;
+  if (schedule.projectId && schedule.versionId) {
+    const project = projects.find((entry) => entry.id === schedule.projectId);
+    const versions = project?.layers?.find((entry) => entry.type === "schedules")?.versions || [];
+    const dateKey = getLocalDateKey(date);
+    const activeVersion = versions.filter((version) => (
+      !version.validityPending
+      && (!version.validFrom || dateKey >= version.validFrom)
+      && (!version.validUntil || dateKey <= version.validUntil)
+    )).sort((a, b) => (
+      String(b.validFrom || "").localeCompare(String(a.validFrom || ""))
+      || String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+    ))[0];
+    if (activeVersion && activeVersion.id !== schedule.versionId) return false;
+  }
+  return true;
 }
 
 function getLessonTeachingForm(lesson) {
@@ -1422,8 +1451,41 @@ function loadProjects() {
   }
 }
 
+function loadProjectFolders(projectList) {
+  let folders = [];
+  try {
+    const stored = JSON.parse(localStorage.getItem(PROJECT_FOLDERS_STORAGE_KEY) || "[]");
+    if (Array.isArray(stored)) folders = stored.filter((folder) => folder?.id && folder?.name);
+  } catch {
+    folders = [];
+  }
+  const foldersById = new Map(folders.map((folder) => [folder.id, folder]));
+  const claimedFolderIds = new Set();
+  const normalizedFolders = [];
+  projectList.forEach((project) => {
+    const storedFolder = foldersById.get(project.folderId);
+    const folder = storedFolder && !claimedFolderIds.has(storedFolder.id)
+      ? storedFolder
+      : {
+        id: globalThis.crypto?.randomUUID?.() ?? `project-folder-${Date.now()}-${normalizedFolders.length}`,
+        name: project.name,
+        createdAt: project.createdAt || new Date().toISOString()
+      };
+    if (!folder.name || folder.name === "Schuljahre" || folder.name === "Importierte Schuljahre") folder.name = project.name;
+    folder.calendarRange ||= structuredClone(project.calendarRange || project.periods?.schoolYear || {});
+    project.folderId = folder.id;
+    claimedFolderIds.add(folder.id);
+    normalizedFolders.push(folder);
+  });
+  folders.filter((folder) => !claimedFolderIds.has(folder.id)).forEach((folder) => normalizedFolders.push(folder));
+  localStorage.setItem(PROJECT_FOLDERS_STORAGE_KEY, JSON.stringify(normalizedFolders));
+  if (projectList.length) localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projectList));
+  return normalizedFolders;
+}
+
 function saveProjects() {
   localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(projects));
+  localStorage.setItem(PROJECT_FOLDERS_STORAGE_KEY, JSON.stringify(projectFolders));
   publishClassDirectory();
   if (overviewSidebar?.classList.contains("is-open")) renderOverviewSidebar();
 }
@@ -1920,14 +1982,25 @@ async function importProjectFromFile(file) {
     throw new Error("Die ausgewählte Datei enthält kein gültiges JSON.");
   }
   const project = normalizeImportedProject(payload);
+  ensureScheduleVersions(project);
+  const importFolder = {
+    id: globalThis.crypto?.randomUUID?.() ?? `project-folder-${Date.now()}`,
+    name: project.name,
+    calendarRange: structuredClone(project.calendarRange || project.periods?.schoolYear || {}),
+    createdAt: new Date().toISOString()
+  };
+  projectFolders.push(importFolder);
+  project.folderId = importFolder.id;
   projects.push(project);
   migrateClassProjectsToSchoolAppointments([project]);
   migrateKnownHolidayCorrections([project]);
   activeProjectId = project.id;
+  activeProjectFolderId = project.folderId;
   displayedProjectId = project.id;
   activeLayerType = null;
   activeScheduleId = null;
   expandedProjectIds.add(project.id);
+  expandedProjectFolderIds.add(project.folderId);
   expandDefaultProjectLayers(project.id);
   localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
   saveProjects();
@@ -2184,8 +2257,9 @@ function buildProjectIcalendar(project, selection = getCompleteIcalendarSelectio
   (Array.isArray(schedulesLayer?.schedules) ? schedulesLayer.schedules : [])
     .filter((schedule) => selection.scheduleIds.has(schedule.id))
     .forEach((schedule) => {
-    const rangeStart = schedule.validFrom || projectPeriod.startDate;
-    const rangeEnd = schedule.validUntil || projectPeriod.endDate;
+    const version = schedulesLayer?.versions?.find((entry) => entry.id === schedule.versionId);
+    const rangeStart = version?.validFrom || schedule.validFrom || projectPeriod.startDate;
+    const rangeEnd = version?.validUntil || schedule.validUntil || projectPeriod.endDate;
     const combinedSchedule = { ...schedule, projectId: project.id };
     (Array.isArray(schedule.lessons) ? schedule.lessons : []).forEach((lesson) => {
       const occurrenceDates = [];
@@ -2466,6 +2540,7 @@ function closeCardMenus(exceptShell = null) {
 }
 
 function selectProject(projectId) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = null;
   activeScheduleId = null;
@@ -2477,7 +2552,17 @@ function selectProject(projectId) {
   renderActiveCalendar();
 }
 
+function selectProjectFolder(folderId) {
+  activeProjectFolderId = folderId;
+  activeLayerType = null;
+  activeScheduleId = null;
+  activeSchoolId = null;
+  renderProjectBrowser();
+  renderProjectDetail();
+}
+
 function selectLayer(projectId, layerType) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = layerType;
   activeScheduleId = null;
@@ -2490,6 +2575,7 @@ function selectLayer(projectId, layerType) {
 }
 
 function selectAppointmentGroup(projectId, layerType, groupId) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = layerType;
   activeScheduleId = null;
@@ -2513,6 +2599,7 @@ function scrollToPendingAppointmentGroup(project, layerType) {
 }
 
 function selectSchool(projectId, schoolId) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = "holidays";
   activeScheduleId = null;
@@ -2523,6 +2610,7 @@ function selectSchool(projectId, schoolId) {
 }
 
 function selectClassCatalogSchool(projectId, schoolId) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = "classCatalog";
   activeScheduleId = null;
@@ -2535,6 +2623,7 @@ function selectClassCatalogSchool(projectId, schoolId) {
 }
 
 function selectClassCatalogTarget(projectId, schoolId, tab, type = null, id = null) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = "classCatalog";
   activeScheduleId = null;
@@ -2549,12 +2638,80 @@ function selectClassCatalogTarget(projectId, schoolId, tab, type = null, id = nu
 }
 
 function selectSchedule(projectId, scheduleId) {
+  activeProjectFolderId = null;
   activeProjectId = projectId;
   activeLayerType = "schedules";
   activeScheduleId = scheduleId;
+  const project = projects.find((entry) => entry.id === projectId);
+  activeScheduleVersionId = project?.layers?.find((entry) => entry.type === "schedules")?.schedules?.find((entry) => entry.id === scheduleId)?.versionId || activeScheduleVersionId;
   renderProjectBrowser();
   renderProjectDetail();
   renderActiveCalendar();
+}
+
+function selectScheduleVersion(projectId, versionId) {
+  activeProjectFolderId = null;
+  activeProjectId = projectId;
+  activeLayerType = "schedules";
+  activeScheduleVersionId = versionId;
+  activeScheduleId = null;
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+}
+
+function duplicateScheduleVersion(project, versionId) {
+  const layer = getProjectLayer(project, "schedules");
+  ensureScheduleVersions(project);
+  const sourceIndex = layer.versions.findIndex((entry) => entry.id === versionId);
+  const sourceVersion = layer.versions[sourceIndex];
+  if (!sourceVersion) return;
+  const newId = (prefix) => globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const baseName = `${sourceVersion.name || "Stundenplanversion"} – Kopie`;
+  let name = baseName;
+  let suffix = 2;
+  const usedNames = new Set(layer.versions.map((entry) => String(entry.name || "").toLocaleLowerCase("de")));
+  while (usedNames.has(name.toLocaleLowerCase("de"))) name = `${baseName} ${suffix++}`;
+  const copyVersion = {
+    id: newId("schedule-version"),
+    name,
+    validFrom: "",
+    validUntil: "",
+    validityPending: true,
+    createdAt: new Date().toISOString(),
+    duplicatedFromId: sourceVersion.id
+  };
+  const seriesIds = new Map();
+  const copies = layer.schedules.filter((schedule) => schedule.versionId === sourceVersion.id).map((source) => {
+    const copy = typeof structuredClone === "function" ? structuredClone(source) : JSON.parse(JSON.stringify(source));
+    copy.id = newId("schedule");
+    copy.versionId = copyVersion.id;
+    copy.createdAt = new Date().toISOString();
+    copy.duplicatedFromId = source.id;
+    copy.displayRows = (Array.isArray(copy.displayRows) ? copy.displayRows : []).map((row) => ({ ...row, id: newId("display") }));
+    copy.lessons = (Array.isArray(copy.lessons) ? copy.lessons : []).map((lesson) => {
+      let seriesId = lesson.seriesId;
+      if (seriesId) {
+        if (!seriesIds.has(seriesId)) seriesIds.set(seriesId, newId("lesson-series"));
+        seriesId = seriesIds.get(seriesId);
+      }
+      return { ...lesson, id: newId("lesson"), ...(seriesId ? { seriesId } : {}) };
+    });
+    return copy;
+  });
+  layer.versions.splice(sourceIndex + 1, 0, copyVersion);
+  layer.schedules.push(...copies);
+  activeProjectFolderId = null;
+  activeProjectId = project.id;
+  activeLayerType = "schedules";
+  activeScheduleVersionId = copyVersion.id;
+  activeScheduleId = null;
+  expandedLayerKeys.add(`${project.id}:schedules:version:${copyVersion.id}`);
+  localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
+  saveProjects();
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar(project);
 }
 
 function toggleLayerExpanded(projectId, layerId) {
@@ -2614,18 +2771,88 @@ function createBrowserGroupRow(project, layerType, group) {
   return row;
 }
 
+function createSchoolYearProject(folderId, name) {
+  const project = {
+    id: globalThis.crypto?.randomUUID?.() ?? `project-${Date.now()}`,
+    folderId,
+    name,
+    createdAt: new Date().toISOString(),
+    layers: LAYER_TYPES.map((layer) => ({ type: layer.id, entries: [] }))
+  };
+  projects.push(project);
+  activeProjectFolderId = folderId;
+  activeProjectId = project.id;
+  displayedProjectId = project.id;
+  localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
+  activeLayerType = null;
+  expandedProjectFolderIds.add(folderId);
+  expandedProjectIds.add(project.id);
+  expandDefaultProjectLayers(project.id);
+  saveProjects();
+  renderProjectBrowser();
+  renderProjectDetail();
+  renderActiveCalendar();
+  return project;
+}
+
+function openNewSchoolYearDialog(folder) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "project-dialog";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const heading = document.createElement("div");
+  heading.innerHTML = `<span class="label">${escapeHtml(folder.name)}</span><h2>Schuljahr hinzufügen</h2>`;
+  const field = document.createElement("label");
+  field.className = "dialog-field";
+  const label = document.createElement("span");
+  label.textContent = "Bezeichnung des Schuljahres";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 80;
+  input.required = true;
+  input.autocomplete = "off";
+  input.placeholder = "z. B. Schuljahr 2027/28";
+  field.append(label, input);
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.textContent = "Abbrechen";
+  cancel.addEventListener("click", () => dialog.close());
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "secondary-button primary-action";
+  submit.textContent = "Schuljahr anlegen";
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) return input.focus();
+    createSchoolYearProject(folder.id, name);
+    dialog.close();
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  actions.append(cancel, submit);
+  form.append(heading, field, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  input.focus();
+}
+
 function renderProjectBrowser() {
-  if (!projects.length) {
+  if (!projectFolders.length) {
     const empty = document.createElement("p");
     empty.className = "project-browser-empty";
-    empty.textContent = "Noch keine Projektordner. Legen Sie über das Aktionsmenü ein neues Projekt an.";
+    empty.textContent = "Noch kein Projektordner. Legen Sie über das Aktionsmenü einen Projektordner an.";
     projectBrowserList.replaceChildren(empty);
     return;
   }
 
   const cards = projects.map((project) => {
     const card = document.createElement("article");
-    const expanded = expandedProjectIds.has(project.id);
+    card.dataset.projectId = project.id;
+    const expanded = true;
     card.className = `project-card${project.id === activeProjectId ? " is-active" : ""}`;
 
     const row = document.createElement("div");
@@ -2690,7 +2917,7 @@ function renderProjectBrowser() {
     exportSubmenu.hidden = true;
     const exportJsonButton = document.createElement("button");
     exportJsonButton.type = "button";
-    exportJsonButton.innerHTML = "<strong>Projektordner</strong><small>JSON · zur Wiederherstellung</small>";
+    exportJsonButton.innerHTML = "<strong>Schuljahr</strong><small>JSON · zur Wiederherstellung</small>";
     exportJsonButton.addEventListener("click", () => {
       closeCardMenus();
       exportProject(project.id);
@@ -2715,7 +2942,7 @@ function renderProjectBrowser() {
     const deleteProjectButton = document.createElement("button");
     deleteProjectButton.type = "button";
     deleteProjectButton.className = "schedule-menu-delete";
-    deleteProjectButton.textContent = "Projekt löschen";
+    deleteProjectButton.textContent = "Schuljahr löschen";
     deleteProjectButton.dataset.projectId = project.id;
     deleteProjectButton.dataset.projectFolderId = project.id;
     deleteProjectButton.setAttribute("aria-label", `${project.name} löschen – gedrückt halten`);
@@ -2838,14 +3065,73 @@ function renderProjectBrowser() {
         }
         if (isLayerExpanded && layer.id === "schedules") {
           const scheduleLayer = getProjectLayer(project, "schedules");
-          scheduleLayer.schedules = Array.isArray(scheduleLayer.schedules) ? scheduleLayer.schedules : [];
-          scheduleLayer.schedules.forEach((schedule) => {
-            const scheduleRow = document.createElement("button");
-            scheduleRow.type = "button";
-            scheduleRow.className = `schedule-tree-row${project.id === activeProjectId && schedule.id === activeScheduleId ? " is-active" : ""}`;
-            scheduleRow.textContent = schedule.name;
-            scheduleRow.addEventListener("click", () => selectSchedule(project.id, schedule.id));
-            layerShell.append(scheduleRow);
+          ensureScheduleVersions(project).forEach((version) => {
+            const versionKey = `schedules:version:${version.id}`;
+            const versionExpanded = expandedLayerKeys.has(`${project.id}:${versionKey}`);
+            const versionShell = document.createElement("div");
+            versionShell.className = "schedule-version-tree";
+            const versionHead = document.createElement("div");
+            versionHead.className = "schedule-version-tree-head";
+            const versionToggle = document.createElement("button");
+            versionToggle.type = "button";
+            versionToggle.className = "layer-tree-toggle";
+            versionToggle.textContent = versionExpanded ? "−" : "+";
+            versionToggle.setAttribute("aria-expanded", String(versionExpanded));
+            versionToggle.addEventListener("click", () => toggleLayerExpanded(project.id, versionKey));
+            const versionRow = document.createElement("button");
+            versionRow.type = "button";
+            versionRow.className = `schedule-tree-row schedule-version-tree-label${project.id === activeProjectId && version.id === activeScheduleVersionId && !activeScheduleId ? " is-active" : ""}`;
+            versionRow.textContent = version.name;
+            versionRow.addEventListener("click", () => selectScheduleVersion(project.id, version.id));
+            const menuShell = document.createElement("div");
+            menuShell.className = "schedule-menu-shell schedule-tree-menu-shell";
+            const menuButton = document.createElement("button");
+            menuButton.type = "button";
+            menuButton.className = "schedule-menu-button schedule-tree-menu-button";
+            menuButton.setAttribute("aria-label", `Menü für ${version.name}`);
+            menuButton.setAttribute("aria-expanded", "false");
+            menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+            const menu = document.createElement("div");
+            menu.className = "schedule-menu schedule-tree-menu";
+            menu.hidden = true;
+            const duplicate = document.createElement("button");
+            duplicate.type = "button";
+            duplicate.textContent = "Duplizieren";
+            duplicate.addEventListener("click", () => duplicateScheduleVersion(project, version.id));
+            const deleteVersion = document.createElement("button");
+            deleteVersion.type = "button";
+            deleteVersion.className = "schedule-menu-delete";
+            deleteVersion.textContent = "Löschen";
+            deleteVersion.dataset.projectId = project.id;
+            deleteVersion.dataset.scheduleVersionId = version.id;
+            deleteVersion.setAttribute("aria-label", `${version.name} löschen – gedrückt halten`);
+            deleteVersion.title = "Zum Löschen gedrückt halten";
+            deleteVersion.addEventListener("pointerdown", beginScheduleDeleteHold);
+            deleteVersion.addEventListener("pointerup", finishScheduleDeleteHold);
+            deleteVersion.addEventListener("pointercancel", cancelScheduleDeleteHold);
+            deleteVersion.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+            menuButton.addEventListener("click", (event) => {
+              event.stopPropagation();
+              const shouldOpen = menu.hidden;
+              closeCardMenus(shouldOpen ? menuShell : null);
+              menu.hidden = !shouldOpen;
+              menuButton.setAttribute("aria-expanded", String(shouldOpen));
+            });
+            menu.append(duplicate, deleteVersion);
+            menuShell.append(menuButton, menu);
+            versionHead.append(versionToggle, versionRow, menuShell);
+            versionShell.append(versionHead);
+            if (versionExpanded) {
+              scheduleLayer.schedules.filter((schedule) => schedule.versionId === version.id).forEach((schedule) => {
+                const scheduleRow = document.createElement("button");
+                scheduleRow.type = "button";
+                scheduleRow.className = `schedule-tree-row schedule-version-logic${project.id === activeProjectId && schedule.id === activeScheduleId ? " is-active" : ""}`;
+                scheduleRow.textContent = schedule.name;
+                scheduleRow.addEventListener("click", () => selectSchedule(project.id, schedule.id));
+                versionShell.append(scheduleRow);
+              });
+            }
+            layerShell.append(versionShell);
           });
         }
         if (isLayerExpanded && (layer.id === "appointments" || layer.id === "individual")) {
@@ -2913,14 +3199,111 @@ function renderProjectBrowser() {
     }
     return card;
   });
-  projectBrowserList.replaceChildren(...cards);
+  const cardsByProjectId = new Map(cards.map((card) => [card.dataset.projectId, card]));
+  const folderCards = projectFolders.map((folder) => {
+    const folderProject = projects.find((project) => project.folderId === folder.id);
+    const folderCard = document.createElement("section");
+    folderCard.className = `school-year-folder${activeProjectFolderId === folder.id ? " is-active" : ""}`;
+    const expanded = expandedProjectFolderIds.has(folder.id);
+    const folderHead = document.createElement("div");
+    folderHead.className = "school-year-folder-head";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "tree-toggle";
+    toggle.textContent = expanded ? "▾" : "▸";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.setAttribute("aria-label", `${folder.name} ${expanded ? "zuklappen" : "aufklappen"}`);
+    toggle.addEventListener("click", () => {
+      if (expanded) expandedProjectFolderIds.delete(folder.id);
+      else expandedProjectFolderIds.add(folder.id);
+      renderProjectBrowser();
+    });
+    const icon = document.createElement("span");
+    icon.className = "folder-icon school-year-folder-icon";
+    icon.setAttribute("aria-hidden", "true");
+    const title = document.createElement("button");
+    title.type = "button";
+    title.className = "school-year-folder-title";
+    title.textContent = folder.name;
+    title.addEventListener("click", () => selectProjectFolder(folder.id));
+    const displayToggle = document.createElement("input");
+    displayToggle.type = "checkbox";
+    displayToggle.className = "project-display-checkbox";
+    displayToggle.checked = Boolean(folderProject && folderProject.id === displayedProjectId);
+    displayToggle.disabled = !folderProject;
+    displayToggle.setAttribute("aria-label", `${folder.name} im Kalender anzeigen`);
+    displayToggle.addEventListener("change", () => {
+      if (!folderProject) return;
+      if (!displayToggle.checked && folderProject.id === displayedProjectId) displayToggle.checked = true;
+      else setDisplayedProject(folderProject.id);
+    });
+    const menuShell = document.createElement("div");
+    menuShell.className = "schedule-menu-shell project-browser-menu";
+    const menuButton = document.createElement("button");
+    menuButton.type = "button";
+    menuButton.className = "schedule-menu-button";
+    menuButton.setAttribute("aria-label", `Menü für ${folder.name}`);
+    menuButton.setAttribute("aria-expanded", "false");
+    menuButton.innerHTML = "<span aria-hidden=\"true\"></span>";
+    const menu = document.createElement("div");
+    menu.className = "schedule-menu";
+    menu.hidden = true;
+    if (folderProject) {
+      const exportJson = document.createElement("button");
+      exportJson.type = "button";
+      exportJson.textContent = "Exportieren";
+      exportJson.addEventListener("click", () => { closeCardMenus(); exportProject(folderProject.id); });
+      const exportCalendar = document.createElement("button");
+      exportCalendar.type = "button";
+      exportCalendar.textContent = "Kalender exportieren";
+      exportCalendar.addEventListener("click", () => { closeCardMenus(); openCalendarExportDialog(folderProject.id); });
+      const idButton = document.createElement("button");
+      idButton.type = "button";
+      idButton.textContent = "ID";
+      idButton.addEventListener("click", () => { closeCardMenus(); openProjectCalendarIdDialog(folderProject); });
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "schedule-menu-delete";
+      deleteButton.textContent = "Projektordner löschen";
+      deleteButton.dataset.projectId = folderProject.id;
+      deleteButton.dataset.projectFolderId = folderProject.id;
+      deleteButton.setAttribute("aria-label", `${folder.name} löschen – gedrückt halten`);
+      deleteButton.addEventListener("pointerdown", beginScheduleDeleteHold);
+      deleteButton.addEventListener("pointerup", finishScheduleDeleteHold);
+      deleteButton.addEventListener("pointercancel", cancelScheduleDeleteHold);
+      deleteButton.addEventListener("lostpointercapture", cancelScheduleDeleteHold);
+      menu.append(exportJson, exportCalendar, idButton, deleteButton);
+    }
+    menuButton.addEventListener("click", () => {
+      menu.hidden = !menu.hidden;
+      menuButton.setAttribute("aria-expanded", String(!menu.hidden));
+    });
+    menuShell.append(menuButton, menu);
+    folderHead.append(toggle, icon, title, displayToggle, menuShell);
+    folderCard.append(folderHead);
+    if (expanded) {
+      const children = document.createElement("div");
+      children.className = "school-year-folder-projects";
+      const folderProjects = projects.filter((project) => project.folderId === folder.id);
+      if (folderProjects.length) folderProjects.forEach((project) => children.append(cardsByProjectId.get(project.id)));
+      else {
+        const empty = document.createElement("p");
+        empty.className = "project-browser-empty school-year-folder-empty";
+        empty.textContent = "Dieser Projektordner enthält noch keine Kalenderdaten.";
+        children.append(empty);
+      }
+      folderCard.append(children);
+    }
+    return folderCard;
+  });
+  projectBrowserList.replaceChildren(...folderCards);
 }
 
 function openProjectCalendarIdDialog(project) {
   const dialog = document.createElement("dialog"); dialog.className = "project-dialog project-id-dialog";
   const form = document.createElement("form"); form.method = "dialog";
-  const heading = document.createElement("div"); heading.innerHTML = `<span class="label">Projektordner</span><h2>Kalender-ID</h2>`;
-  const note = document.createElement("p"); note.textContent = "Mit dieser ID kann Classroom Screen den zusammengeführten Stundenplan dieses Projektordners aufrufen.";
+  const heading = document.createElement("div"); heading.innerHTML = `<span class="label">Schuljahr</span><h2>Kalender-ID</h2>`;
+  const note = document.createElement("p"); note.textContent = "Mit dieser ID kann Classroom Screen den zusammengeführten Stundenplan dieses Schuljahres aufrufen.";
   const value = document.createElement("input"); value.type = "text"; value.readOnly = true; value.value = `SP1:${project.id}`;
   const actions = document.createElement("div"); actions.className = "dialog-actions";
   const close = document.createElement("button"); close.type = "submit"; close.className = "secondary-button"; close.textContent = "Schließen";
@@ -2930,14 +3313,111 @@ function openProjectCalendarIdDialog(project) {
   dialog.addEventListener("close", () => dialog.remove(), { once: true }); dialog.showModal(); value.select();
 }
 
+function getProjectFolderCalendarRange(folder) {
+  const folderProjects = projects.filter((project) => project.folderId === folder.id);
+  const ranges = folderProjects.map((project) => getProjectCalendarRange(project));
+  const starts = ranges.map((range) => range.startDate).filter(Boolean).sort();
+  const ends = ranges.map((range) => range.endDate).filter(Boolean).sort();
+  return {
+    startDate: folder.calendarRange?.startDate || starts[0] || "",
+    endDate: folder.calendarRange?.endDate || ends.at(-1) || ""
+  };
+}
+
+function renderProjectFolderProperties(folder) {
+  detailPanelLabel.textContent = "Projektordner";
+  detailPanelTitle.textContent = "Ordnereinstellungen";
+  const range = getProjectFolderCalendarRange(folder);
+  const sheet = document.createElement("section");
+  sheet.className = "project-summary";
+  const heading = document.createElement("h3");
+  heading.textContent = folder.name;
+  const intro = document.createElement("p");
+  intro.textContent = "Dieser Haupt-Projektordner repräsentiert ein Schuljahr. Klassen, Kurse und Termine gelten gemeinsam; nur die Stundenpläne werden als zeitlich gültige Versionen geführt.";
+  const form = document.createElement("form");
+  form.className = "property-section";
+  const nameRow = document.createElement("label");
+  nameRow.className = "property-row";
+  nameRow.innerHTML = "<span>Projekttitel</span>";
+  const name = document.createElement("input");
+  name.required = true;
+  name.maxLength = 100;
+  name.value = folder.name;
+  nameRow.append(name);
+  const rangeTitle = document.createElement("h3");
+  rangeTitle.textContent = "Kalenderrahmen";
+  const rangeRow = document.createElement("div");
+  rangeRow.className = "property-row project-school-year-row";
+  const rangeLabel = document.createElement("span");
+  rangeLabel.textContent = "Gesamtzeitraum";
+  const fields = document.createElement("div");
+  fields.className = "project-school-year-fields";
+  const fromLabel = document.createElement("label");
+  fromLabel.textContent = "von";
+  const from = document.createElement("input");
+  from.type = "date";
+  from.value = range.startDate;
+  fromLabel.append(from);
+  const untilLabel = document.createElement("label");
+  untilLabel.textContent = "bis";
+  const until = document.createElement("input");
+  until.type = "date";
+  until.value = range.endDate;
+  untilLabel.append(until);
+  fields.append(fromLabel, untilLabel);
+  rangeRow.append(rangeLabel, fields);
+  const status = document.createElement("p");
+  status.className = "property-status";
+  let saveTimer = null;
+  const save = () => {
+    const title = name.value.trim();
+    if (!title || (from.value && until.value && until.value < from.value)) {
+      status.className = "property-status is-error";
+      status.textContent = "Bitte Projekttitel und Kalenderrahmen gültig angeben.";
+      return;
+    }
+    folder.name = title;
+    folder.calendarRange = { startDate: from.value, endDate: until.value };
+    const project = projects.find((entry) => entry.folderId === folder.id);
+    if (project) {
+      project.name = title;
+      project.calendarRange = { startDate: from.value, endDate: until.value, manuallyAdjusted: true };
+      project.periods = project.periods || {};
+      project.periods.schoolYear = { startDate: from.value, endDate: until.value, source: "project-folder" };
+    }
+    saveProjects();
+    heading.textContent = folder.name;
+    status.className = "property-status is-success";
+    status.textContent = "Automatisch gespeichert ✓";
+    renderProjectBrowser();
+  };
+  const scheduleSave = () => {
+    clearTimeout(saveTimer);
+    status.className = "property-status";
+    status.textContent = "Wird gespeichert …";
+    saveTimer = setTimeout(save, 400);
+  };
+  form.addEventListener("input", scheduleSave);
+  form.addEventListener("change", scheduleSave);
+  form.addEventListener("submit", (event) => event.preventDefault());
+  form.append(nameRow, rangeTitle, rangeRow, status);
+  sheet.append(heading, intro, form);
+  projectDetail.replaceChildren(sheet);
+}
+
 function renderProjectDetail() {
+  const activeFolder = projectFolders.find((folder) => folder.id === activeProjectFolderId);
+  if (activeFolder) {
+    renderProjectFolderProperties(activeFolder);
+    return;
+  }
   const project = projects.find((entry) => entry.id === activeProjectId);
   if (!project) {
     detailPanelLabel.textContent = "Einstellungen";
     detailPanelTitle.textContent = "Stundenplan";
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = "Wählen Sie links einen Projektordner aus oder legen Sie ein neues Projekt an.";
+    empty.textContent = "Wählen Sie links ein Schuljahr aus oder legen Sie zunächst einen Projektordner an.";
     projectDetail.replaceChildren(empty);
     return;
   }
@@ -3270,8 +3750,8 @@ function renderAlternatingWeeksConfiguration(panel, draft, getSchoolYearRange) {
 }
 
 function renderProjectFolderSettings(project) {
-  detailPanelLabel.textContent = "Projektordner";
-  detailPanelTitle.textContent = "Projekteinstellungen";
+  detailPanelLabel.textContent = "Schuljahr";
+  detailPanelTitle.textContent = "Schuljahreseinstellungen";
   const schools = ensureSchools(project);
   const automaticStarts = schools.map((school) => school.periods.schoolYear.startDate).filter(Boolean).sort();
   const automaticEnds = schools.map((school) => school.periods.schoolYear.endDate).filter(Boolean).sort();
@@ -3281,19 +3761,19 @@ function renderProjectFolderSettings(project) {
   const heading = document.createElement("h3");
   heading.textContent = project.name;
   const intro = document.createElement("p");
-  intro.textContent = "Die fachlichen Zeiträume werden bei den Schulen gepflegt. Hier bestimmen Sie nur den übergreifenden Kalenderrahmen des Projektordners.";
+  intro.textContent = "Hier legen Sie fest, von wann bis wann dieses Schuljahr gültig ist. Der übergreifende Kalenderrahmen wird im Hauptordner gepflegt.";
   const form = document.createElement("form");
   form.className = "property-section";
   const nameRow = document.createElement("label");
   nameRow.className = "property-row";
-  nameRow.innerHTML = "<span>Projekttitel</span>";
+  nameRow.innerHTML = "<span>Bezeichnung des Schuljahres</span>";
   const name = document.createElement("input");
   name.required = true;
   name.maxLength = 100;
   name.value = project.name;
   nameRow.append(name);
   const rangeTitle = document.createElement("h3");
-  rangeTitle.textContent = "Maximaler Kalenderzeitraum";
+  rangeTitle.textContent = "Gültigkeit";
   const rangeNote = document.createElement("p");
   rangeNote.className = "project-period-intro";
   rangeNote.textContent = automaticStarts.length
@@ -3302,7 +3782,7 @@ function renderProjectFolderSettings(project) {
   const rangeRow = document.createElement("div");
   rangeRow.className = "property-row project-school-year-row";
   const rangeLabel = document.createElement("span");
-  rangeLabel.textContent = "Kalenderrahmen";
+  rangeLabel.textContent = "Schuljahr gültig";
   const rangeFields = document.createElement("div");
   rangeFields.className = "project-school-year-fields";
   const fromLabel = document.createElement("label");
@@ -3327,7 +3807,7 @@ function renderProjectFolderSettings(project) {
   const saveProjectSettings = () => {
     if (!name.value.trim() || !from.value || !until.value || until.value < from.value) {
       status.className = "property-status is-error";
-      status.textContent = "Bitte Projekttitel und Kalenderrahmen vollständig und gültig angeben.";
+      status.textContent = "Bitte Bezeichnung und Gültigkeit des Schuljahres vollständig und gültig angeben.";
       return;
     }
     project.name = name.value.trim();
@@ -6637,6 +7117,31 @@ function getProjectLayer(project, layerType) {
   return layer;
 }
 
+function ensureScheduleVersions(project) {
+  const layer = getProjectLayer(project, "schedules");
+  layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
+  layer.versions = Array.isArray(layer.versions) ? layer.versions : [];
+  if (!layer.versions.length) {
+    const starts = layer.schedules.map((schedule) => schedule.validFrom).filter(Boolean).sort();
+    const ends = layer.schedules.map((schedule) => schedule.validUntil).filter(Boolean).sort();
+    const validFrom = starts[0] || project.calendarRange?.startDate || project.periods?.schoolYear?.startDate || "";
+    const validUntil = ends.at(-1) || project.calendarRange?.endDate || project.periods?.schoolYear?.endDate || "";
+    layer.versions.push({
+      id: globalThis.crypto?.randomUUID?.() ?? `schedule-version-${Date.now()}`,
+      name: "Stundenplan 1",
+      validFrom,
+      validUntil,
+      validityPending: !(validFrom && validUntil),
+      createdAt: project.createdAt || new Date().toISOString()
+    });
+  }
+  const versionIds = new Set(layer.versions.map((version) => version.id));
+  layer.schedules.forEach((schedule) => {
+    if (!versionIds.has(schedule.versionId)) schedule.versionId = layer.versions[0].id;
+  });
+  return layer.versions;
+}
+
 function createSchoolPeriods(source = {}, startDate = "", endDate = "") {
   const models = source.models && typeof source.models === "object" ? source.models : {};
   const range = (value = {}) => ({ startDate: value.startDate || "", endDate: value.endDate || "" });
@@ -6988,6 +7493,29 @@ function deleteSchedule(projectId, scheduleId) {
   renderActiveCalendar();
 }
 
+function deleteScheduleVersion(projectId, versionId) {
+  const project = projects.find((entry) => entry.id === projectId);
+  const layer = project?.layers?.find((entry) => entry.type === "schedules");
+  if (!project || !layer) return;
+  ensureScheduleVersions(project);
+  if (layer.versions.length <= 1) {
+    window.alert("Mindestens eine Stundenplanversion muss erhalten bleiben.");
+    return;
+  }
+  layer.versions = layer.versions.filter((version) => version.id !== versionId);
+  layer.schedules = (layer.schedules || []).filter((schedule) => schedule.versionId !== versionId);
+  expandedLayerKeys.delete(`${projectId}:schedules:version:${versionId}`);
+  localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
+  if (activeScheduleVersionId === versionId) {
+    activeScheduleVersionId = layer.versions[0]?.id || null;
+    activeScheduleId = null;
+  }
+  saveProjects();
+  renderProjectBrowser();
+  renderSchedulesProperties(project);
+  renderActiveCalendar(project);
+}
+
 function deleteHolidayScope(projectId, scopeType) {
   const project = projects.find((entry) => entry.id === projectId);
   const layer = project?.layers?.find((entry) => entry.type === "holidays");
@@ -7056,8 +7584,11 @@ function deleteLesson(projectId, scheduleId, lessonId) {
 }
 
 function deleteProjectFolder(projectId) {
-  if (!projects.some((project) => project.id === projectId)) return;
+  const deletedProject = projects.find((project) => project.id === projectId);
+  if (!deletedProject) return;
   projects = projects.filter((project) => project.id !== projectId);
+  projectFolders = projectFolders.filter((folder) => folder.id !== deletedProject.folderId);
+  expandedProjectFolderIds.delete(deletedProject.folderId);
   expandedProjectIds.delete(projectId);
   [...expandedLayerKeys].filter((key) => key.startsWith(`${projectId}:`)).forEach((key) => expandedLayerKeys.delete(key));
   localStorage.setItem(EXPANDED_LAYERS_STORAGE_KEY, JSON.stringify([...expandedLayerKeys]));
@@ -7072,6 +7603,7 @@ function deleteProjectFolder(projectId) {
     activeLayerType = null;
     activeScheduleId = null;
   }
+  if (activeProjectFolderId === deletedProject.folderId) activeProjectFolderId = null;
   saveProjects();
   renderProjectBrowser();
   renderProjectDetail();
@@ -7191,6 +7723,7 @@ function beginScheduleDeleteHold(event) {
     button,
     projectId: button.dataset.projectId,
     projectFolderId: button.dataset.projectFolderId,
+    scheduleVersionId: button.dataset.scheduleVersionId,
     scheduleId: button.dataset.scheduleId,
     lessonId: button.dataset.lessonId,
     tripId: button.dataset.tripId,
@@ -7226,6 +7759,7 @@ function finishScheduleDeleteHold(event) {
     button,
     projectId,
     projectFolderId,
+    scheduleVersionId,
     scheduleId,
     lessonId,
     tripId,
@@ -7249,6 +7783,7 @@ function finishScheduleDeleteHold(event) {
   resetScheduleDeleteHold();
   if (!armed || !releasedOnButton) return;
   if (projectFolderId) deleteProjectFolder(projectFolderId);
+  else if (scheduleVersionId) deleteScheduleVersion(projectId, scheduleVersionId);
   else if (schoolId) deleteSchool(projectId, schoolId);
   else if (holidayScopeType) deleteHolidayScope(projectId, holidayScopeType);
   else if (classProjectId) deleteClassProject(projectId, classProjectId);
@@ -7295,7 +7830,9 @@ function serializeScheduleLogic(project, schedule) {
 }
 
 function exportScheduleLogics(project) {
-  const schedules = getProjectLayer(project, "schedules").schedules || [];
+  const layer = getProjectLayer(project, "schedules");
+  ensureScheduleVersions(project);
+  const schedules = (layer.schedules || []).filter((schedule) => !activeScheduleVersionId || schedule.versionId === activeScheduleVersionId);
   if (!schedules.length) {
     window.alert("Es ist noch keine Stundenplanlogik vorhanden.");
     return;
@@ -7343,6 +7880,8 @@ async function importScheduleLogicFile(project, file) {
     return { source, rows };
   });
   const layer = getProjectLayer(project, "schedules");
+  ensureScheduleVersions(project);
+  const targetVersionId = activeScheduleVersionId || layer.versions[0].id;
   layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
   const importedSchedules = normalizedSources.map(({ source, rows }, sourceIndex) => {
     const school = schools.find((entry) => entry.id === source.schoolId)
@@ -7352,6 +7891,7 @@ async function importScheduleLogicFile(project, file) {
     const defaults = getDefaultScheduleValidity(project, school.id);
     return {
       id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}-${sourceIndex}`,
+      versionId: targetVersionId,
       name: String(source.name || "Importierte Planlogik").slice(0, 80),
       schoolId: school.id,
       validityPeriodId: period?.id || "schoolYear",
@@ -7373,6 +7913,7 @@ async function importScheduleLogicFile(project, file) {
     };
   });
   layer.schedules.push(...importedSchedules);
+  activeScheduleVersionId = targetVersionId;
   activeScheduleId = importedSchedules.at(-1)?.id || null;
   saveProjects();
   renderProjectBrowser();
@@ -7424,10 +7965,13 @@ function createScheduleLogicTransferMenu(project) {
 
 function renderSchedulesProperties(project) {
   detailPanelLabel.textContent = "Eigenschaften";
-  detailPanelTitle.textContent = "Stundenplanlogiken";
+  detailPanelTitle.textContent = "Stundenpläne";
   const layer = getProjectLayer(project, "schedules");
   const schools = ensureSchools(project);
   layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
+  const versions = ensureScheduleVersions(project);
+  if (!versions.some((version) => version.id === activeScheduleVersionId)) activeScheduleVersionId = versions[0]?.id || null;
+  const activeVersion = versions.find((version) => version.id === activeScheduleVersionId);
   const schedule = layer.schedules.find((entry) => entry.id === activeScheduleId);
 
   if (!schedule) {
@@ -7438,9 +7982,54 @@ function renderSchedulesProperties(project) {
     const headLine = document.createElement("div");
     headLine.className = "schedule-transfer-head";
     const intro = document.createElement("p");
-    intro.textContent = "Legen Sie die möglichen Zeitlogiken Ihrer Schule an – beispielsweise ein Raster aus Einzelstunden, Blockstunden oder abweichenden Stunden- und Pausenfolgen. Die konkreten Unterrichtsstunden werden anschließend innerhalb der gewählten Logik eingetragen.";
+    intro.textContent = "Diese Stundenplanversion umfasst alle unten angelegten Zeitlogiken. Ihr Gültigkeitszeitraum steuert die gemeinsame Darstellung im Kalender.";
     headLine.append(intro, createScheduleLogicTransferMenu(project));
     head.append(headLine);
+    if (activeVersion) {
+      const versionForm = document.createElement("div");
+      versionForm.className = "schedule-version-properties";
+      const nameLabel = document.createElement("label");
+      nameLabel.innerHTML = "<span>Bezeichnung</span>";
+      const nameInput = document.createElement("input");
+      nameInput.value = activeVersion.name || "";
+      nameLabel.append(nameInput);
+      const fromLabel = document.createElement("label");
+      fromLabel.innerHTML = "<span>Gültig von</span>";
+      const fromInput = document.createElement("input");
+      fromInput.type = "date";
+      fromInput.value = activeVersion.validFrom || "";
+      fromLabel.append(fromInput);
+      const untilLabel = document.createElement("label");
+      untilLabel.innerHTML = "<span>Gültig bis</span>";
+      const untilInput = document.createElement("input");
+      untilInput.type = "date";
+      untilInput.value = activeVersion.validUntil || "";
+      untilLabel.append(untilInput);
+      const status = document.createElement("p");
+      status.className = "property-status schedule-validity-hint";
+      const updateVersion = () => {
+        if (!nameInput.value.trim() || (fromInput.value && untilInput.value && untilInput.value < fromInput.value)) {
+          status.textContent = "Bitte Bezeichnung und Gültigkeit vollständig und korrekt eintragen.";
+          status.className = "property-status schedule-validity-hint is-error";
+          return;
+        }
+        activeVersion.name = nameInput.value.trim();
+        activeVersion.validFrom = fromInput.value;
+        activeVersion.validUntil = untilInput.value;
+        activeVersion.validityPending = !(fromInput.value && untilInput.value);
+        status.textContent = activeVersion.validityPending ? "Diese Version bleibt bis zur vollständigen Gültigkeitsangabe im Kalender inaktiv." : "Automatisch gespeichert ✓";
+        status.className = "property-status schedule-validity-hint";
+        saveProjects();
+        renderProjectBrowser();
+        renderActiveCalendar(project);
+      };
+      nameInput.addEventListener("change", updateVersion);
+      fromInput.addEventListener("change", updateVersion);
+      untilInput.addEventListener("change", updateVersion);
+      status.textContent = activeVersion.validityPending ? "Diese Version bleibt bis zur vollständigen Gültigkeitsangabe im Kalender inaktiv." : "";
+      versionForm.append(nameLabel, fromLabel, untilLabel, status);
+      head.append(versionForm);
+    }
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button primary-action schedule-add-button";
@@ -7452,8 +8041,9 @@ function renderSchedulesProperties(project) {
     });
     const scheduleList = document.createElement("div");
     scheduleList.className = "schedule-overview-list";
-    if (layer.schedules.length) {
-      layer.schedules.forEach((entry) => {
+    const versionSchedules = layer.schedules.filter((entry) => entry.versionId === activeVersion?.id);
+    if (versionSchedules.length) {
+      versionSchedules.forEach((entry) => {
         const card = document.createElement("button");
         card.type = "button";
         card.className = "schedule-overview-card";
@@ -7571,13 +8161,8 @@ function renderSchedulesProperties(project) {
   });
   if (!schedule.schoolId && schools[0]) schedule.schoolId = schools[0].id;
   schoolLabel.append(schoolText, createSelectShell(schoolSelect));
-  const selectedValidityPeriod = getScheduleValidityPeriods(project, schedule.schoolId)[0];
-  const previousValidity = `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`;
-  applyScheduleValidityPeriod(schedule, selectedValidityPeriod);
-  if (previousValidity !== `${schedule.validityPeriodId || ""}|${schedule.validFrom || ""}|${schedule.validUntil || ""}`) saveProjects();
   schoolSelect.addEventListener("change", () => {
     schedule.schoolId = schoolSelect.value;
-    applyScheduleValidityPeriod(schedule, getScheduleValidityPeriods(project, schedule.schoolId)[0]);
     saveProjects();
     renderSchedulesProperties(project);
     renderActiveCalendar(project);
@@ -11073,11 +11658,14 @@ schedulePresetForm.addEventListener("submit", (event) => {
   const layer = project && getProjectLayer(project, "schedules");
   const school = project && ensureSchools(project)[0];
   if (!project || !layer || !school) return;
+  ensureScheduleVersions(project);
+  const targetVersionId = activeScheduleVersionId || layer.versions[0].id;
   layer.schedules = Array.isArray(layer.schedules) ? layer.schedules : [];
   const defaultValidity = getDefaultScheduleValidity(project, school.id);
   const defaultValidityPeriod = getScheduleValidityPeriods(project, school.id)[0];
   const newSchedule = {
     id: globalThis.crypto?.randomUUID?.() ?? `schedule-${Date.now()}`,
+    versionId: targetVersionId,
     name: `Planlogik ${layer.schedules.length + 1}`,
     schoolId: school.id,
     validityPeriodId: defaultValidityPeriod?.id || "schoolYear",
@@ -11091,6 +11679,7 @@ schedulePresetForm.addEventListener("submit", (event) => {
     createdAt: new Date().toISOString()
   };
   layer.schedules.push(newSchedule);
+  activeScheduleVersionId = targetVersionId;
   activeScheduleId = newSchedule.id;
   saveProjects();
   schedulePresetDialog.close();
@@ -11222,22 +11811,14 @@ newProjectForm.addEventListener("submit", (event) => {
     newProjectName.focus();
     return;
   }
-  const project = {
-    id: globalThis.crypto?.randomUUID?.() ?? `project-${Date.now()}`,
+  const folder = {
+    id: globalThis.crypto?.randomUUID?.() ?? `project-folder-${Date.now()}`,
     name,
-    createdAt: new Date().toISOString(),
-    layers: LAYER_TYPES.map((layer) => ({ type: layer.id, entries: [] }))
+    createdAt: new Date().toISOString()
   };
-  projects.push(project);
-  activeProjectId = project.id;
-  displayedProjectId = project.id;
-  localStorage.setItem(DISPLAY_PROJECT_STORAGE_KEY, project.id);
-  activeLayerType = null;
-  expandedProjectIds.add(project.id);
-  expandDefaultProjectLayers(project.id);
-  saveProjects();
-  renderProjectBrowser();
-  renderProjectDetail();
+  projectFolders.push(folder);
+  expandedProjectFolderIds.add(folder.id);
+  createSchoolYearProject(folder.id, name);
   newProjectDialog.close();
 });
 document.addEventListener("keydown", (event) => {

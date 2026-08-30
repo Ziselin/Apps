@@ -12,7 +12,8 @@ Dieses Manifest regelt den spezifischen Kompetenzbereich der App Stundenplan. Es
 
 ## 1. Ein Projektordner bündelt Kalenderschichten
 
-- Ein Projektordner ist die fachliche Einheit eines Stundenplanprojekts.
+- Ein Haupt-Projektordner repräsentiert genau ein Schuljahr. Bestehende Projekte werden bei Einführung dieser Ebene nur zugeordnet, nicht inhaltlich umgebaut.
+- Projekttitel und Kalenderrahmen sind Eigenschaften dieses Haupt-Projektordners. Klassen, Kurse, schulische und persönliche Termine sind globale Schuljahresdaten; nur Stundenpläne werden darin versioniert und besitzen eigene Gültigkeitszeiträume.
 - Schulen bündeln Schulart, Bezeichnung, Bundesland, Schuljahr, Zeitmodelle und die zugehörigen Ferien. Eine separate Ferien-Kategorie gibt es nicht mehr.
 - Schulische Ereignisse bilden eine gemeinsame Kalenderschicht. Klassen, Klassenstufen und Kurse sind optionale Eigenschaften eines Ereignisses und erzeugen keine eigenen Browserordner; die sichtbare Organisation bestimmen ausschließlich manuell angelegte Termin- und Projektgruppen.
 - Die Wirkung eines schulischen Ereignisses auf den Unterricht der ausgewählten Klassen und auf den eigenen Unterricht der Lehrkraft wird unabhängig voneinander gespeichert.
@@ -28,6 +29,9 @@ Dieses Manifest regelt den spezifischen Kompetenzbereich der App Stundenplan. Es
 - Ein Schuljahr wird intern mit Anfangs- und Endjahr gespeichert und in der Oberfläche verkürzt angezeigt, zum Beispiel `2026/27`.
 - Der sichtbare Kalenderzeitraum wird künftig aus den tatsächlichen Grenzen des ausgewählten Schuljahres abgeleitet.
 - Zeiträume und Einzeltage bleiben als maschinenlesbare Datumswerte erhalten.
+- Der Bereich „Stundenpläne“ enthält vollständige Stundenplanversionen. Jede Version bündelt sämtliche zu diesem Stand gehörenden Stundenplanlogiken und besitzt genau einen gemeinsamen Gültigkeitszeitraum.
+- Nur vollständige Versionen können für Umstellungen innerhalb eines Schuljahres dupliziert werden. Kopie und Ursprung besitzen unabhängige IDs und Gültigkeitszeiträume; einzelne Logiken werden nicht isoliert dupliziert und die Quelldaten werden nicht verändert.
+- Eine duplizierte Planversion bleibt bis zur vollständigen Angabe ihrer Gültigkeit inaktiv. Bei zeitlicher Überschneidung gilt pro Tag nur eine vollständige Version. Unterrichtsstatistiken werden fachlich über alle aufeinanderfolgenden Versionen des Schuljahres zusammengeführt und dürfen durch die technische Duplikation nicht vervielfacht werden.
 
 ## 3. Ferienimporte werden fachlich geprüft
 

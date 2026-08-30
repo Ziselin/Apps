@@ -4,6 +4,15 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-08-30
+
+- Jeder Haupt-Projektordner repräsentiert genau ein Schuljahr und bewahrt dessen Klassen, Kurse sowie schulische und persönliche Termine global; bestehende Projekte werden verlustfrei in dieses Modell überführt.
+- Projekttitel und Kalenderrahmen liegen im Haupt-Projektordner; ausschließlich die darin enthaltenen Stundenplanversionen besitzen eigene Gültigkeitszeiträume.
+- Der Browser gliedert „Stundenpläne“ in vollständige, zeitlich gültige Stundenplanversionen und deren sämtliche Stundenplanlogiken; bestehende Logiken werden gemeinsam in die erste Version migriert.
+- Vollständige Stundenplanversionen lassen sich samt aller Logiken, Unterrichtsstunden und Zeitraster nicht-destruktiv duplizieren; die Kopie bleibt bis zur vollständigen Gültigkeitsangabe kalenderinaktiv.
+- Stundenplanversionen können über ihr Browsermenü vollständig gelöscht werden; als Schutz vor einem orientierungslosen Leerzustand bleibt mindestens eine Version erhalten.
+- Kurse erhalten eine kopierbare `KU1`-ID; der lokale Klassenkatalog transportiert darüber Fach, Kursname und ausschließlich die ausgewählten Kursschüler.
+
 ### 2026-08-27
 
 - „Projekttage nach Klassen“ in „Schulische Termine“ überführt: gemeinsamer Ereignisdialog mit optionaler Klassen-/Kurszuweisung, getrennten Auswirkungen auf Klassenunterricht und eigenen Unterricht sowie personenbezogener Fristlogik; Klassen erzeugen keine Browserordner mehr.
@@ -13,7 +22,6 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Unterrichtsstunden zeigen 15 Minuten vor Beginn einen kreideroten, rückwärts laufenden Vorbereitungsbalken und wechseln zum Stundenbeginn live in den regulären Phasenverlauf.
 - Schulische und persönliche Termingruppen zeigen im Gruppenkopf den jeweils nächsten anstehenden Termin – einschließlich der Termine aus enthaltenen Projektgruppen.
 - Klassenkarten zeigen Klassenlehrer und Schülerzahl als direkte Sprungziele zu „Allgemein“ beziehungsweise „Schülerliste“ im Klassendialog.
-- Kurse erhalten eine kopierbare `KU1`-ID; der lokale Klassenkatalog transportiert darüber Fach, Kursname und ausschließlich die ausgewählten Kursschüler.
 - Kurse um eine Schülerauswahl mit Checkboxdialog, stabilen Schüler-IDs und gekoppelten Herkunftsklassen erweitert.
 
 ### 2026-08-25
