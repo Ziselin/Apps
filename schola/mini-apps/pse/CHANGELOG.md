@@ -22,6 +22,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 - Manuell eingegebene Temperatur- und Druckwerte dürfen den jeweiligen Sliderbereich überschreiten und werden dennoch vollständig berechnet; nur der Regler bleibt dabei am Bereichsende stehen.
 - Feste Zahlenfeldbreiten verhindern Layoutsprünge bei langen Werten. Separate Maximalfelder steuern die Sliderbereiche; das Reload-Symbol stellt Standardbedingungen und voreingestellte Maxima gemeinsam wieder her.
 - Die Einheitenknöpfe in den linken Wertefeldern öffnen nach oben und schalten Temperatur zwischen °C, K und °F sowie Druck zwischen hPa und bar um, ohne die intern gespeicherten SI-nahen Rechenwerte zu verändern.
+- Bei exakt 0 hPa wird Sublimation unterhalb des hinterlegten Schmelzpunkts nicht mehr als „unbekannt“, sondern mit einer Schraffur in der Feststofffarbe dargestellt; Legende und Fachinformation erläutern die Modellgrenze.
 - Die Phasenslider füllen auch in schmalen Fenstern ihre gesamte responsive Grid-Spalte und schließen ohne eine zusätzliche viewportabhängige Lücke an die Maximalfelder an.
 - Die Häufigkeitsansichten enthalten nun ein Bulk-Moon-PSE für den gesamten Mond. Es verwendet dieselben logarithmischen Massenanteilsfarben wie die Erde und dokumentiert modellbasierte Werte aus Taylor und McLennan.
 

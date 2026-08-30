@@ -581,6 +581,9 @@ html.focus-embed .periodic-table.is-long {
 .periodic-table[data-view="state"] .element[data-state="fest"] { --element-color: #d8c8b9; }
 .periodic-table[data-view="state"] .element[data-state="flüssig"] { --element-color: #9fc8cf; }
 .periodic-table[data-view="state"] .element[data-state="gasförmig"] { --element-color: #c7d8e5; }
+.periodic-table[data-view="state"] .element[data-state="sublimierend"] {
+  --element-color: repeating-linear-gradient(135deg, #d8c8b9 0 4px, #b9a394 4px 6px);
+}
 .periodic-table[data-view="state"] .element[data-state="überkritisch"] { --element-color: #9fc7b5; }
 .periodic-table[data-view="state"] .element[data-state="unbekannt"] { --element-color: #d8d8d0; }
 .periodic-table[data-view="material-class"] .element[data-material="metal"] { --element-color: #63b5d2; }
