@@ -12,7 +12,7 @@ Dieses Manifest konkretisiert die projektweiten Regeln für den Kompetenzbereich
 
 ## Projektstruktur
 
-- Die Schola-Apps liegen unter `schola/classroom`, `schola/noten` und `schola/stundenplan`; eigenständig nutzbare Mini-Apps liegen unter `schola/mini-apps`.
+- Die Schola-Apps liegen unter `schola/classroom`, `schola/noten`, `schola/stundenplan` und `schola/stoffverteilung`; eigenständig nutzbare Mini-Apps liegen unter `schola/mini-apps`.
 - Das Schola-Projektmanifest liegt direkt unter `schola/schola-engineering-manifest.md`.
 - App-spezifische Dateien und Hilfsprogramme bleiben in der jeweiligen App.
 - Appübergreifende UI-Vorlagen werden aus `assets/ui` eingebunden und nicht in Schola-Appordnern dupliziert.
