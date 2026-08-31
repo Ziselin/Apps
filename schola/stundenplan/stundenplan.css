@@ -2121,6 +2121,9 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
 .project-dialog.substitution-dialog { width: min(660px, calc(100vw - 28px)); }
 .substitution-dialog-grid { display: grid; grid-template-columns: minmax(140px, 1.15fr) repeat(2, minmax(108px, .75fr)) minmax(76px, .8fr); gap: 10px; }
 .substitution-dialog-grid .five-minute-time-control { min-width: 108px; }
+.substitution-manual-class-field { margin-top: 4px; }
+.substitution-manual-class-field input { width: 100%; }
+.substitution-manual-class-field small { color: var(--muted); font-size: .68rem; line-height: 1.4; }
 .substitution-subject-field { grid-column: 1 / -1; }
 .substitution-class-section { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,252,.34); }
 .substitution-list { display: grid; gap: 8px; }
@@ -3073,6 +3076,12 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
   background: rgba(255,255,252,.42);
 }
 .dialog-checkbox input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); flex: 0 0 auto; }
+.lesson-impact-checkbox:has(input:checked) {
+  border-color: rgba(183, 67, 58, .42);
+  background: rgba(183, 67, 58, .09);
+  color: #8f302a;
+}
+.lesson-impact-checkbox:has(input:checked) input { accent-color: #b7433a; }
 .dialog-field[hidden] { display: none; }
 .dialog-field input {
   width: 100%;

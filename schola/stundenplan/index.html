@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Stundenplan · Schola</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/ziselin-bild-flach.svg">
-  <link rel="stylesheet" href="stundenplan.css?v=20260830p">
+  <link rel="stylesheet" href="stundenplan.css?v=20260831b">
   <link rel="stylesheet" href="../../assets/ui/app-menu.css?v=20260824b">
 </head>
 <body>
@@ -276,8 +276,8 @@
           <label class="dialog-field"><span>Ende (optional)</span><input id="appointmentEndTime" type="time" step="60"></label>
         </div>
         <label class="dialog-checkbox"><input id="appointmentIsDeadline" type="checkbox"><span>Für mich handelt es sich bei diesem Termin um eine Frist.</span></label>
-        <label id="appointmentOverridesClassLessonsField" class="dialog-checkbox"><input id="appointmentOverridesClassLessons" type="checkbox"><span>Der reguläre Unterricht der ausgewählten Klassen fällt für diesen Zeitraum aus.</span></label>
-        <label class="dialog-checkbox"><input id="appointmentOverridesLessons" type="checkbox"><span>Mein regulärer Unterricht fällt für diesen Zeitraum aus.</span></label>
+        <label id="appointmentOverridesClassLessonsField" class="dialog-checkbox lesson-impact-checkbox"><input id="appointmentOverridesClassLessons" type="checkbox"><span>Der reguläre Unterricht der ausgewählten Klassen fällt für diesen Zeitraum aus.</span></label>
+        <label class="dialog-checkbox lesson-impact-checkbox"><input id="appointmentOverridesLessons" type="checkbox"><span>Mein regulärer Unterricht fällt für diesen Zeitraum aus – auch wenn die Gruppe im Kalender ausgeblendet ist.</span></label>
         <label class="dialog-checkbox"><input id="appointmentCalendarVisible" type="checkbox" checked><span>Dieser Termin soll im Kalender dargestellt werden.</span></label>
       </div>
       <p id="appointmentDialogStatus" class="property-status" role="status" aria-live="polite"></p>
@@ -565,7 +565,7 @@
       </div>
     </form>
   </dialog>
-  <script src="stundenplan.js?v=20260830t"></script>
+  <script src="stundenplan.js?v=20260831b"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

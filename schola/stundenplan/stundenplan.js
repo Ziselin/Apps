@@ -764,15 +764,35 @@ function isMandatorySupervision(schedule) {
   return Boolean(schedule?.supervisionVersionId);
 }
 
+function isTeacherScheduleSuppressedByAppointment(project, lesson, date) {
+  const dateKey = getLocalDateKey(date);
+  const individualLayer = project?.layers?.find((entry) => entry.type === "individual");
+  const schoolAppointmentLayer = project?.layers?.find((entry) => entry.type === "appointments");
+  const individualEntries = Array.isArray(individualLayer?.appliedEntries)
+    ? individualLayer.appliedEntries
+    : (Array.isArray(individualLayer?.entries) ? individualLayer.entries : []);
+  const groupedAppointments = [schoolAppointmentLayer, individualLayer].flatMap((appointmentLayer) => (
+    (Array.isArray(appointmentLayer?.groups) ? appointmentLayer.groups : [])
+      .flatMap((group) => getAppointmentGroupEntries(group))
+  ));
+  return [...individualEntries, ...groupedAppointments].some((entry) => {
+    if (!entry?.overridesLessons) return false;
+    const startDate = entry.startDate || entry.date;
+    const endDate = entry.endDate || entry.date;
+    if (!startDate || !endDate || dateKey < startDate || dateKey > endDate) return false;
+    if (!entry.startTime || !entry.endTime) return true;
+    return timeToMinutes(lesson.start) < timeToMinutes(entry.endTime)
+      && timeToMinutes(lesson.end) > timeToMinutes(entry.startTime);
+  });
+}
+
 function isScheduleLessonSuppressed(schedule, lesson, date) {
-  if (isMandatorySupervision(schedule)) return false;
+  const project = projects.find((entry) => entry.id === schedule.projectId);
+  if (isMandatorySupervision(schedule)) return isTeacherScheduleSuppressedByAppointment(project, lesson, date);
+  const suppressedByAppointment = isLessonSuppressedByClassProject(project, lesson, date);
   return isSchoolHolidayForSchedule(schedule, date)
     || isSicknessForSchedule(schedule, date)
-    || isLessonSuppressedByClassProject(
-      projects.find((project) => project.id === schedule.projectId),
-      lesson,
-      date
-    );
+    || suppressedByAppointment;
 }
 
 function getLessonTeachingForm(lesson) {
@@ -8223,6 +8243,8 @@ function createScheduleLogicTransferMenu(project) {
 
 function openSubstitutionDialog(project, substitution = null) {
   let selectedKeys = substitution ? getStoredClassTargetKeys(project, substitution) : [];
+  const initialManualClassName = substitution?.manualClassName
+    || (!selectedKeys.length ? substitution?.className || "" : "");
   const dialog = document.createElement("dialog");
   dialog.className = "project-dialog substitution-dialog";
   const form = document.createElement("form");
@@ -8265,12 +8287,30 @@ function openSubstitutionDialog(project, substitution = null) {
   const summary = document.createElement("div");
   summary.className = "class-project-target-summary";
   renderClassTargetSummary(summary, getConfiguredClassGroups(project), selectedKeys);
+  const manualClassLabel = document.createElement("label");
+  manualClassLabel.className = "dialog-field substitution-manual-class-field";
+  const manualClassCaption = document.createElement("span");
+  manualClassCaption.textContent = "Klasse manuell eingeben";
+  const manualClass = document.createElement("input");
+  manualClass.type = "text";
+  manualClass.maxLength = 60;
+  manualClass.placeholder = "z. B. 7d oder Grundkurs Biologie";
+  manualClass.value = initialManualClassName;
+  const manualClassHint = document.createElement("small");
+  manualClassHint.textContent = "Für Vertretungsklassen, die nicht im Klassenkatalog geführt werden sollen.";
+  manualClassLabel.append(manualClassCaption, manualClass, manualClassHint);
   chooseClass.addEventListener("click", () => openClassTargetPicker(project, selectedKeys, (keys, groups) => {
     selectedKeys = keys;
+    if (selectedKeys.length) manualClass.value = "";
     renderClassTargetSummary(summary, groups, selectedKeys);
   }, "Vertretungsstunde"));
+  manualClass.addEventListener("input", () => {
+    if (!manualClass.value.trim() || !selectedKeys.length) return;
+    selectedKeys = [];
+    renderClassTargetSummary(summary, getConfiguredClassGroups(project), selectedKeys);
+  });
   classHead.append(classTitle, chooseClass);
-  classSection.append(classHead, summary);
+  classSection.append(classHead, summary, manualClassLabel);
   const status = document.createElement("p");
   status.className = "property-status";
   const actions = document.createElement("div");
@@ -8286,8 +8326,9 @@ function openSubstitutionDialog(project, substitution = null) {
   submit.textContent = substitution ? "Änderungen speichern" : "Vertretungsstunde hinzufügen";
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (!date.input.value || !start.input.value || !end.input.value || end.input.value <= start.input.value || !selectedKeys.length) {
-      status.textContent = "Bitte Datum, gültige Uhrzeiten und mindestens eine Klasse auswählen.";
+    const manualClassName = manualClass.value.trim();
+    if (!date.input.value || !start.input.value || !end.input.value || end.input.value <= start.input.value || (!selectedKeys.length && !manualClassName)) {
+      status.textContent = "Bitte Datum, gültige Uhrzeiten und eine ausgewählte oder manuell eingetragene Klasse angeben.";
       return;
     }
     const layer = getProjectLayer(project, "schedules");
@@ -8301,7 +8342,9 @@ function openSubstitutionDialog(project, substitution = null) {
       subject: subject.input.value.trim(),
       ...targets,
       schoolId: targets.classGroups?.[0]?.schoolId || "",
-      className: targets.classNames?.[0] || ""
+      className: manualClassName || targets.classNames?.[0] || "",
+      classNames: manualClassName ? [manualClassName] : targets.classNames,
+      manualClassName
     };
     if (substitution) Object.assign(substitution, values);
     else layer.substitutions.unshift({ id: globalThis.crypto?.randomUUID?.() ?? `substitution-${Date.now()}`, ...values, createdAt: new Date().toISOString() });

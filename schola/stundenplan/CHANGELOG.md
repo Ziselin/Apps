@@ -4,6 +4,12 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-08-31
+
+- Vertretungsstunden erlauben alternativ zur Katalogauswahl eine freie Klassenangabe, ohne dafür statistisch relevante Klassen anlegen zu müssen.
+- Aufsichten folgen bei ausdrücklich unterrichtsüberschreibenden Terminen derselben Ausblendlogik wie Fächer und Kurse.
+- Unterrichtsüberschreibungen bleiben unabhängig vom Auge einer Termingruppe wirksam; aktivierte Ausfalloptionen werden im Dialog rot und mit einem eindeutigen Hinweis hervorgehoben.
+
 ### 2026-08-30
 
 - Aufsichten erhalten die Unterrichts-Farbpalette, bleiben auch an sonst unterrichtsfreien Tagen obligatorisch sichtbar und zeigen 15 Minuten vor Beginn den roten Countdown.
