@@ -272,7 +272,8 @@ button, input, select, textarea { font-family: inherit; }
 .overview-project-entry.is-completed strong { color: var(--muted); text-decoration: line-through; }
 .overview-project-entry-empty { margin: 0; color: var(--muted); font-size: .72rem; }
 .overview-sidebar-empty { margin: 0; padding: 28px 18px; border: 1px dashed var(--line-strong); border-radius: 13px; color: var(--muted); font-size: .78rem; line-height: 1.5; text-align: center; }
-.overview-todo-card { grid-template-columns: auto minmax(0,1fr); align-items: center; column-gap: 10px; }
+.overview-todo-card { grid-template-columns: auto minmax(0,1fr); align-items: center; column-gap: 10px; cursor: pointer; }
+.overview-todo-card:focus-visible { outline: 2px solid var(--line-strong); outline-offset: 2px; }
 .overview-todo-card > input { align-self: center; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
 .overview-todo-card > span { display: grid; min-width: 0; gap: 4px; }
 .overview-todo-card > span strong,
@@ -287,6 +288,15 @@ button, input, select, textarea { font-family: inherit; }
 .overview-todo-card.is-overdue strong,
 .overview-todo-card.is-overdue small { color: #8f302a; }
 .overview-todo-card.is-overdue > input { accent-color: #b64d43; }
+.overview-todo-card.is-due-today {
+  --overview-color: #c4a43c !important;
+  border-color: rgba(196,164,60,.42);
+  border-left-color: #c4a43c;
+  background: rgba(230,216,168,.34);
+}
+.overview-todo-card.is-due-today strong,
+.overview-todo-card.is-due-today small { color: #6f5919; }
+.overview-todo-card.is-due-today > input { accent-color: #b08e26; }
 #overviewTodosPanel { overflow-y: auto; overscroll-behavior: contain; }
 @media (max-width: 390px) {
   .overview-sidebar-tabs { grid-template-columns: 1fr; }
@@ -1384,6 +1394,12 @@ button.month-view-entry:focus-visible { outline: 1px solid var(--ink-soft); outl
 .trip-entry strong, .trip-entry span { display: block; }
 .trip-entry strong { font-size: .86rem; }
 .trip-entry span { margin-top: 4px; color: var(--muted); font-size: .76rem; }
+.trip-entry.is-expired,
+.appointment-entry.is-expired { opacity: .56; filter: saturate(.42); }
+.trip-entry.is-expired:hover,
+.trip-entry.is-expired:focus-within,
+.appointment-entry.is-expired:hover,
+.appointment-entry.is-expired:focus-within { opacity: .76; }
 .trip-delete-button {
   min-height: 32px;
   padding: 6px 9px;

@@ -280,6 +280,7 @@ let calendarReferenceDate = new Date();
 let scheduleDeleteHoldState = null;
 let livePhaseTimer = null;
 let currentTimeIndicatorTimer = null;
+let pendingTimelineViewport = null;
 let lessonSignalsEnabled = localStorage.getItem(LESSON_SIGNALS_STORAGE_KEY) === "true";
 let lessonSignalsLastCheck = Date.now();
 const playedLessonSignalKeys = new Set();
@@ -623,6 +624,15 @@ function formatAppointmentDateRange(appointment) {
   return startDate === endDate ? formatGermanDate(startDate) : `${formatGermanDate(startDate)}–${formatGermanDate(endDate)}`;
 }
 
+function isCalendarEntryExpired(entry, now = new Date()) {
+  const endDate = getAppointmentEndDate(entry);
+  if (!endDate) return false;
+  const today = getLocalDateKey(now);
+  if (endDate < today) return true;
+  if (endDate > today || !entry.endTime) return false;
+  return timeToMinutes(entry.endTime) <= now.getHours() * 60 + now.getMinutes();
+}
+
 function getCombinedSchedules() {
   return projects.filter((project) => project.id === displayedProjectId).flatMap((project) => {
     const layer = project.layers?.find((entry) => entry.type === "schedules");
@@ -764,6 +774,10 @@ function isMandatorySupervision(schedule) {
   return Boolean(schedule?.supervisionVersionId);
 }
 
+function isMandatorySubstitution(schedule) {
+  return Boolean(schedule?.substitutionId);
+}
+
 function isTeacherScheduleSuppressedByAppointment(project, lesson, date) {
   const dateKey = getLocalDateKey(date);
   const individualLayer = project?.layers?.find((entry) => entry.type === "individual");
@@ -788,6 +802,7 @@ function isTeacherScheduleSuppressedByAppointment(project, lesson, date) {
 
 function isScheduleLessonSuppressed(schedule, lesson, date) {
   const project = projects.find((entry) => entry.id === schedule.projectId);
+  if (isMandatorySubstitution(schedule)) return false;
   if (isMandatorySupervision(schedule)) return isTeacherScheduleSuppressedByAppointment(project, lesson, date);
   const suppressedByAppointment = isLessonSuppressedByClassProject(project, lesson, date);
   return isSchoolHolidayForSchedule(schedule, date)
@@ -1483,7 +1498,35 @@ function renderCombinedScheduleView(view) {
     body.append(column);
   });
   calendar.append(body);
-  requestAnimationFrame(() => updateCurrentTimeIndicator(new Date(), true));
+  const viewportToRestore = pendingTimelineViewport;
+  pendingTimelineViewport = null;
+  requestAnimationFrame(() => {
+    updateCurrentTimeIndicator(new Date(), !viewportToRestore);
+    if (viewportToRestore) restoreTimelineViewport(calendar, viewportToRestore);
+  });
+}
+
+function captureTimelineViewport() {
+  const timeline = calendar.classList.contains("combined-timeline") ? calendar : null;
+  const body = timeline?.querySelector(".timeline-body");
+  if (!timeline || !body || body.offsetHeight <= 0) return null;
+  return {
+    bodyRatio: Math.max(0, (timeline.scrollTop - body.offsetTop) / body.offsetHeight),
+    beforeBody: timeline.scrollTop <= body.offsetTop,
+    scrollTop: timeline.scrollTop,
+    scrollLeft: timeline.scrollLeft
+  };
+}
+
+function restoreTimelineViewport(timeline, viewport) {
+  const body = timeline.querySelector(".timeline-body");
+  if (!body) return;
+  const maximumScrollTop = Math.max(0, timeline.scrollHeight - timeline.clientHeight);
+  const targetScrollTop = viewport.beforeBody
+    ? viewport.scrollTop
+    : body.offsetTop + viewport.bodyRatio * body.offsetHeight;
+  timeline.scrollTop = Math.max(0, Math.min(maximumScrollTop, targetScrollTop));
+  timeline.scrollLeft = viewport.scrollLeft || 0;
 }
 
 function centerCurrentTimeIndicator(indicator) {
@@ -1699,19 +1742,22 @@ function collectOverviewProjects(project) {
 
 function collectOverviewTodos(project) {
   if (!project) return [];
-  const groupedTodos = getOverviewAppointmentSources(project).flatMap(({ group }) => {
+  const groupedTodos = getOverviewAppointmentSources(project).flatMap(({ layerType, group }) => {
     const directDeadlines = (group.appointments || []).filter((entry) => entry.isDeadline).map((entry) => ({
       name: entry.name || "Frist", dueDate: getAppointmentEndDate(entry), completed: Boolean(entry.completed),
-      context: group.name, color: group.color || "#c9c1dd", source: entry
+      context: group.name, color: group.color || "#c9c1dd", source: entry,
+      sourceType: "appointment", layerType, group
     }));
     const projectTodos = (group.projects || []).flatMap((appointmentProject) => [
       ...(appointmentProject.todos || []).map((entry) => ({
         name: entry.name || "To-do", dueDate: entry.dueDate || "", completed: Boolean(entry.completed),
-        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry
+        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry,
+        sourceType: "todo", layerType, group, appointmentProject
       })),
       ...(appointmentProject.appointments || []).filter((entry) => entry.isDeadline).map((entry) => ({
         name: entry.name || "Frist", dueDate: getAppointmentEndDate(entry), completed: Boolean(entry.completed),
-        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry
+        context: `${group.name} · ${appointmentProject.name}`, color: group.color || "#c9c1dd", source: entry,
+        sourceType: "appointment", layerType, group, appointmentProject
       }))
     ]);
     return [...directDeadlines, ...projectTodos];
@@ -1724,17 +1770,39 @@ function collectOverviewTodos(project) {
       completed: Boolean(entry.completed),
       context: entry.type === "school-project" ? "Schulische Termine" : "Persönliche Termine",
       color: entry.color || "#c9c1dd",
-      source: entry
+      source: entry,
+      sourceType: "appointment",
+      layerType: entry.type === "school-project" ? "appointments" : "individual",
+      group: null,
+      appointmentProject: null
     }));
   const today = getLocalDateKey(new Date());
   return [...groupedTodos, ...ungroupedDeadlines]
-    .map((entry) => ({ ...entry, isOverdue: Boolean(!entry.completed && entry.dueDate && entry.dueDate < today) }))
+    .map((entry) => ({
+      ...entry,
+      isOverdue: Boolean(!entry.completed && entry.dueDate && entry.dueDate < today),
+      isDueToday: Boolean(!entry.completed && entry.dueDate === today)
+    }))
     .sort((a, b) => {
-      const priority = (entry) => entry.isOverdue ? 0 : entry.completed ? 2 : 1;
+      const priority = (entry) => entry.isOverdue ? 0 : entry.isDueToday ? 1 : entry.completed ? 3 : 2;
       return priority(a) - priority(b)
         || (a.dueDate || "9999-12-31").localeCompare(b.dueDate || "9999-12-31")
         || a.name.localeCompare(b.name, "de");
     });
+}
+
+function openOverviewTodoEntry(project, entry) {
+  if (entry.sourceType === "todo" && entry.group && entry.appointmentProject) {
+    openAppointmentTodoDialog(project, entry.group, entry.appointmentProject, entry.source, entry.layerType || "appointments");
+    return;
+  }
+  openAppointmentDialog(
+    project,
+    entry.group || null,
+    entry.source,
+    entry.layerType || "appointments",
+    entry.appointmentProject || null
+  );
 }
 
 function collectOverviewEvents(project) {
@@ -1858,21 +1926,33 @@ function renderOverviewSidebar() {
     empty.textContent = "Noch keine To-dos oder als Frist markierten Termine vorhanden.";
     todoList.append(empty);
   } else todos.forEach((entry) => {
-    const label = document.createElement("label");
-    label.className = `overview-sidebar-card overview-todo-card${entry.completed ? " is-completed" : ""}${entry.isOverdue ? " is-overdue" : ""}`;
-    label.style.setProperty("--overview-color", entry.color);
+    const card = document.createElement("article");
+    card.className = `overview-sidebar-card overview-todo-card${entry.completed ? " is-completed" : ""}${entry.isOverdue ? " is-overdue" : ""}${entry.isDueToday ? " is-due-today" : ""}`;
+    card.style.setProperty("--overview-color", entry.color);
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `${entry.name} bearbeiten`);
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = entry.completed;
+    checkbox.setAttribute("aria-label", `${entry.name} als erledigt markieren`);
     const copy = document.createElement("span");
     const title = document.createElement("strong");
     title.textContent = entry.name;
     const meta = document.createElement("small");
-    meta.textContent = `${entry.isOverdue ? "Überfällig · " : ""}${entry.dueDate ? formatGermanDate(entry.dueDate) : "Ohne Frist"} · ${entry.context}`;
+    meta.textContent = `${entry.isOverdue ? "Überfällig · " : entry.isDueToday ? "Heute fällig · " : ""}${entry.dueDate ? formatGermanDate(entry.dueDate) : "Ohne Frist"} · ${entry.context}`;
     copy.append(title, meta);
+    checkbox.addEventListener("click", (event) => event.stopPropagation());
+    checkbox.addEventListener("keydown", (event) => event.stopPropagation());
     checkbox.addEventListener("change", () => { entry.source.completed = checkbox.checked; saveProjects(); });
-    label.append(checkbox, copy);
-    todoList.append(label);
+    card.addEventListener("click", () => openOverviewTodoEntry(project, entry));
+    card.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openOverviewTodoEntry(project, entry);
+    });
+    card.append(checkbox, copy);
+    todoList.append(card);
   });
   overviewTodosPanel.replaceChildren(todoList);
 }
@@ -5405,7 +5485,7 @@ function createMovedProjectSection(project, type, titleText, buttonText, emptyTe
   } else {
     entries.slice().sort((a, b) => a.startDate.localeCompare(b.startDate)).forEach((entry) => {
       const row = document.createElement("article");
-      row.className = "trip-entry";
+      row.className = `trip-entry${!entry.isDeadline && isCalendarEntryExpired(entry) ? " is-expired" : ""}`;
       const copy = document.createElement("div");
       const name = document.createElement("strong");
       name.textContent = entry.name;
@@ -5521,7 +5601,7 @@ function createAppointmentEntryRow(project, group, appointment, layerType, appoi
     row.append(checkLabel, createAppointmentMenu(project, group, appointment, layerType, appointmentProject));
     return row;
   }
-  row.className = "appointment-entry";
+  row.className = `appointment-entry${isCalendarEntryExpired(appointment) ? " is-expired" : ""}`;
   const copy = document.createElement("div");
   const name = document.createElement("strong");
   name.textContent = appointment.name;
@@ -10252,7 +10332,7 @@ function renderIndividualProjectsProperties(project) {
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
       .forEach((trip) => {
         const row = document.createElement("article");
-        row.className = "trip-entry";
+        row.className = `trip-entry${isCalendarEntryExpired(trip) ? " is-expired" : ""}`;
         const copy = document.createElement("div");
         const tripName = document.createElement("strong");
         tripName.textContent = trip.name;
@@ -11873,6 +11953,9 @@ calendarViewButtons.forEach((button) => {
   });
 });
 function moveCalendarPeriod(direction) {
+  pendingTimelineViewport = mainCalendarView === "day" || mainCalendarView === "week"
+    ? captureTimelineViewport()
+    : null;
   if (mainCalendarView === "week") {
     calendarReferenceDate.setDate(calendarReferenceDate.getDate() + direction * 7);
   } else if (mainCalendarView === "month") {

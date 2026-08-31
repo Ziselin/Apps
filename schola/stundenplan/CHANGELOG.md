@@ -9,6 +9,11 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 - Vertretungsstunden erlauben alternativ zur Katalogauswahl eine freie Klassenangabe, ohne dafür statistisch relevante Klassen anlegen zu müssen.
 - Aufsichten folgen bei ausdrücklich unterrichtsüberschreibenden Terminen derselben Ausblendlogik wie Fächer und Kurse.
 - Unterrichtsüberschreibungen bleiben unabhängig vom Auge einer Termingruppe wirksam; aktivierte Ausfalloptionen werden im Dialog rot und mit einem eindeutigen Hinweis hervorgehoben.
+- Beim Blättern durch Tages- und Wochenansicht bleibt die zuvor betrachtete Zeitposition erhalten; die Ansicht springt nicht erneut zur aktuellen Uhrzeit.
+- Vertretungsstunden werden obligatorisch angezeigt und von Ferien, Krankheit, Projekten, Terminen oder anderen Unterrichtsausfällen nicht überschrieben.
+- Heute fällige unerledigte To-dos werden kreidegelb markiert und zwischen überfälligen und später fälligen Aufgaben einsortiert.
+- To-do-Karten öffnen beim Anklicken den zugehörigen Bearbeitungsdialog; ausschließlich die Checkbox ändert den Erledigt-Status.
+- Abgelaufene schulische und persönliche Termine erscheinen im Editor dezent entsättigt und verblasst, bleiben jedoch vollständig bedienbar.
 
 ### 2026-08-30
 
