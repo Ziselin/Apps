@@ -1,0 +1,88 @@
+.classroom-date-widget {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  box-sizing: border-box;
+  min-width: 280px;
+  min-height: 74px;
+  padding: 10px 18px;
+  place-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.classroom-date-widget[hidden] {
+  display: none;
+}
+
+.classroom-date-widget:hover,
+.classroom-date-widget.is-selected {
+  border-color: rgba(33, 54, 51, .5);
+}
+
+.classroom-date-value {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: var(--date-font-size, 42px);
+  font-weight: 700;
+  line-height: 1.08;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.classroom-date-close {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f8f8f3;
+  color: var(--muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 5px 16px rgba(33, 54, 51, .1);
+}
+
+.classroom-date-widget.is-selected .classroom-date-close {
+  display: grid;
+}
+
+.classroom-date-close:hover,
+.classroom-date-close:focus-visible {
+  color: var(--ink);
+  background: #fff;
+}
+
+.classroom-date-resize {
+  position: absolute;
+  display: none;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--ink);
+  background: #f7f7f1;
+}
+
+.classroom-date-widget.is-selected .classroom-date-resize {
+  display: block;
+}
+
+.classroom-date-resize.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.classroom-date-resize.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.classroom-date-resize.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.classroom-date-resize.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+
+@media (max-width: 560px) {
+  .classroom-date-widget {
+    min-width: 220px;
+    padding-inline: 12px;
+  }
+}
