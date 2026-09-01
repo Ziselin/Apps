@@ -4,12 +4,7 @@
   const STORAGE_KEY = "schola-seat-lab-v1";
   const methods = ["sainte-lague", "dhondt", "hare"];
   const colors = ["#416a64", "#c96d55", "#7c72a0", "#c69c45", "#5c7fa3", "#9a6c7b", "#6f8e58", "#b47842"];
-  const descriptions = {
-    "sainte-lague": "Teilt die Stimmen durch 1, 3, 5 … und vergibt Sitze an die höchsten Ergebnisse. Es behandelt große und kleine Parteien möglichst ausgewogen.",
-    dhondt: "Teilt die Stimmen durch 1, 2, 3 … Die höchsten Ergebnisse bekommen die Sitze. Größere Parteien können dabei etwas günstiger abschneiden.",
-    hare: "Berechnet zuerst den genauen Sitzanspruch. Ganze Sitze werden sofort vergeben, die übrigen nach den größten Nachkommaresten.",
-  };
-  const initialState = () => ({ mode: "percent", seats: 20, threshold: 0, view: "compare", method: "sainte-lague", nextId: 3, parties: [{ id: "party-1", name: "Partei A", votes: 50, color: colors[0] }, { id: "party-2", name: "Partei B", votes: 50, color: colors[1] }] });
+  const initialState = () => ({ mode: "percent", seats: 20, threshold: 0, method: "sainte-lague", nextId: 3, parties: [{ id: "party-1", name: "Partei A", votes: 50, color: colors[0] }, { id: "party-2", name: "Partei B", votes: 50, color: colors[1] }] });
   function load() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); return saved?.parties?.length ? { ...initialState(), ...saved } : initialState(); } catch { return initialState(); } }
   let state = load();
   const format = (value, digits = 1) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value);
@@ -93,7 +88,13 @@
 
   function partyLabel(row) { const original = state.parties.find(p => p.id === row.id); return `<span class="party-label"><i style="--party-color:${partyColor(original)}"></i>${escapeHtml(row.name)}</span>`; }
   function renderResultTable(result) {
-    $("#resultTable").innerHTML = `<table><thead><tr><th>Partei</th><th>Stimmen</th><th>Stimmenanteil</th><th>Sitze</th><th>Sitzanteil</th><th>Abweichung</th></tr></thead><tbody>${result.results.map(row => `<tr class="${row.eligible ? "" : "excluded"}"><td>${partyLabel(row)}${row.eligible ? "" : "<small> unter Sperrklausel</small>"}</td><td>${state.mode === "percent" ? `${format(row.votes)} %` : format(row.votes, 0)}</td><td>${format(row.voteShare)} %</td><td><b>${row.seats}</b></td><td>${format(row.seatShare)} %</td><td>${row.deviation > 0 ? "+" : ""}${format(row.deviation)} PP</td></tr>`).join("")}</tbody></table>`;
+    const showAbsoluteVotes = state.mode === "absolute";
+    const voteHeader = showAbsoluteVotes ? "<th>Stimmen</th>" : "";
+    const rows = result.results.map(row => {
+      const voteCell = showAbsoluteVotes ? `<td>${format(row.votes, 0)}</td>` : "";
+      return `<tr class="${row.eligible ? "" : "excluded"}"><td>${partyLabel(row)}${row.eligible ? "" : "<small> unter Sperrklausel</small>"}</td>${voteCell}<td>${format(row.voteShare)} %</td><td><b>${row.seats}</b></td><td>${format(row.seatShare)} %</td><td>${row.deviation > 0 ? "+" : ""}${format(row.deviation)} PP</td></tr>`;
+    }).join("");
+    $("#resultTable").innerHTML = `<table><thead><tr><th>Partei</th>${voteHeader}<th>Stimmenanteil</th><th>Sitze</th><th>Sitzanteil</th><th>Abweichung</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   function renderComparison(all) {
@@ -107,9 +108,25 @@
 
   function calculationTable(result) {
     const tie = result.ties.length ? `<p class="tie-note">Mathematischer Gleichstand erkannt. Für ein reproduzierbares Ergebnis entscheidet zuerst die höhere Stimmenzahl, danach die technische Partei-ID. Reale Wahlordnungen können stattdessen einen Losentscheid vorsehen.</p>` : "";
-    if (result.method === "hare") return `<div class="calculation-section"><h3>${result.methodInfo.name}</h3><p>Exakter Anspruch = Stimmen der zugelassenen Partei ÷ zugelassene Stimmen × ${result.seats} Sitze.</p><div class="table-wrap"><table><thead><tr><th>Partei</th><th>Anspruch</th><th>Zunächst</th><th>Rest</th><th>Zusatzsitz</th></tr></thead><tbody>${result.detail.rows.map(row => `<tr><td>${escapeHtml(row.party.name)}</td><td>${format(row.quota, 3)}</td><td>${row.base}</td><td>${format(row.remainder, 3)}</td><td>${row.extra ? "ja" : "–"}</td></tr>`).join("")}</tbody></table></div>${tie}</div>`;
+    const strongest = [...result.results].filter(row => row.eligible).sort((a, b) => b.votes - a.votes)[0];
+    const unit = state.mode === "percent" ? " %" : "";
+    let example = "";
+    if (strongest && result.method === "hare") {
+      const detail = result.detail.rows.find(row => row.party.id === strongest.id);
+      if (detail) {
+        const eligibleVotes = result.eligible.reduce((sum, party) => sum + party.votes, 0);
+        const extraText = detail.extra ? " Wegen eines der größten Reste erhält die Partei noch einen Zusatzsitz." : " In diesem Ergebnis kommt kein Zusatzsitz hinzu.";
+        example = `<div class="calculation-example"><span class="eyebrow">Beispiel: ${escapeHtml(strongest.name)}</span><p><b>${format(strongest.votes, state.mode === "percent" ? 1 : 0)}${unit} ÷ ${format(eligibleVotes, state.mode === "percent" ? 1 : 0)}${unit} × ${result.seats} Sitze = ${format(detail.quota, 3)}</b></p><p>Der ganzzahlige Anteil ist ${detail.base}. Der Rest beträgt ${format(detail.remainder, 3)}.${extraText} Ergebnis: <b>${strongest.seats} Sitze</b>.</p></div>`;
+      }
+    }
+    if (result.method === "hare") return `<div class="calculation-section"><h3>${result.methodInfo.name}</h3><p>Zuerst wird für jede zugelassene Partei der genaue proportionale Sitzanspruch berechnet: eigener Stimmenwert ÷ Stimmen aller zugelassenen Parteien × ${result.seats} Sitze. Der Teil vor dem Komma wird sofort vergeben. Die noch freien Sitze gehen anschließend an die größten Nachkommareste.</p>${example}<div class="table-wrap"><table><thead><tr><th>Partei</th><th>Anspruch</th><th>Zunächst</th><th>Rest</th><th>Zusatzsitz</th></tr></thead><tbody>${result.detail.rows.map(row => `<tr><td>${escapeHtml(row.party.name)}</td><td>${format(row.quota, 3)}</td><td>${row.base}</td><td>${format(row.remainder, 3)}</td><td>${row.extra ? "ja" : "–"}</td></tr>`).join("")}</tbody></table></div>${tie}</div>`;
+    if (strongest) {
+      const divisors = result.method === "sainte-lague" ? [1, 3, 5] : [1, 2, 3];
+      const equations = divisors.map(divisor => `<li><span>${format(strongest.votes, state.mode === "percent" ? 1 : 0)}${unit} ÷ ${divisor}</span><b>= ${format(strongest.votes / divisor, 3)}</b></li>`).join("");
+      example = `<div class="calculation-example"><span class="eyebrow">Beispiel: ${escapeHtml(strongest.name)}</span><p>Aus dem Stimmenwert der stärksten Partei entstehen nacheinander diese Höchstzahlen:</p><ol class="equation-list">${equations}</ol><p>Dasselbe geschieht für alle Parteien. Danach werden sämtliche Höchstzahlen gemeinsam sortiert. Die höchsten ${result.seats} Werte erhalten je einen Sitz; ${escapeHtml(strongest.name)} kommt so auf <b>${strongest.seats} Sitze</b>.</p></div>`;
+    }
     const relevant = result.detail.steps.slice(Math.max(0, result.detail.steps.length - Math.min(12, result.detail.steps.length)));
-    return `<div class="calculation-section"><h3>${result.methodInfo.name}</h3><p>${result.method === "sainte-lague" ? "Die Höchstzahlen entstehen durch Division durch 1, 3, 5 … Diese Darstellung ist äquivalent zur Standardrundung mit einem gemeinsamen Divisor." : "Die Höchstzahlen entstehen durch Division durch 1, 2, 3 …"} Gezeigt werden die letzten Vergaben.</p><div class="table-wrap"><table><thead><tr><th>Sitz</th><th>Partei</th><th>Divisor</th><th>Höchstzahl</th></tr></thead><tbody>${relevant.map(step => { const party = result.results.find(row => row.id === step.partyId); return `<tr><td>${step.seat}</td><td>${escapeHtml(party.name)}</td><td>${step.divisor}</td><td>${format(step.quotient, 3)}</td></tr>`; }).join("")}</tbody></table></div>${tie}</div>`;
+    return `<div class="calculation-section"><h3>${result.methodInfo.name}</h3><p>${result.method === "sainte-lague" ? "1, 3, 5, 7 … sind die aufeinanderfolgenden Divisoren. Jede Partei teilt ihren Stimmenwert zuerst durch 1, dann durch 3, dann durch 5 und so weiter. Jeder Quotient ist eine Höchstzahl und damit ein möglicher Sitz. Diese Darstellung ist mathematisch gleichwertig zur Standardrundung mit einem gemeinsamen Divisor." : "1, 2, 3, 4 … sind die aufeinanderfolgenden Divisoren. Jede Partei teilt ihren Stimmenwert zuerst durch 1, dann durch 2, dann durch 3 und so weiter. Jeder Quotient ist eine Höchstzahl und damit ein möglicher Sitz."}</p>${example}<p>Die Tabelle zeigt die letzten Vergaben – dort entscheidet sich häufig, warum zwei Verfahren um einen Sitz voneinander abweichen.</p><div class="table-wrap"><table><thead><tr><th>Sitz</th><th>Partei</th><th>Divisor</th><th>Höchstzahl</th></tr></thead><tbody>${relevant.map(step => { const party = result.results.find(row => row.id === step.partyId); return `<tr><td>${step.seat}</td><td>${escapeHtml(party.name)}</td><td>${step.divisor}</td><td>${format(step.quotient, 3)}</td></tr>`; }).join("")}</tbody></table></div>${tie}</div>`;
   }
 
   function validate() {
@@ -126,27 +143,34 @@
     const messages = validate(); $("#validation").textContent = messages.join(" ");
     const all = resultSet(), active = all[state.method];
     const sum = normalizedParties().reduce((total, party) => total + party.votes, 0);
-    $("#shareHint").textContent = state.mode === "percent" ? `Summe der eingegebenen Anteile: ${format(sum)} %` : `Insgesamt eingegebene Stimmen: ${format(sum, 0)}`;
-    $("#assumptionBar").innerHTML = `<span>Stimmenmodus: ${state.mode === "percent" ? "Prozent" : "Anzahl"}</span><span>Sitze: ${state.seats}</span><span>Sperrklausel: ${state.threshold ? `${format(state.threshold)} %` : "keine"}</span><span>Ansicht: ${state.view === "compare" ? "Vergleich" : SeatAllocation.METHODS[state.method].name}</span>`;
-    $("#methodField").hidden = state.view === "compare";
-    $("#comparisonCard").hidden = state.view !== "compare";
-    $("#resultTitle").textContent = state.view === "compare" ? `${active.methodInfo.name} im Parlament` : "Das neue Parlament";
+    const shareHint = $("#shareHint");
+    shareHint.replaceChildren();
+    const totalLine = document.createElement("span");
+    totalLine.textContent = state.mode === "percent" ? `Summe der eingegebenen Anteile: ${format(sum)} %` : `Insgesamt eingegebene Stimmen: ${format(sum, 0)}`;
+    shareHint.append(totalLine);
+    const differenceToHundred = 100 - sum;
+    if (state.mode === "percent" && Math.abs(differenceToHundred) > 0.2000001) {
+      const correctionLine = document.createElement("strong");
+      correctionLine.className = "share-correction";
+      correctionLine.textContent = `${differenceToHundred > 0 ? "+" : "−"}${format(Math.abs(differenceToHundred))} % bis 100 %`;
+      shareHint.append(correctionLine);
+    }
+    $("#comparisonCard").hidden = false;
+    $("#resultTitle").textContent = `${active.methodInfo.name} im Parlament`;
     $("#gallagherBadge").innerHTML = `<span>Gallagher-Index</span><b>${format(active.gallagher, 2)}</b>`;
     renderParliament(active); renderResultTable(active); renderComparison(all);
-    $("#calculation").innerHTML = (state.view === "compare" ? methods.map(method => calculationTable(all[method])).join("") : calculationTable(active));
+    $("#calculation").innerHTML = methods.map(method => calculationTable(all[method])).join("");
   }
 
-  function renderMethodCards() { $("#methodCards").innerHTML = methods.map(method => `<article class="method-card"><span class="eyebrow">${SeatAllocation.METHODS[method].kind}</span><h3>${SeatAllocation.METHODS[method].name}</h3><p>${descriptions[method]}</p></article>`).join(""); }
-  function syncControls() { $("#seatInput").value = state.seats; $("#thresholdInput").value = state.threshold; $("#methodSelect").value = state.method; document.querySelector(`input[name=mode][value=${state.mode}]`).checked = true; document.querySelector(`input[name=view][value=${state.view}]`).checked = true; }
+  function syncControls() { $("#seatInput").value = state.seats; $("#thresholdInput").value = state.threshold; $("#methodSelect").value = state.method; document.querySelector(`input[name=mode][value=${state.mode}]`).checked = true; }
   function update(rebuildEditor = false) { state.seats = Math.max(0, Math.min(10000, Math.floor(Number(state.seats) || 0))); state.threshold = Math.max(0, Math.min(100, Number(state.threshold) || 0)); if (rebuildEditor) renderPartyEditor(); syncControls(); renderResults(); save(); }
   $("#addPartyButton").addEventListener("click", () => { const index = state.parties.length; state.parties.push({ id: `party-${state.nextId++}`, name: `Partei ${String.fromCharCode(65 + index)}`, votes: 0, color: colors[index % colors.length] }); update(true); });
   $("#seatInput").addEventListener("input", event => { state.seats = event.target.value; update(); });
   $("#thresholdInput").addEventListener("input", event => { state.threshold = event.target.value; update(); });
   $("#methodSelect").addEventListener("change", event => { state.method = event.target.value; update(); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", event => { state.mode = event.target.value; renderPartyEditor(); update(); }));
-  document.querySelectorAll("input[name=view]").forEach(input => input.addEventListener("change", event => { state.view = event.target.value; update(); }));
   $("#resetButton").addEventListener("click", () => { if (confirm("Alle Eingaben auf den Ausgangszustand zurücksetzen?")) { state = initialState(); localStorage.removeItem(STORAGE_KEY); renderPartyEditor(); update(); } });
   $("#randomButton").addEventListener("click", () => { const weights = state.parties.map(() => Math.random() ** .75 + .08), total = weights.reduce((a, b) => a + b, 0); state.mode = "percent"; state.parties.forEach((party, index) => { party.votes = Number((weights[index] / total * 100).toFixed(1)); }); renderPartyEditor(); update(); });
   window.addEventListener("resize", () => renderParliament(calculate(state.method)));
-  renderMethodCards(); renderPartyEditor(); syncControls(); renderResults();
+  renderPartyEditor(); syncControls(); renderResults();
 })();

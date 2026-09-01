@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#eeeee7">
-  <title>Sitzverteilungslabor · Schola</title>
-  <link rel="icon" href="../../../assets/sitzverteilungslabor-icon.svg">
+  <title>Parlament · Schola</title>
+  <link rel="icon" href="../../../assets/sitzverteilungslabor-icon.svg?v=20260830d">
   <link rel="stylesheet" href="sitzverteilungslabor.css?v=20260830a">
   <link rel="stylesheet" href="seat-layout-fixes.css?v=20260830a">
 </head>
@@ -13,13 +13,12 @@
   <main class="lab-app">
     <header class="app-head">
       <a class="brand" href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
-      <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Sitzverteilungslabor</h1></div>
+      <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Parlament</h1></div>
       <div class="head-actions"><button id="randomButton" class="quiet" type="button">Zufall</button><button id="resetButton" class="quiet" type="button">Zurücksetzen</button><span id="saveState" class="save-state" aria-live="polite">Automatisch gespeichert</span></div>
     </header>
 
-    <section class="intro" aria-labelledby="labQuestion">
-      <div><span class="eyebrow">Forscherfrage</span><h2 id="labQuestion">Was ändert sich, wenn dieselben Stimmen anders in Sitze umgerechnet werden?</h2></div>
-      <p>Verändere links die Wahl. Rechts siehst du sofort, wie daraus ein Parlament wird.</p>
+    <section class="intro intro-compact" aria-labelledby="labQuestion">
+      <h2 id="labQuestion">Wie werden aus Stimmen Sitze?</h2>
     </section>
 
     <section class="workspace">
@@ -30,25 +29,36 @@
 
         <div class="control-grid">
           <fieldset><legend>Stimmen als</legend><div class="segmented"><label><input type="radio" name="mode" value="percent" checked><span>Prozent</span></label><label><input type="radio" name="mode" value="absolute"><span>Anzahl</span></label></div></fieldset>
-          <label class="field"><span>Sitze im Parlament</span><input id="seatInput" type="number" min="1" max="10000" step="1" inputmode="numeric"></label>
-          <label class="field"><span>Sperrklausel</span><span class="input-suffix"><input id="thresholdInput" type="number" min="0" max="100" step="0.1" inputmode="decimal"><b>%</b></span></label>
-          <fieldset><legend>Ansicht</legend><div class="segmented"><label><input type="radio" name="view" value="compare" checked><span>Vergleich</span></label><label><input type="radio" name="view" value="single"><span>Einzeln</span></label></div></fieldset>
+          <div class="compact-number-fields"><label class="field"><span>Sitze im Parlament</span><input id="seatInput" type="number" min="1" max="10000" step="1" inputmode="numeric"></label><label class="field"><span>Sperrklausel</span><span class="input-suffix"><input id="thresholdInput" type="number" min="0" max="100" step="0.1" inputmode="decimal"><b>%</b></span></label></div>
         </div>
-        <label id="methodField" class="field"><span>Verfahren</span><select id="methodSelect"><option value="sainte-lague">Sainte-Laguë/Schepers</option><option value="dhondt">D’Hondt</option><option value="hare">Hare/Niemeyer</option></select></label>
         <div id="validation" class="validation" role="status"></div>
       </aside>
 
       <section class="results" aria-live="polite">
-        <div class="assumption-bar" id="assumptionBar"></div>
         <article class="parliament-card">
-          <div class="section-head"><div><span class="eyebrow">2 · Ergebnis</span><h2 id="resultTitle">Das neue Parlament</h2></div><div id="gallagherBadge" class="metric-badge"></div></div>
+          <div class="section-head"><div><span class="eyebrow">2 · Ergebnis</span><h2 id="resultTitle">Das neue Parlament</h2></div><div class="parliament-head-actions"><div class="result-method-bar"><label id="methodField" class="field" for="methodSelect"><span>Sitzverteilung nach</span><select id="methodSelect"><option value="sainte-lague">Sainte-Laguë/Schepers</option><option value="dhondt">D’Hondt</option><option value="hare">Hare/Niemeyer</option></select></label></div><div id="gallagherBadge" class="metric-badge"></div></div></div>
           <div id="parliament" class="parliament" role="img"></div>
           <div id="legend" class="legend"></div>
         </article>
         <article id="comparisonCard" class="analysis-card"><div class="section-head"><div><span class="eyebrow">3 · Vergleichen</span><h2>Wo unterscheiden sich die Verfahren?</h2></div></div><div id="comparison"></div></article>
-        <article class="analysis-card"><div class="section-head"><div><span class="eyebrow">Genau hinsehen</span><h2>Stimmen und Sitze</h2></div></div><div id="resultTable" class="table-wrap"></div></article>
-        <details class="calculation-card"><summary><span><span class="eyebrow">Nachvollziehen</span><b>Rechenweg anzeigen</b></span><span aria-hidden="true">+</span></summary><div id="calculation"></div></details>
-        <section id="methodCards" class="method-cards" aria-label="Die Verfahren kurz erklärt"></section>
+        <article class="analysis-card"><div class="section-head"><div><span class="eyebrow">4 · Genau hinsehen</span><h2>Stimmen und Sitze</h2></div></div><div id="resultTable" class="table-wrap"></div></article>
+        <details class="calculation-card"><summary><span><span class="eyebrow">5 · Nachvollziehen</span><b>Rechenweg anzeigen</b></span><span aria-hidden="true">+</span></summary><div id="calculation"></div></details>
+        <details class="reality-card">
+          <summary><span><span class="eyebrow">6 · Realitätscheck</span><b>Wie entsteht der Deutsche Bundestag?</b></span><span aria-hidden="true">+</span></summary>
+          <div class="reality-content">
+            <p class="reality-lead"><strong>Unser Labor zeigt nur den mathematischen Kern.</strong> Bei der Bundestagswahl muss diese Sitzverteilung zusätzlich mit Bundesländern, Landeslisten und Wahlkreisgewinnern verbunden werden. Genau diese Verknüpfung macht das reale Verfahren kompliziert.</p>
+            <ol class="reality-steps">
+              <li><span>1</span><div><h3>Zwei Stimmen erfüllen verschiedene Aufgaben</h3><p>Mit der <strong>Erststimme</strong> wird eine Person im Wahlkreis gewählt. Mit der <strong>Zweitstimme</strong> wird die Landesliste einer Partei gewählt. Für das Kräfteverhältnis der Parteien ist vor allem die Zweitstimme maßgebend.</p></div></li>
+              <li><span>2</span><div><h3>Nicht jede Partei nimmt an der Verteilung teil</h3><p>Grundsätzlich gilt die Fünf-Prozent-Hürde. Derzeit wird eine Partei mit weniger als fünf Prozent trotzdem berücksichtigt, wenn sie mindestens drei Wahlkreise gewinnt. Parteien nationaler Minderheiten sind von der Sperrklausel ausgenommen.</p></div></li>
+              <li class="is-lab-step"><span>3</span><div><h3>Hier arbeitet unser Labor</h3><p>Die <strong>630 Sitze</strong> werden nach den bundesweiten Zweitstimmen auf die zugelassenen Parteien verteilt. Der Bundestag verwendet dafür <strong>Sainte-Laguë/Schepers</strong>. D’Hondt und Hare/Niemeyer dienen in dieser App dem mathematischen Vergleich.</p></div></li>
+              <li><span>4</span><div><h3>Die Parteisitze werden auf 16 Länder verteilt</h3><p>Die bundesweite Sitzzahl einer Partei wird nach ihren Zweitstimmen auf ihre Landeslisten verteilt. Deshalb reicht eine einzige bundesweite Rechnung noch nicht aus.</p></div></li>
+              <li><span>5</span><div><h3>Wahlkreissieg allein garantiert keinen Sitz</h3><p>Innerhalb eines Landes werden zuerst die Wahlkreisgewinner einer Partei berücksichtigt – aber nur so viele, wie durch deren Zweitstimmen gedeckt sind. Übrige Sitze werden über die Landesliste besetzt.</p></div></li>
+            </ol>
+            <aside class="reality-example"><span class="eyebrow">Warum das kompliziert wird</span><h3>Ein Beispiel</h3><p>Eine Partei gewinnt in einem Bundesland <strong>30 Wahlkreise</strong>, ihr stehen dort nach den Zweitstimmen aber nur <strong>28 Sitze</strong> zu. Dann ziehen nur die 28 Wahlkreisgewinner mit den höchsten Erststimmenanteilen ein. Zwei Wahlkreissieger erhalten keinen Sitz. Hat die Partei umgekehrt mehr Sitze als Wahlkreissieger, werden die übrigen Plätze aus der Landesliste besetzt.</p></aside>
+            <p class="reality-boundary"><strong>Merksatz:</strong> Die Zweitstimme bestimmt, wie viele Sitze eine Partei erhält. Die Erststimme wirkt daran mit, welche Personen diese Sitze besetzen.</p>
+            <p class="reality-sources">Stand: Bundestagswahlrecht zur Wahl 2025. Quellen: <a href="https://www.bundestag.de/parlament/bundestagswahl/erst-zweit-stimme-1043134" target="_blank" rel="noopener">Deutscher Bundestag: Erst- und Zweitstimme</a> · <a href="https://www.bundestag.de/services/glossar/glossar/Z/zweitstimmendeckung-1050890" target="_blank" rel="noopener">Zweitstimmendeckung</a> · <a href="https://www.bundeswahlleiterin.de/service/glossar/s/sainte-lague-schepers.html" target="_blank" rel="noopener">Bundeswahlleiterin: Sainte-Laguë/Schepers</a></p>
+          </div>
+        </details>
       </section>
     </section>
   </main>

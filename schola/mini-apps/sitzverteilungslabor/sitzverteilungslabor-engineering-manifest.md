@@ -1,4 +1,4 @@
-# Sitzverteilungslabor Engineering Manifest
+# Parlament Engineering Manifest
 
 ## Fachlicher Zweck
 
