@@ -4,6 +4,10 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ## 1.1.0 – Unveröffentlicht
 
+### 2026-09-02
+
+- Der Live-Ladebalken mit Phasenfortschritt und 15-Minuten-Countdown erscheint in Tages- und Wochenansicht ausschließlich bei Unterrichtsstunden, Vertretungen und Aufsichten.
+
 ### 2026-08-31
 
 - Vertretungsstunden erlauben alternativ zur Katalogauswahl eine freie Klassenangabe, ohne dafür statistisch relevante Klassen anlegen zu müssen.

@@ -14,6 +14,7 @@ Classroom Screen verantwortet die Unterrichtsfläche, ihre Mini-Apps, deren Anor
 
 - Der Classroom Screen bindet eigenständige Mini-Apps ein, besitzt aber nicht deren alleinige fachliche Implementierung.
 - Der Timer muss im Classroom Screen und im eigenständigen Zugang dieselbe Implementierung verwenden.
+- Ist das Stundenplanmodul mit einem ausgewählten Projekt aktiv und sichtbar, spielt der Classroom Screen automatisch die zentralen Stundenplan-Signale zu Stundenbeginn und Stundenende. Es gelten dieselben Regeln für Gültigkeitszeiträume, Wechselwochen, Ferien, Krankheit, Termine und klassenbezogene Unterrichtsausfälle wie für die Stundenanzeige; ein ausgeblendetes oder nicht ausgewähltes Modul erzeugt keine Signale.
 
 - Mini-Apps liegen direkt auf der Unterrichtsfläche und können eigene gespeicherte Zustände besitzen.
 - Das Menü „Mehr“ ist eine reine Verwaltung der Schnellleiste. Seine Checkboxliste führt eigenständige Mini-Apps und integrierte Classroom-Funktionen gemeinsam; ausgewählte Einträge erscheinen als Schnellzugriff in der unteren Leiste. Das Abwählen eines Schnellzugriffs entfernt keine bereits auf der Unterrichtsfläche liegenden Inhalte. Diese Auswahl wird lokal gespeichert. Zu den integrierten Funktionen gehören „Text einfügen“, „Bild einfügen“ und „Datum“.

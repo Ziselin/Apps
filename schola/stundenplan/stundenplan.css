@@ -2389,6 +2389,20 @@ button.class-subject-assignment-pill:hover { transform: translateY(-1px); border
 }
 .live-phase-segment.is-current .live-phase-segment-label { color: var(--ink); font-weight: 700; }
 .live-phase-segment.is-current .live-phase-segment-track { box-shadow: inset 0 0 0 1px rgba(33,54,51,.32); }
+.is-week-timeline .timeline-lesson-card:has(.live-phase:not([hidden])) { padding-bottom: 1.75rem; }
+.is-week-timeline .live-phase {
+  right: 3px;
+  bottom: 3px;
+  left: 3px;
+  gap: 2px;
+  padding: 2px 3px;
+  border-radius: 5px;
+}
+.is-week-timeline .live-phase-copy { font-size: .58rem; }
+.is-week-timeline .live-phase-progress { gap: 1px; }
+.is-week-timeline .live-phase-segment { gap: 1px; }
+.is-week-timeline .live-phase-segment-label { font-size: .55rem; }
+.is-week-timeline .live-phase-segment-track { height: 4px; }
 @media (prefers-contrast: more) {
   .live-phase { background: rgba(255,255,252,.94); }
   .live-phase-segment-track { background: rgba(33,54,51,.3); }

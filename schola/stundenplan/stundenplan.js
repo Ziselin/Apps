@@ -1089,7 +1089,7 @@ function updateLivePhaseElement(element, now = new Date()) {
 }
 
 function configureLivePhase(card, lesson, date, defaultPhaseName = "Unterricht", showPrestart = true) {
-  if (mainCalendarView !== "day" || !date || getLocalDateKey(date) !== getLocalDateKey(new Date())) return;
+  if (!["day", "week"].includes(mainCalendarView) || !date || getLocalDateKey(date) !== getLocalDateKey(new Date())) return;
   const lessonMinutes = Math.max(0, timeToMinutes(lesson.end) - timeToMinutes(lesson.start));
   const phases = Array.isArray(lesson.phases) && lesson.phases.length
     ? lesson.phases
@@ -1256,13 +1256,6 @@ function renderAppointmentTimelineCard(appointment, date = null) {
     card.append(heading, meta, group);
   } else {
     card.append(name, group, time);
-  }
-  if (appointment.startTime && appointment.endTime) {
-    configureLivePhase(card, {
-      start: appointment.startTime,
-      end: appointment.endTime,
-      phases: []
-    }, date, appointment.name || "Termin", false);
   }
   card.addEventListener("click", () => {
     const project = projects.find((entry) => entry.id === appointment.projectId);
