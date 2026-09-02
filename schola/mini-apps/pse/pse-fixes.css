@@ -569,6 +569,18 @@
 
 /* Im Fokus-Material bestimmt allein die Containerbreite die PSE-Größe;
    zusätzliche Höhe bleibt innerhalb des eingebetteten Dokuments scrollbar. */
+html.focus-embed .app-head {
+  display: none;
+}
+
+html.focus-embed .pse-app {
+  padding-top: 5px;
+}
+
+html.focus-embed .table-view {
+  margin-top: 0;
+}
+
 html.focus-embed .periodic-table:not(.is-long) {
   --tile-width: calc((100cqw - 85px) / 18);
 }

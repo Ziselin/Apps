@@ -17,7 +17,10 @@ Fokus ist die lokale Schola-App zum Erstellen und Bearbeiten von Aufgabenspaces.
 - Bei der Abgabe bestätigt der Schüler seinen vollständigen Namen. Erst diese Bestätigung beendet Tracking und Zeitmessung; der Dateiname beginnt mit Name und lokalem Datum-Zeitstempel.
 - Editorfelder wachsen mit dem Inhalt; nur der gesamte Aufgabenraum scrollt.
 - Der Plus-Knopf öffnet eine erweiterbare Auswahl von Aufgabentypen. Unterstützt werden `text` (Textaufgabe) und `cloze` (Lückentext).
+- Jeder Projektordner verwendet einheitlich entweder `BE` (Bewertungseinheiten, zugleich der kompatible Standard für bestehende Projekte) oder `P` (Punkte). Die Auswahl am Bewertungsfeld einer beliebigen Aufgabe stellt alle Aufgaben desselben Projekts um; neue Aufgaben, Export, Schüleransicht und Ergebnisansicht verwenden dieselbe Einheit.
 - Bearbeitung beginnt ausschließlich durch den expliziten Start. Ein Fokusverlust von mindestens zehn Sekunden sperrt die Sitzung.
+- Interaktive Schola-Materialien, die innerhalb des Fokus-Aufgabenraums eingebettet sind, gehören zum erlaubten Arbeitsbereich. Die Interaktion in einem solchen eingebetteten Dokument darf weder als Fokusverlust protokolliert werden noch die Sperrfrist starten; erst das tatsächliche Verlassen oder Ausblenden des Browserdokuments gilt als Fokusverlust.
+- Materialien behalten in der Schüleransicht eine nicht editierbare Materialkopfzeile ohne Ein-/Ausklapp- oder Löschfunktion. Von dort können sie innerhalb der Fokus-Seite bildschirmfüllend geöffnet und wieder verkleinert werden; in dieser Ansicht bleibt die laufende Bearbeitungszeit sichtbar.
 - Gehört eine gesperrte Sitzung zum lokal vorhandenen Lehrkraftprojekt, bietet Fokus eine ausschließlich auf diesem Gerät sichtbare Beendigung der Lehrkraft-Vorschau an. Schülerimporte erhalten diese Freigabe nicht.
 - Eine gesperrte importierte Sitzung kann nach ausdrücklicher Warnbestätigung verworfen werden, damit die Bearbeiten-Startseite und eine neue Dateiauswahl wieder erreichbar sind.
 - Ereignisse unterstützen die Aufsicht, sind aber keine automatische fachliche Bewertung.
