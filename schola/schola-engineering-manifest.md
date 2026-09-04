@@ -45,3 +45,9 @@ Dieses Manifest konkretisiert die projektweiten Regeln für den Kompetenzbereich
 - Typografie innerhalb eines Icons verwendet `Arial, Helvetica, sans-serif` und das dunkle Schola-Grün. Text wird nur eingesetzt, wenn er selbst das zentrale Bildzeichen ist.
 - Neue oder überarbeitete Icons müssen auch in kleiner App-Darstellung klar erkennbar sein und hinsichtlich Randabständen, optischem Gewicht und Motivgröße neben den bestehenden Schola-Icons ausgewogen wirken.
 - App-spezifische Akzentfarben sind möglich, dürfen die gemeinsame Grundpalette und Formsprache jedoch nicht verdrängen. Eine Erweiterung der projektweiten Icon-Farbwelt wird zuerst in diesem Manifest dokumentiert.
+
+## Fachlich strukturierte Modellierungswerkzeuge
+
+- Visuelle Fachmodelle speichern fachliche Objekte, Beziehungen und Eigenschaften unabhängig von ihrer grafischen Position.
+- Eine grafische Verbindung muss eine fachliche Bedeutung tragen, wenn diese Bedeutung den Lerngegenstand bildet; rein dekorative Verbindungen dürfen das strukturierte Modell nicht unterlaufen.
+- Ein reduzierter und ein vertiefender Bedienmodus greifen auf dasselbe fachliche Datenmodell zu und unterscheiden sich nur in den sichtbaren Bearbeitungsmöglichkeiten.

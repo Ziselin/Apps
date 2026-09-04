@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#eeeee7">
+  <title>Staatsbaukasten · Schola</title>
+  <link rel="icon" href="../../../assets/staatsbaukasten-icon.svg?v=20260904a">
+  <link rel="stylesheet" href="staatsbaukasten.css?v=20260904a">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-head">
+      <a class="brand" href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
+      <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Staatsbaukasten</h1></div>
+      <div class="mode-switch" aria-label="Modellierungsmodus"><button data-mode="basic" class="active">Basis</button><button data-mode="advanced">Erweitert</button></div>
+      <div class="head-actions"><button id="newButton" class="quiet">Neu</button><button id="exportButton" class="quiet">Exportieren</button><button id="importButton" class="quiet">Importieren</button><input id="importInput" type="file" accept="application/json" hidden><span id="saveState" aria-live="polite">Automatisch gespeichert</span></div>
+    </header>
+
+    <section class="workspace">
+      <aside class="palette panel" aria-label="Elementpalette">
+        <div class="panel-heading"><span class="step">1</span><div><span class="eyebrow">Elemente</span><h2>Institution wählen</h2></div></div>
+        <p class="hint">Auf die Fläche ziehen oder anklicken.</p>
+        <div id="elementPalette" class="element-palette"></div>
+        <button id="addGroupButton" class="wide secondary">+ Institutionelle Ebene</button>
+      </aside>
+
+      <section class="canvas-panel" aria-label="Modellfläche">
+        <div class="canvas-toolbar">
+          <div><label for="modelTitle">Modell</label><input id="modelTitle" value="Mein Staatsmodell" maxlength="80"></div>
+          <p id="connectionHint">Elemente platzieren und über ihre Anschlusspunkte verbinden.</p>
+          <button id="fitButton" class="icon-button" title="Ansicht zentrieren" aria-label="Ansicht zentrieren">⌖</button>
+        </div>
+        <div id="canvas" class="canvas" tabindex="0">
+          <svg id="edgeLayer" aria-label="Beziehungen im Modell"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z"></path></marker></defs><g id="edges"></g></svg>
+          <div id="groupLayer"></div><div id="nodeLayer"></div>
+          <div id="emptyState" class="empty-state"><strong>Eine politische Ordnung entsteht hier.</strong><span>Ziehe links eine Institution auf die Modellfläche.</span></div>
+        </div>
+      </section>
+
+      <aside class="inspector panel" aria-label="Eigenschaften">
+        <div class="panel-heading"><span class="step">2</span><div><span class="eyebrow">Auswahl</span><h2 id="inspectorTitle">Eigenschaften</h2></div></div>
+        <div id="inspectorEmpty" class="inspector-empty">Wähle ein Element oder eine Beziehung aus.</div>
+        <form id="nodeInspector" hidden>
+          <label>Bezeichnung<input name="label" maxlength="60"></label>
+          <label>Elementtyp<select name="type"></select></label>
+          <div class="advanced-fields" hidden>
+            <label>Staatliche Ebene<select name="level"><option value="">Nicht festgelegt</option><option>Zentralstaat</option><option>Gliedstaat</option><option>Region</option><option>Kommune</option><option>Supranational</option></select></label>
+            <label>Gewaltenzuordnung<select name="branch"><option value="">Nicht festgelegt</option><option>Legislative</option><option>Exekutive</option><option>Judikative</option><option>Gemischt / unabhängig</option></select></label>
+            <label>Amtszeit<input name="term" placeholder="z. B. 5 Jahre"></label>
+            <label>Mitgliederzahl<input name="members" type="number" min="1" placeholder="optional"></label>
+            <label>Struktur<select name="structure"><option value="">Nicht festgelegt</option><option>Einzelorgan</option><option>Kollegialorgan</option></select></label>
+            <label class="check"><input name="independent" type="checkbox"><span>Institutionell unabhängig</span></label>
+          </div>
+          <button type="button" class="danger" data-delete="node">Element löschen</button>
+        </form>
+        <form id="edgeInspector" hidden>
+          <div id="edgeStatement" class="statement"></div>
+          <label>Beziehung<select name="relation"></select></label>
+          <div class="advanced-fields" hidden>
+            <label>Entscheidungsform<select name="decision"><option value="">Nicht festgelegt</option><option>direkt</option><option>indirekt</option><option>bindend</option><option>nicht bindend</option></select></label>
+            <label>Erforderliche Mehrheit<input name="majority" placeholder="z. B. absolute Mehrheit"></label>
+            <label>Bedingungen<textarea name="conditions" rows="3" placeholder="Optionale institutionelle Regeln"></textarea></label>
+          </div>
+          <button type="button" class="danger" data-delete="edge">Beziehung löschen</button>
+        </form>
+        <form id="groupInspector" hidden><label>Bezeichnung<input name="label" maxlength="60"></label><button type="button" class="danger" data-delete="group">Ebene löschen</button></form>
+        <div class="model-summary"><span class="eyebrow">Modellstruktur</span><p><b id="nodeCount">0</b> Elemente · <b id="edgeCount">0</b> Beziehungen</p><button id="dataButton" class="wide secondary">Strukturierte Daten anzeigen</button></div>
+      </aside>
+    </section>
+  </main>
+  <dialog id="relationDialog"><form method="dialog"><span class="eyebrow">Fachliche Aussage</span><h2>Was bedeutet diese Verbindung?</h2><p id="relationSentence"></p><label>Beziehungsgruppe<select id="relationCategory"></select></label><label>Beziehung<select id="relationType"></select></label><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button><button id="confirmRelation" value="default">Verbindung erstellen</button></div></form></dialog>
+  <dialog id="dataDialog"><form method="dialog"><span class="eyebrow">Semantisches Modell</span><h2>Strukturierte Daten</h2><pre id="dataPreview"></pre><div class="dialog-actions"><button value="cancel">Schließen</button></div></form></dialog>
+  <script src="staatsbaukasten.js?v=20260904a"></script>
+</body>
+</html>
