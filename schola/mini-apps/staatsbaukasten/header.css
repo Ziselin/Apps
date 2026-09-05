@@ -19,10 +19,6 @@ button:disabled { opacity: .4; cursor: default; }
 #precisionPanel h3 { font-size: 16px; }
 #precisionPanel p { font-size: 14px; color: #65736e; }
 #frameworkButton { margin-top: 10px; }
-#diagramPreview { position: absolute; inset: 0; padding: 24px; overflow: auto; background: white; }
-#diagramPreview svg { width: 100%; height: 100%; min-height: 400px; }
-body.diagram-mode .head-actions > #exportButton { display: inline-block; }
-body.diagram-mode .canvas-panel { margin: 0; }
 .app-head.topbar { display: flex; flex-wrap: wrap; }
 .app-head .head-actions { margin-left: auto; }
 .canvas-toolbar { flex-wrap: wrap; }
@@ -57,17 +53,6 @@ body.diagram-mode .canvas-panel { margin: 0; }
 .layout-tools legend { grid-column: 1 / -1; padding: 0 0 7px; font-size: .78rem; font-weight: 720; text-transform: uppercase; letter-spacing: .08em; }
 .layout-tools button { padding: .45rem .25rem; font-size: .78rem; }
 .diagram-title { position: absolute; z-index: 5; top: 22px; left: 50%; margin: 0; transform: translateX(-50%); font: 700 1.6rem/1.2 SourceSans, Arial, sans-serif; pointer-events: none; }
-body.diagram-mode .workspace { grid-template-columns: 1fr; }
-body.diagram-mode .palette, body.diagram-mode .inspector { display: none; }
-body.diagram-mode .canvas-toolbar > :not(#connectionHint) { display: none; }
-body.diagram-mode #connectionHint { margin: 0 auto; font-size: .8rem; }
-body.diagram-mode .canvas { background: #fff; }
-body.diagram-mode .canvas-viewport { background-color: #fff; background-image: none; }
-body.diagram-mode .node { border-color: #202421; }
-body.diagram-mode .group { border-color: #202421; }
-body.diagram-mode .group-resize-handle, body.diagram-mode .connection-ready::after { display: none; }
-body.diagram-mode .node.selected, body.diagram-mode .group.selected { outline: none; box-shadow: none; }
-body.diagram-mode .head-actions > :not(#viewButton), body.diagram-mode .mode-switch { display: none; }
 .export-dialog { max-width: 600px; }
 .export-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 18px; }
 .export-options label { display: grid; gap: 5px; font-size: .8rem; font-weight: 720; }
@@ -152,16 +137,11 @@ body.diagram-mode .head-actions > :not(#viewButton), body.diagram-mode .mode-swi
 .group > span { font-size: 16px; letter-spacing: 0; text-transform: none; }
 .group > span, .group-resize-handle { pointer-events: auto; }
 .edge-path { pointer-events: none; }
-body.diagram-mode .head-actions > #exportButton { display: inline-block !important; }
-body.diagram-mode .workspace { display: block; }
-body.diagram-mode .canvas-panel { margin: 0; height: 100%; }
 .app-head.topbar { display: flex; flex-wrap: wrap; }
 .app-head .head-actions { margin-left: auto; }
 .workspace { grid-template-columns: 230px minmax(0,1fr) 280px; }
 @media (max-width: 1100px) { .workspace { grid-template-columns: 190px minmax(0,1fr) 250px; } .workspace .inspector { position: static; width: auto; } .canvas-panel { margin: 0; } }
 @media (max-width: 760px) { .workspace { display: flex; flex-direction: column; overflow: auto; } .canvas-panel { min-height: 60vh; } }
-body.diagram-mode .canvas-toolbar { display: none; }
-body.diagram-mode .canvas { min-height: 0; }
 .node[data-type="constitution"] { border-width: 2px; }
 /* Fixed-distance attachment grid and orthogonal wire editing. */
 .port-markers { opacity: 0; pointer-events: none; }
@@ -203,6 +183,10 @@ body.diagram-mode .canvas { min-height: 0; }
 .snap-preview { pointer-events: none; }
 .node { display: flex; align-items: center; justify-content: center; }
 .node .node-label { display: block; width: 100%; }
+.node.is-collection { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 12px 16px; }
+.node.is-collection .node-label { flex: 0 0 auto; padding-bottom: 8px; border-bottom: 1px solid #cbd2cb; }
+.node-collection-items { flex: 1 1 auto; display: grid; align-content: center; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; color: #42534e; font-size: 13px; line-height: 16px; text-align: center; }
+.node-collection-items li { overflow-wrap: anywhere; }
 .node-label { hyphens: auto; overflow-wrap: normal; word-break: normal; }
 .node.has-children { align-items: flex-start; }
 .node.has-children .node-label { display: grid; align-content: center; height: calc(var(--node-header-height, 54px) - 24px); }
@@ -223,7 +207,6 @@ body.diagram-mode .canvas { min-height: 0; }
 .node.level-muted { opacity: .32; filter: grayscale(1); pointer-events: none; }
 .edge-hit.level-muted, .edge-label.level-muted, .edge-source-mark.level-muted { pointer-events: none; }
 .edge-path.level-muted, .edge-label.level-muted, .edge-source-mark.level-muted { opacity: .25; }
-body.diagram-mode .level-filters { display: none; }
 .canvas-toolbar > div:has(#modelTitle) { flex: 1 1 240px; min-width: 100px; }
 .canvas-toolbar #modelTitle { width: 100%; max-width: none; }
 #connectionHint { display: none; }
