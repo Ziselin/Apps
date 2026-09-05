@@ -421,6 +421,18 @@ button.month-view-entry:focus-visible { outline: 1px solid var(--ink-soft); outl
 .month-view-entry.is-holiday { --month-entry-color: #c6d7bd; }
 .month-view-entry.is-public-holiday { --month-entry-color: #aebfa5; }
 .month-view-entry.is-sickness { --month-entry-color: #d8ccca; }
+.month-view-entry.is-past-calendar-entry,
+.timeline-lesson-card.is-past-calendar-entry {
+  opacity: .55;
+  filter: saturate(.58) brightness(1.08);
+  transition: opacity .16s ease, filter .16s ease;
+}
+.month-view-entry.is-past-calendar-entry:hover,
+.month-view-entry.is-past-calendar-entry:focus-visible,
+.timeline-lesson-card.is-past-calendar-entry:hover,
+.timeline-lesson-card.is-past-calendar-entry:focus-visible {
+  opacity: .74;
+}
 .year-calendar {
   display: grid;
   grid-template-columns: repeat(4, minmax(190px, 1fr));

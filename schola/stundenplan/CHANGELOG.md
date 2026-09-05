@@ -7,6 +7,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 ### 2026-09-02
 
 - Der Live-Ladebalken mit Phasenfortschritt und 15-Minuten-Countdown erscheint in Tages- und Wochenansicht ausschließlich bei Unterrichtsstunden, Vertretungen und Aufsichten.
+- Vergangene Kalendereinträge bleiben farbig, werden in Monats-, Wochen- und Tagesansicht jedoch sichtbar ausgeblendet; am aktuellen Tag greift dies nach der jeweiligen Endzeit.
 
 ### 2026-08-31
 

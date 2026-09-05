@@ -469,6 +469,7 @@ function renderMonthView(project) {
     getSchoolHolidaysForDate(date, schedules).forEach((holiday) => {
       const item = document.createElement("span");
       item.className = `month-view-entry is-holiday${holiday.type === "public-holiday" ? " is-public-holiday" : ""}`;
+      setCalendarEntryTemporalState(item, date);
       item.textContent = holiday.name;
       item.title = holiday.name;
       entries.append(item);
@@ -483,6 +484,7 @@ function renderMonthView(project) {
         const item = document.createElement("button");
         item.type = "button";
         item.className = "month-view-entry is-lesson";
+        setCalendarEntryTemporalState(item, date, lesson.end);
         item.style.setProperty("--month-entry-color", lesson.color || "#bfd2e2");
         item.textContent = `${lesson.start} ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
         item.title = `${lesson.start}–${lesson.end} · ${lesson.subject}${lesson.grade ? ` · ${lesson.grade}` : ""}`;
@@ -493,6 +495,7 @@ function renderMonthView(project) {
     schoolProjects.filter((entry) => dateKey >= (entry.startDate || entry.date) && dateKey <= (entry.endDate || entry.date)).forEach((entry) => {
       const item = document.createElement("span");
       item.className = "month-view-entry is-project";
+      setCalendarEntryTemporalState(item, date, entry.endTime);
       item.style.setProperty("--month-entry-color", entry.color || "#e6d8a8");
       item.textContent = entry.name || "Projekt";
       item.title = entry.name || "Projekt";
@@ -501,6 +504,7 @@ function renderMonthView(project) {
     appointments.filter((entry) => dateKey >= getAppointmentStartDate(entry) && dateKey <= getAppointmentEndDate(entry)).forEach((entry) => {
       const item = document.createElement("span");
       item.className = "month-view-entry is-appointment";
+      setCalendarEntryTemporalState(item, date, entry.endTime);
       item.style.setProperty("--month-entry-color", entry.color || "#c9c1dd");
       item.textContent = `${entry.startTime ? `${entry.startTime} ` : ""}${entry.name || entry.groupName || "Termin"}`;
       item.title = entry.name || entry.groupName || "Termin";
@@ -509,12 +513,35 @@ function renderMonthView(project) {
     sicknessEntries.filter((entry) => dateKey >= entry.startDate && dateKey <= entry.endDate).forEach(() => {
       const item = document.createElement("span");
       item.className = "month-view-entry is-sickness";
+      setCalendarEntryTemporalState(item, date);
       item.textContent = "Krankschreibung";
       entries.append(item);
     });
     cell.append(dayHead, entries);
     calendar.append(cell);
   }
+}
+
+function updateCalendarEntryTemporalState(element, now = new Date()) {
+  const entryDate = element.dataset.calendarDate;
+  const today = getLocalDateKey(now);
+  const endTime = element.dataset.calendarEnd;
+  const isPast = entryDate < today || (
+    entryDate === today
+    && Boolean(endTime)
+    && timeToMinutes(endTime) <= now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
+  );
+  element.classList.toggle("is-past-calendar-entry", isPast);
+}
+
+function setCalendarEntryTemporalState(element, date, endTime = "") {
+  element.dataset.calendarDate = getLocalDateKey(date);
+  if (endTime) element.dataset.calendarEnd = endTime;
+  updateCalendarEntryTemporalState(element);
+}
+
+function updateCalendarEntryTemporalStates(now = new Date()) {
+  document.querySelectorAll("[data-calendar-date]").forEach((element) => updateCalendarEntryTemporalState(element, now));
 }
 
 function getFederalStateName(code) {
@@ -1480,6 +1507,8 @@ function renderCombinedScheduleView(view) {
         : schoolProject
           ? renderSchoolProjectCard(schoolProject, timeToMinutes(lesson.start), timeToMinutes(lesson.end))
           : renderLessonCard(lesson, schedule, date);
+      const explicitEndTime = appointment?.endTime || schoolProject?.endTime || (!appointment && !schoolProject ? lesson.end : "");
+      setCalendarEntryTemporalState(card, date, explicitEndTime);
       const top = ((timeToMinutes(lesson.start) - timelineStart) / timelineMinutes) * 100;
       const height = ((timeToMinutes(lesson.end) - timeToMinutes(lesson.start)) / timelineMinutes) * 100;
       card.style.top = `${top}%`;
@@ -1536,6 +1565,7 @@ function centerCurrentTimeIndicator(indicator) {
 }
 
 function updateCurrentTimeIndicator(now = new Date(), centerOnCurrentTime = false) {
+  updateCalendarEntryTemporalStates(now);
   document.querySelectorAll(".timeline-current-time").forEach((indicator) => {
     const axis = indicator.closest(".timeline-axis");
     const timelineStart = Number(axis?.dataset.timelineStart);
