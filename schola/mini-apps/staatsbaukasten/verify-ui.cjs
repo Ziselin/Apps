@@ -20,7 +20,7 @@ const path=require('node:path');
   {id:'parliament',type:'parliament',label:'Parlament',visual:{x:200,y:200},properties:{}},
   {id:'chamber',type:'parliament',label:'Erste Kammer',parentId:'parliament',visual:{x:0,y:0},properties:{}},
   {id:'government',type:'government',label:'Regierung',visual:{x:620,y:200},properties:{}}
- ],relations:[{id:'r1',source:'people',target:'parliament',type:'wählt',properties:{},visual:{sourcePort:{side:'top',t:.25},targetPort:{side:'bottom',t:.75}}}]};
+ ],relations:[{id:'r1',source:'people',target:'parliament',type:'wählt',properties:{source:'Art. 20 Abs. 2 GG: Staatsgewalt geht vom Volke aus'},visual:{sourcePort:{side:'top',t:.25},targetPort:{side:'bottom',t:.75}}}]};
  await page.evaluate(m=>localStorage.setItem('schola-staatsbaukasten-v1',JSON.stringify(m)),model);await page.reload();
  const from=await page.locator('.node[data-id="people"]').boundingBox(),to=await page.locator('.node[data-id="government"]').boundingBox();
  assert.equal(await page.locator('.port-marker').count(),0,'No ports without hover or selected edge');
@@ -41,6 +41,8 @@ const path=require('node:path');
  assert.ok(Math.abs(created.visual.targetPort.t-.6)<.06);
  await page.locator('#undoButton').click();
  await page.locator('.edge-label').click();
+ assert.equal(await page.locator('.edge-source-mark').count(),1,'Source marker appears above labelled relation');
+ assert.match(await page.locator('#edgeInspector input[name="source"]').inputValue(),/Art\. 20/);
  assert.equal(await page.locator('.port-markers').count(),2,'Selected edge shows ports only on its two connected nodes');
  await page.locator('#sourceSide').selectOption('right');
  await page.locator('#sourceOffset').fill('31');await page.locator('#sourceOffset').dispatchEvent('input');

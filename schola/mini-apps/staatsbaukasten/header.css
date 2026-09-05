@@ -143,6 +143,7 @@ body.diagram-mode .canvas { min-height: 0; }
 .segment-handle:hover { stroke: #d65d3240; }
 .corner-handle { fill: white; stroke: #c76842; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: all; cursor: move; }
 .corner-handle:hover, .snap-preview { fill: #c76842; stroke: white; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.edge-source-mark { font-size: 12px; font-weight: 700; pointer-events: none; }
 .snap-preview { pointer-events: none; }
 .node { display: flex; align-items: center; justify-content: center; }
 .node .node-label { display: block; width: 100%; }

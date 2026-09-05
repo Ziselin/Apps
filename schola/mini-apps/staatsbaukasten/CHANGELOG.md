@@ -53,3 +53,8 @@
 - Nach Wahl eines Startpunkts werden die Anschlusspunkte aller möglichen Ziele eingeblendet; bei einer ausgewählten Verbindung nur diejenigen ihrer beiden Elemente.
 - Der magnetisch rot hervorgehobene Punkt ist unmittelbar anklickbar. Das zusätzliche Fadenkreuz und der Fadenkreuz-Cursor wurden entfernt.
 - Browserprüfung deckt alle Sichtbarkeitszustände sowie den vollständigen Marker-Klickablauf ab.
+## Verfassungsquellen an Beziehungen – 2026-09-05
+
+- Beziehungen können nun eine konkrete Verfassungsfundstelle oder Passage als Quelle erhalten.
+- Bei vorhandener Quelle erscheint ein § oberhalb der Beziehungsbeschriftung; Editor, Diagrammansicht und Export verwenden dieselbe Darstellung.
+- Browserprüfung für Quellenfeld, Persistenz und §-Markierung ergänzt.
