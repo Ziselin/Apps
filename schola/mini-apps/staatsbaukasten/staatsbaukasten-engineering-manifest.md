@@ -24,3 +24,16 @@ Dieses Manifest regelt den spezifischen Kompetenzbereich der MiniApp Staatsbauka
 - Jedes Element, jede Beziehung und jede institutionelle Ebene besitzt eine stabile Identität.
 - Modelle werden automatisch lokal gespeichert und vollständig als versionierte JSON-Datei exportiert und importiert.
 - Visuelle Informationen dürfen fachliche Informationen nicht ersetzen; ein Modell bleibt ohne seine Anordnung semantisch verständlich.
+
+## Diagrammgestaltung und Bedienung
+
+- Die Schola-Kopfzeile und das zentrale App-Menü bleiben die verbindlichen Oberflächenvorlagen.
+- Diagramme verwenden kompakte rechteckige Organe, offene Gewaltenbereiche und beschriftete Trennlinien für staatliche Ebenen. Farben sind optional.
+- Paletteinträge zeigen bei Auswahl didaktische Erläuterungen. Drag-and-drop erzeugt Kopien mit eigener Identität.
+- Verfassungen und Grundordnungen sind normative Grundlagen und werden von handelnden Institutionen unterschieden.
+- Anschlusspositionen werden als Seite und relativer Anteil der Elementkontur an der Beziehung gespeichert. Verschieben, Skalieren und Export erhalten diese Positionen.
+- Editor und Export verwenden dieselbe Geometrie für Kartengrößen, mehrzeilige Namen, Verschachtelung, Anschlüsse und Linien.
+- Automatisches Routing berücksichtigt andere Organe. Bei geometrisch unmöglichen Wegen muss die Ausgabeprüfung auf einen verbleibenden Konflikt hinweisen.
+- Einpassung verändert nur den Bildausschnitt. Rückgängig/Wiederholen stellt den vollständigen Modellzustand wieder her.
+- Bereichszugehörigkeit und visuelle Verschachtelung ersetzen keine ausdrücklich modellierte politische Beziehung.
+- Importdateien werden vor der Übernahme auf gültige Referenzen und zyklenfreie Hierarchien geprüft.
