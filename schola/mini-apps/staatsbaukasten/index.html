@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#eeeee7">
   <title>Staatsbaukasten · Schola</title>
   <link rel="icon" href="../../../assets/staatsbaukasten-icon.svg?v=20260904a">
-  <link rel="stylesheet" href="staatsbaukasten.css?v=20260904a">
+  <link rel="stylesheet" href="staatsbaukasten.css?v=20260905y">
   <link rel="stylesheet" href="../../../assets/ui/app-menu.css?v=20260824b">
-  <link rel="stylesheet" href="header.css?v=20260905d">
+  <link rel="stylesheet" href="header.css?v=20260905zl">
 </head>
 <body>
   <main class="app-shell">
@@ -18,7 +18,7 @@
         <div class="brand-mark"><a class="brand-home-link" href="../../../index.html?project=schola" aria-label="Zur Schola-Startseite"><img class="brand-bird" src="../../../assets/ziselin-bild-flach.svg" alt="" aria-hidden="true"></a><span class="brand-name">staatsbaukasten</span></div>
       </div>
       <div class="mode-switch" aria-label="Modellierungsmodus"><button data-mode="basic" class="active">Basis</button><button data-mode="advanced">Erweitert</button></div>
-      <div class="head-actions"><button id="viewButton" class="quiet">Diagramm</button><button id="newButton" class="quiet">Neu</button><button id="exportButton" class="quiet">Exportieren</button><button id="importButton" class="quiet">Importieren</button><input id="importInput" type="file" accept="application/json" hidden><span id="saveState" aria-live="polite">Automatisch gespeichert</span></div>
+      <span id="saveState" hidden aria-live="polite">Automatisch gespeichert</span>
     </header>
 
     <div id="menuOverlay" class="menu-overlay" hidden></div>
@@ -39,7 +39,7 @@
         <div class="panel-heading"><span class="step">1</span><div><span class="eyebrow">Elemente</span><h2>Institution wählen</h2></div></div>
         <p class="hint">Auf die Fläche ziehen oder anklicken.</p>
         <div id="elementPalette" class="element-palette"></div>
-        <button id="addGroupButton" class="wide secondary">+ Institutionelle Ebene</button>
+        <button id="addGroupButton" class="wide secondary">+ Staatliche Ebene</button>
       </aside>
 
       <section class="canvas-panel" aria-label="Modellfläche">
@@ -47,15 +47,18 @@
           <div><label for="modelTitle">Modell</label><input id="modelTitle" value="Mein Staatsmodell" maxlength="80"></div>
           <p id="connectionHint">Elemente platzieren und über ihre Anschlusspunkte verbinden.</p>
           <div class="zoom-control" aria-label="Zoom der Modellfläche"><button id="zoomOutButton" type="button" aria-label="Herauszoomen">−</button><output id="zoomValue">100 %</output><button id="zoomInButton" type="button" aria-label="Hineinzoomen">+</button></div>
-          <button id="fitButton" class="icon-button" title="Ansicht zentrieren" aria-label="Ansicht zentrieren">⌖</button>
+          <button id="fitButton" class="icon-button canvas-tool-button" type="button" title="Alles zentrieren" aria-label="Alles auf der Modellfläche zentrieren"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2.5"/></svg></button>
+          <details id="canvasActionMenu" class="canvas-action-menu"><summary class="icon-button canvas-tool-button" title="Modellmenü" aria-label="Modellmenü öffnen">⋮</summary><div class="canvas-action-popover" role="menu"><button id="newButton" type="button" role="menuitem">Neu</button><button id="generateButton" type="button" role="menuitem">Generieren</button><button id="importButton" type="button" role="menuitem">Importieren</button><button id="exportButton" type="button" role="menuitem">Exportieren</button></div></details>
+          <input id="importInput" type="file" accept="application/json" hidden>
         </div>
         <div id="canvas" class="canvas" tabindex="0">
           <h2 id="diagramTitle" class="diagram-title" hidden></h2>
+          <div id="levelFilters" class="level-filters" aria-label="Administrative Ebenen"></div>
+          <label class="relation-layer-filter">Beziehungsrubrik<select id="relationLayerSelect" aria-label="Sichtbare Beziehungsrubrik"></select></label>
           <div id="canvasViewport" class="canvas-viewport">
-            <svg id="edgeLayer" aria-label="Beziehungen im Modell"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z"></path></marker></defs><g id="guides"></g><g id="edges"></g></svg>
+            <svg id="edgeLayer" aria-label="Beziehungen im Modell"><defs><marker id="arrow" markerWidth="12" markerHeight="10" refX="11" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L0,8 L11,4 z"></path></marker></defs><g id="guides"></g><g id="edges"></g></svg>
             <div id="groupLayer"></div><div id="nodeLayer"></div>
           </div>
-          <div id="emptyState" class="empty-state"><strong>Eine politische Ordnung entsteht hier.</strong><span>Ziehe links eine Institution auf die Modellfläche.</span></div>
         </div>
       </section>
 
@@ -73,8 +76,11 @@
         <form id="nodeInspector" hidden>
           <label>Bezeichnung<input name="label" maxlength="60"></label>
           <label>Elementtyp<select name="type"></select></label>
-          <label>Untergeordnet unter<select name="parentId"><option value="">Keinem Element</option></select></label>
-          <label>Institutioneller Bereich<select name="groupId"><option value="">Keinem Bereich</option></select></label>
+          <label>Elementgruppe / enthalten in<select name="parentId"><option value="">Keiner Elementgruppe</option></select></label>
+          <p class="field-hint">Ein übergeordnetes Element wird automatisch zur Gruppe und umfasst seine Unterelemente. „Keiner Elementgruppe“ löst die Zuordnung wieder.</p>
+          <label>Administrative Ebene<select name="groupId"><option value="">Keiner administrativen Ebene</option></select></label>
+          <button id="editNodeSource" type="button" class="secondary wide">Quelle zur Funktion hinzufügen</button>
+          <p id="nodeSourceSummary" class="field-hint" hidden></p>
           <div class="advanced-fields" hidden>
             <label>Staatliche Ebene<select name="level"><option value="">Nicht festgelegt</option><option>Zentralstaat</option><option>Gliedstaat</option><option>Region</option><option>Kommune</option><option>Supranational</option></select></label>
             <label>Gewaltenzuordnung<select name="branch"><option value="">Nicht festgelegt</option><option>Legislative</option><option>Exekutive</option><option>Judikative</option><option>Gemischt / unabhängig</option></select></label>
@@ -88,25 +94,27 @@
         <form id="edgeInspector" hidden>
           <div id="edgeStatement" class="statement"></div>
           <label>Beziehung<select name="relation"></select></label>
-          <label>Position der Beschriftung<input name="labelPosition" type="range" min="0.1" max="0.9" step="0.05" value="0.5"></label>
-          <label>Verfassungsquelle / Passage<input name="source" maxlength="240" placeholder="z. B. Art. 20 Abs. 2 GG: ..."></label>
-          <div class="advanced-fields" hidden>
-            <label>Entscheidungsform<select name="decision"><option value="">Nicht festgelegt</option><option>direkt</option><option>indirekt</option><option>bindend</option><option>nicht bindend</option></select></label>
-            <label>Erforderliche Mehrheit<input name="majority" placeholder="z. B. absolute Mehrheit"></label>
-            <label>Bedingungen<textarea name="conditions" rows="3" placeholder="Optionale institutionelle Regeln"></textarea></label>
-          </div>
+          <label id="customRelationInspectorField" hidden>Eigene Beziehungsbeschreibung<input name="customRelation" maxlength="100" placeholder="z. B. legt dem Parlament einen Bericht vor"></label>
+          <input name="labelPosition" type="hidden">
+          <button id="editRelationSource" type="button" class="secondary wide">Quelle hinzufügen</button>
+          <p id="relationSourceSummary" class="field-hint" hidden></p>
           <button type="button" class="danger" data-delete="edge">Beziehung löschen</button>
         </form>
-        <form id="groupInspector" hidden><label>Bezeichnung<input name="label" maxlength="60"></label><label>Bereichsart<select name="kind"><option value="level">Staatliche Ebene</option><option value="branch">Gewaltenbereich</option><option value="institution">Institutioneller Bereich</option></select></label><label>Eingeordnet in<select name="parentGroupId"><option value="">Keinen übergeordneten Bereich</option></select></label><fieldset class="layout-tools"><legend>Elemente anordnen</legend><button type="button" class="secondary" data-layout="horizontal">Horizontal</button><button type="button" class="secondary" data-layout="vertical">Vertikal</button><button type="button" class="secondary" data-layout="compact">Kompakt</button></fieldset><button type="button" class="danger" data-delete="group">Bereich löschen</button></form>
+        <form id="groupInspector" hidden><p class="field-hint">Administrative Ebenen ordnen staatliche Elemente und können über die Schalter auf der Arbeitsfläche fokussiert werden.</p><label>Bezeichnung<input name="label" maxlength="60"></label><button type="button" class="danger" data-delete="group">Ebene löschen</button></form>
         <div class="model-summary"><span class="eyebrow">Modellstruktur</span><p><b id="nodeCount">0</b> Elemente · <b id="edgeCount">0</b> Beziehungen</p><button id="dataButton" class="wide secondary">Strukturierte Daten anzeigen</button></div>
       </aside>
     </section>
   </main>
-  <dialog id="relationDialog"><form method="dialog"><span class="eyebrow">Fachliche Aussage</span><h2>Was bedeutet diese Verbindung?</h2><p id="relationSentence"></p><label>Beziehungsgruppe<select id="relationCategory"></select></label><label>Beziehung<select id="relationType"></select></label><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button><button id="confirmRelation" value="default">Verbindung erstellen</button></div></form></dialog>
+  <dialog id="relationDialog"><form method="dialog"><span class="eyebrow">Fachliche Aussage</span><h2>Was bedeutet diese Verbindung?</h2><p id="relationSentence"></p><label>Beziehung<select id="relationType"></select></label><label id="customRelationDialogField" hidden>Eigene Beziehungsbeschreibung<input id="relationCustom" maxlength="100" placeholder="z. B. legt dem Parlament einen Bericht vor"></label><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button><button id="confirmRelation" value="default">Verbindung erstellen</button></div></form></dialog>
+  <dialog id="sourceDialog"><form method="dialog"><span id="sourceEditorEyebrow" class="eyebrow">Rechtsgrundlage</span><div class="source-dialog-heading"><h2 id="sourceEditorTitle">Quellen der Beziehung</h2><div class="source-navigation" aria-label="Quellen navigieren"><button id="sourcePrevious" type="button" class="quiet" aria-label="Vorherige Quelle">←</button><output id="sourcePosition">1 / 1</output><button id="sourceNext" type="button" class="quiet" aria-label="Nächste Quelle">→</button><button id="sourceAdd" type="button" aria-label="Weitere Quelle hinzufügen">＋</button></div></div><label>Gesetzestext<input id="sourceLaw" maxlength="180" placeholder="z. B. Verfassung des Landes Mecklenburg-Vorpommern"></label><label>Bezeichnung der Stelle<input id="sourceCitation" maxlength="120" placeholder="z. B. Art. 3 Abs. 2 oder § 12"></label><label>Link zur Quelle<input id="sourceUrl" type="url" maxlength="500" placeholder="z. B. www.landesrecht-mv.de/..."></label><label>Notiz zum Inhalt<textarea id="sourceNote" rows="5" maxlength="1200" placeholder="Was regelt diese Stelle für die dargestellte Funktion oder Beziehung?"></textarea></label><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button><button id="saveRelationSource" value="default">Quellen übernehmen</button></div></form></dialog>
+  <dialog id="sourceInfoDialog" class="source-info-dialog"><form method="dialog"><span class="eyebrow">Rechtsgrundlagen der Beziehung</span><div class="source-dialog-heading"><h2 id="sourceInfoLaw">Gesetzestext</h2><div class="source-navigation" aria-label="Quellen navigieren"><button id="sourceInfoPrevious" type="button" class="quiet" aria-label="Vorherige Quelle">←</button><output id="sourceInfoPosition">1 / 1</output><button id="sourceInfoNext" type="button" class="quiet" aria-label="Nächste Quelle">→</button></div></div><div id="sourceInfoCitationBlock" class="source-citation"><span>Fundstelle</span><strong id="sourceInfoCitation"></strong></div><div id="sourceInfoNoteBlock" class="source-note"><span>Inhalt der Stelle</span><p id="sourceInfoNote"></p></div><div id="sourceInfoUrlBlock" class="source-link"><span>Quelle im Web</span><a id="sourceInfoUrl" target="_blank" rel="noopener noreferrer">Gesetzestext öffnen ↗</a></div><div class="dialog-actions"><button value="cancel">Schließen</button></div></form></dialog>
   <dialog id="dataDialog"><form method="dialog"><span class="eyebrow">Semantisches Modell</span><h2>Strukturierte Daten</h2><pre id="dataPreview"></pre><div class="dialog-actions"><button value="cancel">Schließen</button></div></form></dialog>
+  <dialog id="generatorDialog" class="generator-dialog"><form method="dialog"><span class="eyebrow">KI-Vorlage</span><h2>Staatsaufbau generieren lassen</h2><p>Erzeuge eine genaue Arbeitsanweisung für eine KI. Deren JSON-Datei kannst du anschließend über „Importieren“ in den Staatsbaukasten laden.</p><label>Welcher Staat soll dargestellt werden?<input id="generatorState" maxlength="160" autocomplete="off" placeholder="z. B. Bundesrepublik Deutschland"></label><button id="createPromptButton" type="button">Prompt generieren</button><div id="generatedPromptBlock" class="generated-prompt" hidden><label for="generatedPrompt">Generierter Prompt</label><textarea id="generatedPrompt" rows="16" readonly></textarea><div class="prompt-copy-row"><span id="promptCopyStatus" aria-live="polite"></span><button id="copyPromptButton" type="button">Prompt kopieren</button></div></div><div class="dialog-actions"><button value="cancel" class="quiet">Schließen</button></div></form></dialog>
+  <dialog id="importChoiceDialog" class="import-choice-dialog"><form method="dialog"><span class="eyebrow">Modell übernehmen</span><h2>Wie möchtest du importieren?</h2><p>Beide Wege prüfen die Daten vor dem Einfügen in die Modellfläche.</p><div class="import-choice-grid"><button id="importFileChoice" type="button"><strong>Datei auswählen</strong><span>Eine gespeicherte .json- oder .staatsmodell.json-Datei öffnen</span></button><button id="importCodeChoice" type="button"><strong>JSON-Code einfügen</strong><span>Die Ausgabe eines KI-Modells direkt aus der Zwischenablage übernehmen</span></button></div><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button></div></form></dialog>
+  <dialog id="jsonImportDialog" class="json-import-dialog"><form method="dialog"><span class="eyebrow">Direktimport</span><h2>JSON-Code einfügen</h2><p>Füge das vollständige JSON-Objekt ein. Markdown-Codeblöcke werden automatisch entfernt.</p><label for="jsonImportCode">JSON des Staatsmodells</label><textarea id="jsonImportCode" rows="18" spellcheck="false" autocomplete="off" placeholder="{&#10;  &quot;version&quot;: 1,&#10;  …&#10;}"></textarea><p id="jsonImportError" class="import-error" role="alert" hidden></p><div class="dialog-actions"><button value="cancel" class="quiet">Abbrechen</button><button id="confirmJsonImport" type="button">JSON importieren</button></div></form></dialog>
   <dialog id="exportDialog" class="export-dialog"><form method="dialog"><span class="eyebrow">Ausgabe</span><h2>Diagramm exportieren</h2><div id="exportValidation" class="export-validation"></div><div class="export-options"><label>Darstellung<select id="exportTheme"><option value="mono">Schwarz-Weiß</option><option value="color">Kategoriefarben</option></select></label><label>Format<select id="exportPaper"><option value="auto">Inhalt</option><option value="a4">A4</option><option value="a3">A3</option></select></label><label>Ausrichtung<select id="exportOrientation"><option value="portrait">Hochformat</option><option value="landscape">Querformat</option></select></label><label class="check"><input id="exportTitle" type="checkbox" checked><span>Diagrammtitel anzeigen</span></label></div><div class="export-formats"><button id="exportSvgButton" type="button">SVG herunterladen</button><button id="printPdfButton" type="button">Drucken / PDF</button><button id="exportJsonButton" type="button" class="quiet">Modelldatei</button></div><div class="dialog-actions"><button value="cancel" class="quiet">Schließen</button></div></form></dialog>
   <script src="../../../assets/ui/app-menu.js?v=20260824b"></script>
-  <script src="diagram-geometry.js?v=20260905d"></script>
-  <script src="staatsbaukasten.js?v=20260905d"></script>
+  <script src="diagram-geometry.js?v=20260905x"></script>
+  <script src="staatsbaukasten.js?v=20260905zp"></script>
 </body>
 </html>
