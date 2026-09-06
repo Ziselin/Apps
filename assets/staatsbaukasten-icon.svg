@@ -1,12 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Staatsaufbau-Diagramm">
   <rect width="128" height="128" rx="28" fill="#eeeee7"/>
+  <g fill="none" stroke="#213633" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 49v17M31 66h66M31 66v13M64 66v13M97 66v13"/>
+  </g>
   <g fill="#f8f8f3" stroke="#213633" stroke-width="4" stroke-linejoin="round">
-    <path d="M22 43h42v28H22z"/><path d="M75 21h31v26H75z"/><path d="M72 80h35v28H72z"/>
+    <rect x="38" y="24" width="52" height="27" rx="6"/>
+    <rect x="17" y="78" width="28" height="28" rx="6"/>
+    <rect x="50" y="78" width="28" height="28" rx="6"/>
+    <rect x="83" y="78" width="28" height="28" rx="6"/>
   </g>
-  <g fill="none" stroke="#213633" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M64 57h18V47"/><path d="M48 71v23h24"/><path d="m77 41 5 6 6-5"/><path d="m66 89 6 5-6 5"/>
-  </g>
-  <circle cx="43" cy="57" r="5" fill="#213633"/>
-  <circle cx="90" cy="34" r="5" fill="#213633"/>
-  <circle cx="89" cy="94" r="5" fill="#213633"/>
 </svg>

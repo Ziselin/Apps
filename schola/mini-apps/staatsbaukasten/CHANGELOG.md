@@ -2,6 +2,20 @@
 
 ## 0.2.0 – Unveröffentlicht
 
+### 2026-09-06
+
+- Ein verbindliches 24-Pixel-Satzraster – die doppelte Pfeilgröße – steuert nun Elementpositionen und -maße, Gruppenabstände, Anschlusspunktabstände, automatische Pfeilkanäle sowie manuell verschobene Segmente und Knickpunkte. Der KI-Generator verwendet dieselben Vielfachen für Positionen, Größen und Freiräume.
+- Rasterpunkte allein können keine orthogonale Strecke garantieren. Nach jeder Pfeilmanipulation werden deshalb diagonale Restsegmente automatisch durch rechtwinklige Rasterknicke ersetzt und anschließend redundante Punkte entfernt.
+- Der sichtbare Linienschaft endet nun exakt an der breiten Pfeilbasis. Nur die Pfeilspitze überbrückt die letzte Pfeillänge bis zur Element-Outline; Klickfläche und semantischer Zielpunkt bleiben weiterhin exakt auf der Outline.
+- Anschlussmarker orientieren sich nun am globalen 24-px-Raster statt nur an der jeweiligen Elementmitte. Dadurch können freie Elemente und Unterelemente einer Gruppe auf identischen Achsen direkt miteinander verbunden werden; die Gruppenüberschrift bleibt eine reine Beschriftung.
+- Die Gewaltensteuerung verwendet nur noch ihre farbigen Checkboxen. Ausgewählte Legislative und Judikative erhalten etwas kräftigere, die optisch dominante Exekutive eine bewusst zurückhaltendere Flächentönung.
+- Institutionen einer Sammlung werden nun einzeln in einem eigenen Dialog angelegt und bearbeitet. Pfeile navigieren zwischen Einträgen, Plus ergänzt eine Institution und ein gezielter Entfernen-Button löscht den aktuellen Eintrag.
+- Element-Outlines und Verbindungspfeile verwenden nun dieselbe kräftige Linienstärke von 3 Pixeln; auch Unterelemente, Sammlungen und Verfassungselemente folgen diesem einheitlichen Satzbild.
+- Im erweiterten Modus stehen unter den administrativen Ebenen nun Legislative, Exekutive und Judikative als eigene Darstellungssteuerung. Ein Klick öffnet rechts die Farbeinstellung; die gewählte Farbe kennzeichnet alle entsprechend zugewiesenen Elemente. Wird eine Gewalt deaktiviert, bleiben ihre Elemente sichtbar und bedienbar, erscheinen jedoch neutral schwarz-weiß.
+- Institutionssammlungen erscheinen als kompakte Dropdown-Elemente. Ein klar integrierter Chevron öffnet eine begrenzte, scrollbarere Menüliste mit Anzahl, ruhigen Zeilen und lesbarem Umbruch; der Diagrammknoten und seine Pfeilanschlüsse verändern dabei weder Größe noch Position. Das Mausrad scrollt im Menü, ohne den Canvas zu zoomen. Die Einträge bleiben vorerst informativ, während Beziehungen weiterhin an der Sammlung als Ganzem ansetzen.
+- Die Anzahl der Institutionen ist selbst die kontrastreiche Schaltfläche zum Öffnen der Sammlung. Ein zusätzlicher Chevron entfällt vollständig; der offene Zustand wird ruhig über Hintergrund und Rahmen signalisiert.
+- Die Modellfläche synchronisiert nach dynamischer Vergrößerung und Zentrierung nun Elemente, Gruppen und Pfeile im selben Zeichenzyklus. Dadurch bleiben Pfeilanschlüsse beim Zoomen, Verschieben und erneuten Einpassen stabil an ihren Elementen, statt vorübergehend versetzt oder losgelöst zu erscheinen.
+
 ### 2026-09-05
 
 - Der neue Elementtyp „Institutionssammlung“ zeigt bis zu 40 Institutionen als kompakte Liste in einer gemeinsamen Box. Nur die Sammlung besitzt Anschlusspunkte und Beziehungen; ihre Einträge bleiben bewusst rein informativ und reduzieren so Pfeil- und Routingkomplexität.
@@ -129,3 +143,21 @@
 - Die geteilten Segmente lassen sich anschließend unabhängig verschieben; der Punkt kann wie bestehende freie Ecken per Rechtsklick entfernt werden.
 - Die Doppelklick-Erkennung bleibt stabil, obwohl die Linie nach dem ersten Klick ausgewählt und mit Bearbeitungsgriffen neu gezeichnet wird.
 - Geometrie- und Browsertests prüfen Einfügen, Speichern, Sichtbarkeit und anschließendes Entfernen.
+- Die sichtbaren Rückgängig-/Wiederholen-Schalter wurden aus der Canvas-Kopfzeile entfernt; die Tastenkürzel Strg+Z und Strg+Y bleiben verfügbar.
+- Die App-Kopfzeile folgt nun der DNA-App: 44-px-Bildmarke, zweizeilige Titelhierarchie, Arial-Typografie und dieselben Abstands- und Größenverhältnisse. Der Basis-/Erweitert-Schalter bleibt als kompakter Modusregler erhalten.
+- Menübutton und die Beschriftung „Modus“ wurden aus der App-Kopfzeile entfernt; der Basis-/Erweitert-Schalter bleibt rechts erhalten.
+- Gewaltenfarben füllen bei gruppierten Elementen nicht mehr den gesamten Gruppenrahmen. Dadurch bleiben interne Verbindungslinien bei aktiver Ebene sichtbar; die Farbe erscheint weiterhin an Outline und Gruppenüberschrift.
+- Die Modellfläche lässt sich ohne Maus mit den Pfeiltasten navigieren. Umschalt plus Pfeiltaste bewegt den Ausschnitt in größeren Schritten; Formularfelder und Dialoge behalten ihre normale Tastaturbedienung.
+- Das App-Icon zeigt nun ein reduziertes Staatsaufbau-Schema mit einem übergeordneten Element und drei gleichrangigen Gewalten. Form, Farbwelt und Strichstärken folgen den übrigen Schola-Icons.
+- Weiteres Hineinzoomen an der 250-%-Grenze verändert die Ansicht nicht mehr. Der Canvas bleibt am aktuellen Ausschnitt, statt unvermittelt zur zentrierten Ansicht zu springen.
+- Die Titelhierarchie der Kopfzeile zeigt „Politische Ordnung“ klein und „Staatsbaukasten“ als großen App-Namen.
+- Die Schalter zum Ein- und Ausklappen der Seitenleisten verwenden nun den dunklen, kontrastreichen Stil des aktiven Modusbuttons.
+- Die redundante Vorschau „Strukturierte Daten anzeigen“ wurde entfernt; strukturierte Modelldaten stehen weiterhin über den JSON-Export zur Verfügung.
+- Eine eingetragene Amtszeit erscheint direkt unter der Elementbezeichnung in normaler Schriftstärke. Element- und Gruppenhöhen passen sich automatisch an.
+- Das Eigenschaftsfeld heißt nun „Amtszeit/Legislatur“ und deckt damit Einzelämter sowie parlamentarische Wahlperioden ab.
+- Die Endpunkte bestehender Beziehungen lassen sich nun auf Anschluss-Nodes anderer Elemente aktiver Ebenen umhängen. Während des Ziehens werden alle gültigen Ziele eingeblendet.
+- Gruppen-Outlines gelten bei Beziehungen zwischen einer Gruppe und ihren Elementen sowie zwischen Elementen derselben Gruppe nicht als blockierende Fläche. Fremde Elemente bleiben von der Kollisionsprüfung geschützt.
+- Die Ebenensteuerung trägt nun analog zu den Gewalten die Überschrift „Staatliche Ebenen“; der Trennstrich zwischen beiden Bereichen wurde entfernt.
+- Die linke Elementpalette ist nun ein funktionaler Werkzeugkoffer aus Institution, Strukturgruppe, Sammlung und Rechtsgrundlage. Frühere fachliche Elementtypen werden beim Laden und Importieren kompatibel als Institution übernommen.
+- Die staatlichen Ebenen besitzen keine Drei-Punkte-Schalter mehr. Nur ein Klick auf die Checkbox ändert die Sichtbarkeit; der Ebenenname öffnet die Einstellung und dient als Griff zum Umsortieren innerhalb der Liste.
+- Das Umsortieren der staatlichen Ebenen übernimmt die neue Position beim Loslassen nun zuverlässig über einen internen Drag-Zustand.
