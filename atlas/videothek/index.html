@@ -8,7 +8,7 @@
   <title>Videothek</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/videothek-favicon.svg">
   <link rel="stylesheet" href="videothek.css">
-  <link rel="stylesheet" href="videothek-fixes.css">
+  <link rel="stylesheet" href="videothek-fixes.css?v=20260912-7">
 </head>
 <body>
   <div class="app-shell">
@@ -23,6 +23,7 @@
       </nav>
       <div class="top-actions">
         <label class="search"><span class="sr-only">Filme suchen</span><input id="searchInput" type="search" placeholder="Titel, Regie, Genre …" spellcheck="false" autocomplete="off"></label>
+        <button id="catalogMenuButton" class="catalog-menu-button" type="button" aria-label="Auswahl und Sortierung öffnen" aria-expanded="false" aria-controls="catalogDrawer"><span aria-hidden="true">☰</span></button>
       </div>
     </header>
 
@@ -39,7 +40,6 @@
             <h2 id="allFilmsHeading">Alle Filme</h2>
             <div class="catalog-meta">
               <span id="filmCount"></span>
-              <label class="select-wrap">Projekt<select id="projectSelect"></select></label>
             </div>
           </div>
           <div id="filmGrid" class="film-grid"></div>
@@ -84,11 +84,33 @@
     </main>
   </div>
 
+  <div id="catalogBackdrop" class="catalog-drawer-backdrop" aria-hidden="true"></div>
+  <aside id="catalogDrawer" class="catalog-drawer" aria-hidden="true" aria-labelledby="catalogDrawerTitle">
+    <div class="catalog-drawer-head"><div><p class="eyebrow">Entdecken</p><h2 id="catalogDrawerTitle">Auswahl &amp; Anordnung</h2></div><button id="catalogDrawerClose" type="button" aria-label="Seitenmenü schließen">×</button></div>
+    <div class="catalog-drawer-fields">
+      <label>Projekt<select id="projectSelect"></select></label>
+      <label>Playlist<select id="catalogPlaylistSelect"><option value="all">Alle Playlisten</option></select></label>
+      <label>Anordnung<select id="catalogSortSelect"><option value="alphabetical">Alphabetisch</option><option value="year-desc">Jahr · neu nach alt</option><option value="year-asc">Jahr · alt nach neu</option><option value="genre">Genre</option><option value="collection-number">Nach Sammlungsnummer</option><option value="random">Zufällig</option></select></label>
+      <label class="drawer-toggle"><input id="catalogOriginalTitleToggle" type="checkbox"><span>Originaltitel anzeigen</span></label>
+      <section class="drawer-language-section" aria-labelledby="drawerLanguageTitle">
+        <div><strong id="drawerLanguageTitle">Sprachen</strong><small>Keine Auswahl zeigt alle Filme.</small></div>
+        <div id="catalogLanguageFilters" class="drawer-language-filters"></div>
+        <p id="catalogLanguagesEmpty" class="drawer-language-empty" hidden>Noch keine Sprachen in eigenen Fassungen hinterlegt.</p>
+      </section>
+    </div>
+  </aside>
+
   <dialog id="filmDialog" class="dialog">
     <form id="filmForm" method="dialog">
       <div class="dialog-head"><div><p class="eyebrow">Filmeintrag</p><h2 id="filmDialogTitle">Film bearbeiten</h2></div><button class="dialog-close" value="cancel" formnovalidate aria-label="Schließen">×</button></div>
       <input id="filmId" type="hidden">
       <input id="filmTmdbId" type="hidden">
+      <div class="film-editor-tabs" role="tablist" aria-label="Bereiche des Filmeintrags">
+        <button class="is-active" type="button" role="tab" aria-selected="true" data-film-tab="general">Filminformationen</button>
+        <button type="button" role="tab" aria-selected="false" data-film-tab="copies">Meine Fassungen <span id="filmCopyCount">0</span></button>
+        <button type="button" role="tab" aria-selected="false" data-film-tab="playlists">Playlisten <span id="filmPlaylistCount">0</span></button>
+      </div>
+      <div id="filmGeneralPanel" class="film-tab-panel" role="tabpanel">
       <section class="tmdb-panel" aria-labelledby="tmdbPanelTitle">
         <div class="tmdb-panel-head">
           <div><strong id="tmdbPanelTitle">Informationen mit TMDB ergänzen</strong><small>Titel suchen, Treffer prüfen und Filmdaten übernehmen.</small></div>
@@ -104,17 +126,28 @@
       </section>
       <div class="form-grid">
         <label class="span-2">Titel<input id="filmTitle" required maxlength="160"></label>
+        <label class="span-2">Originaltitel<input id="filmOriginalTitle" maxlength="200"></label>
         <label>Jahr<input id="filmYear" type="number" min="1888" max="2200"></label>
         <label>Laufzeit (h:mm:ss)<input id="filmRuntime" type="text" inputmode="numeric" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]" placeholder="1:42:30" title="Bitte im Format Stunden:Minuten:Sekunden eingeben, z. B. 1:42:30"></label>
         <label>Regie<input id="filmDirector" maxlength="120"></label>
+        <label class="span-2">Schauspieler<input id="filmCast" maxlength="600" placeholder="Namen, durch Kommas getrennt"></label>
         <label>Genre<input id="filmGenre" maxlength="120" placeholder="Drama, Dokumentarfilm"></label>
-        <label class="span-2">Link zum Film<input id="filmLink" type="url" placeholder="https://… oder file:///…"></label>
+        <label>Länder<input id="filmCountries" maxlength="240" placeholder="z. B. Frankreich, Deutschland"></label>
         <label class="span-2">Trailer-Link<input id="filmTrailer" type="url" placeholder="https://…"></label>
         <label class="span-2">Cover-Link<input id="filmCover" type="url" placeholder="https://…"></label>
-        <label>Status<select id="filmStatus"><option value="verfügbar">Verfügbar</option><option value="prüfen">Link prüfen</option><option value="nicht verfügbar">Nicht verfügbar</option></select></label>
         <label>Altersfreigabe<input id="filmRating" maxlength="20" placeholder="FSK 12"></label>
-        <label class="span-2">Beschreibung<textarea id="filmDescription" rows="4" maxlength="1200"></textarea></label>
-        <label class="span-2">Schlagwörter<input id="filmTags" maxlength="240" placeholder="Unterricht, Weimarer Republik, Klassiker"></label>
+        <label class="span-2">Beschreibung<textarea id="filmDescription" rows="4"></textarea></label>
+      </div>
+      </div>
+      <div id="filmCopiesPanel" class="film-tab-panel" role="tabpanel" hidden>
+        <div class="copies-head"><div><strong>Meine Fassungen</strong><small>Links und technische Eigenschaften deiner eigenen Kopien.</small></div><button id="addFilmCopyButton" class="secondary-action" type="button">Fassung hinzufügen</button></div>
+        <div id="filmCopiesList" class="film-copies-list"></div>
+        <div id="filmCopiesEmpty" class="copies-empty">Noch keine eigene Fassung hinterlegt.</div>
+      </div>
+      <div id="filmPlaylistsPanel" class="film-tab-panel" role="tabpanel" hidden>
+        <div class="copies-head"><div><strong>Playlisten</strong><small>Wähle aus, auf welchen Playlists dieser Film erscheinen soll.</small></div></div>
+        <div id="filmPlaylistChecklist" class="film-playlist-checklist"></div>
+        <div id="filmPlaylistsEmpty" class="copies-empty">Noch keine Playlist angelegt.</div>
       </div>
       <div class="dialog-actions"><button id="deleteFilmButton" class="danger-button" type="button">Film löschen</button><span></span><button value="cancel" formnovalidate>Abbrechen</button><button class="primary-button" value="default">Speichern</button></div>
     </form>
@@ -133,7 +166,7 @@
     <form id="playlistForm" method="dialog">
       <div class="dialog-head"><div><p class="eyebrow">Neue Sammlung</p><h2>Playlist anlegen</h2></div><button class="dialog-close" value="cancel" formnovalidate aria-label="Schließen">×</button></div>
       <label>Playlistname<input id="playlistName" required maxlength="100" placeholder="z. B. Freitagabend"></label>
-      <label>Beschreibung<textarea id="playlistDescription" rows="3" maxlength="400"></textarea></label>
+      <label>Beschreibung<textarea id="playlistDescription" rows="3" maxlength="800"></textarea></label>
       <div class="dialog-actions"><span></span><span></span><button value="cancel" formnovalidate>Abbrechen</button><button class="primary-button" value="default">Anlegen</button></div>
     </form>
   </dialog>
@@ -152,7 +185,7 @@
 
   <dialog id="detailDialog" class="detail-dialog"><div id="detailContent"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="videothek-import.js"></script>
-  <script src="videothek.js?v=20260912-5"></script>
+  <script src="videothek-import.js?v=20260912-2"></script>
+  <script src="videothek.js?v=20260912-25"></script>
 </body>
 </html>

@@ -88,7 +88,6 @@
       status: link ? "verfügbar" : "prüfen",
       rating: "",
       description: "",
-      tags: [provider, purchased ? `Erworben: ${purchased}` : "", "Import"].filter(Boolean).join(", ")
     };
   }
 
@@ -148,7 +147,7 @@
       if (seen.has(identity)) continue;
       seen.add(identity);
       const link = urls[0] || `https://www.youtube.com/results?search_query=${encodeURIComponent(titlePart)}`;
-      films.push({title:titlePart,link,year:"",runtime:"",director:"",genre:"",cover:"",trailer:"",status:urls[0]?"verfügbar":"prüfen",rating:"",description:urls[0]?"":"Automatisch erzeugter YouTube-Suchlink; der direkte Wiedergabelink wurde beim Kopieren nicht übertragen.",tags:"Google TV / YouTube, Copy-Paste-Import"});
+      films.push({title:titlePart,link,year:"",runtime:"",director:"",genre:"",cover:"",trailer:"",status:urls[0]?"verfügbar":"prüfen",rating:"",description:urls[0]?"":"Automatisch erzeugter YouTube-Suchlink; der direkte Wiedergabelink wurde beim Kopieren nicht übertragen."});
     }
     return { films, ignored, examined: lines.length };
   }

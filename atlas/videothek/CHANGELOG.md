@@ -1,5 +1,114 @@
 # Changelog
 
+## 0.13.3 – 2026-09-12
+
+- „Originaltitel anzeigen“ ersetzt nun den fett gesetzten Kartentitel, statt eine zusätzliche Titelzeile einzublenden.
+
+## 0.13.2 – 2026-09-12
+
+- Checkbox „Originaltitel anzeigen“ unter „Auswahl & Anordnung“ ergänzt.
+- Aktivierte Originaltitel erscheinen auf den Filmkarten; identische Titel werden nicht doppelt dargestellt.
+
+## 0.13.1 – 2026-09-12
+
+- Das Feld „Titel“ unter „Meine Fassungen“ heißt nun „Quelle“; Daten und Verhalten bleiben unverändert.
+
+## 0.13.0 – 2026-09-12
+
+- Filme lassen sich in der Archivansicht am Cover oder Titel greifen und auf ein anderes Projekt ziehen.
+- Gültige Zielprojekte werden beim Ziehen dezent hervorgehoben; nach dem Ablegen wird der vollständige Filmeintrag verschoben.
+
+## 0.12.3 – 2026-09-12
+
+- Den unnötigen vertikalen Abstand zwischen Filmtitel und verlinkter Regiezeile wieder entfernt.
+
+## 0.12.2 – 2026-09-12
+
+- Regienamen unter den Filmcovern sind anklickbar und filtern die Entdecken-Ansicht nach der vollständigen Regie.
+- Zu lange Regienamen werden automatisch auf das letzte Namenswort verkürzt, bevor ein Zeilenumbruch entsteht.
+
+## 0.12.1 – 2026-09-12
+
+- Die Suche bleibt nun in der Archivansicht und filtert dort die Filmtabelle des aktiven Projekts.
+- Für eine leere Trefferliste erscheint eine eigene Rückmeldung.
+
+## 0.12.0 – 2026-09-12
+
+- Sprachfilter als Checkboxliste im Seitenmenü „Auswahl & Anordnung“ ergänzt.
+- Verfügbare Sprachen werden aus den eigenen Filmfassungen ermittelt und nach Häufigkeit sortiert.
+- Mehrere ausgewählte Sprachen filtern gemeinsam nach Filmen, die mindestens eine davon enthalten.
+
+## 0.11.6 – 2026-09-12
+
+- Maximale Länge der Playlistbeschreibung von 400 auf 800 Zeichen verdoppelt.
+
+## 0.11.5 – 2026-09-12
+
+- Sammlungsnummer unter den Filmcovern typografisch an die graue Metazeile angepasst.
+
+## 0.11.4 – 2026-09-12
+
+- Anordnung nach Sammlungsnummer ergänzt.
+- Bei dieser Anordnung wird die verwendete Sammlungsnummer zusätzlich unter dem Filmcover angezeigt.
+
+## 0.11.3 – 2026-09-12
+
+- Schlagwörter vollständig aus Filmbearbeitung, Detailansicht, TMDB-Übernahme und Filmsuche entfernt.
+- Bereits gespeicherte alte Schlagwörter werden nicht mehr für Suchergebnisse berücksichtigt.
+
+## 0.11.2 – 2026-09-12
+
+- Sammlungsnummernfeld in der Playlist-Checkliste in dieselbe Zeile wie die Sammlung gesetzt.
+- Nummernfeld bleibt unabhängig vom Haken editierbar und akzeptiert maximal sechs Buchstaben oder Ziffern.
+
+## 0.11.1 – 2026-09-12
+
+- Playlist-Zuordnungen um eine manuelle Sammlungsnummer mit maximal sechs Buchstaben oder Ziffern erweitert.
+- Bestehende Zuordnungen bleiben kompatibel und erhalten zunächst eine leere Sammlungsnummer.
+
+## 0.11.0 – 2026-09-12
+
+- Dritten Bearbeitungstab „Playlisten“ ergänzt.
+- Filme lassen sich per Checkliste mehreren Playlists hinzufügen oder daraus entfernen.
+- Playlistzuordnungen werden gemeinsam mit dem Filmeintrag gespeichert und beim Löschen bereinigt.
+
+## 0.10.2 – 2026-09-12
+
+- Zufällige Filmanordnung ergänzt; die Mischung bleibt während der Sitzung stabil und wird beim Neuladen neu erzeugt.
+
+## 0.10.1 – 2026-09-12
+
+- Unter den Filmcovern wird neben dem Jahr nun die Regie statt des Genres angezeigt.
+
+## 0.10.0 – 2026-09-12
+
+- Animiertes Seitenmenü für Auswahl und Anordnung in der Entdecken-Ansicht ergänzt.
+- Projektauswahl aus der Filmfläche in das neue Seitenmenü verschoben.
+- Playlistfilter und Sortierung nach Alphabet, Jahr oder Genre ergänzt.
+
+## 0.9.1 – 2026-09-12
+
+- Originaltitel und Produktionsländer als eigene Filminformationen ergänzt und über TMDB befüllt.
+- Detailansicht zeigt den Originaltitel als Haupttitel sowie die Länder an.
+- Jede eigene Fassung besitzt einen frei änderbaren Titel; Fassungstitel sind über die globale Filmsuche auffindbar.
+
+## 0.9.0 – 2026-09-12
+
+- Filmbearbeitung in die Tabs „Filminformationen“ und „Meine Fassungen“ aufgeteilt.
+- Pro Film können mehrere eigene Fassungen mit Bezeichnung, Link, Sprachen, Auflösung, Qualität und Status gespeichert werden.
+- Bestehende einzelne Film-Links werden automatisch als erste Fassung weiterverwendet.
+- Detailansicht bietet jede verfügbare Fassung mit ihren technischen Angaben separat zum Öffnen an.
+
+## 0.8.2 – 2026-09-12
+
+- Zeichenbegrenzung des Beschreibungsfelds entfernt, damit vollständige TMDB-Beschreibungen übernommen werden können.
+
+## 0.8.1 – 2026-09-12
+
+- Schauspieler als eigene Filminformation ergänzt und in die Filmsuche aufgenommen.
+- TMDB übernimmt die wichtigsten Darsteller aus den Credits.
+- Schlagwörter werden bei einer TMDB-Zuweisung ausschließlich aus den TMDB-Keywords befüllt.
+
 ## 0.8.0 – 2026-09-12
 
 - TMDB-Suche direkt in den Dialog zum Anlegen und Bearbeiten von Filmen integriert.
