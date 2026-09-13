@@ -1,0 +1,3 @@
+[submodule "videothek.com"]
+	path = videothek.com
+	url = https://github.com/Ziselin/videothek.com.git
