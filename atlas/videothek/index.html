@@ -6,9 +6,11 @@
   <meta name="theme-color" content="#f3efe6">
   <meta name="description" content="Videothek verwaltet kuratierte Filmprojekte und Verweise auf externe Speicherorte.">
   <title>Videothek</title>
+  <script>try{if(localStorage.getItem("videothek-theme-v1")==="neon")document.documentElement.dataset.theme="neon"}catch{}</script>
   <link rel="icon" type="image/svg+xml" href="../../assets/videothek-favicon.svg">
   <link rel="stylesheet" href="videothek.css">
   <link rel="stylesheet" href="videothek-fixes.css?v=20260912-7">
+  <link rel="stylesheet" href="videothek-neon.css?v=20260913-14">
 </head>
 <body>
   <div class="app-shell">
@@ -16,6 +18,7 @@
       <a class="brand" href="../../index.html" aria-label="Zur Atlas-Startseite">
         <img src="../../assets/ziselin-bild-flach.svg" alt="">
         <span>Videothek</span>
+        <img class="neon-brand-sign" src="assets/videothek-neon-sign.png" alt="">
       </a>
       <nav class="main-nav" aria-label="Hauptnavigation">
         <button class="nav-button is-active" type="button" data-view="cinema">Entdecken</button>
@@ -23,7 +26,10 @@
       </nav>
       <div class="top-actions">
         <label class="search"><span class="sr-only">Filme suchen</span><input id="searchInput" type="search" placeholder="Titel, Regie, Genre …" spellcheck="false" autocomplete="off"></label>
-        <button id="catalogMenuButton" class="catalog-menu-button" type="button" aria-label="Auswahl und Sortierung öffnen" aria-expanded="false" aria-controls="catalogDrawer"><span aria-hidden="true">☰</span></button>
+        <div class="header-tools">
+          <button id="catalogMenuButton" class="catalog-menu-button" type="button" aria-label="Auswahl und Sortierung öffnen" aria-expanded="false" aria-controls="catalogDrawer"><span aria-hidden="true">☰</span></button>
+          <button id="themeToggle" class="theme-toggle" type="button" aria-label="Neon-Thema einschalten" aria-pressed="false" title="Neon-Thema einschalten"><span aria-hidden="true"></span></button>
+        </div>
       </div>
     </header>
 
@@ -186,6 +192,6 @@
   <dialog id="detailDialog" class="detail-dialog"><div id="detailContent"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="videothek-import.js?v=20260912-2"></script>
-  <script src="videothek.js?v=20260912-25"></script>
+  <script src="videothek.js?v=20260913-3"></script>
 </body>
 </html>

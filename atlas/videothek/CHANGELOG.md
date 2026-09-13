@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.14.0 – 2026-09-13
+
+- Umschaltbares Neon-Theme im Stil einer prototypischen amerikanischen Videothek ergänzt.
+- Reduzierter Regenbogen-Schalter oben rechts; die Auswahl bleibt lokal gespeichert.
+- Im Neonmodus erscheinen eine neu aufgebaute Kopfzeile mit zentriertem Leuchtschriftzug sowie eigenständige Oberflächen für Entdecken, Archive, Menüs und Dialoge.
+- Eigene Neon-Cursor für Navigation, Interaktion, Texteingabe und Filmverschiebung sowie passende Textauswahl und Scrollleisten ergänzt.
+- Die Designprinzipien beider Themes liegen als wiederverwendbare Vorlagen im Ordner `design-templates`.
+- Das bisherige helle Arthouse-Theme bleibt vollständig erhalten.
+- Den zentralen Schriftzug als großen, klassischen Script-Neonschriftzug mit Cyan-Unterstrich gestaltet und die harte Kopfzeilengrenze in einen Lichtverlauf aufgelöst.
+- Die Suche im Neonmodus mittig unter dem Schriftzug angeordnet; Navigation und Werkzeuge flankieren sie ohne Überlagerung.
+- Den simulierten CSS-Schriftzug durch ein fotografisches Neonschild mit realen Röhren, Halterungen und Lichtspill ersetzt.
+- Das Neonschild vom oberen Fensterrand gelöst und den Cyan-Lichtschein an seiner Unterkante weich in die Kopfzeile ausgeblendet.
+- Den Bildausschnitt des Neonschilds erhöht, damit der vollständige Schriftzug statt einer leeren dunklen Fläche sichtbar bleibt.
+- Das Schildfoto bis an den oberen Fensterrand gezogen; der zuvor sichtbare separate schwarze Streifen entfällt.
+- Die verbleibende dunkle Fotozone oberhalb der Röhren mit violett-pinkem Lichtspill an den Fensterhintergrund angeglichen.
+- Genres im Neonmodus als vertikale Navigation links neben das Filmraster verschoben.
+- Komödie, Science Fiction, Thriller, Abenteuer, Fantasy, Action, Horror und Romantik bleiben immer sichtbar; weitere Genres lassen sich aufdecken.
+- Der Filter „Romantik“ umfasst auch Liebesfilm und Erotik.
+- Die redundante Überschrift „Alle Filme“ über dem Filmraster wird im Neonmodus ausgeblendet.
+- Das Genreregal bleibt beim Scrollen des Filmrasters im Neonmodus sichtbar und kann bei Bedarf unabhängig scrollen.
+- Die acht Hauptgenres erhalten im Neonmodus eigene subtile Raumakzente – von Schleim und Kratzspuren bis zu Laser, Portallicht und Konfetti.
+- Genreakzente bleiben hinter dem Katalog, respektieren reduzierte Bewegung sowie erzwungene Kontraste und verändern keine funktionalen UI-Farben.
+- Genreknöpfe weisen ihren Auswahlzustand nun zusätzlich semantisch über `aria-pressed` aus.
+
 ## 0.13.3 – 2026-09-12
 
 - „Originaltitel anzeigen“ ersetzt nun den fett gesetzten Kartentitel, statt eine zusätzliche Titelzeile einzublenden.
