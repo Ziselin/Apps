@@ -16,5 +16,10 @@ Die MiniApp isoliert die mathematische proportionale Sitzverteilung. Sie bildet 
 ## Oberfläche und Zustand
 
 - Die Anwendung folgt der Schola-Farb-, Karten- und Navigationssprache und ist eigenständig sowie per `iframe` einbettbar.
-- Parteien, Stimmenmodus, Sitzzahl, Sperrklausel und Ansicht werden ausschließlich lokal im Browser gespeichert.
+- Parteien, Stimmenmodus, Sitzzahl, Sperrklausel und gewählte Ergebnisansicht werden ausschließlich lokal im Browser gespeichert.
+- Der Explorer verwaltet benannte, voneinander unabhängige Momentaufnahmen. Ein Datensatz verändert den aktuellen Arbeitsstand erst durch die ausdrückliche Aktion „Im Parlament öffnen“.
+- Die „Aktuelle Ansicht“ ist der ungespeicherte Arbeitsstand und wird im Explorer stets separat von benannten Momentaufnahmen geführt; erst „Wahlergebnis speichern“ erzeugt einen Archivdatensatz.
+- JSON-Exporte verwenden den Typ `schola-parliament-result` und die Formatversion 1; Importe werden vor dem lokalen Speichern validiert und normalisiert.
+- Die Diagrammansicht sortiert ausschließlich die Parteien nach Stimmenanteil, die die eingestellte Sperrklausel erreichen. Die vollständige Eingabeliste bleibt Container 1 vorbehalten.
+- Die Säulenauswahl summiert ausschließlich die im aktuell gewählten Verfahren vergebenen Sitze; die Anzeige nennt den Anteil dieser Sitze am gesamten Parlament und nicht die Stimmenanteile.
 - Farben sind abstrakt, stabil am Datensatz gespeichert und tragen nie allein die Ergebnisinformation.

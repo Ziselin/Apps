@@ -7,14 +7,14 @@
   <title>Parlament · Schola</title>
   <link rel="icon" href="../../../assets/sitzverteilungslabor-icon.svg?v=20260830d">
   <link rel="stylesheet" href="sitzverteilungslabor.css?v=20260830a">
-  <link rel="stylesheet" href="seat-layout-fixes.css?v=20260830a">
+  <link rel="stylesheet" href="seat-layout-fixes.css?v=20260920q">
 </head>
 <body>
-  <main class="lab-app">
+  <main id="labView" class="lab-app">
     <header class="app-head">
       <a class="brand" href="../../../index.html?project=schola" aria-label="Zur Schola-Hauptseite"><img src="../../../assets/ziselin-bild-flach.svg" alt=""></a>
       <div class="title-block"><span class="eyebrow">Schola MiniApp</span><h1>Parlament</h1></div>
-      <div class="head-actions"><button id="randomButton" class="quiet" type="button">Zufall</button><button id="resetButton" class="quiet" type="button">Zurücksetzen</button><span id="saveState" class="save-state" aria-live="polite">Automatisch gespeichert</span></div>
+      <div class="head-actions"><button id="openLibraryButton" class="quiet library-open-button" type="button"><span class="library-button-icon" aria-hidden="true"></span>Wahlergebnisse</button></div>
     </header>
 
     <section class="intro intro-compact" aria-labelledby="labQuestion">
@@ -23,7 +23,7 @@
 
     <section class="workspace">
       <aside class="control-panel" aria-label="Wahldaten und Einstellungen">
-        <div class="section-head"><div><span class="eyebrow">1 · Wahlergebnis</span><h2>Parteien und Stimmen</h2></div><button id="addPartyButton" class="secondary compact" type="button">+ Partei</button></div>
+        <div class="section-head"><div><span class="eyebrow">1 · Wahlergebnis</span><h2>Parteien und Stimmen</h2></div><div class="party-head-actions"><button id="addPartyButton" class="secondary compact add-party-button" type="button">+ Partei</button><button id="newViewButton" class="secondary compact" type="button">Neu</button></div></div>
         <div id="partyEditor" class="party-editor"></div>
         <p id="shareHint" class="soft-note" aria-live="polite"></p>
 
@@ -35,10 +35,22 @@
       </aside>
 
       <section class="results" aria-live="polite">
-        <article class="parliament-card">
-          <div class="section-head"><div><span class="eyebrow">2 · Ergebnis</span><h2 id="resultTitle">Das neue Parlament</h2></div><div class="parliament-head-actions"><div class="result-method-bar"><label id="methodField" class="field" for="methodSelect"><span>Sitzverteilung nach</span><select id="methodSelect"><option value="sainte-lague">Sainte-Laguë/Schepers</option><option value="dhondt">D’Hondt</option><option value="hare">Hare/Niemeyer</option></select></label></div><div id="gallagherBadge" class="metric-badge"></div></div></div>
-          <div id="parliament" class="parliament" role="img"></div>
-          <div id="legend" class="legend"></div>
+        <article id="resultCard" class="parliament-card">
+          <div class="section-head"><div><span class="eyebrow">2 · Ergebnis</span><h2 id="resultTitle">Das neue Parlament</h2></div><div class="parliament-head-actions"><div class="result-method-bar"><label id="methodField" class="field" for="methodSelect"><span>Sitzverteilung nach</span><select id="methodSelect"><option value="sainte-lague">Sainte-Laguë/Schepers</option><option value="dhondt">D’Hondt</option><option value="hare">Hare/Niemeyer</option></select></label></div><div id="gallagherBadge" class="metric-badge"></div><div id="chartSeatSelection" class="chart-seat-selection" aria-live="polite" hidden><b>0,0 %</b><span>der Sitze</span></div></div></div>
+          <div id="parliamentView" class="result-view">
+            <div id="parliament" class="parliament" role="img"></div>
+            <div id="legend" class="legend"></div>
+          </div>
+          <div id="voteChartView" class="result-view" hidden>
+            <div id="voteChart"></div>
+          </div>
+          <div class="result-view-nav">
+            <span id="resultViewLabel">Sitzverteilung</span>
+            <button id="resultViewToggle" class="result-view-toggle" type="button" aria-label="Stimmenanteile als Säulendiagramm zeigen" title="Zum Säulendiagramm">
+              <svg class="view-icon view-icon-chart" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27V16h5v11M14 27V10h5v17M23 27V5h5v22M3 27.5h27"/></svg>
+              <svg class="view-icon view-icon-parliament" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26a12 12 0 0 1 24 0" pathLength="100" stroke-dasharray="29 6 29 6 30"/><path d="M8 26a8 8 0 0 1 16 0" pathLength="100" stroke-dasharray="29 6 29 6 30"/><path d="M12 26a4 4 0 0 1 8 0" pathLength="100" stroke-dasharray="29 6 29 6 30"/></svg>
+            </button>
+          </div>
         </article>
         <article id="comparisonCard" class="analysis-card"><div class="section-head"><div><span class="eyebrow">3 · Vergleichen</span><h2>Wo unterscheiden sich die Verfahren?</h2></div></div><div id="comparison"></div></article>
         <article class="analysis-card"><div class="section-head"><div><span class="eyebrow">4 · Genau hinsehen</span><h2>Stimmen und Sitze</h2></div></div><div id="resultTable" class="table-wrap"></div></article>
@@ -62,7 +74,48 @@
       </section>
     </section>
   </main>
+
+  <section id="resultLibraryView" class="result-library-view" aria-label="Wahlergebnis-Explorer" hidden>
+    <button type="button" id="returnLabButton" class="workspace-strip workspace-strip-top" aria-label="Zum Parlament zurückkehren"><span>Parlament</span></button>
+    <main class="library-stage">
+      <section class="library-panel library-browser-panel" aria-labelledby="resultBrowserTitle">
+        <div class="library-panel-head">
+          <div><span class="eyebrow">Browser</span><h2 id="resultBrowserTitle">Wahlergebnisse</h2></div>
+          <div class="browser-actions-menu-shell">
+            <button type="button" id="libraryActionsButton" class="browser-actions-button" aria-label="Aktionen für Wahlergebnisse" aria-expanded="false" aria-controls="libraryActionsMenu"><span class="browser-actions-dots" aria-hidden="true"></span></button>
+            <div id="libraryActionsMenu" class="browser-actions-menu" role="menu" hidden>
+              <button type="button" id="createResultButton" role="menuitem">Neues Wahlergebnis</button>
+              <button type="button" id="newResultButton" role="menuitem">Aktuelles Ergebnis speichern</button>
+              <button type="button" id="importResultButton" role="menuitem">Importieren</button>
+            </div>
+          </div>
+        </div>
+        <div id="resultBrowserList" class="result-browser-list" aria-label="Gespeicherte Wahlergebnisse"></div>
+      </section>
+      <section class="library-panel" aria-labelledby="resultDetailTitle">
+        <div class="library-panel-head"><div><span id="resultDetailLabel" class="eyebrow">Editor</span><h2 id="resultDetailTitle">Wahlergebnis</h2></div></div>
+        <div id="resultDetail" class="result-detail"><p class="library-empty">Wähle links ein Wahlergebnis aus oder speichere zunächst den aktuellen Stand.</p></div>
+      </section>
+    </main>
+  </section>
+
+  <dialog id="newResultDialog" class="library-dialog" aria-labelledby="newResultTitle">
+    <form id="newResultForm" method="dialog">
+      <div><span class="eyebrow">Wahlergebnisse</span><h2 id="newResultTitle">Aktuellen Stand speichern</h2></div>
+      <label class="library-dialog-field"><span>Name</span><input id="newResultName" type="text" maxlength="80" autocomplete="off" required placeholder="z. B. Bundestagswahl 2025"></label>
+      <div class="library-dialog-actions"><button type="button" id="cancelNewResultButton" class="secondary">Abbrechen</button><button id="confirmNewResultButton" type="submit" class="secondary library-primary-action">Speichern</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="importResultDialog" class="library-dialog" aria-labelledby="importResultTitle">
+    <form id="importResultForm" method="dialog">
+      <div><span class="eyebrow">Wahlergebnisse</span><h2 id="importResultTitle">Wahlergebnis importieren</h2><p class="library-dialog-intro">Wähle eine zuvor aus Parlament exportierte JSON-Datei.</p></div>
+      <label class="library-dialog-field"><span>JSON-Datei</span><input id="importResultFile" type="file" accept=".json,application/json" required></label>
+      <p id="importResultStatus" class="library-status" role="status" aria-live="polite"></p>
+      <div class="library-dialog-actions"><button type="button" id="cancelImportResultButton" class="secondary">Abbrechen</button><button type="submit" class="secondary library-primary-action">Importieren</button></div>
+    </form>
+  </dialog>
   <script src="allocation-engine.js?v=20260830a"></script>
-  <script src="sitzverteilungslabor.js?v=20260830a"></script>
+  <script src="sitzverteilungslabor.js?v=20260920n"></script>
 </body>
 </html>

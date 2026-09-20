@@ -2,20 +2,34 @@
   "use strict";
   const $ = selector => document.querySelector(selector);
   const STORAGE_KEY = "schola-seat-lab-v1";
+  const LIBRARY_KEY = "schola-parliament-results-v1";
+  const CURRENT_VIEW_ID = "current-view";
   const methods = ["sainte-lague", "dhondt", "hare"];
   const colors = ["#416a64", "#c96d55", "#7c72a0", "#c69c45", "#5c7fa3", "#9a6c7b", "#6f8e58", "#b47842"];
-  const initialState = () => ({ mode: "percent", seats: 20, threshold: 0, method: "sainte-lague", nextId: 3, parties: [{ id: "party-1", name: "Partei A", votes: 50, color: colors[0] }, { id: "party-2", name: "Partei B", votes: 50, color: colors[1] }] });
+  const initialState = () => ({ mode: "percent", seats: 20, threshold: 0, method: "sainte-lague", resultView: "parliament", nextId: 3, parties: [{ id: "party-1", name: "Partei A", votes: 0, color: colors[0] }, { id: "party-2", name: "Partei B", votes: 0, color: colors[1] }] });
   function load() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); return saved?.parties?.length ? { ...initialState(), ...saved } : initialState(); } catch { return initialState(); } }
   let state = load();
+  function loadLibrary() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LIBRARY_KEY));
+      if (!Array.isArray(saved)) return [];
+      return saved.map(entry => {
+        try {
+          return { id: String(entry.id || makeId()), name: String(entry.name || "Wahlergebnis").slice(0, 80), createdAt: entry.createdAt || new Date().toISOString(), updatedAt: entry.updatedAt || new Date().toISOString(), state: normalizeSnapshot(entry.state) };
+        } catch { return null; }
+      }).filter(Boolean);
+    } catch { return []; }
+  }
+  let resultLibrary = loadLibrary();
+  let activeResultId = CURRENT_VIEW_ID;
+  let resultDialogMode = "snapshot";
+  let selectedChartPartyIds = new Set();
   const format = (value, digits = 1) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(value);
   const escapeHtml = text => String(text).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const partyColor = party => party.color || colors[state.parties.indexOf(party) % colors.length];
 
   function save() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    $("#saveState").textContent = "Gespeichert";
-    window.clearTimeout(save.timer);
-    save.timer = window.setTimeout(() => $("#saveState").textContent = "Automatisch gespeichert", 900);
   }
   function normalizedParties() { return state.parties.map(party => ({ ...party, votes: Math.max(0, Number(party.votes) || 0) })); }
   function calculate(method) { return SeatAllocation.allocateSeats({ method, parties: normalizedParties(), seats: state.seats, threshold: state.threshold }); }
@@ -87,6 +101,76 @@
   }
 
   function partyLabel(row) { const original = state.parties.find(p => p.id === row.id); return `<span class="party-label"><i style="--party-color:${partyColor(original)}"></i>${escapeHtml(row.name)}</span>`; }
+
+  function renderVoteChart(result) {
+    const rows = result.results.filter(row => row.eligible).sort((a, b) => b.voteShare - a.voteShare || a.name.localeCompare(b.name, "de"));
+    selectedChartPartyIds = new Set([...selectedChartPartyIds].filter(id => rows.some(row => row.id === id)));
+    if (!rows.length) {
+      $("#voteChart").innerHTML = '<p class="empty-result vote-chart-empty">Keine Partei erreicht die eingestellte Sperrklausel.</p>';
+      $("#chartSeatSelection").hidden = true;
+      return;
+    }
+    const highestValue = Math.max(...rows.map(row => row.voteShare), 1);
+    const scaleMax = Math.min(100, Math.max(10, Math.ceil(highestValue * 1.12 / 5) * 5));
+    const ticks = [scaleMax, scaleMax / 2, 0];
+    const columns = rows.map(row => {
+      const original = state.parties.find(party => party.id === row.id);
+      const barHeight = Math.min(100, row.voteShare / scaleMax * 100);
+      const seatLabel = `${row.seats} ${row.seats === 1 ? "Sitz" : "Sitze"}`;
+      const thresholdDistance = row.voteShare - state.threshold;
+      const thresholdContext = state.threshold > 0 ? (Math.abs(thresholdDistance) < 1e-9 ? "genau auf der Sperrklausel" : `${format(thresholdDistance)} PP über der ${format(state.threshold)}-%-Hürde`) : "keine Sperrklausel";
+      const feedback = `${row.name} · ${format(row.voteShare)} % Stimmen · ${seatLabel} (${result.methodInfo.name}) · ${thresholdContext}`;
+      const isSelected = selectedChartPartyIds.has(row.id);
+      return `<button class="vote-column${isSelected ? " is-selected" : ""}" type="button" style="--bar-height:${barHeight}%;--party-color:${partyColor(original)}" data-party-id="${escapeHtml(row.id)}" data-feedback="${escapeHtml(feedback)}" aria-label="${escapeHtml(feedback)}" aria-pressed="${isSelected}"><span class="vote-bar-area"><span class="vote-value">${format(row.voteShare)} %</span><i class="vote-bar"></i></span><b title="${escapeHtml(row.name)}">${escapeHtml(row.name)}</b></button>`;
+    }).join("");
+    const densityClass = rows.length > 16 ? " is-dense" : rows.length > 10 ? " is-crowded" : "";
+    const ariaLabel = `Stimmenanteile der Parteien, die die Sperrklausel erreichen, absteigend sortiert. ${rows.map(row => `${row.name}: ${format(row.voteShare)} Prozent`).join(". ")}.`;
+    $("#voteChart").innerHTML = `<p class="sr-only">${escapeHtml(ariaLabel)}</p><p id="voteChartFeedback" class="chart-feedback" aria-hidden="true"></p><div class="vote-chart-shell"><div class="vote-axis" aria-hidden="true">${ticks.map(value => `<span>${format(value, 0)} %</span>`).join("")}</div><div class="vote-plot"><div class="vote-columns${densityClass}">${columns}</div></div></div>`;
+    const feedbackLine = $("#voteChartFeedback");
+    $("#voteChart").querySelectorAll(".vote-column").forEach(column => {
+      const showFeedback = () => { feedbackLine.textContent = column.dataset.feedback; column.classList.add("is-active"); };
+      const resetFeedback = () => { feedbackLine.textContent = ""; column.classList.remove("is-active"); };
+      column.addEventListener("mouseenter", showFeedback);
+      column.addEventListener("mouseleave", resetFeedback);
+      column.addEventListener("focus", showFeedback);
+      column.addEventListener("blur", resetFeedback);
+      column.addEventListener("click", () => {
+        const partyId = column.dataset.partyId;
+        if (selectedChartPartyIds.has(partyId)) selectedChartPartyIds.delete(partyId);
+        else selectedChartPartyIds.add(partyId);
+        const isSelected = selectedChartPartyIds.has(partyId);
+        column.classList.toggle("is-selected", isSelected);
+        column.setAttribute("aria-pressed", String(isSelected));
+        updateChartSeatSelection(result);
+      });
+    });
+    updateChartSeatSelection(result);
+  }
+
+  function updateChartSeatSelection(result) {
+    const metric = $("#chartSeatSelection");
+    const selectedRows = result.results.filter(row => selectedChartPartyIds.has(row.id));
+    if (!selectedRows.length) {
+      metric.hidden = true;
+      return;
+    }
+    const selectedSeats = selectedRows.reduce((sum, row) => sum + row.seats, 0);
+    const share = result.seats ? selectedSeats / result.seats * 100 : 0;
+    metric.innerHTML = `<b>${format(share)} %</b><span>der Sitze</span>`;
+    metric.setAttribute("aria-label", `${selectedRows.map(row => row.name).join(", ")}: ${format(share)} Prozent der Sitze`);
+    metric.hidden = false;
+  }
+
+  function applyResultView() {
+    const showChart = state.resultView === "chart";
+    $("#parliamentView").hidden = showChart;
+    $("#voteChartView").hidden = !showChart;
+    $("#resultCard").classList.toggle("is-chart-view", showChart);
+    $("#resultTitle").textContent = showChart ? "Stimmenanteile im Überblick" : `${calculate(state.method).methodInfo.name} im Parlament`;
+    $("#resultViewLabel").textContent = showChart ? "Stimmenanteile" : "Sitzverteilung";
+    $("#resultViewToggle").setAttribute("aria-label", showChart ? "Zur Sitzverteilung wechseln" : "Stimmenanteile als Säulendiagramm zeigen");
+    $("#resultViewToggle").setAttribute("title", showChart ? "Zur Sitzverteilung" : "Zum Säulendiagramm");
+  }
   function renderResultTable(result) {
     const showAbsoluteVotes = state.mode === "absolute";
     const voteHeader = showAbsoluteVotes ? "<th>Stimmen</th>" : "";
@@ -158,19 +242,274 @@
     $("#comparisonCard").hidden = false;
     $("#resultTitle").textContent = `${active.methodInfo.name} im Parlament`;
     $("#gallagherBadge").innerHTML = `<span>Gallagher-Index</span><b>${format(active.gallagher, 2)}</b>`;
-    renderParliament(active); renderResultTable(active); renderComparison(all);
+    renderParliament(active); renderVoteChart(active); applyResultView(); renderResultTable(active); renderComparison(all);
     $("#calculation").innerHTML = methods.map(method => calculationTable(all[method])).join("");
+  }
+
+  function makeId(prefix = "result") {
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function snapshotState() {
+    return {
+      mode: state.mode,
+      seats: state.seats,
+      threshold: state.threshold,
+      method: state.method,
+      resultView: state.resultView,
+      nextId: state.nextId,
+      parties: normalizedParties().map(party => ({ id: party.id, name: party.name, votes: party.votes, color: party.color }))
+    };
+  }
+
+  function emptyResultState() {
+    const fresh = initialState();
+    fresh.parties = fresh.parties.map(party => ({ ...party, votes: 0 }));
+    return fresh;
+  }
+
+  function normalizeSnapshot(source) {
+    if (!source || typeof source !== "object" || !Array.isArray(source.parties) || source.parties.length < 2) throw new Error("Die Datei enthält kein gültiges Wahlergebnis.");
+    const mode = source.mode === "absolute" ? "absolute" : "percent";
+    const method = methods.includes(source.method) ? source.method : "sainte-lague";
+    const parties = source.parties.slice(0, 100).map((party, index) => ({
+      id: `party-${index + 1}`,
+      name: String(party?.name || `Partei ${index + 1}`).slice(0, 40),
+      votes: Math.max(0, Number(party?.votes) || 0),
+      color: /^#[0-9a-f]{6}$/i.test(String(party?.color || "")) ? party.color : colors[index % colors.length]
+    }));
+    return {
+      mode,
+      seats: Math.max(1, Math.min(10000, Math.floor(Number(source.seats) || 20))),
+      threshold: Math.max(0, Math.min(100, Number(source.threshold) || 0)),
+      method,
+      resultView: source.resultView === "chart" ? "chart" : "parliament",
+      nextId: parties.length + 1,
+      parties
+    };
+  }
+
+  function persistLibrary() {
+    localStorage.setItem(LIBRARY_KEY, JSON.stringify(resultLibrary));
+  }
+
+  function closeLibraryMenus() {
+    $("#libraryActionsMenu").hidden = true;
+    $("#libraryActionsButton").setAttribute("aria-expanded", "false");
+    document.querySelectorAll(".result-item-menu").forEach(menu => { menu.hidden = true; });
+    document.querySelectorAll(".result-item-menu-button").forEach(button => button.setAttribute("aria-expanded", "false"));
+  }
+
+  function downloadResult(entry) {
+    const payload = { kind: "schola-parliament-result", version: 1, exportedAt: new Date().toISOString(), result: { name: entry.name, state: entry.state } };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const safeName = entry.name.trim().replace(/[^a-z0-9äöüß_-]+/gi, "-").replace(/^-|-$/g, "") || "wahlergebnis";
+    link.href = url;
+    link.download = `${safeName}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function openSavedResult(entry) {
+    state = { ...initialState(), ...normalizeSnapshot(entry.state) };
+    selectedChartPartyIds.clear();
+    activeResultId = CURRENT_VIEW_ID;
+    $("#resultLibraryView").hidden = true;
+    $("#labView").hidden = false;
+    renderPartyEditor();
+    update();
+    $("#openLibraryButton").focus();
+  }
+
+  function loadSavedResultIntoEditor(entry) {
+    state = { ...initialState(), ...normalizeSnapshot(entry.state) };
+    selectedChartPartyIds.clear();
+    activeResultId = CURRENT_VIEW_ID;
+    save();
+    renderLibrary();
+  }
+
+  function renderResultBrowser() {
+    const browser = $("#resultBrowserList");
+    const currentItem = `<article class="result-browser-item current-result-item${activeResultId === CURRENT_VIEW_ID ? " is-active" : ""}"><span class="result-browser-icon" aria-hidden="true"></span><button class="result-browser-main" type="button"><strong>Aktuelle Ansicht</strong><small>${state.parties.length} Parteien · ${state.seats} Sitze</small></button><span class="current-result-dot" title="Nicht als Wahlergebnis gespeichert" aria-label="Nicht gespeichert"></span></article>`;
+    const savedItems = resultLibrary.map(entry => {
+      const snapshot = entry.state;
+      return `<article class="result-browser-item${entry.id === activeResultId ? " is-active" : ""}" data-result-id="${escapeHtml(entry.id)}"><span class="result-browser-icon" aria-hidden="true"></span><button class="result-browser-main" type="button"><strong>${escapeHtml(entry.name)}</strong><small>${snapshot.parties.length} Parteien · ${snapshot.seats} Sitze</small></button><div class="result-item-menu-shell"><button class="result-item-menu-button" type="button" aria-label="Menü für ${escapeHtml(entry.name)}" aria-expanded="false"><span class="browser-actions-dots" aria-hidden="true"></span></button><div class="result-item-menu" hidden><button type="button" data-action="open">Im Parlament öffnen</button><button type="button" data-action="export">Exportieren</button><button type="button" class="is-danger" data-action="delete">Löschen</button></div></div></article>`;
+    }).join("");
+    browser.innerHTML = currentItem + savedItems;
+    browser.querySelector(".current-result-item .result-browser-main").addEventListener("click", () => { activeResultId = CURRENT_VIEW_ID; renderLibrary(); });
+    browser.querySelectorAll(".result-browser-item[data-result-id]").forEach(item => {
+      const entry = resultLibrary.find(candidate => candidate.id === item.dataset.resultId);
+      item.querySelector(".result-browser-main").addEventListener("click", () => loadSavedResultIntoEditor(entry));
+      const menuButton = item.querySelector(".result-item-menu-button");
+      const menu = item.querySelector(".result-item-menu");
+      menuButton.addEventListener("click", event => {
+        event.stopPropagation();
+        const opening = menu.hidden;
+        closeLibraryMenus();
+        menu.hidden = !opening;
+        menuButton.setAttribute("aria-expanded", String(opening));
+      });
+      menu.addEventListener("click", event => {
+        const action = event.target.closest("button")?.dataset.action;
+        if (action === "open") openSavedResult(entry);
+        if (action === "export") downloadResult(entry);
+        if (action === "delete" && confirm(`„${entry.name}“ wirklich löschen?`)) {
+          resultLibrary = resultLibrary.filter(candidate => candidate.id !== entry.id);
+          activeResultId = CURRENT_VIEW_ID;
+          persistLibrary();
+          renderLibrary();
+        }
+        closeLibraryMenus();
+      });
+    });
+  }
+
+  function renderCurrentResultEditor() {
+    $("#resultDetailLabel").textContent = "Editor";
+    $("#resultDetailTitle").textContent = "Aktuelle Ansicht";
+    const maximumVotes = Math.max(...normalizedParties().map(party => party.votes), 1);
+    const voteStep = state.mode === "percent" ? "0.1" : "1";
+    const partyRows = state.parties.map((party, index) => {
+      const width = Math.max(0, Number(party.votes) || 0) / maximumVotes * 100;
+      return `<div class="current-party-editor-row" data-party-id="${escapeHtml(party.id)}"><div class="current-party-editor-fields"><label class="current-party-color" title="Farbe für ${escapeHtml(party.name)}"><input type="color" value="${escapeHtml(partyColor(party))}"><i style="--party-color:${partyColor(party)}"></i></label><label><span class="sr-only">Parteiname</span><input class="current-party-name" value="${escapeHtml(party.name)}" maxlength="40"></label><label><span class="sr-only">${state.mode === "percent" ? "Stimmenanteil" : "Stimmenzahl"}</span><input class="current-party-votes" type="number" min="0" step="${voteStep}" value="${escapeHtml(party.votes)}"></label><button class="current-party-delete" type="button" aria-label="${escapeHtml(party.name)} löschen"${state.parties.length <= 2 ? " disabled" : ""}>×</button></div><div class="current-party-bar-track" aria-hidden="true"><i style="--party-color:${partyColor(party)};--editor-bar-width:${width}%"></i></div></div>`;
+    }).join("");
+    $("#resultDetail").innerHTML = `<div class="current-result-editor"><div class="current-result-settings"><label class="library-field"><span>Stimmen als</span><select id="currentModeSelect"><option value="percent"${state.mode === "percent" ? " selected" : ""}>Prozent</option><option value="absolute"${state.mode === "absolute" ? " selected" : ""}>Anzahl</option></select></label><label class="library-field"><span>Sitze</span><input id="currentSeatsInput" type="number" min="1" max="10000" value="${state.seats}"></label><label class="library-field"><span>Sperrklausel (%)</span><input id="currentThresholdInput" type="number" min="0" max="100" step="0.1" value="${state.threshold}"></label><label class="library-field"><span>Verfahren</span><select id="currentMethodSelect"><option value="sainte-lague"${state.method === "sainte-lague" ? " selected" : ""}>Sainte-Laguë/Schepers</option><option value="dhondt"${state.method === "dhondt" ? " selected" : ""}>D’Hondt</option><option value="hare"${state.method === "hare" ? " selected" : ""}>Hare/Niemeyer</option></select></label></div><div class="current-party-editor-head"><span>Parteien und Stimmen</span></div><div id="currentPartyEditor" class="current-party-editor">${partyRows}</div><div class="result-editor-actions"><button id="currentAddPartyButton" class="secondary add-party-button" type="button">+ Partei</button><button id="saveCurrentResultButton" type="button" class="secondary library-primary-action">Wahlergebnis speichern</button></div></div>`;
+    const refreshBars = () => {
+      const maxVotes = Math.max(...state.parties.map(party => Math.max(0, Number(party.votes) || 0)), 1);
+      $("#currentPartyEditor").querySelectorAll(".current-party-editor-row").forEach(row => {
+        const party = state.parties.find(candidate => candidate.id === row.dataset.partyId);
+        row.querySelector(".current-party-bar-track i").style.setProperty("--editor-bar-width", `${Math.max(0, Number(party.votes) || 0) / maxVotes * 100}%`);
+      });
+    };
+    $("#currentPartyEditor").querySelectorAll(".current-party-editor-row").forEach(row => {
+      const party = state.parties.find(candidate => candidate.id === row.dataset.partyId);
+      row.querySelector("input[type=color]").addEventListener("input", event => { party.color = event.target.value; row.querySelector(".current-party-bar-track i").style.setProperty("--party-color", party.color); row.querySelector(".current-party-color i").style.setProperty("--party-color", party.color); save(); });
+      row.querySelector(".current-party-name").addEventListener("input", event => { party.name = event.target.value; save(); });
+      row.querySelector(".current-party-votes").addEventListener("input", event => { party.votes = event.target.value; refreshBars(); save(); });
+      row.querySelector(".current-party-delete").addEventListener("click", () => { state.parties = state.parties.filter(candidate => candidate.id !== party.id); save(); renderLibrary(); });
+    });
+    $("#currentModeSelect").addEventListener("change", event => { state.mode = event.target.value; save(); renderLibrary(); });
+    $("#currentSeatsInput").addEventListener("input", event => { state.seats = Math.max(1, Math.min(10000, Math.floor(Number(event.target.value) || 1))); save(); renderResultBrowser(); });
+    $("#currentThresholdInput").addEventListener("input", event => { state.threshold = Math.max(0, Math.min(100, Number(event.target.value) || 0)); save(); });
+    $("#currentMethodSelect").addEventListener("change", event => { state.method = event.target.value; save(); });
+    $("#currentAddPartyButton").addEventListener("click", () => { const index = state.parties.length; state.parties.push({ id: `party-${state.nextId++}`, name: `Partei ${String.fromCharCode(65 + index)}`, votes: 0, color: colors[index % colors.length] }); save(); renderLibrary(); });
+    $("#saveCurrentResultButton").addEventListener("click", () => $("#newResultButton").click());
+  }
+
+  function renderResultDetail() {
+    activeResultId = CURRENT_VIEW_ID;
+    renderCurrentResultEditor();
+  }
+
+  function renderLibrary() {
+    renderResultBrowser();
+    renderResultDetail();
+  }
+
+  function openLibrary() {
+    $("#labView").hidden = true;
+    $("#resultLibraryView").hidden = false;
+    renderLibrary();
+    $("#returnLabButton").focus();
   }
 
   function syncControls() { $("#seatInput").value = state.seats; $("#thresholdInput").value = state.threshold; $("#methodSelect").value = state.method; document.querySelector(`input[name=mode][value=${state.mode}]`).checked = true; }
   function update(rebuildEditor = false) { state.seats = Math.max(0, Math.min(10000, Math.floor(Number(state.seats) || 0))); state.threshold = Math.max(0, Math.min(100, Number(state.threshold) || 0)); if (rebuildEditor) renderPartyEditor(); syncControls(); renderResults(); save(); }
   $("#addPartyButton").addEventListener("click", () => { const index = state.parties.length; state.parties.push({ id: `party-${state.nextId++}`, name: `Partei ${String.fromCharCode(65 + index)}`, votes: 0, color: colors[index % colors.length] }); update(true); });
+  $("#newViewButton").addEventListener("click", () => {
+    if (!confirm("Die eingetragenen Ergebnisse der aktuellen Ansicht werden entfernt. Ein neues Wahlergebnis beginnen?")) return;
+    state = emptyResultState();
+    selectedChartPartyIds.clear();
+    activeResultId = CURRENT_VIEW_ID;
+    renderPartyEditor();
+    update();
+  });
   $("#seatInput").addEventListener("input", event => { state.seats = event.target.value; update(); });
   $("#thresholdInput").addEventListener("input", event => { state.threshold = event.target.value; update(); });
   $("#methodSelect").addEventListener("change", event => { state.method = event.target.value; update(); });
+  $("#resultViewToggle").addEventListener("click", () => { state.resultView = state.resultView === "chart" ? "parliament" : "chart"; update(); });
   document.querySelectorAll("input[name=mode]").forEach(input => input.addEventListener("change", event => { state.mode = event.target.value; renderPartyEditor(); update(); }));
-  $("#resetButton").addEventListener("click", () => { if (confirm("Alle Eingaben auf den Ausgangszustand zurücksetzen?")) { state = initialState(); localStorage.removeItem(STORAGE_KEY); renderPartyEditor(); update(); } });
-  $("#randomButton").addEventListener("click", () => { const weights = state.parties.map(() => Math.random() ** .75 + .08), total = weights.reduce((a, b) => a + b, 0); state.mode = "percent"; state.parties.forEach((party, index) => { party.votes = Number((weights[index] / total * 100).toFixed(1)); }); renderPartyEditor(); update(); });
+  $("#openLibraryButton").addEventListener("click", openLibrary);
+  $("#returnLabButton").addEventListener("click", () => { $("#resultLibraryView").hidden = true; $("#labView").hidden = false; renderPartyEditor(); update(); $("#openLibraryButton").focus(); });
+  $("#libraryActionsButton").addEventListener("click", event => {
+    event.stopPropagation();
+    const menu = $("#libraryActionsMenu");
+    const opening = menu.hidden;
+    closeLibraryMenus();
+    menu.hidden = !opening;
+    $("#libraryActionsButton").setAttribute("aria-expanded", String(opening));
+  });
+  $("#createResultButton").addEventListener("click", () => {
+    closeLibraryMenus();
+    resultDialogMode = "empty";
+    $("#newResultForm").reset();
+    $("#newResultTitle").textContent = "Neues Wahlergebnis";
+    $("#confirmNewResultButton").textContent = "Anlegen";
+    $("#newResultName").value = `Wahlergebnis ${resultLibrary.length + 1}`;
+    $("#newResultDialog").showModal();
+    requestAnimationFrame(() => $("#newResultName").select());
+  });
+  $("#newResultButton").addEventListener("click", () => {
+    closeLibraryMenus();
+    resultDialogMode = "snapshot";
+    $("#newResultForm").reset();
+    $("#newResultTitle").textContent = "Aktuellen Stand speichern";
+    $("#confirmNewResultButton").textContent = "Speichern";
+    $("#newResultName").value = `Wahlergebnis ${resultLibrary.length + 1}`;
+    $("#newResultDialog").showModal();
+    requestAnimationFrame(() => $("#newResultName").select());
+  });
+  $("#cancelNewResultButton").addEventListener("click", () => $("#newResultDialog").close());
+  $("#newResultForm").addEventListener("submit", event => {
+    event.preventDefault();
+    const name = $("#newResultName").value.trim();
+    if (!name) return $("#newResultName").focus();
+    const now = new Date().toISOString();
+    const entry = { id: makeId(), name, createdAt: now, updatedAt: now, state: resultDialogMode === "empty" ? emptyResultState() : snapshotState() };
+    resultLibrary.unshift(entry);
+    activeResultId = resultDialogMode === "empty" ? entry.id : CURRENT_VIEW_ID;
+    persistLibrary();
+    $("#newResultDialog").close();
+    if (resultDialogMode === "empty") openSavedResult(entry);
+    else renderLibrary();
+  });
+  $("#importResultButton").addEventListener("click", () => {
+    closeLibraryMenus();
+    $("#importResultForm").reset();
+    $("#importResultStatus").textContent = "";
+    $("#importResultDialog").showModal();
+  });
+  $("#cancelImportResultButton").addEventListener("click", () => $("#importResultDialog").close());
+  $("#importResultForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const file = $("#importResultFile").files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { $("#importResultStatus").textContent = "Die Datei ist größer als 2 MB."; return; }
+    try {
+      const payload = JSON.parse(await file.text());
+      if (payload?.kind !== "schola-parliament-result" || payload?.version !== 1 || !payload?.result) throw new Error("Die Datei ist kein gültiger Parlament-Export.");
+      const now = new Date().toISOString();
+      const entry = { id: makeId(), name: String(payload.result.name || file.name.replace(/\.json$/i, "") || "Importiertes Wahlergebnis").slice(0, 80), createdAt: now, updatedAt: now, state: normalizeSnapshot(payload.result.state) };
+      resultLibrary.unshift(entry);
+      state = { ...initialState(), ...normalizeSnapshot(entry.state) };
+      selectedChartPartyIds.clear();
+      activeResultId = CURRENT_VIEW_ID;
+      save();
+      persistLibrary();
+      $("#importResultDialog").close();
+      renderLibrary();
+    } catch (error) {
+      $("#importResultStatus").textContent = error instanceof Error ? error.message : "Das Wahlergebnis konnte nicht importiert werden.";
+    }
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".browser-actions-menu-shell") && !event.target.closest(".result-item-menu-shell")) closeLibraryMenus();
+  });
   window.addEventListener("resize", () => renderParliament(calculate(state.method)));
   renderPartyEditor(); syncControls(); renderResults();
 })();
