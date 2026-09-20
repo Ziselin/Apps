@@ -18,6 +18,20 @@ for (const method of ["sainte-lague", "dhondt", "hare"]) {
   test(`${method}: eine Partei erhält alle Sitze`, () => assert.deepEqual(run(method, [["A", 100]], 19).results.map(row => row.seats), [19]));
 }
 
+test("Prozentmodus: 4,9 Prozent bleiben unter einer 5-Prozent-Hürde", () => {
+  const result = allocateSeats({
+    method: "sainte-lague",
+    parties: parties([["A", 60], ["B", 25], ["C", 4.9]]),
+    seats: 100,
+    threshold: 5,
+    voteMode: "percent",
+  });
+  const excluded = result.results.find(row => row.name === "C");
+  assert.equal(excluded.voteShare, 4.9);
+  assert.equal(excluded.eligible, false);
+  assert.equal(excluded.seats, 0);
+});
+
 test("bekannter Vergleichsfall mit 7 Sitzen", () => {
   const values = [["A", 38], ["B", 27], ["C", 19], ["D", 10], ["E", 6]];
   assert.deepEqual(run("sainte-lague", values, 7).results.map(row => row.seats), [3, 2, 1, 1, 0]);

@@ -24,13 +24,13 @@
     }));
   }
 
-  function prepare(parties, threshold) {
+  function prepare(parties, threshold, voteMode) {
     const normalized = normalizeParties(parties);
     const totalVotes = normalized.reduce((sum, party) => sum + party.votes, 0);
     const limit = Math.min(100, Math.max(0, safeNumber(threshold)));
     const enriched = normalized.map(party => ({
       ...party,
-      voteShare: totalVotes ? party.votes / totalVotes * 100 : 0,
+      voteShare: voteMode === "percent" ? party.votes : (totalVotes ? party.votes / totalVotes * 100 : 0),
     })).map(party => ({ ...party, eligible: party.voteShare + EPSILON >= limit && party.votes > 0 }));
     return { parties: enriched, eligible: enriched.filter(party => party.eligible), totalVotes, threshold: limit };
   }
@@ -80,10 +80,10 @@
     return { awarded: new Map(rows.map(row => [row.party.id, row.base + row.extra])), rows, steps };
   }
 
-  function allocateSeats({ method, parties, seats, threshold = 0 }) {
+  function allocateSeats({ method, parties, seats, threshold = 0, voteMode = "absolute" }) {
     if (!METHODS[method]) throw new Error("Unbekanntes Sitzverteilungsverfahren.");
     const seatCount = Math.max(0, Math.min(10000, Math.floor(safeNumber(seats))));
-    const prepared = prepare(parties || [], threshold);
+    const prepared = prepare(parties || [], threshold, voteMode);
     let calculation = { awarded: new Map(), steps: [], rows: [] };
     if (seatCount && prepared.eligible.length) {
       if (method === "sainte-lague") calculation = highestAverages(prepared.eligible, seatCount, current => 2 * current + 1);

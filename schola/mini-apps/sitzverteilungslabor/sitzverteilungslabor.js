@@ -32,7 +32,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
   function normalizedParties() { return state.parties.map(party => ({ ...party, votes: Math.max(0, Number(party.votes) || 0) })); }
-  function calculate(method) { return SeatAllocation.allocateSeats({ method, parties: normalizedParties(), seats: state.seats, threshold: state.threshold }); }
+  function calculate(method) { return SeatAllocation.allocateSeats({ method, parties: normalizedParties(), seats: state.seats, threshold: state.threshold, voteMode: state.mode }); }
   function resultSet() { return Object.fromEntries(methods.map(method => [method, calculate(method)])); }
 
   function renderPartyEditor() {
