@@ -140,11 +140,11 @@
 
   <dialog id="classLinkDialog">
     <form id="classLinkForm" class="dialog-card compact">
-      <div class="dialog-head"><div><span class="eyebrow">Stundenplan-Verknüpfung</span><h2>Klasse hinzufügen</h2></div><button id="cancelClassLink" class="icon-button" type="button" aria-label="Schließen">×</button></div>
-      <p>Füge die Klassen-ID aus dem Stundenplan ein. Die Klasse und ihre Schülerliste werden lokal übernommen.</p>
-      <label class="field-label">Klassen-ID<input id="classLinkId" autocomplete="off" spellcheck="false" placeholder="KL1:…" required></label>
+      <div class="dialog-head"><div><span class="eyebrow">Stundenplan-Verknüpfung</span><h2>Klasse oder Kurs hinzufügen</h2></div><button id="cancelClassLink" class="icon-button" type="button" aria-label="Schließen">×</button></div>
+      <p>Füge die Klassen- oder Kurs-ID aus dem Stundenplan ein. Die zugehörige Schülerliste wird lokal übernommen.</p>
+      <label class="field-label">Klassen- oder Kurs-ID<input id="classLinkId" autocomplete="off" spellcheck="false" placeholder="KL1:… oder KU1:…" required></label>
       <p id="classLinkError" class="error" role="alert"></p>
-      <div class="dialog-actions"><button id="cancelClassLinkAction" class="secondary" type="button">Abbrechen</button><button class="primary" type="submit">Klasse hinzufügen</button></div>
+      <div class="dialog-actions"><button id="cancelClassLinkAction" class="secondary" type="button">Abbrechen</button><button class="primary" type="submit">Hinzufügen</button></div>
     </form>
   </dialog>
 
@@ -202,7 +202,7 @@
     <div><img src="../../assets/fokus-icon.svg" alt=""><span class="eyebrow">Bearbeitung pausiert</span><h1>Fokus ist gesperrt</h1><p>Die Ansicht war länger als 10 Sekunden verlassen. Bitte wende dich an deine Lehrkraft.</p><label class="field-label">Entsperrcode<input id="unlockCode" autocomplete="off"></label><button id="unlockSession" class="primary" type="button">Entsperren</button><button id="leaveLockedSession" class="secondary recovery-button" type="button">Zur Bearbeiten-Startseite</button><button id="recoverTeacherPreview" class="secondary recovery-button" type="button" hidden>Lehrkraft-Vorschau beenden</button><p id="unlockError" class="error"></p></div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="fokus.js?v=20260902d"></script>
+  <script src="fokus.js?v=20260925a"></script>
   <script src="../../assets/ui/app-menu.js?v=20260824a"></script>
 </body>
 </html>

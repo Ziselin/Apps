@@ -6,8 +6,8 @@ Fokus ist die lokale Schola-App zum Erstellen und Bearbeiten von Aufgabenspaces.
 
 - Lehrkraft-Masterdaten, Klartextcodes und Codezustände bleiben im lokalen Browser-Speicher.
 - Der Erstellen-Modus besitzt einen Editor-/Browser-Umschalter in der unteren Fußleiste. Der Browser verwaltet mehrere lokale Projekte sowie vollständige `.fokus-lehrer`-Sicherungen.
-- Projektordner folgen dem Ziselin-Browserbaum und lassen sich aufklappen. Der Kindbereich `Klassen` verwaltet projektbezogene Klassen und Schülerlisten mit stabilen lokalen IDs.
-- Klassen- und Namensdaten sind Bestandteil der Lehrerversion, werden jedoch nicht in die verteilte Schülerversion übernommen.
+- Projektordner folgen dem Ziselin-Browserbaum und lassen sich aufklappen. Der Kindbereich `Klassen & Kurse` verwaltet projektbezogene Klassen, Kurse und Schülerlisten mit stabilen lokalen IDs. Dasselbe Eingabefeld akzeptiert Klassen-IDs (`KL1`) und Kurs-IDs (`KU1`) aus dem Stundenplan; Kursimporte enthalten ausschließlich die dort ausgewählten Schüler.
+- Klassen-, Kurs- und Namensdaten sind Bestandteil der Lehrerversion, werden jedoch nicht in die verteilte Schülerversion übernommen. Beim Aktualisieren werden Schüler über ihre stabilen IDs abgeglichen, damit vorhandene Abgabezuweisungen erhalten bleiben.
 - Der Export in der Editor-Hauptansicht erzeugt ausschließlich die reduzierte Schülerversion `.fokus`.
 - Verteilte `.fokus`-Dateien enthalten Aufgaben, BE, Wortgrenzen und ausschließlich SHA-256-Prüfwerte der vierstelligen alphanumerischen Zugangscodes; die Codes selbst sind nicht enthalten.
 - Verteilte `.fokus`-Dateien enthalten niemals Lösungen, Lösungsvarianten, Lösungshashes, Erwartungshorizonte oder andere auswertungsrelevante Lehrkraftdaten. Beim Lückentext wird nur die Position der Lücken exportiert.
