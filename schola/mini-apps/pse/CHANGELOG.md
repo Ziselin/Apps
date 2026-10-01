@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Ergänzt
 
+- Die neue Form „Hauptgruppen“ zeigt ausschließlich die Gruppen 1, 2 und 13–18 in einem kompakten Achtspaltenraster und kann wie Kurzform und Langbahn gespeichert oder per Darstellungs-ID weitergegeben werden.
 - Ein Drei-Punkte-Menü im Kopfbereich kopiert die stabile ID der aktuell gewählten Darstellung in die Zwischenablage und bestätigt den Vorgang direkt in der App.
 - Kleine Kachelbeschriftungen verwenden die lokal gebündelte Source Sans 3 und werden beim Überfahren nicht mehr mitskaliert, damit sie auch auf dunklen Ansichten klar gerastert bleiben.
 - Bei schmalen Fenstern bleiben Ordnungszahl und Elementname sichtbar; die Kollisionsprüfung verkleinert Namen zunächst behutsam und blendet sie erst aus, wenn auch die kompakte Stufe nicht passt.

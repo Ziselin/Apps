@@ -299,6 +299,19 @@
   margin-inline: 0;
 }
 
+.periodic-table.is-main-groups {
+  --tile-width: min(
+    calc((100cqw - 35px) / 8),
+    max(34px, calc((100dvh - 150px) / 9))
+  );
+  grid-template-columns: repeat(8, var(--tile-width));
+  grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height));
+}
+
+.periodic-table .element.layout-hidden {
+  display: none;
+}
+
 /* Die Aggregatzustandsansicht reserviert Höhe für Legende und Regler. */
 .table-view[data-view="state"] .periodic-table:not(.is-long) {
   --tile-width: min(
@@ -312,6 +325,13 @@
     calc((100cqw - 155px) / 32),
     calc((100dvh - 251px) / 9)
   ));
+}
+
+.table-view[data-view="state"] .periodic-table.is-main-groups {
+  --tile-width: min(
+    calc((100cqw - 35px) / 8),
+    max(34px, calc((100dvh - 251px) / 9))
+  );
 }
 
 .table-view[data-view="state"] .legend {
@@ -342,6 +362,13 @@
     calc((100cqw - 155px) / 32),
     calc((100dvh - 245px) / 9)
   ));
+}
+
+.table-view[data-view="discovery"] .periodic-table.is-main-groups {
+  --tile-width: min(
+    calc((100cqw - 35px) / 8),
+    max(34px, calc((100dvh - 245px) / 9))
+  );
 }
 
 .table-view[data-view="discovery"] .legend {
@@ -452,6 +479,14 @@
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 14px;
+}
+
+.segmented-control.layout-control {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.layout-control span {
+  padding-inline: 6px;
 }
 
 .tile-setting-label {
@@ -587,6 +622,9 @@ html.focus-embed .periodic-table:not(.is-long) {
 html.focus-embed .periodic-table.is-long {
   --tile-width: calc((100cqw - 155px) / 32);
   min-width: 0;
+}
+html.focus-embed .periodic-table.is-main-groups {
+  --tile-width: calc((100cqw - 35px) / 8);
 }
 
 .periodic-table[data-view="state"] .element { --element-color: #d9ddd8; }
