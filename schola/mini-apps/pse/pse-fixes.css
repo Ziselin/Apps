@@ -272,7 +272,10 @@
 }
 
 .periodic-table {
-  --label-reserve: 0px;
+  --left-label-reserve: 0px;
+  --right-label-reserve: 0px;
+  --label-reserve: calc(var(--left-label-reserve) + var(--right-label-reserve));
+  --header-height: clamp(15px, 1.3vw, 18px);
   --fluid-gap: clamp(1px, 0.35vw, 5px);
   --tile-width: min(
     calc((100cqw - 85px - var(--label-reserve)) / 18),
@@ -280,7 +283,7 @@
   );
   --tile-height: calc(var(--tile-width) * 1.16);
   grid-template-columns: repeat(18, var(--tile-width));
-  grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height)) clamp(4px, 0.9vw, 12px) repeat(2, var(--tile-height));
+  grid-template-rows: var(--header-height) repeat(7, var(--tile-height)) clamp(4px, 0.9vw, 12px) repeat(2, var(--tile-height));
   gap: var(--fluid-gap);
   justify-content: center;
   width: max-content;
@@ -293,7 +296,7 @@
 .periodic-table.is-long {
   --tile-width: max(26px, min(calc((100cqw - 155px - var(--label-reserve)) / 32), calc((100dvh - 150px) / 9)));
   grid-template-columns: repeat(32, var(--tile-width));
-  grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height));
+  grid-template-rows: var(--header-height) repeat(7, var(--tile-height));
   justify-content: space-between;
   width: 100%;
   min-width: calc(987px + var(--label-reserve));
@@ -306,21 +309,30 @@
     max(34px, calc((100dvh - 150px) / 9))
   );
   grid-template-columns: repeat(8, var(--tile-width));
-  grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height));
+  grid-template-rows: var(--header-height) repeat(7, var(--tile-height));
 }
 
 .periodic-table.has-period-labels {
-  --label-reserve: clamp(30px, 4.2cqw, 46px);
-  grid-template-columns: var(--label-reserve) repeat(18, var(--tile-width));
+  --left-label-reserve: clamp(22px, 2.8cqw, 34px);
 }
 
-.periodic-table.is-long.has-period-labels {
-  grid-template-columns: var(--label-reserve) repeat(32, var(--tile-width));
+.periodic-table.has-shell-labels {
+  --right-label-reserve: clamp(22px, 2.8cqw, 34px);
 }
 
-.periodic-table.is-main-groups.has-period-labels {
-  grid-template-columns: var(--label-reserve) repeat(8, var(--tile-width));
+.periodic-table.has-dual-group-labels {
+  --header-height: clamp(24px, 2.2vw, 30px);
 }
+
+.periodic-table.has-period-labels:not(.has-shell-labels) { grid-template-columns: var(--left-label-reserve) repeat(18, var(--tile-width)); }
+.periodic-table.has-shell-labels:not(.has-period-labels) { grid-template-columns: repeat(18, var(--tile-width)) var(--right-label-reserve); }
+.periodic-table.has-period-labels.has-shell-labels { grid-template-columns: var(--left-label-reserve) repeat(18, var(--tile-width)) var(--right-label-reserve); }
+.periodic-table.is-long.has-period-labels:not(.has-shell-labels) { grid-template-columns: var(--left-label-reserve) repeat(32, var(--tile-width)); }
+.periodic-table.is-long.has-shell-labels:not(.has-period-labels) { grid-template-columns: repeat(32, var(--tile-width)) var(--right-label-reserve); }
+.periodic-table.is-long.has-period-labels.has-shell-labels { grid-template-columns: var(--left-label-reserve) repeat(32, var(--tile-width)) var(--right-label-reserve); }
+.periodic-table.is-main-groups.has-period-labels:not(.has-shell-labels) { grid-template-columns: var(--left-label-reserve) repeat(8, var(--tile-width)); }
+.periodic-table.is-main-groups.has-shell-labels:not(.has-period-labels) { grid-template-columns: repeat(8, var(--tile-width)) var(--right-label-reserve); }
+.periodic-table.is-main-groups.has-period-labels.has-shell-labels { grid-template-columns: var(--left-label-reserve) repeat(8, var(--tile-width)) var(--right-label-reserve); }
 
 .periodic-table .element.layout-hidden {
   display: none;
@@ -499,13 +511,71 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.segmented-control.label-control {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.layout-control span {
+  padding-inline: 6px;
 }
 
-.layout-control span,
-.label-control span {
-  padding-inline: 6px;
+.label-toggle-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.label-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,252,.42);
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.label-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.label-toggle i {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(33,54,51,.24);
+  border-radius: 999px;
+  background: rgba(33,54,51,.12);
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.label-toggle i::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(33,54,51,.24);
+  content: "";
+  transition: transform .15s ease;
+}
+
+.label-toggle input:checked + i {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.label-toggle input:checked + i::after { transform: translateX(14px); }
+.label-toggle:has(input:focus-visible) { outline: 2px solid rgba(33,54,51,.36); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .label-toggle-list { grid-template-columns: 1fr; }
 }
 
 .tile-setting-label {
@@ -816,7 +886,10 @@ html.focus-embed .periodic-table.is-main-groups {
 }
 
 .group-number {
+  display: grid;
+  gap: 2px;
   align-self: center;
+  justify-items: center;
   overflow: visible;
   font-size: 0.75rem;
   line-height: 1;
@@ -825,6 +898,10 @@ html.focus-embed .periodic-table.is-main-groups {
 .group-number.is-traditional {
   font-size: clamp(0.48rem, 0.68vw, 0.7rem);
   white-space: nowrap;
+}
+
+.group-number.has-two-lines span:first-child {
+  font-size: .68rem;
 }
 
 .period-label {
@@ -836,6 +913,16 @@ html.focus-embed .periodic-table.is-main-groups {
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+}
+
+.shell-label {
+  align-self: center;
+  justify-self: start;
+  padding-left: clamp(3px, 0.5vw, 7px);
+  color: var(--muted);
+  font-size: clamp(0.5rem, 0.72vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1;
 }
 
 .periodic-table.pse-hide-names .element-name {

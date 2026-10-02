@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20261002a">
+  <link rel="stylesheet" href="pse-fixes.css?v=20261002b">
 </head>
 <body>
   <main class="pse-app">
@@ -90,10 +90,11 @@
           <label><input type="radio" name="layout" value="main-groups"><span>Hauptgruppen</span></label>
         </div>
         <p class="tile-setting-label">Beschriftung</p>
-        <div class="segmented-control label-control">
-          <label><input type="radio" name="labelMode" value="groups" checked><span>Gruppen 1–18</span></label>
-          <label><input type="radio" name="labelMode" value="traditional"><span>Haupt-/Nebengruppen</span></label>
-          <label><input type="radio" name="labelMode" value="periods"><span>Perioden &amp; Schalen</span></label>
+        <div class="label-toggle-list">
+          <label class="label-toggle"><span>Gruppenziffern 1–18</span><input type="checkbox" name="tableLabel" value="groupNumbers" checked><i aria-hidden="true"></i></label>
+          <label class="label-toggle"><span>Haupt-/Nebengruppen</span><input type="checkbox" name="tableLabel" value="traditionalGroups"><i aria-hidden="true"></i></label>
+          <label class="label-toggle"><span>Periodenziffern links</span><input type="checkbox" name="tableLabel" value="periods"><i aria-hidden="true"></i></label>
+          <label class="label-toggle"><span>Schalen K–Q rechts</span><input type="checkbox" name="tableLabel" value="shells"><i aria-hidden="true"></i></label>
         </div>
       </section>
       <section class="settings-section" aria-labelledby="tileMetaTitle">
@@ -160,6 +161,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20261002a"></script>
+  <script src="pse.js?v=20261002b"></script>
 </body>
 </html>
