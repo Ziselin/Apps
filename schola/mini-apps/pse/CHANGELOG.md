@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Ergänzt
 
+- Unter „Form“ lässt sich die Rasterbeschriftung zwischen IUPAC-Gruppen 1–18, traditionellen Haupt-/Nebengruppen mit römischen Ziffern sowie Perioden 1–7 mit den Schalen K–Q umschalten; die Auswahl wird gespeichert und in Darstellungs-IDs übernommen.
 - Die neue Form „Hauptgruppen“ zeigt ausschließlich die Gruppen 1, 2 und 13–18 in einem kompakten Achtspaltenraster und kann wie Kurzform und Langbahn gespeichert oder per Darstellungs-ID weitergegeben werden.
 - Ein Drei-Punkte-Menü im Kopfbereich kopiert die stabile ID der aktuell gewählten Darstellung in die Zwischenablage und bestätigt den Vorgang direkt in der App.
 - Kleine Kachelbeschriftungen verwenden die lokal gebündelte Source Sans 3 und werden beim Überfahren nicht mehr mitskaliert, damit sie auch auf dunklen Ansichten klar gerastert bleiben.

@@ -272,9 +272,10 @@
 }
 
 .periodic-table {
+  --label-reserve: 0px;
   --fluid-gap: clamp(1px, 0.35vw, 5px);
   --tile-width: min(
-    calc((100cqw - 85px) / 18),
+    calc((100cqw - 85px - var(--label-reserve)) / 18),
     max(26px, calc((100dvh - 150px) / 12))
   );
   --tile-height: calc(var(--tile-width) * 1.16);
@@ -290,22 +291,35 @@
 }
 
 .periodic-table.is-long {
-  --tile-width: max(26px, min(calc((100cqw - 155px) / 32), calc((100dvh - 150px) / 9)));
+  --tile-width: max(26px, min(calc((100cqw - 155px - var(--label-reserve)) / 32), calc((100dvh - 150px) / 9)));
   grid-template-columns: repeat(32, var(--tile-width));
   grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height));
   justify-content: space-between;
   width: 100%;
-  min-width: 987px;
+  min-width: calc(987px + var(--label-reserve));
   margin-inline: 0;
 }
 
 .periodic-table.is-main-groups {
   --tile-width: min(
-    calc((100cqw - 35px) / 8),
+    calc((100cqw - 35px - var(--label-reserve)) / 8),
     max(34px, calc((100dvh - 150px) / 9))
   );
   grid-template-columns: repeat(8, var(--tile-width));
   grid-template-rows: clamp(15px, 1.3vw, 18px) repeat(7, var(--tile-height));
+}
+
+.periodic-table.has-period-labels {
+  --label-reserve: clamp(30px, 4.2cqw, 46px);
+  grid-template-columns: var(--label-reserve) repeat(18, var(--tile-width));
+}
+
+.periodic-table.is-long.has-period-labels {
+  grid-template-columns: var(--label-reserve) repeat(32, var(--tile-width));
+}
+
+.periodic-table.is-main-groups.has-period-labels {
+  grid-template-columns: var(--label-reserve) repeat(8, var(--tile-width));
 }
 
 .periodic-table .element.layout-hidden {
@@ -315,21 +329,21 @@
 /* Die Aggregatzustandsansicht reserviert Höhe für Legende und Regler. */
 .table-view[data-view="state"] .periodic-table:not(.is-long) {
   --tile-width: min(
-    calc((100cqw - 85px) / 18),
+    calc((100cqw - 85px - var(--label-reserve)) / 18),
     max(26px, calc((100dvh - 261px) / 12))
   );
 }
 
 .table-view[data-view="state"] .periodic-table.is-long {
   --tile-width: max(26px, min(
-    calc((100cqw - 155px) / 32),
+    calc((100cqw - 155px - var(--label-reserve)) / 32),
     calc((100dvh - 251px) / 9)
   ));
 }
 
 .table-view[data-view="state"] .periodic-table.is-main-groups {
   --tile-width: min(
-    calc((100cqw - 35px) / 8),
+    calc((100cqw - 35px - var(--label-reserve)) / 8),
     max(34px, calc((100dvh - 251px) / 9))
   );
 }
@@ -352,21 +366,21 @@
 /* Die Entdeckungszeitleiste erhält dieselbe Höhenreserve wie die Phasenregler. */
 .table-view[data-view="discovery"] .periodic-table:not(.is-long) {
   --tile-width: min(
-    calc((100cqw - 85px) / 18),
+    calc((100cqw - 85px - var(--label-reserve)) / 18),
     max(26px, calc((100dvh - 250px) / 12))
   );
 }
 
 .table-view[data-view="discovery"] .periodic-table.is-long {
   --tile-width: max(26px, min(
-    calc((100cqw - 155px) / 32),
+    calc((100cqw - 155px - var(--label-reserve)) / 32),
     calc((100dvh - 245px) / 9)
   ));
 }
 
 .table-view[data-view="discovery"] .periodic-table.is-main-groups {
   --tile-width: min(
-    calc((100cqw - 35px) / 8),
+    calc((100cqw - 35px - var(--label-reserve)) / 8),
     max(34px, calc((100dvh - 245px) / 9))
   );
 }
@@ -485,7 +499,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.layout-control span {
+.segmented-control.label-control {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.layout-control span,
+.label-control span {
   padding-inline: 6px;
 }
 
@@ -617,14 +636,14 @@ html.focus-embed .table-view {
 }
 
 html.focus-embed .periodic-table:not(.is-long) {
-  --tile-width: calc((100cqw - 85px) / 18);
+  --tile-width: calc((100cqw - 85px - var(--label-reserve)) / 18);
 }
 html.focus-embed .periodic-table.is-long {
-  --tile-width: calc((100cqw - 155px) / 32);
+  --tile-width: calc((100cqw - 155px - var(--label-reserve)) / 32);
   min-width: 0;
 }
 html.focus-embed .periodic-table.is-main-groups {
-  --tile-width: calc((100cqw - 35px) / 8);
+  --tile-width: calc((100cqw - 35px - var(--label-reserve)) / 8);
 }
 
 .periodic-table[data-view="state"] .element { --element-color: #d9ddd8; }
@@ -801,6 +820,22 @@ html.focus-embed .periodic-table.is-main-groups {
   overflow: visible;
   font-size: 0.75rem;
   line-height: 1;
+}
+
+.group-number.is-traditional {
+  font-size: clamp(0.48rem, 0.68vw, 0.7rem);
+  white-space: nowrap;
+}
+
+.period-label {
+  align-self: center;
+  justify-self: end;
+  padding-right: clamp(3px, 0.5vw, 7px);
+  color: var(--muted);
+  font-size: clamp(0.5rem, 0.72vw, 0.72rem);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .periodic-table.pse-hide-names .element-name {
