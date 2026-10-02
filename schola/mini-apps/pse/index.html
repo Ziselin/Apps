@@ -8,7 +8,7 @@
   <link rel="icon" href="../../../assets/pse-icon.svg">
   <link rel="stylesheet" href="pse.css?v=20260814a">
   <link rel="stylesheet" href="../../../assets/ui/buttons.css?v=20260815c">
-  <link rel="stylesheet" href="pse-fixes.css?v=20261002b">
+  <link rel="stylesheet" href="pse-fixes.css?v=20261002c">
 </head>
 <body>
   <main class="pse-app">
@@ -19,6 +19,14 @@
         <button id="infoButton" class="settings-button" type="button" aria-label="Informationen zur aktiven Darstellung öffnen" title="Informationen">
           <span class="z-button-icon z-icon-information" aria-hidden="true"></span>
         </button>
+        <div id="exportMenu" class="view-menu export-menu">
+          <button id="exportMenuButton" class="settings-button export-button" type="button" aria-label="Darstellung exportieren" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenuPopup" title="Exportieren">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 14v5h14v-5"/></svg>
+          </button>
+          <div id="exportMenuPopup" class="view-menu-popup" role="menu" hidden>
+            <button id="imageExportButton" type="button" role="menuitem">Als Bilddatei</button>
+          </div>
+        </div>
         <button id="settingsButton" class="settings-button" type="button" aria-label="Einstellungen öffnen" title="Einstellungen">
           <span class="z-button-icon z-icon-settings" aria-hidden="true"></span>
         </button>
@@ -161,6 +169,6 @@
   <script src="name-data.js?v=20260814c"></script>
   <script src="detail-data.js?v=20260814b"></script>
   <script src="origin-data.js?v=20260815a"></script>
-  <script src="pse.js?v=20261002b"></script>
+  <script src="pse.js?v=20261002c"></script>
 </body>
 </html>

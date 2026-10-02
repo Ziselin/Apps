@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der Mini-App werden in dieser Datei dokumentier
 
 ### Ergänzt
 
+- Ein Exportbutton zwischen Information und Einstellungen öffnet ein erweiterbares Menü; „Als Bilddatei“ speichert die aktuelle PSE-Darstellung samt Titel, Beschriftungen und Legende als PNG auf weißem Hintergrund.
 - Unter „Form“ lassen sich IUPAC-Gruppen 1–18, traditionelle Haupt-/Nebengruppen, Perioden links und Schalen K–Q rechts unabhängig per Kippschalter einblenden; Kombinationen werden gespeichert und in Darstellungs-IDs übernommen.
 - Die neue Form „Hauptgruppen“ zeigt ausschließlich die Gruppen 1, 2 und 13–18 in einem kompakten Achtspaltenraster und kann wie Kurzform und Langbahn gespeichert oder per Darstellungs-ID weitergegeben werden.
 - Ein Drei-Punkte-Menü im Kopfbereich kopiert die stabile ID der aktuell gewählten Darstellung in die Zwischenablage und bestätigt den Vorgang direkt in der App.
