@@ -2622,6 +2622,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetText.classList.toggle("has-first-line-indent", style.firstLineIndent === true);
   targetText.classList.toggle("has-italic-quotes", style.quoteStyle === "italic");
   targetText.style.textAlign = textType === "lyric" ? "left" : style.textAlign;
+  targetText.classList.toggle("is-justified", textType !== "lyric" && style.textAlign === "justify");
   targetText.lang = hyphenationSettings.language;
   targetText.style.hyphens = hyphenationSettings.mode;
   targetText.style.setProperty("-webkit-hyphens", hyphenationSettings.mode);
@@ -5956,6 +5957,7 @@ ${buildHtmlFontFaceCss(project)}
     header.authors-first .authors { margin: 0 0 .68em; }
     .lead { margin: 1.1em 0 0; color: #213633; font-family: ${leadPresentation.fontFamily}; font-size: ${leadPresentation.fontSize}em; font-weight: ${leadPresentation.fontWeight}; line-height: ${leadPresentation.lineHeight}; white-space: pre-wrap; font-synthesis-style: none; }
     .typemap-text { position: relative; max-width: ${project.style.measure}ch; color: #213633; font-family: ${bodyFontFamily}; font-synthesis-style: none; white-space: pre-wrap; overflow-wrap: break-word; text-wrap: pretty;${ligatureCss} }
+    .typemap-text.is-justified p, .typemap-text.is-justified li, .typemap-text.is-justified blockquote { text-wrap: wrap; text-justify: inter-word; }
     .typemap-text.has-line-numbers { position: relative; }
     .preview-small-caps { font-size: inherit; font-variant-caps: small-caps; font-feature-settings: "smcp" 1; letter-spacing: .01em; text-transform: none; hyphens: inherit; -webkit-hyphens: inherit; overflow-wrap: inherit; word-break: normal; }
     .preview-small-caps-f { font-variant-caps: all-small-caps; font-feature-settings: "c2sc" 1; }
@@ -6043,7 +6045,7 @@ ${buildHtmlFontFaceCss(project)}
       ${!authorsFirst && authors.length ? `<p class="authors">${escapeHtml(authors.join("; "))}</p>` : ""}
       ${citationSource.lead ? `<p class="lead">${escapeHtml(citationSource.lead)}</p>` : ""}
     </header>
-    <section id="typemapText" class="typemap-text is-text-type-${escapeHtml(textType)}${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">${blocks}</section>
+    <section id="typemapText" class="typemap-text is-text-type-${escapeHtml(textType)}${textType !== "lyric" && project.style.textAlign === "justify" ? " is-justified" : ""}${lineNumbering.enabled ? " has-line-numbers" : ""}" lang="${escapeHtml(hyphenationSettings.language)}">${blocks}</section>
     </div>
   </main>
   <script>

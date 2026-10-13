@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Behoben
 
+- Kurze Absätze und Absatzenden im Blocksatz verwenden nicht mehr Chromiums auf Schlusszeilen optimierten `pretty`-Umbruch. Dadurch werden vorletzte Zeilen nicht übermäßig gesperrt und die automatische Silbentrennung kann reguläre Umbruchstellen wieder nutzen; Vorschau, HTML und PDF folgen derselben Regel.
 - Bei Markdown-Tabellen genügt in der Trennzeile nun ein Bindestrich pro Spalte (`|-|-|`); längere und ausgerichtete Varianten bleiben weiterhin gültig.
 - Markdown-Tabellen werden auch dann als eigene Blöcke erkannt, wenn vor oder nach ihnen keine Leerzeile steht.
 - Der JSON-Export über das Exportmenü enthält nur noch das aktive TypeMap-Projekt statt der gesamten lokalen Projektbibliothek.

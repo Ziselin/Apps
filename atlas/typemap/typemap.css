@@ -999,6 +999,19 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
 }
 
 /*
+ * Chromiums "pretty"-Umbruch optimiert vor allem gegen einzelne Schlusswörter.
+ * Im Blocksatz kann das bei kurzen Absätzen die vorletzte Zeile unvertretbar
+ * stark sperren und zugleich eine günstigere Trennstelle verwerfen. Für
+ * Blocksatz gilt deshalb der normale, trennfähige Zeilenumbruch.
+ */
+.preview-text.is-justified p,
+.preview-text.is-justified li,
+.preview-text.is-justified blockquote {
+  text-wrap: wrap;
+  text-justify: inter-word;
+}
+
+/*
  * Lange Dokumente behalten ihre vollständige semantische DOM-Struktur, aber
  * der Browser setzt und zeichnet außerhalb des Viewports liegende Textblöcke
  * erst, wenn sie benötigt werden. Die gespeicherte Eigenhöhe stabilisiert den
