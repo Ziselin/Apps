@@ -1248,6 +1248,52 @@ function parseMarkdownTable(value) {
   return { header, alignments, rows };
 }
 
+function splitMarkdownTableBlocks(blocks, sourceLines) {
+  const sourceLineById = new Map(sourceLines.map((line) => [line.id, line]));
+  const result = [];
+
+  function appendSegment(block, lines) {
+    if (!lines.length) return;
+    result.push({
+      ...block,
+      id: `paragraph-${result.length + 1}`,
+      text: lines.map((line) => line.text).join("\n"),
+      startOffset: lines[0].startOffset,
+      endOffset: lines[lines.length - 1].endOffset,
+      lineIds: lines.map((line) => line.id),
+    });
+  }
+
+  blocks.forEach((block) => {
+    const lines = (block.lineIds || []).map((id) => sourceLineById.get(id)).filter(Boolean);
+    if (lines.length < 2) {
+      appendSegment(block, lines);
+      return;
+    }
+    let cursor = 0;
+    let plainStart = 0;
+    while (cursor < lines.length - 1) {
+      const tableStart = parseMarkdownTable(`${lines[cursor].text}\n${lines[cursor + 1].text}`);
+      if (!tableStart) {
+        cursor += 1;
+        continue;
+      }
+      appendSegment(block, lines.slice(plainStart, cursor));
+      let tableEnd = cursor + 2;
+      while (tableEnd < lines.length) {
+        const rowText = lines[tableEnd].text;
+        if (!rowText.includes("|") || splitMarkdownTableRow(rowText).length < 2) break;
+        tableEnd += 1;
+      }
+      appendSegment(block, lines.slice(cursor, tableEnd));
+      cursor = tableEnd;
+      plainStart = tableEnd;
+    }
+    appendSegment(block, lines.slice(plainStart));
+  });
+  return result;
+}
+
 function hasCitationObject(project) {
   return /(?:^|\r?\n)\s*\{\{citation\}\}\s*(?=\r?\n|$)/i.test(String(project?.source?.rawText || ""));
 }
@@ -1535,6 +1581,8 @@ function buildSourceModelUncached(project) {
     cursor = endOffset + 1;
   });
   flushParagraph(rawText.length);
+  const structuredParagraphs = splitMarkdownTableBlocks(paragraphs, sourceLines);
+  paragraphs.splice(0, paragraphs.length, ...structuredParagraphs);
   // Direkt eingeschobene Fußnotendefinitionen werden bereits beim Lesen
   // angelegt; die Quellposition stellt anschließend die Dokumentreihenfolge her.
   paragraphs.sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
@@ -1615,6 +1663,7 @@ function createSourceModelWorker() {
       ${isCitationObjectText.toString()}
       ${splitMarkdownTableRow.toString()}
       ${parseMarkdownTable.toString()}
+      ${splitMarkdownTableBlocks.toString()}
       ${getMarkdownBlockType.toString()}
       ${createParatextVisibilityKey.toString()}
       ${createMarkdownBlockNode.toString()}

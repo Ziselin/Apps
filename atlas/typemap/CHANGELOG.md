@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Behoben
 
+- Markdown-Tabellen werden auch dann als eigene Blöcke erkannt, wenn vor oder nach ihnen keine Leerzeile steht.
 - Der JSON-Export über das Exportmenü enthält nur noch das aktive TypeMap-Projekt statt der gesamten lokalen Projektbibliothek.
 - Fußnoten werden in der gerenderten Ansicht unabhängig von ihren Markdown-Labels nach ihrem ersten Auftreten fortlaufend über das gesamte Dokument nummeriert; dieselbe Nummerierung gilt im HTML- und Druckexport.
 - Die geometrisch aufwendige Markierungsschicht im Markdown-Editor wurde entfernt, damit auch sehr umfangreiche Dokumente ohne vollständigen DOM-Spiegel bearbeitet werden können.
