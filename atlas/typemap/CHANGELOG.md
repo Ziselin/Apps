@@ -6,6 +6,7 @@ Alle wesentlichen Änderungen an der App werden in dieser Datei dokumentiert.
 
 ### Behoben
 
+- Bei Markdown-Tabellen genügt in der Trennzeile nun ein Bindestrich pro Spalte (`|-|-|`); längere und ausgerichtete Varianten bleiben weiterhin gültig.
 - Markdown-Tabellen werden auch dann als eigene Blöcke erkannt, wenn vor oder nach ihnen keine Leerzeile steht.
 - Der JSON-Export über das Exportmenü enthält nur noch das aktive TypeMap-Projekt statt der gesamten lokalen Projektbibliothek.
 - Fußnoten werden in der gerenderten Ansicht unabhängig von ihren Markdown-Labels nach ihrem ersten Auftreten fortlaufend über das gesamte Dokument nummeriert; dieselbe Nummerierung gilt im HTML- und Druckexport.

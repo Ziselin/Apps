@@ -1233,7 +1233,7 @@ function parseMarkdownTable(value) {
   const header = splitMarkdownTableRow(lines[0]);
   const separators = splitMarkdownTableRow(lines[1]);
   if (header.length < 2 || separators.length !== header.length) return null;
-  if (!separators.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, "")))) return null;
+  if (!separators.every((cell) => /^:?-+:?$/.test(cell.replace(/\s+/g, "")))) return null;
   const alignments = separators.map((cell) => {
     const normalized = cell.replace(/\s+/g, "");
     if (normalized.startsWith(":") && normalized.endsWith(":")) return "center";
