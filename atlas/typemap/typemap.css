@@ -998,6 +998,17 @@ body.typemap-theme-light .preview-side-toc-item.is-active {
   scroll-margin-top: 28px;
 }
 
+/*
+ * Lange Dokumente behalten ihre vollständige semantische DOM-Struktur, aber
+ * der Browser setzt und zeichnet außerhalb des Viewports liegende Textblöcke
+ * erst, wenn sie benötigt werden. Die gespeicherte Eigenhöhe stabilisiert den
+ * Scrollbereich bis zur tatsächlichen Layoutberechnung.
+ */
+.preview-text > .preview-body-block {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.5em;
+}
+
 .preview-text.has-ligatures {
   font-variant-ligatures: common-ligatures contextual;
   font-feature-settings: "liga" 1, "clig" 1, "calt" 1;
@@ -1283,6 +1294,96 @@ body.typemap-theme-light .preview-text blockquote {
 
 .preview-text a:hover {
   text-decoration: underline;
+}
+
+.preview-table-block {
+  width: 100%;
+  margin: 1.15em 0 1.35em;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.preview-markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: inherit;
+  font: inherit;
+  line-height: 1.32;
+  text-align: left;
+}
+
+.preview-markdown-table th,
+.preview-markdown-table td {
+  padding: 0.42em 0.58em;
+  vertical-align: top;
+}
+
+.preview-markdown-table [data-align="left"] { text-align: left; }
+.preview-markdown-table [data-align="center"] { text-align: center; }
+.preview-markdown-table [data-align="right"] { text-align: right; }
+
+/* Artikel: ruhiger klassischer Buchsatz mit ausschließlich horizontalen Regeln. */
+.preview-table-article .preview-markdown-table {
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+}
+
+.preview-table-article thead {
+  border-bottom: 1px solid rgba(33, 54, 51, 0.55);
+}
+
+.preview-table-article th {
+  font-family: var(--preview-strong-font, inherit);
+  font-size: 0.94em;
+  font-weight: 600;
+  letter-spacing: 0.018em;
+}
+
+.preview-table-article tbody tr + tr {
+  border-top: 1px solid rgba(33, 54, 51, 0.12);
+}
+
+/* Aufsatz: LaTeX-/booktabs-nahe Hierarchie ohne vertikale Linien. */
+.preview-table-paper .preview-markdown-table {
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+}
+
+.preview-table-paper thead {
+  border-bottom: 1px solid currentColor;
+}
+
+.preview-table-paper th {
+  font-weight: 700;
+}
+
+.preview-table-paper th,
+.preview-table-paper td {
+  padding-block: 0.48em;
+}
+
+/* Notizbuch: einfaches Raster mit klar abgesetztem Tabellenkopf. */
+.preview-table-notebook .preview-markdown-table {
+  border: 1px solid rgba(33, 54, 51, 0.34);
+}
+
+.preview-table-notebook th,
+.preview-table-notebook td {
+  border: 1px solid rgba(33, 54, 51, 0.24);
+}
+
+.preview-table-notebook th {
+  background: rgba(196, 136, 47, 0.1);
+  font-weight: 600;
+}
+
+body:not(.typemap-theme-light) .preview-table-article thead,
+body:not(.typemap-theme-light) .preview-table-article tbody tr + tr,
+body:not(.typemap-theme-light) .preview-table-notebook .preview-markdown-table,
+body:not(.typemap-theme-light) .preview-table-notebook th,
+body:not(.typemap-theme-light) .preview-table-notebook td {
+  border-color: rgba(231, 237, 234, 0.28);
 }
 
 .preview-text u,
@@ -3320,6 +3421,13 @@ body.typemap-theme-light .citation-output textarea[readonly] {
 #lineNumberDialog .line-number-property-list .property-toggle-row input[type="checkbox"] {
   justify-self: start;
   margin: 0 0 0 9px;
+}
+
+.settings-dialog-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 560px) {

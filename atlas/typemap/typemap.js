@@ -1,9 +1,14 @@
 const LOCAL_DB_NAME = "typemap-local-db";
-const LOCAL_DB_VERSION = 2;
+const LOCAL_DB_VERSION = 3;
 const LOCAL_DB_STORE = "appState";
 const LOCAL_DB_KEY = "primary";
+const LOCAL_DB_PROJECT_STORE = "projects";
+const LOCAL_DB_LIBRARY_STORE = "library";
+const LOCAL_DB_LIBRARY_KEY = "primary";
 const PROJECT_FILE_VERSION = 1;
 const DOCUMENT_STYLE_PRESET_VERSION = 1;
+const LIVE_LINE_NUMBER_MAX_CHARACTERS = 50000;
+const LIVE_LINE_NUMBER_MAX_SOURCE_LINES = 1500;
 const THEME_STORAGE_KEY = "typemap-theme";
 // ARCHITEKTURREGEL: TypeMap-spezifische Einfügungsobjekte, die im Editor als
 // grüne Kartusche erscheinen, verwenden bis auf Weiteres ausschließlich die
@@ -232,6 +237,7 @@ const ui = {
   lineNumberFromInput: document.getElementById("lineNumberFromInput"),
   lineNumberIntervalInput: document.getElementById("lineNumberIntervalInput"),
   lineNumberStartInput: document.getElementById("lineNumberStartInput"),
+  lineNumberLiveNotice: document.getElementById("lineNumberLiveNotice"),
   spellcheckToggleButton: document.getElementById("spellcheckToggleButton"),
   spellcheckToggleCheck: document.getElementById("spellcheckToggleCheck"),
   chapterNumbersToggleButton: document.getElementById("chapterNumbersToggleButton"),
@@ -331,6 +337,18 @@ function findFootnoteReferences(value) {
 function getFootnoteDefinition(value) {
   const match = String(value || "").match(/^\s*\[\^([^\]\r\n]+)\]:[ \t]*(.*)$/s);
   return match ? { label: match[1], content: match[2] } : null;
+}
+
+function buildFootnoteNumberMap(blocks, hiddenParatextRanges = []) {
+  const numbers = new Map();
+  blocks.forEach((block) => {
+    if (isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)) return;
+    if (getFootnoteDefinition(block.text)) return;
+    findFootnoteReferences(block.text).forEach(({ label }) => {
+      if (!numbers.has(label)) numbers.set(label, numbers.size + 1);
+    });
+  });
+  return numbers;
 }
 
 function getOpeningTitleHeading(rawText) {
@@ -490,8 +508,19 @@ const state = {
   editorResizeObserver: null,
   editorMeasurementInput: null,
   editorInlineMeasurement: null,
+  sourceModelCache: new Map(),
+  sourceModelWorker: null,
+  sourceModelWorkerRequests: new Map(),
+  sourceModelWorkerRequestId: 0,
+  sourceModelWorkerUnavailable: false,
+  dirtyProjectIds: new Set(),
+  projectChangeVersions: new Map(),
+  deletedProjectIds: new Set(),
+  persistAllProjects: false,
+  publicationTimer: 0,
   projectActivationToken: 0,
   lineNumberStartIsAutomatic: true,
+  previewResizeObserver: null,
 };
 
 function createId(prefix) {
@@ -789,6 +818,21 @@ function getDisplayedLineNumber(countedLine, lineNumbering) {
   const relativeLine = countedLine - lineNumbering.fromLine + 1;
   if (relativeLine < 1 || relativeLine % lineNumbering.interval !== 0) return null;
   return lineNumbering.start + (relativeLine / lineNumbering.interval - 1) * lineNumbering.interval;
+}
+
+function canShowLiveLineNumbers(project, layoutModel = state.layoutModel) {
+  const isActiveScopedSection = state.activeSourceRange?.projectId === project?.id
+    && state.activeSourceRange?.id
+    && state.activeSourceRange.id !== "document-root";
+  if (isActiveScopedSection && layoutModel?.activeRange) return true;
+  const rawText = String(project?.source?.rawText || "");
+  if (rawText.length > LIVE_LINE_NUMBER_MAX_CHARACTERS) return false;
+  let sourceLineCount = 1;
+  for (let index = 0; index < rawText.length; index += 1) {
+    if (rawText.charCodeAt(index) === 10) sourceLineCount += 1;
+    if (sourceLineCount > LIVE_LINE_NUMBER_MAX_SOURCE_LINES) return false;
+  }
+  return true;
 }
 
 function normalizeHyphenationSettings(value, legacyMode = "manual", legacyLanguage = "de") {
@@ -1143,6 +1187,67 @@ function isCitationObjectText(text) {
   return String(text || "").trim().toLowerCase() === CITATION_OBJECT_MARKER;
 }
 
+function splitMarkdownTableRow(value) {
+  let row = String(value || "").trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|") && !row.endsWith("\\|")) row = row.slice(0, -1);
+  const cells = [];
+  let cell = "";
+  let escaped = false;
+  let codeFenceLength = 0;
+  for (let index = 0; index < row.length; index += 1) {
+    const character = row[index];
+    if (escaped) {
+      cell += character;
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      cell += character;
+      continue;
+    }
+    if (character === "`") {
+      let runLength = 1;
+      while (row[index + runLength] === "`") runLength += 1;
+      codeFenceLength = codeFenceLength === runLength ? 0 : (codeFenceLength ? codeFenceLength : runLength);
+      cell += "`".repeat(runLength);
+      index += runLength - 1;
+      continue;
+    }
+    if (character === "|" && codeFenceLength === 0) {
+      cells.push(cell.trim().replace(/\\\|/g, "|"));
+      cell = "";
+      continue;
+    }
+    cell += character;
+  }
+  if (escaped) cell += "\\";
+  cells.push(cell.trim().replace(/\\\|/g, "|"));
+  return cells;
+}
+
+function parseMarkdownTable(value) {
+  const lines = String(value || "").trim().split(/\r\n|\r|\n/).filter((line) => line.trim());
+  if (lines.length < 2) return null;
+  const header = splitMarkdownTableRow(lines[0]);
+  const separators = splitMarkdownTableRow(lines[1]);
+  if (header.length < 2 || separators.length !== header.length) return null;
+  if (!separators.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, "")))) return null;
+  const alignments = separators.map((cell) => {
+    const normalized = cell.replace(/\s+/g, "");
+    if (normalized.startsWith(":") && normalized.endsWith(":")) return "center";
+    if (normalized.endsWith(":")) return "right";
+    if (normalized.startsWith(":")) return "left";
+    return "";
+  });
+  const rows = lines.slice(2).map((line) => {
+    const cells = splitMarkdownTableRow(line);
+    return Array.from({ length: header.length }, (_, index) => cells[index] || "");
+  });
+  return { header, alignments, rows };
+}
+
 function hasCitationObject(project) {
   return /(?:^|\r?\n)\s*\{\{citation\}\}\s*(?=\r?\n|$)/i.test(String(project?.source?.rawText || ""));
 }
@@ -1168,7 +1273,7 @@ function getMarkdownBlockType(text) {
   if (isCitationObjectText(value)) return "citation";
   if (isParatextMarker(value)) return "paratext-marker";
   if (/^#{1,7}\s+/.test(value)) return "heading";
-  if (/^\|.+\|\s*(\n\|?\s*:?-{3,}:?\s*\|.*)?/m.test(value)) return "table";
+  if (parseMarkdownTable(value)) return "table";
   if (/^```/.test(value)) return "code";
   if (/^>\s?/m.test(value)) return "quote";
   if (value.split("\n").filter(Boolean).every((line) => /^[-*]\s+/.test(line))) return "list";
@@ -1307,7 +1412,7 @@ function collectDocumentSections(node, sections = []) {
   return sections;
 }
 
-function buildSourceModel(project) {
+function buildSourceModelUncached(project) {
   const rawText = String(project?.source?.rawText || "");
   const paragraphs = [];
   const sourceLines = [];
@@ -1469,6 +1574,121 @@ function buildSourceModel(project) {
   };
 }
 
+function buildSourceModel(project) {
+  const projectId = project?.id || "";
+  const rawText = String(project?.source?.rawText || "");
+  const chapterRolesSignature = JSON.stringify(project?.chapterRoles || {});
+  const cached = state.sourceModelCache.get(projectId);
+  if (cached?.rawText === rawText && cached.chapterRolesSignature === chapterRolesSignature) {
+    return cached.model;
+  }
+  const model = buildSourceModelUncached(project);
+  if (projectId) state.sourceModelCache.set(projectId, { rawText, chapterRolesSignature, model });
+  return model;
+}
+
+function createSourceModelWorker() {
+  if (state.sourceModelWorkerUnavailable || typeof Worker !== "function") return null;
+  if (state.sourceModelWorker) return state.sourceModelWorker;
+  try {
+    const workerSource = `
+      const TOC_OBJECT_MARKER = ${JSON.stringify(TOC_OBJECT_MARKER)};
+      const LEGACY_TOC_OBJECT_HEADING = ${JSON.stringify(LEGACY_TOC_OBJECT_HEADING)};
+      const CITATION_OBJECT_MARKER = ${JSON.stringify(CITATION_OBJECT_MARKER)};
+      const ORIGINAL_PAGE_MARKER_SOURCE = ${JSON.stringify(ORIGINAL_PAGE_MARKER_SOURCE)};
+      const PARATEXT_START_PATTERN = ${PARATEXT_START_PATTERN.toString()};
+      const PARATEXT_END_PATTERN = ${PARATEXT_END_PATTERN.toString()};
+      const PARATEXT_HEADING_PATTERN = ${PARATEXT_HEADING_PATTERN.toString()};
+      const CHAPTER_ROLES = new Set(${JSON.stringify(Array.from(CHAPTER_ROLES))});
+      ${normalizeMarkdownHeadingText.toString()}
+      ${stripOriginalPageMarkers.toString()}
+      ${stripInlineMarkdownSyntax.toString()}
+      ${getPlainDocumentLabel.toString()}
+      ${getFootnoteDefinition.toString()}
+      ${createChapterRoleKey.toString()}
+      ${getExplicitChapterRole.toString()}
+      ${normalizeParatextKind.toString()}
+      ${getParatextHeadingKind.toString()}
+      ${getParatextMarkerKind.toString()}
+      ${isParatextMarker.toString()}
+      ${isTableOfContentsText.toString()}
+      ${isCitationObjectText.toString()}
+      ${splitMarkdownTableRow.toString()}
+      ${parseMarkdownTable.toString()}
+      ${getMarkdownBlockType.toString()}
+      ${createParatextVisibilityKey.toString()}
+      ${createMarkdownBlockNode.toString()}
+      ${buildDocumentTree.toString()}
+      ${collectDocumentSections.toString()}
+      ${buildSourceModelUncached.toString()}
+      self.onmessage = (event) => {
+        const { requestId, project } = event.data;
+        try {
+          self.postMessage({ requestId, model: buildSourceModelUncached(project) });
+        } catch (error) {
+          self.postMessage({ requestId, error: error?.message || String(error) });
+        }
+      };
+    `;
+    const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    const worker = new Worker(workerUrl, { name: "typemap-source-model" });
+    URL.revokeObjectURL(workerUrl);
+    worker.onmessage = (event) => {
+      const request = state.sourceModelWorkerRequests.get(event.data?.requestId);
+      if (!request) return;
+      state.sourceModelWorkerRequests.delete(event.data.requestId);
+      if (event.data.error) request.reject(new Error(event.data.error));
+      else request.resolve(event.data.model);
+    };
+    worker.onerror = (event) => {
+      const error = new Error(event.message || "typemap-worker-failed");
+      state.sourceModelWorkerRequests.forEach((request) => request.reject(error));
+      state.sourceModelWorkerRequests.clear();
+      worker.terminate();
+      state.sourceModelWorker = null;
+      state.sourceModelWorkerUnavailable = true;
+    };
+    state.sourceModelWorker = worker;
+    return worker;
+  } catch (error) {
+    state.sourceModelWorkerUnavailable = true;
+    console.warn("TypeMap worker unavailable; using main thread", error);
+    return null;
+  }
+}
+
+async function buildSourceModelAsync(project) {
+  const projectId = project?.id || "";
+  const rawText = String(project?.source?.rawText || "");
+  const chapterRolesSignature = JSON.stringify(project?.chapterRoles || {});
+  const cached = state.sourceModelCache.get(projectId);
+  if (cached?.rawText === rawText && cached.chapterRolesSignature === chapterRolesSignature) {
+    return cached.model;
+  }
+  const worker = createSourceModelWorker();
+  if (!worker) return buildSourceModel(project);
+  const requestId = ++state.sourceModelWorkerRequestId;
+  const workerProject = { id: projectId, source: { rawText }, chapterRoles: { ...(project?.chapterRoles || {}) } };
+  let model;
+  try {
+    model = await new Promise((resolve, reject) => {
+      state.sourceModelWorkerRequests.set(requestId, { resolve, reject });
+      worker.postMessage({ requestId, project: workerProject });
+    });
+  } catch (error) {
+    state.sourceModelWorkerRequests.delete(requestId);
+    worker.terminate();
+    state.sourceModelWorker = null;
+    state.sourceModelWorkerUnavailable = true;
+    console.warn("TypeMap worker failed; using main thread", error);
+    return buildSourceModel(project);
+  }
+  if (String(project?.source?.rawText || "") === rawText) {
+    state.sourceModelCache.set(projectId, { rawText, chapterRolesSignature, model });
+  }
+  return model;
+}
+
 function buildBrowserLayoutModel(sourceModel, style, range = null) {
   const rangeStart = Number.isFinite(range?.startOffset) ? range.startOffset : 0;
   const rangeEnd = Number.isFinite(range?.endOffset) ? range.endOffset : sourceModel.rawText.length;
@@ -1620,9 +1840,11 @@ function appendInlineMarkdown(parent, text, options = {}) {
       node = document.createElement("sup");
       node.className = "preview-footnote-reference";
       const footnoteLabel = match.slice(2, -1);
-      node.textContent = footnoteLabel;
+      const footnoteNumber = options.footnoteNumbers?.get(footnoteLabel) || footnoteLabel;
+      node.textContent = footnoteNumber;
       node.dataset.footnoteLabel = footnoteLabel;
-      node.setAttribute("aria-label", `Fußnote ${footnoteLabel}`);
+      node.dataset.footnoteNumber = String(footnoteNumber);
+      node.setAttribute("aria-label", `Fußnote ${footnoteNumber}`);
     } else {
       const linkMatch = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       node = document.createElement("a");
@@ -1636,6 +1858,43 @@ function appendInlineMarkdown(parent, text, options = {}) {
     return match;
   });
   if (cursor < text.length) appendTextNode(parent, text.slice(cursor), options);
+}
+
+function createMarkdownTableElement(tableData, options = {}) {
+  const project = options.project || getActiveProject();
+  const theme = normalizeDocumentStyleId(project?.metadata?.textKind);
+  const wrapper = document.createElement("div");
+  wrapper.className = `preview-table-block preview-table-${theme} preview-embedded-object`;
+  wrapper.setAttribute("role", "region");
+  wrapper.setAttribute("aria-label", "Tabelle");
+  wrapper.tabIndex = 0;
+  const table = document.createElement("table");
+  table.className = "preview-markdown-table";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  tableData.header.forEach((value, index) => {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    if (tableData.alignments[index]) cell.dataset.align = tableData.alignments[index];
+    appendInlineMarkdown(cell, value, { ...options, smallCaps: false });
+    headRow.appendChild(cell);
+  });
+  head.appendChild(headRow);
+  table.appendChild(head);
+  const body = document.createElement("tbody");
+  tableData.rows.forEach((row) => {
+    const tableRow = document.createElement("tr");
+    row.forEach((value, index) => {
+      const cell = document.createElement("td");
+      if (tableData.alignments[index]) cell.dataset.align = tableData.alignments[index];
+      appendInlineMarkdown(cell, value, { ...options, smallCaps: false });
+      tableRow.appendChild(cell);
+    });
+    body.appendChild(tableRow);
+  });
+  table.appendChild(body);
+  wrapper.appendChild(table);
+  return wrapper;
 }
 
 function createMarkdownBlockElement(block, textType, options = {}) {
@@ -1675,15 +1934,18 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     object.appendChild(citationText);
     return object;
   }
+  const tableData = parseMarkdownTable(text);
+  if (tableData) return createMarkdownTableElement(tableData, options);
   const footnoteDefinition = getFootnoteDefinition(text);
   if (footnoteDefinition) {
     const footnote = document.createElement("aside");
     footnote.className = "preview-footnote-definition";
     const label = document.createElement("sup");
     label.className = "preview-footnote-definition-label";
-    label.textContent = footnoteDefinition.label;
+    const footnoteNumber = options.footnoteNumbers?.get(footnoteDefinition.label) || footnoteDefinition.label;
+    label.textContent = footnoteNumber;
     const content = document.createElement("span");
-    appendInlineMarkdown(content, footnoteDefinition.content);
+    appendInlineMarkdown(content, footnoteDefinition.content, options);
     footnote.append(label, content);
     return footnote;
   }
@@ -1704,13 +1966,13 @@ function createMarkdownBlockElement(block, textType, options = {}) {
       && block.chapterNumber
       ? `${block.chapterNumber} ${headingMatch[2]}`
       : headingMatch[2];
-    appendInlineMarkdown(heading, headingLabel, { smallCaps: false });
+    appendInlineMarkdown(heading, headingLabel, { ...options, smallCaps: false });
     return heading;
   }
 
   if (text.startsWith(">") && textType !== "lyric") {
     const quote = document.createElement("blockquote");
-    appendInlineMarkdown(quote, text.replace(/^>\s?/gm, ""));
+    appendInlineMarkdown(quote, text.replace(/^>\s?/gm, ""), options);
     return quote;
   }
 
@@ -1719,7 +1981,7 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     const list = document.createElement("ul");
     unorderedLines.forEach((line) => {
       const item = document.createElement("li");
-      appendInlineMarkdown(item, line.replace(/^[-*]\s+/, ""));
+      appendInlineMarkdown(item, line.replace(/^[-*]\s+/, ""), options);
       list.appendChild(item);
     });
     return list;
@@ -1729,7 +1991,7 @@ function createMarkdownBlockElement(block, textType, options = {}) {
     const list = document.createElement("ol");
     unorderedLines.forEach((line) => {
       const item = document.createElement("li");
-      appendInlineMarkdown(item, line.replace(/^\d+\.\s+/, ""));
+      appendInlineMarkdown(item, line.replace(/^\d+\.\s+/, ""), options);
       list.appendChild(item);
     });
     return list;
@@ -1744,7 +2006,7 @@ function createMarkdownBlockElement(block, textType, options = {}) {
   }
 
   const paragraph = document.createElement("p");
-  appendInlineMarkdown(paragraph, text);
+  appendInlineMarkdown(paragraph, text, options);
   return paragraph;
 }
 
@@ -1876,9 +2138,10 @@ function collectReferencedFootnotes(blocks, hiddenParatextRanges = []) {
   });
   // Die Position und Reihenfolge der Darstellung folgen den Verweisen im
   // Fließtext. Der Ablageort einer Markdown-Definition ist dafür unerheblich.
+  const footnoteNumbers = buildFootnoteNumberMap(blocks, hiddenParatextRanges);
   return referencedLabels
     .filter((label) => definitions.has(label))
-    .map((label) => ({ label, content: definitions.get(label) }));
+    .map((label) => ({ label, number: footnoteNumbers.get(label), content: definitions.get(label) }));
 }
 
 function getVisiblePreviewFootnoteLabels() {
@@ -2022,14 +2285,14 @@ function renderSideTableOfContents(targetPage, targetText, project, layoutModel,
   footnoteSection.appendChild(footnoteTitle);
   const footnoteList = document.createElement("div");
   footnoteList.className = "preview-side-footnotes-list";
-  footnotes.forEach(({ label, content }) => {
+  footnotes.forEach(({ label, number, content }) => {
     const item = document.createElement("article");
     item.className = "preview-side-footnote";
     item.dataset.footnoteLabel = label;
     item.hidden = true;
     const itemLabel = document.createElement("sup");
     itemLabel.className = "preview-side-footnote-label";
-    itemLabel.textContent = label;
+    itemLabel.textContent = number;
     const itemContent = document.createElement("div");
     itemContent.className = "preview-side-footnote-content";
     appendInlineMarkdown(itemContent, content, { smallCaps: false });
@@ -2186,6 +2449,16 @@ function scheduleLineNumberLayer(targetText, lineNumbering) {
   });
 }
 
+function refreshPreviewLineNumbers() {
+  const project = getActiveProject();
+  if (!project || !ui.previewText || state.previewRenderedProjectId !== project.id) return;
+  const settings = getProjectLineNumbering(project);
+  scheduleLineNumberLayer(ui.previewText, {
+    ...settings,
+    enabled: settings.enabled && canShowLiveLineNumbers(project, state.layoutModel),
+  });
+}
+
 function getDocumentTitleAlignment(project) {
   const textType = project?.source?.textType || "prose";
   if (textType === "lyric") return "left";
@@ -2256,6 +2529,10 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   const leadPresentation = getLeadPresentation(project, titleScale);
   const textType = project.source.textType || "prose";
   const lineNumbering = getProjectLineNumbering(project);
+  const liveLineNumbering = {
+    ...lineNumbering,
+    enabled: lineNumbering.enabled && canShowLiveLineNumbers(project, layoutModel),
+  };
   const documentTitleAlign = getDocumentTitleAlignment(project);
   const hyphenationSettings = normalizeHyphenationSettings(style.hyphenationSettings, style.hyphenation, style.language);
   targetPage.style.setProperty("--preview-line-height", String(textType === "lyric" ? 1.5 : style.lineHeight));
@@ -2304,7 +2581,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
   targetText.style.setProperty("-webkit-hyphenate-limit-lines", String(hyphenationSettings.consecutiveLines));
   targetText.style.setProperty("-webkit-hyphenate-limit-before", String(hyphenationSettings.before));
   targetText.style.setProperty("-webkit-hyphenate-limit-after", String(hyphenationSettings.after));
-  targetText.classList.toggle("has-line-numbers", lineNumbering.enabled === true);
+  targetText.classList.toggle("has-line-numbers", liveLineNumbering.enabled === true);
   targetText.classList.toggle("has-ligatures", style.ligatures !== false);
   targetText.classList.remove("is-text-type-prose", "is-text-type-lyric", "is-text-type-drama", "is-text-type-note");
   targetText.classList.add(`is-text-type-${textType}`);
@@ -2324,6 +2601,10 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     ? (layoutModel.sourceLineBlocks || [])
     : layoutModel.blocks;
   const hiddenParatextRanges = collectHiddenParatextRanges(project, state.sourceModel || null);
+  const documentFootnoteNumbers = buildFootnoteNumberMap(
+    (state.sourceModel || buildSourceModel(project)).paragraphs,
+    hiddenParatextRanges,
+  );
   const sideRail = renderSideTableOfContents(targetPage, targetText, project, layoutModel, blocks, hiddenParatextRanges);
 
   if (!blocks.length) {
@@ -2331,11 +2612,12 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     empty.className = "preview-empty";
     empty.textContent = "Beginne unten mit deinem Text.";
     targetText.appendChild(empty);
-    scheduleLineNumberLayer(targetText, lineNumbering);
+    scheduleLineNumberLayer(targetText, liveLineNumbering);
     return;
   }
 
-  blocks.forEach((block, index) => {
+  const blockFragment = document.createDocumentFragment();
+  blocks.forEach((block) => {
     if (isBlockHiddenByParatextVisibility(block, hiddenParatextRanges)) return;
     if (isTableOfContentsBlock(block) || isOriginalPageMarkerBlock(block) || isParatextMarkerBlock(block)) return;
     // In der interaktiven Gesamtansicht übernimmt die Randspalte die sichtbare
@@ -2348,6 +2630,7 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     const element = createMarkdownBlockElement(block, textType, {
       chapterNumbers: project.style.chapterNumbers === true,
       project,
+      footnoteNumbers: documentFootnoteNumbers,
     });
     element.classList.add("preview-body-block");
     if (getMarkdownHeadingLevel(block.text)) {
@@ -2367,9 +2650,10 @@ function renderTextView(targetPage, targetText, project, layoutModel) {
     }
     element.dataset.sourceStart = String(block.sourceStartOffset);
     element.dataset.sourceEnd = String(block.sourceEndOffset);
-    targetText.appendChild(element);
+    blockFragment.appendChild(element);
   });
-  scheduleLineNumberLayer(targetText, lineNumbering);
+  targetText.appendChild(blockFragment);
+  scheduleLineNumberLayer(targetText, liveLineNumbering);
   if (targetText === ui.previewText) scheduleSideTableOfContentsStateUpdate();
 }
 
@@ -2393,6 +2677,7 @@ async function renderPreviewOnDemand() {
   const project = getActiveProject();
   if (!project) return;
   if (!state.previewDirty && state.previewRenderedProjectId === project.id) return;
+  const renderStartedAt = performance.now();
   const token = ++state.previewRenderToken;
   if (ui.previewRenderProgress) ui.previewRenderProgress.hidden = false;
   ui.previewPage?.setAttribute("aria-busy", "true");
@@ -2401,7 +2686,7 @@ async function renderPreviewOnDemand() {
 
   try {
     setPreviewRenderProgress(28, "Dokumentstruktur wird gelesen …");
-    const sourceModel = buildSourceModel(project);
+    const sourceModel = await buildSourceModelAsync(project);
     await waitForPreviewPaint();
     if (token !== state.previewRenderToken || state.activeProjectId !== project.id) return;
 
@@ -2417,6 +2702,16 @@ async function renderPreviewOnDemand() {
     renderViewLayer(project, sourceModel, layoutModel);
     state.previewDirty = false;
     state.previewRenderedProjectId = project.id;
+    const renderDuration = performance.now() - renderStartedAt;
+    if (renderDuration >= 100) {
+      console.info("TypeMap performance", {
+        operation: "preview-render",
+        durationMs: Math.round(renderDuration),
+        characters: project.source.rawText.length,
+        blocks: layoutModel.blocks.length,
+      });
+    }
+    scheduleProjectPublication(project);
     setPreviewRenderProgress(100, "TypeMap ist bereit.");
     await waitForPreviewPaint();
   } finally {
@@ -3708,6 +4003,30 @@ function wrapEditorSelection(marker) {
   replaceEditorSelection((selected) => `${marker}${selected || "Text"}${marker}`);
 }
 
+function insertMarkdownTable() {
+  replaceEditorSelection((selected) => {
+    const selectedRows = String(selected || "")
+      .trim()
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => line.split("\t"));
+    const columnCount = Math.max(2, ...selectedRows.map((row) => row.length));
+    const normalizeRow = (row = []) => Array.from(
+      { length: columnCount },
+      (_, index) => String(row[index] || "").trim().replace(/\|/g, "\\|")
+    );
+    const header = normalizeRow(selectedRows[0] || ["Spalte 1", "Spalte 2"]);
+    const bodyRows = selectedRows.length > 1
+      ? selectedRows.slice(1).map(normalizeRow)
+      : [normalizeRow(selectedRows.length ? [] : ["Inhalt", "Inhalt"])];
+    return [
+      `| ${header.join(" | ")} |`,
+      `| ${Array(columnCount).fill("---").join(" | ")} |`,
+      ...bodyRows.map((row) => `| ${row.join(" | ")} |`),
+    ].join("\n");
+  });
+}
+
 function clearEditorFormatting() {
   replaceEditorSelection((selected) => String(selected || "")
     .replace(/(```|`|==|\*\*|__|\*|_)/g, "")
@@ -3935,6 +4254,7 @@ async function saveDocumentPropertiesDialog() {
     }
   });
   await flushAutosave();
+  scheduleProjectPublication(getActiveProject());
   renderEditor();
   setDialogOpen(false);
 }
@@ -3969,6 +4289,12 @@ function openLineNumberDialog() {
   if (ui.lineNumberFromInput) ui.lineNumberFromInput.value = String(settings.fromLine);
   if (ui.lineNumberIntervalInput) ui.lineNumberIntervalInput.value = String(settings.interval);
   if (ui.lineNumberStartInput) ui.lineNumberStartInput.value = String(settings.start);
+  if (ui.lineNumberLiveNotice) {
+    const liveAvailable = canShowLiveLineNumbers(project);
+    ui.lineNumberLiveNotice.textContent = liveAvailable
+      ? "Wenn aktiviert, erscheinen die Nummern in diesem kurzen Dokument beziehungsweise der aktuellen Kapitelansicht zusätzlich in der flexiblen Vorschau. Nach Größenänderungen werden sie neu berechnet."
+      : "Dieses Dokument ist für eine stabile Live-Nummerierung zu umfangreich. Die Einstellung gilt deshalb nur für Exporte. PDF und Druck nummerieren aus Gründen stabiler Seitenumbrüche stets Textblockanfänge; HTML und Bild können zusätzlich Sichtzeilen nummerieren.";
+  }
   state.lineNumberStartIsAutomatic = settings.start === settings.interval;
   setLineNumberDialogOpen(true);
   ui.lineNumberEnabledInput?.focus();
@@ -4135,9 +4461,16 @@ function renderApp() {
 function markProjectChanged(project) {
   if (!project) return;
   project.updatedAt = new Date().toISOString();
+  markProjectDirty(project.id);
   state.previewDirty = true;
   state.previewRenderToken += 1;
   scheduleAutosave();
+}
+
+function markProjectDirty(projectId) {
+  if (!projectId) return;
+  state.dirtyProjectIds.add(projectId);
+  state.projectChangeVersions.set(projectId, (state.projectChangeVersions.get(projectId) || 0) + 1);
 }
 
 async function activateProject(projectId, options = {}) {
@@ -4164,6 +4497,7 @@ async function activateProject(projectId, options = {}) {
 function addProject(title = "Neues Dokument") {
   const project = createDefaultProject(title);
   state.projects.push(project);
+  markProjectDirty(project.id);
   state.activeSourceRange = null;
   void activateProject(project.id, { resetSourceRange: true });
 }
@@ -4183,6 +4517,7 @@ function addGeneratedProject(jsonInput) {
   // bleiben individuelle Anpassungen des Nutzers erhalten.
   applyDocumentStylePreset(project, project.metadata.textKind);
   state.projects.push(project);
+  markProjectDirty(project.id);
   state.activeSourceRange = null;
   state.editorDataView = "json";
   state.jsonEditorDraft = "";
@@ -5197,6 +5532,7 @@ function applyJsonEditorDraft() {
     const projectIndex = state.projects.findIndex((project) => project.id === activeProject.id);
     if (projectIndex < 0) return;
     state.projects[projectIndex] = normalized;
+    markProjectDirty(normalized.id);
     state.previewDirty = true;
     state.previewRenderToken += 1;
     state.jsonEditorDraft = "";
@@ -5210,8 +5546,14 @@ function applyJsonEditorDraft() {
 }
 
 function deleteProject(projectId) {
+  state.deletedProjectIds.add(projectId);
+  state.dirtyProjectIds.delete(projectId);
+  state.projectChangeVersions.delete(projectId);
+  state.sourceModelCache.delete(projectId);
   if (state.projects.length <= 1) {
-    state.projects = [createDefaultProject("Neues Dokument")];
+    const replacement = createDefaultProject("Neues Dokument");
+    state.projects = [replacement];
+    markProjectDirty(replacement.id);
     state.activeProjectId = null;
   } else {
     state.projects = state.projects.filter((project) => project.id !== projectId);
@@ -5277,7 +5619,8 @@ function buildSnapshot() {
   };
 }
 
-function applySnapshot(snapshot) {
+function applySnapshot(snapshot, options = {}) {
+  const previousProjectIds = new Set(state.projects.map((project) => project.id));
   const rawProjects = Array.isArray(snapshot?.state?.projects)
     ? snapshot.state.projects
     : Array.isArray(snapshot?.projects)
@@ -5290,13 +5633,16 @@ function applySnapshot(snapshot) {
   state.activeProjectId = null;
   state.activeSourceRange = null;
   state.projectActivationToken += 1;
+  if (options.markDirty !== false) {
+    state.projects.forEach((project) => markProjectDirty(project.id));
+    const nextProjectIds = new Set(state.projects.map((project) => project.id));
+    previousProjectIds.forEach((projectId) => {
+      if (!nextProjectIds.has(projectId)) state.deletedProjectIds.add(projectId);
+    });
+    state.persistAllProjects = true;
+  }
   renderApp();
-  scheduleAutosave();
-}
-
-function exportProjects() {
-  const blob = new Blob([JSON.stringify(buildSnapshot(), null, 2)], { type: "application/json" });
-  downloadBlob(blob, "typemap-dokument.json");
+  if (options.scheduleSave !== false) scheduleAutosave();
 }
 
 function exportActiveProjectJson() {
@@ -5378,11 +5724,11 @@ function escapeScriptJson(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project = null) {
+function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project = null, footnoteNumbers = new Map()) {
   if (isTableOfContentsBlock(block)) return "";
   if (isOriginalPageMarkerBlock(block)) return "";
   if (isParatextMarkerBlock(block)) return "";
-  const element = createMarkdownBlockElement(block, textType, { chapterNumbers, project });
+  const element = createMarkdownBlockElement(block, textType, { chapterNumbers, project, footnoteNumbers });
   element.classList.add("preview-body-block");
   if (getMarkdownHeadingLevel(block.text)) {
     element.id = getPreviewHeadingId(block.sourceStartOffset);
@@ -5402,6 +5748,7 @@ function buildHtmlBlockMarkup(block, textType, chapterNumbers = false, project =
 }
 
 function buildChapterGroupedHtmlMarkup(blocks, textType, chapterNumbers = false, project = null) {
+  const footnoteNumbers = buildFootnoteNumberMap(blocks);
   const definitions = new Map();
   blocks.forEach((block) => {
     const definition = getFootnoteDefinition(block.text);
@@ -5417,7 +5764,7 @@ function buildChapterGroupedHtmlMarkup(blocks, textType, chapterNumbers = false,
   const flushChapterFootnotes = () => {
     if (!chapterFootnotes.length) return;
     const notes = chapterFootnotes
-      .map((block) => buildHtmlBlockMarkup(block, textType, chapterNumbers, project))
+      .map((block) => buildHtmlBlockMarkup(block, textType, chapterNumbers, project, footnoteNumbers))
       .join("");
     markup.push(`<section class="chapter-footnotes" aria-label="Fußnoten">${notes}</section>`);
     chapterFootnotes = [];
@@ -5437,7 +5784,7 @@ function buildChapterGroupedHtmlMarkup(blocks, textType, chapterNumbers = false,
     const endsDocumentBody = isCitationObjectText(block.text);
     if (startsChapter || endsDocumentBody) flushChapterFootnotes();
 
-    markup.push(buildHtmlBlockMarkup(block, textType, chapterNumbers, project));
+    markup.push(buildHtmlBlockMarkup(block, textType, chapterNumbers, project, footnoteNumbers));
     findFootnoteReferences(block.text).forEach(({ label }) => {
       if (chapterLabels.has(label) || !definitions.has(label)) return;
       chapterLabels.add(label);
@@ -5599,6 +5946,23 @@ ${buildHtmlFontFaceCss(project)}
     pre { margin: .9em 0; padding: .9em 1em; border: 1px solid rgba(33, 54, 51, .14); border-radius: 6px; background: rgba(250, 247, 239, .78); color: #203431; overflow-x: auto; }
     pre code { background: transparent; color: inherit; padding: 0; }
     .preview-blank-line { min-height: 1.5em; margin: 0; }
+    .preview-table-block { width: 100%; margin: 1.15em 0 1.35em; overflow-x: auto; }
+    .preview-markdown-table { width: 100%; border-collapse: collapse; border-spacing: 0; color: inherit; font: inherit; line-height: 1.32; text-align: left; }
+    .preview-markdown-table th, .preview-markdown-table td { padding: .42em .58em; vertical-align: top; }
+    .preview-markdown-table [data-align="left"] { text-align: left; }
+    .preview-markdown-table [data-align="center"] { text-align: center; }
+    .preview-markdown-table [data-align="right"] { text-align: right; }
+    .preview-table-article .preview-markdown-table { border-top: 1px solid currentColor; border-bottom: 1px solid currentColor; }
+    .preview-table-article thead { border-bottom: 1px solid rgba(33, 54, 51, .55); }
+    .preview-table-article th { font-family: ${project.style.headingFontFamily || bodyFontFamily}; font-size: .94em; font-weight: 600; letter-spacing: .018em; }
+    .preview-table-article tbody tr + tr { border-top: 1px solid rgba(33, 54, 51, .12); }
+    .preview-table-paper .preview-markdown-table { border-top: 2px solid currentColor; border-bottom: 2px solid currentColor; }
+    .preview-table-paper thead { border-bottom: 1px solid currentColor; }
+    .preview-table-paper th { font-weight: 700; }
+    .preview-table-paper th, .preview-table-paper td { padding-block: .48em; }
+    .preview-table-notebook .preview-markdown-table { border: 1px solid rgba(33, 54, 51, .34); }
+    .preview-table-notebook th, .preview-table-notebook td { border: 1px solid rgba(33, 54, 51, .24); }
+    .preview-table-notebook th { background: rgba(196, 136, 47, .1); font-weight: 600; }
     .typemap-text.is-text-type-lyric p { white-space: pre-wrap; margin-bottom: 1.5em; }
     .typemap-text.is-text-type-lyric .preview-source-line-block { margin-bottom: 0; }
     .typemap-text.is-text-type-lyric .preview-blank-line { min-height: 1.5em; margin: 0; }
@@ -5611,6 +5975,10 @@ ${buildHtmlFontFaceCss(project)}
       .html-side-toc { display: none; }
       .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; }
       .typemap-text, .preview-body-block { overflow: visible; }
+      .preview-table-block { overflow: visible; break-inside: auto; }
+      .preview-markdown-table { break-inside: auto; }
+      .preview-markdown-table thead { display: table-header-group; }
+      .preview-markdown-table tr { break-inside: avoid; page-break-inside: avoid; }
       .line-number { display: block !important; transform: translateY(calc(-100% - 0.42em)); color: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
@@ -5679,9 +6047,10 @@ ${buildHtmlFontFaceCss(project)}
       range.detach();
       return rects.length ? rects[rects.length - 1].bottom : null;
     }
-    function renderLineNumbers() {
+    function renderLineNumbers(options = {}) {
       text.querySelectorAll(".line-number").forEach((label) => label.remove());
       if (!lineNumbering.enabled) return;
+      const printSafe = options.printSafe === true || window.matchMedia("print").matches;
       const blocks = Array.from(text.querySelectorAll(".preview-body-block"));
       const isNumberableBlock = (block) => block.dataset.matter === "body"
         && (!block.dataset.chapterRole || block.dataset.chapterRole === "main")
@@ -5698,9 +6067,9 @@ ${buildHtmlFontFaceCss(project)}
       blocks.forEach((block, blockIndex) => {
         if (blockIndex > lastContentIndex || !isNumberableBlock(block)) return;
         if (lineNumbering.mode === "source-lines" && block.dataset.sourceBlankLine === "true" && !lineNumbering.includeBlankLines) return;
-        let rects = lineNumbering.mode === "source-lines"
+        let rects = !printSafe && lineNumbering.mode === "source-lines"
           ? getVisualLineRects(block)
-          : [block.getBoundingClientRect()].filter((rect) => rect.width > 0 && rect.height > 0);
+          : getVisualLineRects(block).slice(0, 1);
         if (blockIndex === lastContentIndex) {
           const lastTextBottom = getLastTextContentBottom(block);
           if (lastTextBottom !== null) rects = rects.filter((rect) => rect.top < lastTextBottom + 1);
@@ -5722,8 +6091,8 @@ ${buildHtmlFontFaceCss(project)}
     }
     window.addEventListener("load", renderLineNumbers);
     window.addEventListener("resize", renderLineNumbers);
-    window.addEventListener("beforeprint", renderLineNumbers);
-    window.addEventListener("afterprint", renderLineNumbers);
+    window.addEventListener("beforeprint", () => renderLineNumbers({ printSafe: true }));
+    window.addEventListener("afterprint", () => renderLineNumbers());
     if (document.fonts?.ready) document.fonts.ready.then(renderLineNumbers);
     renderLineNumbers();
   </script>
@@ -6018,7 +6387,7 @@ function handleExportFormat(format) {
       window.alert("PNG-Export fehlgeschlagen. Bitte versuche es erneut.");
     });
   } else {
-    exportProjects();
+    exportActiveProjectJson();
   }
 }
 
@@ -6040,39 +6409,91 @@ function openLocalDb() {
     const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(LOCAL_DB_STORE)) request.result.createObjectStore(LOCAL_DB_STORE);
+      if (!request.result.objectStoreNames.contains(LOCAL_DB_PROJECT_STORE)) {
+        request.result.createObjectStore(LOCAL_DB_PROJECT_STORE, { keyPath: "id" });
+      }
+      if (!request.result.objectStoreNames.contains(LOCAL_DB_LIBRARY_STORE)) {
+        request.result.createObjectStore(LOCAL_DB_LIBRARY_STORE);
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-async function withStore(mode, callback) {
-  const db = await openLocalDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(LOCAL_DB_STORE, mode);
-    const store = tx.objectStore(LOCAL_DB_STORE);
-    const request = callback(store);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
-}
-
-async function saveLocalSnapshot() {
+async function saveLocalProjects(options = {}) {
+  const saveStartedAt = performance.now();
   try {
-    await withStore("readwrite", (store) => store.put(buildSnapshot(), LOCAL_DB_KEY));
+    const db = await openLocalDb();
+    const projectsToSave = options.all === true || state.persistAllProjects
+      ? [...state.projects]
+      : state.projects.filter((project) => state.dirtyProjectIds.has(project.id));
+    const savedChangeVersions = new Map(projectsToSave.map((project) => [
+      project.id,
+      state.projectChangeVersions.get(project.id) || 0,
+    ]));
+    const deletedProjectIds = [...state.deletedProjectIds];
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction([LOCAL_DB_PROJECT_STORE, LOCAL_DB_LIBRARY_STORE], "readwrite");
+      const projectStore = tx.objectStore(LOCAL_DB_PROJECT_STORE);
+      projectsToSave.forEach((project) => projectStore.put(project));
+      deletedProjectIds.forEach((projectId) => projectStore.delete(projectId));
+      tx.objectStore(LOCAL_DB_LIBRARY_STORE).put({
+        version: PROJECT_FILE_VERSION,
+        projectIds: state.projects.map((project) => project.id),
+        updatedAt: new Date().toISOString(),
+      }, LOCAL_DB_LIBRARY_KEY);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error("typemap-save-aborted"));
+    });
+    db.close();
+    projectsToSave.forEach((project) => {
+      if ((state.projectChangeVersions.get(project.id) || 0) === savedChangeVersions.get(project.id)) {
+        state.dirtyProjectIds.delete(project.id);
+      }
+    });
+    deletedProjectIds.forEach((projectId) => state.deletedProjectIds.delete(projectId));
+    state.persistAllProjects = false;
+    const saveDuration = performance.now() - saveStartedAt;
+    if (saveDuration >= 50) {
+      console.info("TypeMap performance", {
+        operation: "local-save",
+        durationMs: Math.round(saveDuration),
+        projectsWritten: projectsToSave.length,
+      });
+    }
   } catch (error) {
     console.warn("TypeMap local save failed", error);
   }
 }
 
-async function loadLocalSnapshot() {
+async function loadLocalProjects() {
   try {
-    return await withStore("readonly", (store) => store.get(LOCAL_DB_KEY));
+    const db = await openLocalDb();
+    const result = await new Promise((resolve, reject) => {
+      const tx = db.transaction([LOCAL_DB_PROJECT_STORE, LOCAL_DB_LIBRARY_STORE, LOCAL_DB_STORE], "readonly");
+      const libraryRequest = tx.objectStore(LOCAL_DB_LIBRARY_STORE).get(LOCAL_DB_LIBRARY_KEY);
+      const projectsRequest = tx.objectStore(LOCAL_DB_PROJECT_STORE).getAll();
+      const legacyRequest = tx.objectStore(LOCAL_DB_STORE).get(LOCAL_DB_KEY);
+      tx.oncomplete = () => resolve({
+        library: libraryRequest.result || null,
+        projects: projectsRequest.result || [],
+        legacySnapshot: legacyRequest.result || null,
+      });
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    if (result.library && result.projects.length) {
+      const byId = new Map(result.projects.map((project) => [project.id, project]));
+      const projects = result.library.projectIds.map((id) => byId.get(id)).filter(Boolean);
+      result.projects.forEach((project) => {
+        if (!result.library.projectIds.includes(project.id)) projects.push(project);
+      });
+      return { snapshot: { state: { projects } }, migrated: false };
+    }
+    if (result.legacySnapshot) return { snapshot: result.legacySnapshot, migrated: true };
+    return null;
   } catch (error) {
     console.warn("TypeMap local load failed", error);
     return null;
@@ -6124,17 +6545,30 @@ async function publishProjectForApps(project) {
   return presentation;
 }
 
-async function publishAllProjectsForApps() {
-  for (const project of state.projects) await publishProjectForApps(project);
-}
-
 function renderSharedDocumentId(project, publishedAt = "") {
   if (!project) return;
   if (ui.sharedDocumentIdOutput) ui.sharedDocumentIdOutput.value = `TM1:${project.id}`;
   if (ui.sharedDocumentStatus) ui.sharedDocumentStatus.textContent = "Für verbundene Apps verfügbar";
   if (ui.sharedDocumentPublishedAtOutput) ui.sharedDocumentPublishedAtOutput.textContent = publishedAt
     ? formatProvenanceTimestamp(publishedAt)
-    : "Wird automatisch aktualisiert";
+    : "Wird bei Vorschau oder Freigabe aktualisiert";
+}
+
+function scheduleProjectPublication(project = getActiveProject()) {
+  if (!project?.id) return;
+  if (state.publicationTimer) {
+    if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(state.publicationTimer);
+    else window.clearTimeout(state.publicationTimer);
+  }
+  const publish = () => {
+    state.publicationTimer = 0;
+    publishProjectForApps(project).catch((error) => {
+      console.warn("TypeMap app presentation publish failed", error);
+    });
+  };
+  state.publicationTimer = typeof window.requestIdleCallback === "function"
+    ? window.requestIdleCallback(publish, { timeout: 5000 })
+    : window.setTimeout(publish, 1200);
 }
 
 function scheduleAutosave() {
@@ -6142,9 +6576,7 @@ function scheduleAutosave() {
   const delay = (getActiveProject()?.source?.rawText?.length || 0) > 120000 ? 1800 : 500;
   state.autosaveTimer = window.setTimeout(() => {
     state.autosaveTimer = null;
-    saveLocalSnapshot().then(() => publishProjectForApps(getActiveProject())).catch((error) => {
-      console.warn("TypeMap app presentation publish failed", error);
-    });
+    void saveLocalProjects();
   }, delay);
 }
 
@@ -6153,8 +6585,7 @@ async function flushAutosave() {
     window.clearTimeout(state.autosaveTimer);
     state.autosaveTimer = null;
   }
-  await saveLocalSnapshot();
-  await publishProjectForApps(getActiveProject());
+  await saveLocalProjects();
 }
 
 function setMenuOpen(isOpen) {
@@ -6408,6 +6839,7 @@ function bindEditor() {
   window.addEventListener("resize", () => {
     setDetailsLayoutMode(state.detailsLayoutMode);
     scheduleEditorGeometrySync();
+    refreshPreviewLineNumbers();
   });
   if (typeof ResizeObserver === "function" && ui.textInput) {
     state.editorResizeObserver?.disconnect();
@@ -6415,6 +6847,11 @@ function bindEditor() {
     state.editorResizeObserver.observe(ui.textInput);
     const editorFrame = ui.textInput.closest(".markdown-editor-frame");
     if (editorFrame) state.editorResizeObserver.observe(editorFrame);
+  }
+  if (typeof ResizeObserver === "function" && ui.previewText) {
+    state.previewResizeObserver?.disconnect();
+    state.previewResizeObserver = new ResizeObserver(refreshPreviewLineNumbers);
+    state.previewResizeObserver.observe(ui.previewText);
   }
   document.fonts?.ready?.then(scheduleEditorGeometrySync);
   ui.browserActionsMenuButton?.addEventListener("click", (event) => {
@@ -6618,6 +7055,8 @@ function bindEditor() {
         insertTableOfContentsObject();
       } else if (button.dataset.insertObject === "citation") {
         toggleCitationObject();
+      } else if (button.dataset.insertObject === "table") {
+        insertMarkdownTable();
       } else if (button.dataset.viewOption === "toc") {
         updateActiveProject((project) => {
           if (!hasTableOfContentsObject(project)) return;
@@ -6854,16 +7293,18 @@ async function init() {
   setDetailsLayoutMode("normal");
   bindMenu();
   bindEditor();
-  const snapshot = await loadLocalSnapshot();
-  if (snapshot) {
-    applySnapshot(snapshot);
+  const stored = await loadLocalProjects();
+  if (stored?.snapshot) {
+    applySnapshot(stored.snapshot, { markDirty: stored.migrated, scheduleSave: false });
+    if (stored.migrated) await saveLocalProjects({ all: true });
   } else {
-    state.projects = [createDefaultProject("Erstes Dokument")];
+    const project = createDefaultProject("Erstes Dokument");
+    state.projects = [project];
+    markProjectDirty(project.id);
     state.activeProjectId = null;
     renderApp();
-    scheduleAutosave();
+    await saveLocalProjects();
   }
-  await publishAllProjectsForApps();
   setWorkspaceSection("preview");
 }
 

@@ -360,7 +360,6 @@
         <section class="editor-section editor-text-section">
           <div class="field text-editor-field">
             <div class="markdown-editor-frame">
-              <pre id="textInputHighlight" class="markdown-editor-highlight" aria-hidden="true"></pre>
               <textarea id="textInput" rows="10" spellcheck="true" aria-label="Text"></textarea>
             </div>
           </div>
@@ -855,14 +854,14 @@
         <h3>Nummerierung</h3>
         <div class="property-list line-number-property-list">
           <label class="property-row property-toggle-row">
-            <span>Nummerierung anzeigen</span>
+            <span>In Exporten anzeigen</span>
             <input id="lineNumberEnabledInput" type="checkbox">
           </label>
           <label class="property-row">
             <span>Bezugsgröße</span>
             <select id="lineNumberModeInput">
-              <option value="paragraphs">Absätze</option>
-              <option value="source-lines">Einzelzeilen</option>
+              <option value="paragraphs">Textblöcke / Absätze</option>
+              <option value="source-lines">Sichtzeilen (HTML / Bild)</option>
             </select>
           </label>
           <label class="property-row property-toggle-row">
@@ -882,6 +881,7 @@
             <input id="lineNumberStartInput" type="number" min="0" max="99999" step="1" value="1">
           </label>
         </div>
+        <p id="lineNumberLiveNotice" class="settings-dialog-note"></p>
       </section>
     </div>
     <div class="property-dialog-actions">
