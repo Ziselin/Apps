@@ -6026,9 +6026,13 @@ ${buildHtmlFontFaceCss(project)}
       .html-side-toc { display: none; }
       .html-document-flow { width: 100%; max-width: ${project.style.measure}ch; }
       .typemap-text, .preview-body-block { overflow: visible; }
+      .typemap-text p, .typemap-text li, .typemap-text blockquote { orphans: 2; widows: 2; }
+      .preview-heading { break-inside: avoid-page; break-after: avoid-page; page-break-inside: avoid; page-break-after: avoid; }
+      .typemap-text p:has(+ .preview-table-block) { break-after: avoid-page; page-break-after: avoid; }
       .preview-table-block { overflow: visible; break-inside: auto; }
       .preview-markdown-table { break-inside: auto; }
-      .preview-markdown-table thead { display: table-header-group; }
+      .preview-markdown-table thead { display: table-header-group; break-after: avoid-page; page-break-after: avoid; }
+      .preview-markdown-table tbody tr:first-child { break-before: avoid-page; page-break-before: avoid; }
       .preview-markdown-table tr { break-inside: avoid; page-break-inside: avoid; }
       .line-number { display: block !important; transform: translateY(calc(-100% - 0.42em)); color: #555 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
