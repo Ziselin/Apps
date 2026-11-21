@@ -15,9 +15,7 @@
       <img src="deus-guide-icon.svg" alt="" width="38" height="38">
       <span><strong>Deus Guide</strong><small>XP Deus II Einstellungsassistent</small></span>
     </a>
-    <button class="icon-button" id="savedButton" type="button" aria-label="Gespeicherte Programme öffnen" title="Gespeicherte Programme">
-      <span aria-hidden="true">★</span><span class="saved-count" id="savedCount">0</span>
-    </button>
+    <button class="icon-button" id="resetButton" type="button" aria-label="Aktuelle Einstellungen zurücksetzen" title="Aktuelle Einstellungen zurücksetzen">↻</button>
   </header>
 
   <main id="app" tabindex="-1"></main>
@@ -25,13 +23,9 @@
   <nav class="bottom-nav" aria-label="Hauptnavigation">
     <button type="button" data-route="start"><span aria-hidden="true">⌂</span>Assistent</button>
     <button type="button" data-route="tuner"><span aria-hidden="true">⌁</span>Vor Ort</button>
+    <button type="button" data-route="current"><span aria-hidden="true">●</span>Programm</button>
     <button type="button" data-route="wissen"><span aria-hidden="true">i</span>Wissen</button>
   </nav>
-
-  <dialog id="savedDialog" class="saved-dialog">
-    <div class="dialog-head"><div><small>Deine Sammlung</small><h2>Gespeicherte Programme</h2></div><button class="close-button" type="button" aria-label="Schließen">×</button></div>
-    <div id="savedList" class="saved-list"></div>
-  </dialog>
 
   <template id="startTemplate">
     <section class="hero">

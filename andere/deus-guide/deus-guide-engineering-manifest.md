@@ -9,7 +9,7 @@ Deus Guide ist ein mobiler, einsteigerfreundlicher Einstellungsassistent für de
 - Die App liegt eigenständig unter `Andere/deus-guide` und folgt dem Ziselin-Organisationsmanifest.
 - Sie wird nicht auf der allgemeinen Ziselin-Startseite verlinkt. Der Zugriff erfolgt über den eigenständigen Ziselin-Bereich `Andere`, der nur über seine direkte URL erreichbar ist.
 - App-spezifischer Quellcode, Gestaltung, Icon und Dokumentation verbleiben in diesem Ordner.
-- Die App ist statisch, benötigt kein Konto und speichert persönliche Programme ausschließlich im Browser (`localStorage`).
+- Die App ist statisch, benötigt kein Konto und speichert ausschließlich die eine aktuelle situative Auswahl im Browser (`localStorage`). Eine dauerhafte Programmsammlung ist nicht Teil des Produkts.
 
 ## Verbindliche Produktregeln
 
@@ -17,6 +17,8 @@ Deus Guide ist ein mobiler, einsteigerfreundlicher Einstellungsassistent für de
 - Gold, Silber oder andere Metalle werden nicht als sicher anhand eines Leitwerts identifizierbar dargestellt.
 - Aggressive Notch- oder Diskriminierungsempfehlungen werden vermieden, wenn dadurch wertvolle Ziele verloren gehen können.
 - Die Oberfläche zeigt Anfängern primär die gegenüber dem Werkprogramm zu ändernden Werte und die zugehörigen Menüpfade.
+- Jede Auswahloption erklärt didaktisch sowohl ihren passenden Einsatz als auch den damit verbundenen Zielkonflikt.
+- Das aktuelle Programm ist jederzeit über die Hauptnavigation erreichbar und kann vollständig zurückgesetzt werden.
 - Parameter werden nach beobachtbaren Problemen einzeln feinjustiert; gleichzeitige, nicht nachvollziehbare Mehrfachänderungen werden vermieden.
 - Rechtsinformationen sind Hinweise, keine Suchfreigabe oder Rechtsberatung.
 
