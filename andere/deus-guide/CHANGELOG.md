@@ -1,5 +1,12 @@
 # Changelog – Deus Guide
 
+## 0.3.0 – 2026-11-21
+
+- Fokussierte Wirkungsansichten direkt an den einzelnen Einstellungskarten mit Slidern für Empfindlichkeit, Reaktivität, Eisenlautstärke, Kronkorken- und gegebenenfalls Salzfilter ergänzt.
+- Leitwertüberlappungen, vereinfachten Bodenquerschnitt sowie Anzeigen für Tiefenreserve, Zieltrennung und Laufruhe hinzugefügt.
+- Simulierte Werte können in das aktuelle Programm übernommen oder auf die ursprüngliche Empfehlung zurückgesetzt werden.
+- Wirkungsmodell ausdrücklich als didaktische Tendenz ohne Fund- oder Materialgarantie gekennzeichnet.
+
 ## 0.2.0 – 2026-11-21
 
 - Aktuelle Assistentenauswahl und Programmeinstellung automatisch im Browser gespeichert.
