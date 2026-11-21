@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#152019">
+  <meta name="description" content="Geführter Einstellungsassistent für den XP Deus II.">
+  <title>Deus Guide</title>
+  <link rel="icon" href="deus-guide-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="deus-guide.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="#/start" aria-label="Deus Guide Startseite">
+      <img src="deus-guide-icon.svg" alt="" width="38" height="38">
+      <span><strong>Deus Guide</strong><small>XP Deus II Einstellungsassistent</small></span>
+    </a>
+    <button class="icon-button" id="savedButton" type="button" aria-label="Gespeicherte Programme öffnen" title="Gespeicherte Programme">
+      <span aria-hidden="true">★</span><span class="saved-count" id="savedCount">0</span>
+    </button>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation">
+    <button type="button" data-route="start"><span aria-hidden="true">⌂</span>Assistent</button>
+    <button type="button" data-route="tuner"><span aria-hidden="true">⌁</span>Vor Ort</button>
+    <button type="button" data-route="wissen"><span aria-hidden="true">i</span>Wissen</button>
+  </nav>
+
+  <dialog id="savedDialog" class="saved-dialog">
+    <div class="dialog-head"><div><small>Deine Sammlung</small><h2>Gespeicherte Programme</h2></div><button class="close-button" type="button" aria-label="Schließen">×</button></div>
+    <div id="savedList" class="saved-list"></div>
+  </dialog>
+
+  <template id="startTemplate">
+    <section class="hero">
+      <p class="eyebrow">Bereit in etwa 30 Sekunden</p>
+      <h1>Die passende Einstellung für deinen Suchplatz.</h1>
+      <p>Beantworte wenige Fragen. Du erhältst ein solides Startprogramm, genaue Änderungen und einen kurzen Vor-Ort-Check.</p>
+      <button class="primary-button" id="beginButton" type="button">Einstellung finden</button>
+    </section>
+    <section class="quick-grid" aria-label="Schnellzugriff">
+      <button type="button" data-quick="field"><span class="quick-icon">♧</span><strong>Acker &amp; Wiese</strong><small>Münzen und kleine Funde</small></button>
+      <button type="button" data-quick="forest"><span class="quick-icon">♜</span><strong>Wald</strong><small>Ruhige, tiefe Suche</small></button>
+      <button type="button" data-quick="park"><span class="quick-icon">◉</span><strong>Park</strong><small>Schrott und Kronkorken</small></button>
+      <button type="button" data-quick="beach"><span class="quick-icon">≈</span><strong>Nasser Strand</strong><small>Salz und feiner Schmuck</small></button>
+    </section>
+    <aside class="notice"><strong>Wichtig</strong><p>Gold, Silber und Aluminium teilen sich Leitwertbereiche. Der Guide vermeidet deshalb aggressive Ausblendungen, die wertvolle Ziele kosten können.</p></aside>
+  </template>
+
+  <script src="deus-guide.js"></script>
+</body>
+</html>
