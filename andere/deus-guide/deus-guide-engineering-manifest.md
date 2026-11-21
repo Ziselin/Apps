@@ -20,6 +20,7 @@ Deus Guide ist ein mobiler, einsteigerfreundlicher Einstellungsassistent für de
 - Jede Auswahloption erklärt didaktisch sowohl ihren passenden Einsatz als auch den damit verbundenen Zielkonflikt.
 - Das aktuelle Programm ist jederzeit über die Hauptnavigation erreichbar und kann vollständig zurückgesetzt werden.
 - Die Wirkungsansicht stellt Parameterfolgen als vereinfachte Tendenzen dar. Überlappende Leitwertbereiche und Unsicherheit bleiben sichtbar; sie darf keine Fund- oder Materialgarantie suggerieren.
+- Erkennungstiefe und die Erkennung konkreter tiefer Objekte werden nicht aus Einstellwerten berechnet oder bildlich als erreichbar dargestellt.
 - Simulationswerte bleiben von der ursprünglichen Empfehlung unterscheidbar und werden erst durch eine ausdrückliche Übernahme Teil des aktuellen Programms.
 - Parameter werden nach beobachtbaren Problemen einzeln feinjustiert; gleichzeitige, nicht nachvollziehbare Mehrfachänderungen werden vermieden.
 - Rechtsinformationen sind Hinweise, keine Suchfreigabe oder Rechtsberatung.

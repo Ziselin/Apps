@@ -1,5 +1,11 @@
 # Changelog – Deus Guide
 
+## 0.3.1 – 2026-11-21
+
+- Irreführenden Bodenquerschnitt mit vermeintlich erkannten tiefen Münzen aus dem Finetuning entfernt.
+- „Tiefenreserve“ durch die vorsichtigere Wirkungskategorie „Schwache Signale“ ersetzt.
+- Ausdrücklich klargestellt, dass Einstellungen allein keine Erkennungstiefe oder Erkennung einer tiefen Münze vorhersagen können.
+
 ## 0.3.0 – 2026-11-21
 
 - Fokussierte Wirkungsansichten direkt an den einzelnen Einstellungskarten mit Slidern für Empfindlichkeit, Reaktivität, Eisenlautstärke, Kronkorken- und gegebenenfalls Salzfilter ergänzt.
